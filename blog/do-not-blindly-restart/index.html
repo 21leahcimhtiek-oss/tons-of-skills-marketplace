@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Do Not Blindly Restart: Designing a Self-Healing Watchdog That Stays Honest — Tons of Skills Work Diary</title>
+    <meta name="description" content="A burn-in watchdog latched on a phantom io spike. The fix: fail-closed self-healing that restarts an allowlist, latches everything else, and never trusts one sample.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://startaitools.com/posts/do-not-blindly-restart/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/do-not-blindly-restart/">
+    <meta property="og:title" content="Do Not Blindly Restart: Designing a Self-Healing Watchdog That Stays Honest — Tons of Skills Work Diary">
+    <meta property="og:description" content="A burn-in watchdog latched on a phantom io spike. The fix: fail-closed self-healing that restarts an allowlist, latches everything else, and never trusts one sample.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="Do Not Blindly Restart: Designing a Self-Healing Watchdog That Stays Honest — Tons of Skills Work Diary">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/do-not-blindly-restart/">
+    <meta name="twitter:title" content="Do Not Blindly Restart: Designing a Self-Healing Watchdog That Stays Honest — Tons of Skills Work Diary">
+    <meta name="twitter:description" content="A burn-in watchdog latched on a phantom io spike. The fix: fail-closed self-healing that restarts an allowlist, latches everything else, and never trusts one sample.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"Do Not Blindly Restart: Designing a Self-Healing Watchdog That Stays Honest","description":"A burn-in watchdog latched on a phantom io spike. The fix: fail-closed self-healing that restarts an allowlist, latches everything else, and never trusts one sample.","datePublished":"2026-07-20","url":"https://tonsofskills.com/blog/undefined","author":{"@type":"Person","name":"Jeremy Longshore"},"publisher":{"@type":"Organization","name":"Tons of Skills","url":"https://tonsofskills.com"}}</script>
+  
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.post-header[data-astro-cid-7jjqptxk]{background:var(--panel);padding:4rem 1.5rem 3rem;border-bottom:1px solid var(--border)}.post-header-inner[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto}.back-link[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3);text-decoration:none;display:inline-block;margin-bottom:1.5rem;transition:color .2s}.back-link[data-astro-cid-7jjqptxk]:hover{color:var(--primary)}.post-meta[data-astro-cid-7jjqptxk]{display:flex;align-items:center;gap:.75rem;margin-bottom:1rem}time[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3)}.featured-badge[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.2rem .6rem;background:#ce114126;color:var(--red);border-radius:0;font-weight:600;text-transform:uppercase;letter-spacing:.05em}.post-header[data-astro-cid-7jjqptxk] h1[data-astro-cid-7jjqptxk]{font-family:var(--font-body);font-size:clamp(1.5rem,4vw,2.2rem);font-weight:700;color:var(--text);line-height:1.25;margin-bottom:.75rem;letter-spacing:0}.post-desc[data-astro-cid-7jjqptxk]{color:var(--text-2);font-size:1.05rem;line-height:1.6;margin-bottom:1rem}.post-tags[data-astro-cid-7jjqptxk]{display:flex;gap:.4rem;flex-wrap:wrap}.tag[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.15rem .5rem;background:var(--surface-3);color:var(--text-3);border-radius:0}.post-body[data-astro-cid-7jjqptxk]{padding:3rem 1.5rem 4rem}.prose[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto;color:var(--text-2);line-height:1.8;font-size:1rem}.prose[data-astro-cid-7jjqptxk] h2{font-family:var(--font-body);font-size:1.5rem;font-weight:700;color:var(--text);margin:2.5rem 0 1rem;letter-spacing:0}.prose[data-astro-cid-7jjqptxk] h3{font-size:1.2rem;font-weight:600;color:var(--text);margin:2rem 0 .75rem}.prose[data-astro-cid-7jjqptxk] p{margin-bottom:1rem}.prose[data-astro-cid-7jjqptxk] ul,.prose[data-astro-cid-7jjqptxk] ol{margin:.5rem 0 1rem 1.5rem}.prose[data-astro-cid-7jjqptxk] li{margin-bottom:.35rem}.prose[data-astro-cid-7jjqptxk] strong{color:var(--text);font-weight:600}.prose[data-astro-cid-7jjqptxk] code{font-family:var(--font-mono);font-size:.88em;background:var(--surface-3);padding:.15em .35em;border-radius:0;color:var(--primary)}.prose[data-astro-cid-7jjqptxk] a{color:var(--primary);text-decoration:none}.prose[data-astro-cid-7jjqptxk] a:hover{text-decoration:underline}@media(max-width:768px){.post-header[data-astro-cid-7jjqptxk]{padding:3rem 1rem 2rem}.post-body[data-astro-cid-7jjqptxk]{padding:2rem 1rem 3rem}}
+</style></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  <article class="post" data-astro-cid-7jjqptxk>
+    <header class="post-header" data-astro-cid-7jjqptxk>
+      <div class="post-header-inner" data-astro-cid-7jjqptxk>
+        <a href="/blog" class="back-link" data-astro-cid-7jjqptxk>Back to Work Diary</a>
+        <div class="post-meta" data-astro-cid-7jjqptxk>
+          <time datetime="2026-07-20" data-astro-cid-7jjqptxk>July 19, 2026</time>
+          
+        </div>
+        <h1 data-astro-cid-7jjqptxk>Do Not Blindly Restart: Designing a Self-Healing Watchdog That Stays Honest</h1>
+        <p class="post-desc" data-astro-cid-7jjqptxk>A burn-in watchdog latched on a phantom io spike. The fix: fail-closed self-healing that restarts an allowlist, latches everything else, and never trusts one sample.</p>
+        <div class="post-tags" data-astro-cid-7jjqptxk>
+          <span class="tag" data-astro-cid-7jjqptxk>observability</span><span class="tag" data-astro-cid-7jjqptxk>devops</span><span class="tag" data-astro-cid-7jjqptxk>automation</span><span class="tag" data-astro-cid-7jjqptxk>architecture</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="post-body" data-astro-cid-7jjqptxk>
+      <div class="prose" data-astro-cid-7jjqptxk>
+        <p>A self-healing system that restarts blindly is an outage generator with extra steps.</p>
+<p>On 2026-07-20 a burn-in watchdog guarding the SigNoz observability stack hard-latched and paged. The stack was fine. The breach was a phantom. That failure exposed two design defects that show up in almost every monitoring system built in a hurry: a watchdog that restarts blindly, and a monitor that lies about its own success. Both come back to the same rule: infrastructure that watches for failure has to be more honest about failure than the thing it watches.</p>
+<h2 id="the-problem-a-phantom-latch">The problem: a phantom latch</h2>
+<p>The burn-in watchdog exists to prove a freshly deployed container is stable before promotion. It polls pressure-stall (PSI) metrics for memory and io, and if a resource crosses a ceiling it stops the burn-in, latches, and pages a human. That last part matters: a latch is a hard stop. Nothing recovers on its own after a latch. Someone gets woken up.</p>
+<p>The 2026-07-20 page fired on io PSI. Root cause: a ClickHouse background-merge io burst, sub-10-seconds long, against a baseline io of roughly 0.00. The check that caught it looked like this:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#6A737D"># The bad check: single sample, no duration, hard ceiling</span></span>
+<span class="line"><span style="color:#E1E4E8">psi_io</span><span style="color:#F97583">=</span><span style="color:#E1E4E8">$(</span><span style="color:#B392F0">read_psi_io_avg10</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#F97583">if</span><span style="color:#B392F0"> awk</span><span style="color:#9ECBFF"> "BEGIN{exit !(</span><span style="color:#E1E4E8">$psi_io</span><span style="color:#9ECBFF"> >= 1.0)}"</span><span style="color:#E1E4E8">; </span><span style="color:#F97583">then</span></span>
+<span class="line"><span style="color:#B392F0">  latch</span><span style="color:#9ECBFF"> "io PSI breach: ${</span><span style="color:#E1E4E8">psi_io</span><span style="color:#9ECBFF">}%"</span><span style="color:#6A737D">   # hard stop + page</span></span>
+<span class="line"><span style="color:#F97583">fi</span></span></code></pre>
+<p>One sample. One threshold. No sense of time. A transient merge that lasted less than ten seconds tripped a hard stop on a stack that was never in trouble. The watchdog was not measuring saturation. It was measuring a spike and calling it saturation.</p>
+<h2 id="why-not-just-raise-the-threshold">Why not just raise the threshold</h2>
+<p>The obvious fix is to bump <code>1.0</code> to something higher and move on. That is the wrong fix, and it is worth being precise about why.</p>
+<p>A blanket raise trades one failure mode for a worse one. Raise the io ceiling high enough that a merge burst no longer trips it, and you have also raised it past the point where a real, sustained io saturation would trip it. You do not get fewer false pages. You get false pages replaced by missed real incidents, which is the failure mode a watchdog exists to prevent. Raising the number makes the monitor quieter, not more correct. A quiet monitor that misses saturation is worse than a noisy one, because you trust it.</p>
+<p>The actual problem was never the height of the ceiling. It was that the check had no concept of duration. A spike and a sustained load produce the same instantaneous PSI reading. The only thing that separates them is time. So the fix is time, applied per resource:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#6A737D"># Duration-tolerant io check: a spike is logged and ignored,</span></span>
+<span class="line"><span style="color:#6A737D"># sustained pressure confirms and trips.</span></span>
+<span class="line"><span style="color:#E1E4E8">psi_io_avg10</span><span style="color:#F97583">=</span><span style="color:#E1E4E8">$(</span><span style="color:#B392F0">read_psi_io_avg10</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">psi_io_avg60</span><span style="color:#F97583">=</span><span style="color:#E1E4E8">$(</span><span style="color:#B392F0">read_psi_io_avg60</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#F97583">if</span><span style="color:#B392F0"> awk</span><span style="color:#9ECBFF"> "BEGIN{exit !(</span><span style="color:#E1E4E8">$psi_io_avg10</span><span style="color:#9ECBFF"> >= 15.0)}"</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#E1E4E8">   &#x26;&#x26; </span><span style="color:#B392F0">awk</span><span style="color:#9ECBFF"> "BEGIN{exit !(</span><span style="color:#E1E4E8">$psi_io_avg60</span><span style="color:#9ECBFF"> >= 5.0)}"</span><span style="color:#E1E4E8">; </span><span style="color:#F97583">then</span></span>
+<span class="line"><span style="color:#B392F0">  breach</span><span style="color:#9ECBFF"> "io PSI sustained: avg10=${</span><span style="color:#E1E4E8">psi_io_avg10</span><span style="color:#9ECBFF">}% avg60=${</span><span style="color:#E1E4E8">psi_io_avg60</span><span style="color:#9ECBFF">}%"</span></span>
+<span class="line"><span style="color:#F97583">else</span></span>
+<span class="line"><span style="color:#B392F0">  log</span><span style="color:#9ECBFF"> "io PSI transient ignored: avg10=${</span><span style="color:#E1E4E8">psi_io_avg10</span><span style="color:#9ECBFF">}%"</span></span>
+<span class="line"><span style="color:#F97583">fi</span></span></code></pre>
+<p>The io ceiling now requires <code>avg10 >= 15%</code> AND <code>avg60 >= 5%</code>. Yes, the avg10 number itself moved from 1.0 up to 15, and that is not the blanket raise the last section warned against. The 1.0% single-sample line was never a saturation boundary in the first place, it sat down in the noise floor where a routine merge lives, so it was destined to fire on nothing. Raising it alone would still miss a real event. The avg60 term is what makes the higher ceiling honest instead of just quieter: it is the confirmation window. A sub-10-second merge cannot move a 60-second average past 5%, so it gets logged and ignored. A genuine io saturation holds both windows and trips. The fix was never a bigger number, it was a bigger number that a spike cannot reach.</p>
+<p>Memory PSI kept its single-sample <code>avg10 &#x3C; 1.0%</code> rule on purpose. Memory baseline is 0.00 and a memory floor breach is the kind of thing you want to latch fast, so the fast latch there is deliberate, filed as an advisory item rather than “fixed.” That is the point of per-resource ceilings: io needs duration tolerance, memory does not, and a blanket policy would get one of them wrong.</p>
+<h2 id="the-redesign-classify-then-bound-then-latch">The redesign: classify, then bound, then latch</h2>
+<p>Raising thresholds was never going to be enough, because the deeper defect was structural. The old watchdog had exactly one response to any breach: stop and page. It could not tell a recoverable hiccup apart from a permanent fault, so it treated everything as permanent. The redesign gives it a decision: classify the breach, restart if it is on a known-safe allowlist, latch if it is anything else, and stop restarting before restarting becomes the outage.</p>
+<p>Four conditions landed, each closing a specific way a self-healer can hurt you.</p>
+<h3 id="c1-fail-closed-classifier">C1: Fail-closed classifier</h3>
+<p>RECOVERABLE is an allowlist, not a denylist. Exactly two reasons are recoverable: <code>c8-unhealthy</code> and <code>staging-restart-anomaly</code>. Everything else latches immediately: a RAM floor, disk, the data tree, a memory-PSI breach, a prod-unhealthy signal, an unexpected listener (that is a security event), and critically any reason the classifier has never seen.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">classify_breach</span><span style="color:#E1E4E8">() {</span></span>
+<span class="line"><span style="color:#F97583">  case</span><span style="color:#9ECBFF"> "</span><span style="color:#79B8FF">$1</span><span style="color:#9ECBFF">"</span><span style="color:#F97583"> in</span></span>
+<span class="line"><span style="color:#DBEDFF">    c8-unhealthy</span><span style="color:#F97583">|</span><span style="color:#DBEDFF">staging-restart-anomaly</span><span style="color:#F97583">)</span><span style="color:#79B8FF"> echo</span><span style="color:#9ECBFF"> "RECOVERABLE"</span><span style="color:#E1E4E8"> ;;</span></span>
+<span class="line"><span style="color:#F97583">    *)</span><span style="color:#79B8FF">                                    echo</span><span style="color:#9ECBFF"> "NON_RECOVERABLE"</span><span style="color:#E1E4E8"> ;;</span></span>
+<span class="line"><span style="color:#F97583">  esac</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>The default arm is the whole design. A denylist would restart on anything it forgot to name. This allowlist latches on anything it does not explicitly bless. When someone adds a new breach reason next quarter and forgets to classify it, the watchdog latches and pages instead of restarting into an unknown state. That is fail-closed: the unknown path is the safe path. Do not blindly restart.</p>
+<h3 id="c2-slow-flap-guard">C2: Slow-flap guard</h3>
+<p>A container that restarts, looks healthy, then breaches again an hour later can loop for days, each cycle a small outage. <code>BI_MAX_LIFETIME_RECOVERIES=3</code> caps lifetime recoveries per burn-in. After the cap, a recoverable breach latches instead of restarting forever. Recovery is bounded, not infinite.</p>
+<h3 id="c3-health-poll-not-snapshot">C3: Health poll, not snapshot</h3>
+<p>A restarted container is not healthy the instant it comes up. Verifying health with a single snapshot can latch a container that is still starting. <code>verify_healthy</code> polls up to <code>BI_HEALTH_TIMEOUT=120s</code>, requiring staging active AND C8 healthy, before it decides anything.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">verify_healthy</span><span style="color:#E1E4E8">() {</span></span>
+<span class="line"><span style="color:#F97583">  local</span><span style="color:#E1E4E8"> deadline</span><span style="color:#F97583">=</span><span style="color:#E1E4E8">$((</span><span style="color:#B392F0">SECONDS</span><span style="color:#9ECBFF"> +</span><span style="color:#9ECBFF"> BI_HEALTH_TIMEOUT</span><span style="color:#E1E4E8">))</span></span>
+<span class="line"><span style="color:#F97583">  while</span><span style="color:#E1E4E8"> (( SECONDS </span><span style="color:#F97583">&#x3C;</span><span style="color:#E1E4E8"> deadline )); </span><span style="color:#F97583">do</span></span>
+<span class="line"><span style="color:#F97583">    if</span><span style="color:#B392F0"> staging_active</span><span style="color:#E1E4E8"> &#x26;&#x26; </span><span style="color:#B392F0">c8_healthy</span><span style="color:#E1E4E8">; </span><span style="color:#F97583">then</span><span style="color:#F97583"> return</span><span style="color:#79B8FF"> 0</span><span style="color:#E1E4E8">; </span><span style="color:#F97583">fi</span></span>
+<span class="line"><span style="color:#B392F0">    sleep</span><span style="color:#79B8FF"> 5</span></span>
+<span class="line"><span style="color:#F97583">  done</span></span>
+<span class="line"><span style="color:#F97583">  return</span><span style="color:#79B8FF"> 1</span><span style="color:#6A737D">   # never latched on a single still-starting snapshot</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<h3 id="c4-reset-hygiene-and-honest-outcome">C4: Reset hygiene and honest outcome</h3>
+<p>A new <code>burn-in-reset.sh</code> clears <code>recovery.json</code> and <code>incident.json</code>. RECOVERED is logged only after a verified-healthy poll passes, never optimistically at restart time. The first breach is preserved exactly once in <code>incident.json</code>, so the original signal survives even after a successful recovery. <code>recovery_count</code> is surfaced in <code>status.json</code>, and recovery pages carry severity <code>info</code>, because a recovery is not an incident and should not read like one.</p>
+<h2 id="verification-is-the-product">Verification is the product</h2>
+<p>A self-healer is only as trustworthy as the failures you can prove it survives. The redesign shipped with four planted scenarios, each run 20 times, 20 for 20:</p>
+<ul>
+<li><strong>transient-recovery</strong>: breach, restart, verify healthy, log RECOVERED.</li>
+<li><strong>persistent-failure</strong>: breach latches immediately, zero restarts.</li>
+<li><strong>notification-failure</strong>: recovery proceeds, logs an honest “receipt non-zero,” fires no false page.</li>
+<li><strong>retry-exhaustion</strong>: exactly MAX_RESTARTS attempts, then latch, no infinite loop.</li>
+</ul>
+<p>The two that matter most are the ones that assert the watchdog does nothing. Persistent-failure must latch with zero restarts, because a fault that restarting cannot fix must never be restarted. Retry-exhaustion must stop at the cap and latch, because the whole point of a bound is that it holds under a fault that never clears. A test that only proves the happy path (breach, restart, healthy) proves nothing about safety. The proof that a self-healer is safe is the set of scenarios where it correctly refuses to act.</p>
+<p>All three scripts are shellcheck clean. The scenarios are wired into <code>validate:signoz-staging</code>, and <code>pnpm check</code> exits 0. Guardian review returned approve-with-conditions, and the four conditions above are those blocking conditions, landed.</p>
+<h2 id="the-parallel-honesty-story">The parallel honesty story</h2>
+<p>The same day, a second system taught the same lesson from a different angle. The governed alert chain went live on both hosts, and the trap was sitting in plain sight: <code>notify.sh</code> exits 0 unconditionally. It always reports success. Reuse it as the alert transport and you recreate a prior defect where 108 alerts were false-delivered: reported sent, never sent.</p>
+<p>An alert transport that always exits 0 is not a monitor. It is a monitor-shaped object that lies. The fix was a new <code>vps-slack-transport.sh</code> that does an honest webhook POST, classifying the HTTP status and treating a non-2xx as a real failure instead of trusting the exit code. <code>notify.sh</code> was left untouched for its other callers, so the honesty lives in the transport that needs it.</p>
+<p>That verification was as ruthless as the watchdog’s: six drills, a bidirectional rollback rehearsal that succeeded in each direction, and a 26-case proof covering 22 failure modes plus 4 non-delivered outcomes, with live green sweeps captured on both hosts. The dev box also got the migrated scorecardecho uptime producer, replacing a stale pre-adoption copy that cron had been quietly running since 07-16, a real docs-versus-reality gap, plus an external dead-man’s-switch ping. The guardian loop stayed honest too: round one blocked on an untracked liveness-bypass exclusion, which became a filed follow-up, and round two approved.</p>
+<p>Both systems converge on one rule. A monitor that always reports success is worse than no monitor, because no monitor at least tells you nothing is watching. A lying monitor tells you everything is fine. The watchdog’s fail-closed classifier and the transport’s 2xx check are the same idea wearing different clothes: make the honest outcome the default outcome.</p>
+<h2 id="also-shipped">Also shipped</h2>
+<p>Outside the watchdog incident, three smaller things landed the same day.</p>
+<ul>
+<li><strong>diagnostic-pro (PR #23)</strong>: added the in-repo MiniMax advisory PR-review workflow (defect lane plus adversarial-claims lane), the same reviewer already running in claude-code-plugins and intent-os. Runs on <code>pull_request</code> (never <code>pull_request_target</code>), same-repo head guard so fork PRs never see the API key, gated behind an <code>ENABLE_MINIMAX_REVIEW</code> kill switch, advisory only. Enforcement travels with the code.</li>
+<li><strong>claude-code-plugins</strong>: fixed a heredoc bug in the MiniMax A-grade-coach lane. A <code>head -c 16000</code> byte cut landed mid-line, leaving no trailing newline, so the closing <code>__MINIMAX_EOF__</code> delimiter fused onto the last content line and GitHub Actions aborted the step with “Matching delimiter not found.” Fix: force a trailing newline plus a per-run random delimiter. Only triggered on PRs big enough to fill the 16KB cap.</li>
+<li><strong>learn-intent-solutions-hub</strong>: ported the CPN cohort hub off Cloudflare onto Intent Solutions infra. Four runtime seams swapped: Workers <code>export default app</code> to <code>@hono/node-server</code>; D1 <code>drizzle(c.env.DB)</code> to a <code>better-sqlite3</code> file; <code>c.env.ASSETS.fetch()</code> to Caddy <code>file_server</code>; <code>c.env.EXPORT_TOKEN</code> to <code>process.env</code>. Added <code>/api/health</code> for a real post-deploy smoke. Product behavior, schema, and routes unchanged.</li>
+</ul>
+<h2 id="related-posts">Related posts</h2>
+<ul>
+<li><a href="/blog/exit-0-is-not-success/">Exit 0 Is Not Success</a></li>
+<li><a href="/blog/a-green-recovery-drill-can-still-be-lying/">A Green Recovery Drill Can Still Be Lying</a></li>
+<li><a href="/blog/liveness-without-health-is-theater/">Liveness Without Health Is Theater</a></li>
+</ul>
+      </div>
+    </div>
+  </article>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
