@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Safety Model First: 16-Tool Ops MCP, One Day — Tons of Skills Work Diary</title>
+    <meta name="description" content="Design a 7-point safety model before writing tools. How server-ops-mcp shipped 16 tools, 40 tests, and v0.1.0 in a single day.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://startaitools.com/posts/server-ops-mcp-safety-before-tools/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/server-ops-mcp-safety-before-tools/">
+    <meta property="og:title" content="Safety Model First: 16-Tool Ops MCP, One Day — Tons of Skills Work Diary">
+    <meta property="og:description" content="Design a 7-point safety model before writing tools. How server-ops-mcp shipped 16 tools, 40 tests, and v0.1.0 in a single day.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="Safety Model First: 16-Tool Ops MCP, One Day — Tons of Skills Work Diary">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/server-ops-mcp-safety-before-tools/">
+    <meta name="twitter:title" content="Safety Model First: 16-Tool Ops MCP, One Day — Tons of Skills Work Diary">
+    <meta name="twitter:description" content="Design a 7-point safety model before writing tools. How server-ops-mcp shipped 16 tools, 40 tests, and v0.1.0 in a single day.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"Safety Model First: 16-Tool Ops MCP, One Day","description":"Design a 7-point safety model before writing tools. How server-ops-mcp shipped 16 tools, 40 tests, and v0.1.0 in a single day.","datePublished":"2026-05-22","url":"https://tonsofskills.com/blog/undefined","author":{"@type":"Person","name":"Jeremy Longshore"},"publisher":{"@type":"Organization","name":"Tons of Skills","url":"https://tonsofskills.com"}}</script>
+  
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.post-header[data-astro-cid-7jjqptxk]{background:var(--panel);padding:4rem 1.5rem 3rem;border-bottom:1px solid var(--border)}.post-header-inner[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto}.back-link[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3);text-decoration:none;display:inline-block;margin-bottom:1.5rem;transition:color .2s}.back-link[data-astro-cid-7jjqptxk]:hover{color:var(--primary)}.post-meta[data-astro-cid-7jjqptxk]{display:flex;align-items:center;gap:.75rem;margin-bottom:1rem}time[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3)}.featured-badge[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.2rem .6rem;background:#ce114126;color:var(--red);border-radius:0;font-weight:600;text-transform:uppercase;letter-spacing:.05em}.post-header[data-astro-cid-7jjqptxk] h1[data-astro-cid-7jjqptxk]{font-family:var(--font-body);font-size:clamp(1.5rem,4vw,2.2rem);font-weight:700;color:var(--text);line-height:1.25;margin-bottom:.75rem;letter-spacing:0}.post-desc[data-astro-cid-7jjqptxk]{color:var(--text-2);font-size:1.05rem;line-height:1.6;margin-bottom:1rem}.post-tags[data-astro-cid-7jjqptxk]{display:flex;gap:.4rem;flex-wrap:wrap}.tag[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.15rem .5rem;background:var(--surface-3);color:var(--text-3);border-radius:0}.post-body[data-astro-cid-7jjqptxk]{padding:3rem 1.5rem 4rem}.prose[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto;color:var(--text-2);line-height:1.8;font-size:1rem}.prose[data-astro-cid-7jjqptxk] h2{font-family:var(--font-body);font-size:1.5rem;font-weight:700;color:var(--text);margin:2.5rem 0 1rem;letter-spacing:0}.prose[data-astro-cid-7jjqptxk] h3{font-size:1.2rem;font-weight:600;color:var(--text);margin:2rem 0 .75rem}.prose[data-astro-cid-7jjqptxk] p{margin-bottom:1rem}.prose[data-astro-cid-7jjqptxk] ul,.prose[data-astro-cid-7jjqptxk] ol{margin:.5rem 0 1rem 1.5rem}.prose[data-astro-cid-7jjqptxk] li{margin-bottom:.35rem}.prose[data-astro-cid-7jjqptxk] strong{color:var(--text);font-weight:600}.prose[data-astro-cid-7jjqptxk] code{font-family:var(--font-mono);font-size:.88em;background:var(--surface-3);padding:.15em .35em;border-radius:0;color:var(--primary)}.prose[data-astro-cid-7jjqptxk] a{color:var(--primary);text-decoration:none}.prose[data-astro-cid-7jjqptxk] a:hover{text-decoration:underline}@media(max-width:768px){.post-header[data-astro-cid-7jjqptxk]{padding:3rem 1rem 2rem}.post-body[data-astro-cid-7jjqptxk]{padding:2rem 1rem 3rem}}
+</style></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  <article class="post" data-astro-cid-7jjqptxk>
+    <header class="post-header" data-astro-cid-7jjqptxk>
+      <div class="post-header-inner" data-astro-cid-7jjqptxk>
+        <a href="/blog" class="back-link" data-astro-cid-7jjqptxk>Back to Work Diary</a>
+        <div class="post-meta" data-astro-cid-7jjqptxk>
+          <time datetime="2026-05-22" data-astro-cid-7jjqptxk>May 21, 2026</time>
+          
+        </div>
+        <h1 data-astro-cid-7jjqptxk>Safety Model First: 16-Tool Ops MCP, One Day</h1>
+        <p class="post-desc" data-astro-cid-7jjqptxk>Design a 7-point safety model before writing tools. How server-ops-mcp shipped 16 tools, 40 tests, and v0.1.0 in a single day.</p>
+        <div class="post-tags" data-astro-cid-7jjqptxk>
+          <span class="tag" data-astro-cid-7jjqptxk>mcp</span><span class="tag" data-astro-cid-7jjqptxk>typescript</span><span class="tag" data-astro-cid-7jjqptxk>claude-code</span><span class="tag" data-astro-cid-7jjqptxk>devops</span><span class="tag" data-astro-cid-7jjqptxk>architecture</span><span class="tag" data-astro-cid-7jjqptxk>ssh</span><span class="tag" data-astro-cid-7jjqptxk>automation</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="post-body" data-astro-cid-7jjqptxk>
+      <div class="prose" data-astro-cid-7jjqptxk>
+        <p>The Intent Solutions production stack now lives on a single Contabo VPS after <a href="/blog/propagation-day-when-the-spec-becomes-the-migration-plan/">a multi-week migration</a>. Twenty-four containers across five stacks — Braves, Plane, Twenty, Umami, ntfy — sit behind one Caddy reverse proxy. Every day-to-day operational task touches that box: reload Caddy after a host-block edit, restart a stuck container, pull the last 200 lines of a service log, snapshot an instance before a risky change. Doing those by hand from a shell defeats the point of having Claude Code in the loop. Doing them through <a href="/blog/guidewire-mcp-v0-1-0-foundation-ship/">a sloppy MCP server</a> is how you brick prod from a chat window.</p>
+<p>So the question on day one wasn’t “what tools do I want?” The question was “what would have to be true of those tools before I let a model fire them at a server I actually depend on?”</p>
+<p>The answer became a 7-point safety model, written into the README on the very first commit, before any tool existed. That model — and the host registry that sits behind it — is the whole reason the rest of the work fit in one day.</p>
+<h2 id="the-7-point-safety-model">The 7-point safety model</h2>
+<p>The model is what every tool in the catalog has to satisfy before it ships: a hard write denylist, dry-run-by-default for destructive operations, argument validation, key-based SSH only, backup-before-write, validate-before-reload, and capped output. No exceptions, no “we’ll add that later.”</p>
+<ol>
+<li><strong>Write denylist (hard).</strong> <code>server.file.write</code> always refuses <code>/etc/passwd</code>, <code>/etc/shadow</code>, <code>/etc/sudoers[.d/...]</code>, <code>~/.ssh/authorized_keys</code>, <code>/boot/</code>, <code>/usr/</code>. Per-host config cannot opt out.</li>
+<li><strong>Dry-run by default.</strong> Every destructive tool requires explicit <code>apply: true</code> to actually fire. Omitting it returns the command that <em>would</em> run.</li>
+<li><strong>Argument validation.</strong> Unit names, container names, service names, and paths are regex-validated before they ever reach a shell. <code>/^[A-Za-z0-9_.@-]+$/</code> for systemd units, <code>/^[A-Za-z0-9_.-]+$/</code> for container names, <code>/^\/[A-Za-z0-9_./-]+$/</code> for absolute paths. Shell metacharacters never get the chance.</li>
+<li><strong>Key-based SSH only.</strong> The <code>ssh2</code> Client opens with <code>privateKey</code>. No password fallback, no agent fallback. If the key isn’t there, the call fails.</li>
+<li><strong>Backup before write.</strong> Real writes do <code>cp -p &#x3C;path> &#x3C;path>.bak</code> first. Recovery is one SSH command away.</li>
+<li><strong>Validate before reload.</strong> <code>server.caddy.reload</code> runs <code>caddy validate</code> first and refuses to reload if validation fails. A broken Caddyfile cannot leave the building.</li>
+<li><strong>Output capped.</strong> <code>server.exec</code> defaults to 8 KiB per stream; <code>server.file.read</code> to 1 MiB. A runaway log tail can’t blow up the context window or the model’s reasoning.</li>
+</ol>
+<p>The thing to notice: none of these are tool-specific. They’re cross-cutting invariants. Designing them first meant every tool I built afterward had a fixed checklist to satisfy, not a fresh argument to relitigate.</p>
+<p>A tool author shouldn’t be inventing safety policy at 3pm on commit four. By then, the pressure to “just ship this one helper” has won the argument. The 7-point list exists so that argument never starts — every tool either passes all seven gates or doesn’t ship.</p>
+<h2 id="the-host-registry-as-the-access-control-boundary">The host registry as the access-control boundary</h2>
+<p>Here’s the architectural choice that did the most work: <strong>the tools enforce nothing host-level. The registry does.</strong></p>
+<p>Only hosts in <code>~/.config/server-ops/hosts.yaml</code> are reachable. The tools take a <code>host</code> parameter, look it up, and refuse if it isn’t there. Adding a new host is one YAML edit. Rotating a key is one YAML edit. Restricting which commands <code>server.exec</code> may run on a given host is one YAML edit.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">hosts</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  intentsolutions</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    address</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">167.86.106.29</span></span>
+<span class="line"><span style="color:#85E89D">    user</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">intentsolutions</span></span>
+<span class="line"><span style="color:#85E89D">    key</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">~/.ssh/id_ed25519</span></span>
+<span class="line"><span style="color:#85E89D">    port</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">22</span></span>
+<span class="line"><span style="color:#85E89D">    allowed_commands</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#9ECBFF">"^docker "</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#9ECBFF">"^free"</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#9ECBFF">"^df"</span></span>
+<span class="line"><span style="color:#85E89D">    write_allowed_paths</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#9ECBFF">"^/srv/braves/.env$"</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#9ECBFF">"^/etc/caddy/Caddyfile$"</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">  dev-box</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    address</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">100.x.x.x</span></span>
+<span class="line"><span style="color:#85E89D">    user</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">jeremy</span></span>
+<span class="line"><span style="color:#85E89D">    key</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">~/.ssh/id_ed25519</span></span>
+<span class="line"><span style="color:#6A737D">    # No allowed_commands -> all commands allowed</span></span>
+<span class="line"><span style="color:#6A737D">    # No write_allowed_paths -> denylist only</span></span></code></pre>
+<p>Two optional per-host regex allowlists do the per-host narrowing:</p>
+<ul>
+<li><code>allowed_commands</code> — <code>server.exec</code> only runs commands matching one of these. Omit to permit anything.</li>
+<li><code>write_allowed_paths</code> — <code>server.file.write</code> only writes paths matching one of these. The hard write denylist is <em>always</em> enforced regardless.</li>
+</ul>
+<p>The prod host gets the tight collar. The dev box stays loose because if I brick it, I haven’t taken any customer down.</p>
+<p>The asymmetry is the point — least privilege per environment, not a blanket policy. A flat policy that treated every host identically would either be too loose for prod or too tight for the dev box. Per-host config lets each environment carry exactly the constraints that match its blast radius. The Caddyfile and the Braves <code>.env</code> are the only two files I ever intentionally edit on the prod box; everything else stays read-only. That’s enforceable in seven lines of YAML.</p>
+<h3 id="why-not-let-the-tools-do-acls">Why not let the tools do ACLs?</h3>
+<p>Tempting design: bake the allow/deny logic into each tool. Don’t. Two reasons.</p>
+<p>First, you end up with the same access policy duplicated across <code>exec</code>, <code>file.write</code>, <code>systemd.restart</code>, <code>docker.restart</code>, <code>compose.up/down</code>, and <code>caddy.reload</code>. Drift between those is inevitable, and one drifted tool is the one an attacker (or a confused model) walks through.</p>
+<p>Second, the host registry is a much better trust seam. Reviewing one YAML file is a five-minute job. Reviewing seven tool implementations for consistent ACL enforcement is a meeting. The tools stay simple — they just do their one thing, validate their args, and ask the registry “am I allowed here?” The registry owns the answer.</p>
+<h2 id="the-shared-ssh-client-pool">The shared SSH client pool</h2>
+<p>The second choice worth calling out: <strong>one <code>ssh2.Client</code> per host, shared across exec and SFTP.</strong></p>
+<p>Every tool — <code>server.exec</code>, <code>server.file.read</code>, <code>server.file.write</code> — goes through the same pool. A first call to <code>host:intentsolutions</code> opens the TCP connection, authenticates, and caches the client. Every subsequent call against that host reuses it. The pool drops the cached client on <code>close</code> or <code>error</code> events so the next call reconnects cleanly. On <code>SIGINT</code> / <code>SIGTERM</code> the server calls <code>closeAllClients()</code> to drain on shutdown.</p>
+<p>The alternative — opening a fresh SSH session per tool call — would have added a full TCP + TLS + auth roundtrip to every operation. With Claude Code firing a sequence of <code>exec</code> then <code>file.read</code> then <code>systemd.restart</code> calls against the same host, that’s three connection setups where one would do. Worse, key-only auth is slow enough that the latency would show up in conversations.</p>
+<p>Pooling is one of those “obvious in hindsight” decisions that only stays clean if you commit to it on day one. Retrofit-pooling is a rewrite — every tool that opened its own client now has to learn to ask the pool, and the lifecycle questions (who closes? who reconnects on error? what happens on shutdown?) get answered seven different ways instead of once.</p>
+<h3 id="why-not-use-ssh-agent">Why not use ssh-agent?</h3>
+<p>Using the local SSH agent would have eliminated the need to handle a private key file directly. It would also have made the server’s behavior depend on out-of-band ambient state — whether an agent is running, whether the right key is loaded, whether the user remembered to <code>ssh-add</code> after a reboot. For a server that needs to be predictable from a long-running Claude Code session, that ambient state is a liability. The <code>privateKey</code> path is explicit, reproducible, and the failure mode is loud: missing key, fail immediately.</p>
+<h2 id="the-tool-catalog">The tool catalog</h2>
+<p>With the safety model and the host registry settled, the actual tools fell out fast. Six commits, 16 tools, 40 unit tests, ~1,950 lines added.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Tool</th><th>What it does</th><th>Destructive?</th></tr></thead><tbody><tr><td><code>server.exec</code></td><td>Run shell command; capped output, optional allowlist</td><td>Configurable</td></tr><tr><td><code>server.file.read</code></td><td>SFTP read, 1 MiB cap</td><td>No</td></tr><tr><td><code>server.file.write</code></td><td>SFTP write with <code>&#x3C;path>.bak</code> snapshot</td><td>Dry-run default + write denylist</td></tr><tr><td><code>server.health</code></td><td>Snapshot uptime, free, df, sensors, 7d OOM count</td><td>No</td></tr><tr><td><code>server.systemd.status</code></td><td><code>systemctl status &#x3C;unit></code></td><td>No</td></tr><tr><td><code>server.systemd.restart</code></td><td><code>sudo systemctl restart &#x3C;unit></code></td><td>Dry-run default</td></tr><tr><td><code>server.caddy.reload</code></td><td>Validate then reload Caddyfile</td><td>Dry-run default; refuses if validate fails</td></tr><tr><td><code>server.docker.ps</code></td><td>List running containers</td><td>No</td></tr><tr><td><code>server.docker.logs</code></td><td>Tail container logs (default 200 lines)</td><td>No</td></tr><tr><td><code>server.docker.restart</code></td><td>Restart container</td><td>Dry-run default</td></tr><tr><td><code>server.compose.up</code></td><td><code>docker compose up -d</code> in a directory</td><td>Dry-run default</td></tr><tr><td><code>server.compose.down</code></td><td><code>docker compose down</code></td><td>Dry-run default</td></tr><tr><td><code>server.compose.logs</code></td><td>Tail one service’s logs</td><td>No</td></tr><tr><td><code>contabo.instance.list</code></td><td>List Contabo instances</td><td>No</td></tr><tr><td><code>contabo.instance.create</code></td><td>Provision new instance (billed)</td><td>Dry-run default</td></tr><tr><td><code>contabo.instance.snapshot</code></td><td>Snapshot an instance</td><td>Dry-run default</td></tr></tbody></table>
+<p>The pattern is uniform: read-only tools just run; destructive tools default to dry-run and only fire with <code>apply: true</code>. A dry-run call returns the command that <em>would</em> execute, so the model (or the human reading the transcript) can verify before committing.</p>
+<h2 id="the-contabo-wrapper-has-a-quirk-worth-knowing">The Contabo wrapper has a quirk worth knowing</h2>
+<p>Contabo’s identity server requires <em>both</em> OAuth2 <code>(client_id, client_secret)</code> <em>and</em> legacy <code>(api_user, api_password)</code> to mint a bearer token. This is non-standard — most OAuth2 flows want one or the other, not both. The wrapper validates all four env vars are present and surfaces a clean error if any are missing:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>Missing Contabo credentials: CONTABO_API_USER, CONTABO_API_PASSWORD</span></span></code></pre>
+<p>The token is cached in-process until 30 seconds before expiry. Tests expose <code>_clearTokenCache()</code> to reset between cases. <code>contabo.instance.create</code> and <code>contabo.instance.snapshot</code> default to dry-run for the obvious reason: a create call books real money. Snapshot doesn’t bill the same way, but the principle is consistent — if it mutates infrastructure, it asks before firing.</p>
+<p>The wrapper is intentionally thin. It’s not trying to be a full Contabo SDK. It exposes three operations because those are the three I actually need from a Claude Code session: list what’s running, provision a new instance when scaling out, snapshot before doing something risky. Adding more later is cheap; getting the safety defaults right is the part that has to be right on the first commit.</p>
+<h3 id="why-not-allowlist-commands-inside-serverexec-itself">Why not allowlist commands inside <code>server.exec</code> itself?</h3>
+<p>I went back and forth on this. The case for in-tool allowlists is “defense in depth — even if the registry is wrong, the tool refuses.” The case against won, for the same reason the registry owns ACLs in general: every additional enforcement point is another spot where the policy can drift from intent.</p>
+<p>The <code>server.exec</code> allowlist <em>is</em> a regex array — but it lives per-host in <code>hosts.yaml</code>, not hardcoded in the tool. The tool itself just asks the registry “is this command allowed on this host?” and refuses if no, runs if yes. One source of truth, reviewable in one place.</p>
+<h2 id="what-this-buys-you">What this buys you</h2>
+<p>The day’s stats are downstream of the design, not the other way around. Six commits, 16 tools, 40 passing unit tests, typecheck + build clean, CI matrix green on Node 20 and 22. v0.1.0 cut and registered in <code>.mcp.json</code> by end of day.</p>
+<p>That pace is possible because the cross-cutting decisions were nailed before any tool got written. Every tool was a fill-in-the-blanks exercise: validate args, look up host, check allowlist, build command, run with output cap, return dry-run-or-result. No tool needed to argue with the safety model — it just had to satisfy it.</p>
+<p>The opposite path — build tools first, retrofit safety after — is how MCP servers end up with five different error paths, three different ACL styles, and the one tool that forgot to cap its output. Designing the invariants before the surface area is what keeps the surface area honest.</p>
+<p>There’s a second-order benefit: the safety model is the spec. When a future tool gets added — say <code>server.nginx.reload</code> or <code>server.zfs.snapshot</code> — there’s no design meeting. The author reads the 7-point list, picks the matching pattern (validate-before-reload for nginx, dry-run for zfs), drops it into a host’s <code>allowed_commands</code>, and ships. The cognitive load of “is this safe enough?” got paid down once, on day one.</p>
+<p>This matters more for a Model Context Protocol (MCP) server than for ordinary tools because the caller is a model, not a human. A human reading <code>server.exec</code> documentation would hesitate before running <code>rm -rf /srv/braves</code>. A model that just learned the tool exists will happily fire it if the prompt nudges that way. The guardrails are the layer that doesn’t depend on the caller having good judgment.</p>
+<h2 id="also-shipped">Also shipped</h2>
+<ul>
+<li><strong>claude-code-plugins (PRs #762/#763/#764):</strong> CI hardening — eslint + prettier added as blocking gates (first PR of a multi-PR cleanup), human-triggered auto-merge disabled (dependabot bumps still auto-merge), and nine historical AA-AACR audit files from December 2025 committed to the record.</li>
+<li><strong>intentional-cognition-os:</strong> v0.2 dogfood continued — <code>paraphrase_robustness</code> metric landed in <code>verify.py</code>, <code>ask-loop.py</code> extracted as a standalone helper with <code>--paraphrases</code>, <code>bank.py</code> schema library plus ADRs 029-032, release v1.2.5, wiki/citation resolution against the workspace cache (closes h99). Continuation of <a href="https://startaitools.com/posts/icos-dogfood-zero-to-five-fts-fallback/">yesterday’s zero-to-five FTS fallback arc</a>.</li>
+<li><strong>pipelinepilot:</strong> Firebase Cloud Functions standardized on Gen2 Node 20 ESM (<code>firebase-admin</code> import fixed), orchestrator wrapper added with sync <code>query(**kwargs)</code> and pinned cloudpickle, Python smoke for the Vertex AI Reasoning Engine, beads tracking initialized, <code>.env</code> patterns added to <code>.gitignore</code>.</li>
+<li><strong>hybrid-ai-stack + intent-genai-project-template:</strong> Gemini PR-review fixups — flake8 violations cleared, three pre-existing security defects in redact/sanitize/routes closed, mypy + ruff cleanup.</li>
+</ul>
+<h2 id="related-posts">Related Posts</h2>
+<ul>
+<li><a href="https://startaitools.com/posts/intent-catalog-six-phases-control-plane/">Intent Catalog: Six Phases from Empty Repo to Production Control Plane</a> — the sibling shape: empty repo to working control plane in a small number of clean phases.</li>
+<li><a href="/blog/guidewire-mcp-v0-1-0-foundation-ship/">Guidewire MCP v0.1.0: Carrier-Native Server Blueprint</a> — another foundation-ship MCP post, same v0.1.0 framing.</li>
+<li><a href="/blog/v1-release-gate-conditional-go/">A v1.0 Is a Gate, Not a Tag</a> — release-gate discipline; the same logic that says “design the invariants first” applies to “earn the version number.”</li>
+</ul>
+      </div>
+    </div>
+  </article>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

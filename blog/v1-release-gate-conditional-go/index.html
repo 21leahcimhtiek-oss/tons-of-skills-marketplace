@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A v1.0 Is a Gate, Not a Tag — Tons of Skills Work Diary</title>
+    <meta name="description" content="Why release gates should accept GO with conditions, not binary GO/NO-GO. How ICO v1.0.0 shipped with documented gaps and a same-day v1.0.1.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://startaitools.com/posts/v1-release-gate-conditional-go/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/v1-release-gate-conditional-go/">
+    <meta property="og:title" content="A v1.0 Is a Gate, Not a Tag — Tons of Skills Work Diary">
+    <meta property="og:description" content="Why release gates should accept GO with conditions, not binary GO/NO-GO. How ICO v1.0.0 shipped with documented gaps and a same-day v1.0.1.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="A v1.0 Is a Gate, Not a Tag — Tons of Skills Work Diary">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/v1-release-gate-conditional-go/">
+    <meta name="twitter:title" content="A v1.0 Is a Gate, Not a Tag — Tons of Skills Work Diary">
+    <meta name="twitter:description" content="Why release gates should accept GO with conditions, not binary GO/NO-GO. How ICO v1.0.0 shipped with documented gaps and a same-day v1.0.1.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"A v1.0 Is a Gate, Not a Tag","description":"Why release gates should accept GO with conditions, not binary GO/NO-GO. How ICO v1.0.0 shipped with documented gaps and a same-day v1.0.1.","datePublished":"2026-05-18","url":"https://tonsofskills.com/blog/undefined","author":{"@type":"Person","name":"Jeremy Longshore"},"publisher":{"@type":"Organization","name":"Tons of Skills","url":"https://tonsofskills.com"}}</script>
+  
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.post-header[data-astro-cid-7jjqptxk]{background:var(--panel);padding:4rem 1.5rem 3rem;border-bottom:1px solid var(--border)}.post-header-inner[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto}.back-link[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3);text-decoration:none;display:inline-block;margin-bottom:1.5rem;transition:color .2s}.back-link[data-astro-cid-7jjqptxk]:hover{color:var(--primary)}.post-meta[data-astro-cid-7jjqptxk]{display:flex;align-items:center;gap:.75rem;margin-bottom:1rem}time[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3)}.featured-badge[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.2rem .6rem;background:#ce114126;color:var(--red);border-radius:0;font-weight:600;text-transform:uppercase;letter-spacing:.05em}.post-header[data-astro-cid-7jjqptxk] h1[data-astro-cid-7jjqptxk]{font-family:var(--font-body);font-size:clamp(1.5rem,4vw,2.2rem);font-weight:700;color:var(--text);line-height:1.25;margin-bottom:.75rem;letter-spacing:0}.post-desc[data-astro-cid-7jjqptxk]{color:var(--text-2);font-size:1.05rem;line-height:1.6;margin-bottom:1rem}.post-tags[data-astro-cid-7jjqptxk]{display:flex;gap:.4rem;flex-wrap:wrap}.tag[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.15rem .5rem;background:var(--surface-3);color:var(--text-3);border-radius:0}.post-body[data-astro-cid-7jjqptxk]{padding:3rem 1.5rem 4rem}.prose[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto;color:var(--text-2);line-height:1.8;font-size:1rem}.prose[data-astro-cid-7jjqptxk] h2{font-family:var(--font-body);font-size:1.5rem;font-weight:700;color:var(--text);margin:2.5rem 0 1rem;letter-spacing:0}.prose[data-astro-cid-7jjqptxk] h3{font-size:1.2rem;font-weight:600;color:var(--text);margin:2rem 0 .75rem}.prose[data-astro-cid-7jjqptxk] p{margin-bottom:1rem}.prose[data-astro-cid-7jjqptxk] ul,.prose[data-astro-cid-7jjqptxk] ol{margin:.5rem 0 1rem 1.5rem}.prose[data-astro-cid-7jjqptxk] li{margin-bottom:.35rem}.prose[data-astro-cid-7jjqptxk] strong{color:var(--text);font-weight:600}.prose[data-astro-cid-7jjqptxk] code{font-family:var(--font-mono);font-size:.88em;background:var(--surface-3);padding:.15em .35em;border-radius:0;color:var(--primary)}.prose[data-astro-cid-7jjqptxk] a{color:var(--primary);text-decoration:none}.prose[data-astro-cid-7jjqptxk] a:hover{text-decoration:underline}@media(max-width:768px){.post-header[data-astro-cid-7jjqptxk]{padding:3rem 1rem 2rem}.post-body[data-astro-cid-7jjqptxk]{padding:2rem 1rem 3rem}}
+</style></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  <article class="post" data-astro-cid-7jjqptxk>
+    <header class="post-header" data-astro-cid-7jjqptxk>
+      <div class="post-header-inner" data-astro-cid-7jjqptxk>
+        <a href="/blog" class="back-link" data-astro-cid-7jjqptxk>Back to Work Diary</a>
+        <div class="post-meta" data-astro-cid-7jjqptxk>
+          <time datetime="2026-05-18" data-astro-cid-7jjqptxk>May 17, 2026</time>
+          
+        </div>
+        <h1 data-astro-cid-7jjqptxk>A v1.0 Is a Gate, Not a Tag</h1>
+        <p class="post-desc" data-astro-cid-7jjqptxk>Why release gates should accept GO with conditions, not binary GO/NO-GO. How ICO v1.0.0 shipped with documented gaps and a same-day v1.0.1.</p>
+        <div class="post-tags" data-astro-cid-7jjqptxk>
+          <span class="tag" data-astro-cid-7jjqptxk>release-engineering</span><span class="tag" data-astro-cid-7jjqptxk>ci-cd</span><span class="tag" data-astro-cid-7jjqptxk>typescript</span><span class="tag" data-astro-cid-7jjqptxk>testing</span><span class="tag" data-astro-cid-7jjqptxk>monorepo</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="post-body" data-astro-cid-7jjqptxk>
+      <div class="prose" data-astro-cid-7jjqptxk>
+        <p>Two beads were open at the start of 2026-05-18. E10-B11 was the v1.0 release-readiness gate. E10-B12 was the v1.0 release cut, blocked-by-design on B11. Epic 10 was the last epic in <code>intentional-cognition-os</code> (ICO). The release pipeline was wired through <code>/release</code>. Everything that mattered had to clear one ritual.</p>
+<p>Five npm releases shipped that day: v0.21.0 → v0.22.0 → v0.22.1 → v0.22.2 → <strong>v1.0.0</strong> → v1.0.1. The interesting one is v1.0.0, because the gate said <strong>GO with conditions</strong>, not GO. And the same-day v1.0.1 is the proof that “GO with conditions” is the correct verdict shape for a real release, not a binary.</p>
+<h2 id="the-3-degradation-gate">The 3× degradation gate</h2>
+<p>The release ran on top of fresh benchmark infrastructure. <code>625691e</code> and <code>f7bd287</code> closed out E10-B06 (performance profiling) with a 500-source large-corpus benchmark. The headline addition was a <strong>3× degradation gate</strong> — a configurable cap (default 3.0) that fails the run if per-unit cost at large scale exceeds 3× the moderate-corpus baseline.</p>
+<p>The gate is intentionally narrow:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="ts"><code><span class="line"><span style="color:#6A737D">// utils/degradation.ts — gate stays honest by NOT inferring per-unit costs</span></span>
+<span class="line"><span style="color:#F97583">export</span><span style="color:#F97583"> function</span><span style="color:#B392F0"> computeDegradation</span><span style="color:#E1E4E8">(</span></span>
+<span class="line"><span style="color:#FFAB70">  moderatePerUnitMs</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> number</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#FFAB70">  largePerUnitMs</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> number</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#FFAB70">  cap</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> 3.0</span></span>
+<span class="line"><span style="color:#E1E4E8">)</span><span style="color:#F97583">:</span><span style="color:#E1E4E8"> { </span><span style="color:#FFAB70">ratio</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> number</span><span style="color:#E1E4E8">; </span><span style="color:#FFAB70">pass</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> boolean</span><span style="color:#E1E4E8"> } {</span></span>
+<span class="line"><span style="color:#F97583">  if</span><span style="color:#E1E4E8"> (moderatePerUnitMs </span><span style="color:#F97583">===</span><span style="color:#79B8FF"> 0</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#F97583">    return</span><span style="color:#E1E4E8"> { ratio: </span><span style="color:#79B8FF">Infinity</span><span style="color:#E1E4E8">, pass: </span><span style="color:#79B8FF">false</span><span style="color:#E1E4E8"> }; </span><span style="color:#6A737D">// catch degenerate samples loudly</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> ratio</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> largePerUnitMs </span><span style="color:#F97583">/</span><span style="color:#E1E4E8"> moderatePerUnitMs;</span></span>
+<span class="line"><span style="color:#F97583">  return</span><span style="color:#E1E4E8"> { ratio, pass: ratio </span><span style="color:#F97583">&#x3C;=</span><span style="color:#E1E4E8"> cap };</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>The runner does per-unit derivation BEFORE calling the gate. Ingest’s <code>perFile.medianMs</code> is already per-unit (each iteration was one file). Lint’s <code>result.medianMs</code> is whole-workspace, so the runner divides by page count first. Putting that decision in the runner instead of the gate is the difference between “gate that knows what it’s measuring” and “gate that guesses at the measurement units.”</p>
+<p>Results at 500 sources: ingest 1.25× (PASS), lint 0.33× (PASS — got faster at scale, likely amortized constants). The gate had teeth and the system passed cleanly.</p>
+<h2 id="the-release-readiness-checklist-e10-b11-pr-73">The release-readiness checklist (E10-B11, PR #73)</h2>
+<p>Eight items, verified item-by-item, recorded honestly. No “looks good to me” entries:</p>
+<ol>
+<li><strong>CI passes</strong> — all 4 jobs green on last 3 main runs</li>
+<li><strong>Evals pass</strong> — smoke eval clean; retrieval/citation/compilation handlers wired with 30+ unit tests</li>
+<li><strong>Coverage targets</strong> — PARTIAL. Types 100%, kernel 84.6% (target 90%), compiler 62.3% (target 80%), CLI 45.2% (target 70%)</li>
+<li><strong>Docs updated</strong> — current per E10-B07/B08</li>
+<li><strong>CHANGELOG complete</strong> — auto-generated, current through v0.22.0</li>
+<li><strong>No critical beads open</strong> — only B11 (this) + B12 (release cut, blocked by design)</li>
+<li><strong>User journey walkthrough</strong> — <code>ico init</code> → status → 14-command CLI surface, live smoke-tested</li>
+<li><strong>Performance targets met</strong> — ingest 200× headroom, lint 3000× headroom, 3× degradation gate PASS</li>
+</ol>
+<p>Verdict: <strong>GO with two conditions.</strong></p>
+<ul>
+<li><strong>C1:</strong> <code>ico --version</code> reported <code>0.1.0</code> (a stale kernel constant) instead of the published <code>0.22.x</code>. Fix in-cut.</li>
+<li><strong>C2:</strong> Coverage shortfall on kernel/compiler/cli. Documented as post-v1, not blocking. 1,210 passing tests, zero known bugs.</li>
+</ul>
+<p>That verdict is the artifact. Most release rituals make GO/NO-GO a binary. The conditional verdict is honest: state the gap, decide if it blocks, ship if it doesn’t, document the gap permanently if it doesn’t.</p>
+<h2 id="what-go-with-conditions-actually-means">What “GO with conditions” actually means</h2>
+<p>A conditional release verdict is the three-state model: <strong>fix what’s fixable in-cut, document what isn’t, ship anyway.</strong> Unlike a binary GO/NO-GO gate that forces a boolean choice, a conditional gate acknowledges that real releases ship with known imperfections. The conditions are documented forever in the release record — no lying about readiness, no pretending gaps don’t exist, but no unnecessary delays waiting for the perfect threshold that never comes.</p>
+<h2 id="why-not-gono-go-binary">Why not GO/NO-GO binary?</h2>
+<p>Binary GO/NO-GO encourages two bad behaviors.</p>
+<p><strong>Behavior one: lower the bar to ship.</strong> “The version-string bug is fine, users will figure it out.” The release ships, the operator-visible defect ships with it, and the next person debugging an environment ends up reading the wrong build into their incident postmortem.</p>
+<p><strong>Behavior two: delay until the gate is perfect.</strong> Coverage targets met on a Tuesday that never comes. Kernel at 84.6% is allegedly not 90%, so v1.0 slips. Then 90% becomes 95%, because some new code landed during the wait. The gate becomes a treadmill.</p>
+<p>Coverage at kernel 84.6% / compiler 62.3% / CLI 45.2% with 1,210 passing tests and zero known bugs <strong>is shippable</strong>. Blocking v1.0 on coverage uplift would have been a bigger lie than shipping with documented shortfalls. The AAR opens C2 as a post-v1 bead for the next planning cycle. The truth is in the record.</p>
+<p>C1 is the inverse case — <code>ico --version</code> reporting the wrong number is shippable but ugly, and the fix is small. So fix it in-cut, document it, move on. The gate didn’t pretend C1 was fine; it just didn’t pretend it was a v2.0-blocker either.</p>
+<p>The prescription is a three-part rule, not a two-part one: <strong>fix what’s fixable in-cut, document what isn’t, ship anyway.</strong> Binary GO/NO-GO collapses three states into two and loses the most useful one — the “shippable with known imperfections” state where most real releases actually live.</p>
+<h2 id="c1-fix-read-your-own-version-pr-74">C1 fix: read your own version (PR #74)</h2>
+<p><code>packages/cli/src/index.ts</code> had been importing <code>version</code> from <code>@ico/kernel</code>, which exported a hardcoded string. The kernel constant was never maintained in lock-step with the published CLI package — and <strong>shouldn’t be</strong>, since they are independent artifacts on independent release cadences.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="ts"><code><span class="line"><span style="color:#6A737D">// packages/cli/src/index.ts — read from CLI's own package.json</span></span>
+<span class="line"><span style="color:#F97583">function</span><span style="color:#B392F0"> readCliVersion</span><span style="color:#E1E4E8">()</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> string</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">  try</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">    const</span><span style="color:#79B8FF"> pkgPath</span><span style="color:#F97583"> =</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> URL</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'../package.json'</span><span style="color:#E1E4E8">, </span><span style="color:#F97583">import</span><span style="color:#E1E4E8">.</span><span style="color:#79B8FF">meta</span><span style="color:#E1E4E8">.url);</span></span>
+<span class="line"><span style="color:#F97583">    const</span><span style="color:#79B8FF"> pkg</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> JSON</span><span style="color:#E1E4E8">.</span><span style="color:#B392F0">parse</span><span style="color:#E1E4E8">(</span><span style="color:#B392F0">readFileSync</span><span style="color:#E1E4E8">(pkgPath, </span><span style="color:#9ECBFF">'utf-8'</span><span style="color:#E1E4E8">));</span></span>
+<span class="line"><span style="color:#F97583">    return</span><span style="color:#E1E4E8"> pkg.version;</span></span>
+<span class="line"><span style="color:#E1E4E8">  } </span><span style="color:#F97583">catch</span><span style="color:#E1E4E8"> (err) {</span></span>
+<span class="line"><span style="color:#E1E4E8">    console.</span><span style="color:#B392F0">error</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'[ico] failed to read CLI package.json:'</span><span style="color:#E1E4E8">, err);</span></span>
+<span class="line"><span style="color:#F97583">    return</span><span style="color:#9ECBFF"> '0.0.0-unknown'</span><span style="color:#E1E4E8">; </span><span style="color:#6A737D">// sentinel — CLI keeps working, operator sees clear msg</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"><span style="color:#F97583">export</span><span style="color:#F97583"> const</span><span style="color:#79B8FF"> cliVersion</span><span style="color:#F97583"> =</span><span style="color:#B392F0"> readCliVersion</span><span style="color:#E1E4E8">();</span></span></code></pre>
+<p>The try/catch is load-bearing. <code>readCliVersion()</code> runs at module load, BEFORE the process-level error handlers are installed further down the file. An uncaught throw here would surface as a raw Node stack trace and bypass the friendly <code>[ico]</code>-prefixed message convention every other CLI error uses. The sentinel path is what makes this safe to call at import time — the CLI keeps working, the operator gets a legible message, and the bug is visible without crashing.</p>
+<p>The test was tightened in the same PR. <code>/^\d+\.\d+\.\d+/</code> (no end anchor — would accept nonsense like <code>0.22.1.99</code>) became:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="ts"><code><span class="line"><span style="color:#B392F0">expect</span><span style="color:#E1E4E8">(cliVersion).</span><span style="color:#B392F0">toMatch</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">/</span><span style="color:#F97583">^</span><span style="color:#79B8FF">\d</span><span style="color:#F97583">+</span><span style="color:#85E89D;font-weight:bold">\.</span><span style="color:#79B8FF">\d</span><span style="color:#F97583">+</span><span style="color:#85E89D;font-weight:bold">\.</span><span style="color:#79B8FF">\d</span><span style="color:#F97583">+</span><span style="color:#DBEDFF">(-</span><span style="color:#79B8FF">[\w.-]</span><span style="color:#F97583">+</span><span style="color:#DBEDFF">)</span><span style="color:#F97583">?$</span><span style="color:#9ECBFF">/</span><span style="color:#E1E4E8">);</span></span></code></pre>
+<p>Strict semver core plus optional pre-release tag. The previous regex was a one-character bug; the fix is one character plus an opt-in pre-release group.</p>
+<h2 id="the-cut-itself-52fa7a4--v100">The cut itself (52fa7a4 → v1.0.0)</h2>
+<p>The cut commit was tiny: 11 files, +54/-10 lines. It did one thing: aligned <strong>all 6 workspace <code>package.json</code></strong> + <code>version.txt</code> + <code>kernel/src/version.ts</code> at 1.0.0.</p>
+<p>The auto-release workflow had been bumping the root <code>package.json</code> and <code>version.txt</code> only — internal packages had drifted to 0.1.0 or 0.22.1 depending on history. <code>/release</code> Phase 3 caught the drift. Phase 5 required explicit SHA approval before any push (<code>f1a627b</code>). Phases 6-8 ran atomically.</p>
+<p>Verified at v1.0:</p>
+<ul>
+<li>1,210 / 1,210 tests pass across 5 packages</li>
+<li>Lint + typecheck clean</li>
+<li>escape-scan REFUSE=0 CHALLENGE=0 FLAG=0</li>
+<li><code>ico --version</code> reports <code>1.0.0</code></li>
+</ul>
+<h2 id="the-tarball-turned-out-incomplete-v101-same-day">The tarball turned out incomplete (v1.0.1, same day)</h2>
+<p>During the actual <code>npm publish</code> flow, the pack dry-run reported <strong>7 files</strong> when expected was 9: dist + package.json, no README, no LICENSE. The CLI’s <code>package.json</code> declared:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="json"><code><span class="line"><span style="color:#9ECBFF">"files"</span><span style="color:#E1E4E8">: [</span><span style="color:#9ECBFF">"dist"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"README.md"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"LICENSE"</span><span style="color:#E1E4E8">]</span></span></code></pre>
+<p>But the CLI directory didn’t OWN those files. The canonical <code>README.md</code> and <code>LICENSE</code> live at the monorepo root.</p>
+<p>Fix landed inline before the real publish:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="ts"><code><span class="line"><span style="color:#6A737D">// packages/cli/tsup.config.ts — copy README + LICENSE at build time</span></span>
+<span class="line"><span style="color:#F97583">export</span><span style="color:#F97583"> default</span><span style="color:#B392F0"> defineConfig</span><span style="color:#E1E4E8">({</span></span>
+<span class="line"><span style="color:#6A737D">  // ... entry, format, dts, sourcemap ...</span></span>
+<span class="line"><span style="color:#E1E4E8">  onSuccess: </span><span style="color:#9ECBFF">'cp ../../README.md ../../LICENSE ./'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">});</span></span></code></pre>
+<p>The copies are gitignored (their source of truth is the repo root). v1.0.0 on npm now includes both. No version bump for the build-infra fix itself, but the same day shipped v1.0.1 for the next user-visible change.</p>
+<p>This is the test of whether “GO with conditions” was the right shape. A binary GO/NO-GO ritual would have caught the version string (C1) and either fixed it before re-running the whole gate or punted to v1.0.1. The conditional model said: ship, here’s what we know is imperfect. When the tarball turned out incomplete during the actual publish — a discovery that <strong>couldn’t</strong> have been made during gate verification, because it only surfaces in the publish pipeline itself — the answer was just: ship v1.0.1 the same day. No drama. No “release is broken” panic. The model already accepted that real releases generate follow-on releases.</p>
+<h2 id="aar-same-day">AAR same day</h2>
+<p><code>d17e10e docs(aar): v1.0.0 release after-action report</code> landed within hours. Three lessons-for-next-release, captured while they were still warm:</p>
+<ol>
+<li><strong>Beads JSONL/Dolt sync flapping</strong> during multi-PR sessions — repeated need to re-close beads after merges. Filed as a follow-up to investigate the sync ordering.</li>
+<li><strong>Auto-release workflow bumps root + <code>version.txt</code> only</strong> — should bump <code>packages/*/package.json</code> in lock-step. The 11-file cut commit was entirely correcting drift the workflow could have prevented.</li>
+<li><strong><code>/release</code> skill execution worked as designed</strong> — Phase 0 surfaced no blockers, Phases 1-3 caught the version drift, Phase 5 required SHA approval, Phases 6-8 atomic.</li>
+</ol>
+<p>Same-day AAR is non-negotiable. The version-drift issue, the tarball issue, the conditional-verdict pattern — all of them lose 80% of their teaching value if you write the AAR a week later, after the warm memory of “wait, why didn’t the workflow catch that?” has faded into “yeah, we shipped, it was fine.”</p>
+<h2 id="also-shipped">Also shipped</h2>
+<p>The release gate constrained the v1.0.0 cut, not the working day. Three other repos kept moving in parallel — exactly the behavior the conditional-verdict model is designed to enable. A release that takes the whole org offline isn’t a release ritual; it’s an outage.</p>
+<ul>
+<li><strong>hustle:</strong> Phase 3 auth landed in three commits — NextAuth + Drizzle/SQLite infrastructure, dashboard cutover, password reset flow. Coordinated migration from the previous auth stack on a single feature branch.</li>
+<li><strong>claude-code-slack-channel:</strong> ACP session/cancel boundary adapter extracted into a module, and JSON-RPC <code>id</code> widened to nullable per spec §5.1 (#172, #173).</li>
+<li><strong>claude-code-plugins:</strong> Six PRs — repo quality audit, private vulnerability reporting enabled, validator discovers root-level <code>SKILL.md</code> (Anthropic-spec layout), slack-channel mirror stopped stripping upstream tests, blog cross-post infra fix.</li>
+</ul>
+<h2 id="related-posts">Related Posts</h2>
+<ul>
+<li><a href="/blog/honest-perf-benchmarks-paid-api-compiler/">Honest perf benchmarks for a paid-API compiler</a> — yesterday’s post on the benchmark infrastructure that fed this release gate</li>
+<li><a href="/blog/five-releases-fifteen-minutes-mandy-cutover-and-freeze-break/">Five releases in fifteen minutes: Mandy cutover and freeze break</a> — earlier five-releases-in-a-day pattern</li>
+<li><a href="/blog/github-release-workflow-uncommitted-changes-semantic-versioning/">GitHub release workflow: uncommitted changes and semantic versioning</a> — related release-engineering theme</li>
+</ul>
+      </div>
+    </div>
+  </article>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
