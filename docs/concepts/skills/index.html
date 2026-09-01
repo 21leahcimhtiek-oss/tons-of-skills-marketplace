@@ -1,0 +1,1001 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Understanding Agent Skills (SKILL.md) | Docs</title>
+    <meta name="description" content="Deep dive into SKILL.md files — the auto-activating instruction sets that give Claude Code domain expertise. Learn frontmatter fields, body structure, dynamic context injection, and path variables.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://tonsofskills.com/tons-of-skills-marketplace/docs/concepts/skills/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/docs/concepts/skills/">
+    <meta property="og:title" content="Understanding Agent Skills (SKILL.md) | Docs">
+    <meta property="og:description" content="Deep dive into SKILL.md files — the auto-activating instruction sets that give Claude Code domain expertise. Learn frontmatter fields, body structure, dynamic context injection, and path variables.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="Understanding Agent Skills (SKILL.md) | Docs">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/docs/concepts/skills/">
+    <meta name="twitter:title" content="Understanding Agent Skills (SKILL.md) | Docs">
+    <meta name="twitter:description" content="Deep dive into SKILL.md files — the auto-activating instruction sets that give Claude Code domain expertise. Learn frontmatter fields, body structure, dynamic context injection, and path variables.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Understanding Agent Skills (SKILL.md)","description":"Deep dive into SKILL.md files — the auto-activating instruction sets that give Claude Code domain expertise. Learn frontmatter fields, body structure, dynamic context injection, and path variables.","author":{"@type":"Organization","name":"Intent Solutions","url":"https://intentsolutions.io"},"publisher":{"@type":"Organization","name":"Tons of Skills","url":"https://tonsofskills.com"},"url":"https://tonsofskills.com/docs/concepts/skills","keywords":"SKILL.md, Claude Code skills, agent skills, auto-activating skills, allowed-tools, dynamic context injection, skill frontmatter, Claude Code plugin skills","mainEntityOfPage":{"@type":"WebPage","@id":"https://tonsofskills.com/docs/concepts/skills"}}</script>
+  
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/_..B9N6JsV8.css"></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  <div class="docs-page" data-astro-cid-ya4srytn>
+    <div class="docs-container" data-astro-cid-ya4srytn>
+      <aside class="docs-sidebar" id="docs-sidebar" data-astro-cid-qrwn6rcr>
+  <div class="sidebar-sticky" data-astro-cid-qrwn6rcr>
+    <a href="/docs" class="sidebar-home" data-astro-cid-qrwn6rcr>Documentation</a>
+    <nav class="sidebar-nav" data-astro-cid-qrwn6rcr>
+      <div class="sidebar-section" data-astro-cid-qrwn6rcr>
+          <h3 class="sidebar-section-title" data-astro-cid-qrwn6rcr>Getting Started</h3>
+          <ul class="sidebar-list" data-astro-cid-qrwn6rcr>
+            <li data-astro-cid-qrwn6rcr>
+                <a href="/docs/getting-started/installation" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Install Claude Code Plugins
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/getting-started/first-plugin" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Install Your First Plugin
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/getting-started/first-skill" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Your First Agent Skill
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/getting-started/cli-reference" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  ccpi CLI Quick Reference
+                </a>
+              </li>
+          </ul>
+        </div><div class="sidebar-section" data-astro-cid-qrwn6rcr>
+          <h3 class="sidebar-section-title" data-astro-cid-qrwn6rcr>Concepts</h3>
+          <ul class="sidebar-list" data-astro-cid-qrwn6rcr>
+            <li data-astro-cid-qrwn6rcr>
+                <a href="/docs/concepts/plugins" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  What Are Claude Code Plugins?
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/concepts/skills" class="sidebar-link active" data-astro-cid-qrwn6rcr>
+                  Understanding Agent Skills (SKILL.md)
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/concepts/agents" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Claude Code Agents and Subagents
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/concepts/commands-and-hooks" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Slash Commands and Hooks
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/concepts/mcp-servers" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  MCP Servers in Claude Code Plugins
+                </a>
+              </li>
+          </ul>
+        </div><div class="sidebar-section" data-astro-cid-qrwn6rcr>
+          <h3 class="sidebar-section-title" data-astro-cid-qrwn6rcr>Guides</h3>
+          <ul class="sidebar-list" data-astro-cid-qrwn6rcr>
+            <li data-astro-cid-qrwn6rcr>
+                <a href="/docs/guides/write-a-skill" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  How to Write a Claude Code Skill
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/guides/build-a-plugin" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  How to Build a Claude Code Plugin
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/guides/create-an-agent" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  How to Create a Claude Code Agent
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/guides/saas-skill-packs" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  SaaS Skill Packs: Platform Integrations
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/guides/mcp-server-plugin" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Building an MCP Server Plugin
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/guides/publish-to-marketplace" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Publish a Plugin to the Marketplace
+                </a>
+              </li>
+          </ul>
+        </div><div class="sidebar-section" data-astro-cid-qrwn6rcr>
+          <h3 class="sidebar-section-title" data-astro-cid-qrwn6rcr>Reference</h3>
+          <ul class="sidebar-list" data-astro-cid-qrwn6rcr>
+            <li data-astro-cid-qrwn6rcr>
+                <a href="/docs/reference/skill-frontmatter" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  SKILL.md Frontmatter Reference
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/reference/plugin-json-schema" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  plugin.json Schema Reference
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/reference/plugin-categories" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Plugin Categories and Tags
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/reference/allowed-tools" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Allowed Tools Reference
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/reference/cli-commands" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  ccpi CLI Command Reference
+                </a>
+              </li>
+          </ul>
+        </div><div class="sidebar-section" data-astro-cid-qrwn6rcr>
+          <h3 class="sidebar-section-title" data-astro-cid-qrwn6rcr>Ecosystem</h3>
+          <ul class="sidebar-list" data-astro-cid-qrwn6rcr>
+            <li data-astro-cid-qrwn6rcr>
+                <a href="/docs/ecosystem/marketplace-overview" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Tons of Skills Marketplace Guide
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/ecosystem/official-anthropic-docs" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Official Anthropic Documentation Links
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/ecosystem/community-resources" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Claude Code Community and Resources
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/ecosystem/faq" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Claude Code Plugins FAQ
+                </a>
+              </li>
+          </ul>
+        </div>
+    </nav>
+  </div>
+</aside>
+
+      <div class="docs-main" data-astro-cid-ya4srytn>
+        <!-- Breadcrumbs -->
+        <nav class="docs-breadcrumbs" aria-label="Breadcrumb" data-astro-cid-ya4srytn>
+          <a href="/" data-astro-cid-ya4srytn>Home</a>
+          <span class="sep" data-astro-cid-ya4srytn>/</span>
+          <a href="/docs" data-astro-cid-ya4srytn>Docs</a>
+          <span class="sep" data-astro-cid-ya4srytn>/</span>
+          <a href="/docs#concepts" data-astro-cid-ya4srytn>Concepts</a>
+          <span class="sep" data-astro-cid-ya4srytn>/</span>
+          <span class="current" data-astro-cid-ya4srytn>Understanding Agent Skills (SKILL.md)</span>
+        </nav>
+
+        <!-- Header -->
+        <header class="docs-header" data-astro-cid-ya4srytn>
+          <h1 class="docs-title" data-astro-cid-ya4srytn>Understanding Agent Skills (SKILL.md)</h1>
+          <p class="docs-description" data-astro-cid-ya4srytn>Deep dive into SKILL.md files — the auto-activating instruction sets that give Claude Code domain expertise. Learn frontmatter fields, body structure, dynamic context injection, and path variables.</p>
+        </header>
+
+        <!-- Content -->
+        <article class="docs-content" id="docs-content" data-astro-cid-ya4srytn>
+          
+  <p>Skills are the most important building block in the Claude Code plugin ecosystem. A skill is a <code>SKILL.md</code> file that contains structured instructions telling Claude how to perform a specific task, follow a particular methodology, or apply domain-specific knowledge. Unlike slash commands (which users invoke explicitly), skills activate automatically when Claude determines they are relevant to the current conversation.</p>
+<p>The <a href="/">Tons of Skills marketplace</a> contains over 2,834 individual skills across 418 plugins, covering everything from Terraform module patterns to React component testing to database migration workflows.</p>
+<h2 id="what-makes-skills-special">What Makes Skills Special</h2>
+<p>Skills differ from other forms of AI instruction (system prompts, CLAUDE.md files, ad-hoc instructions) in several important ways:</p>
+<p><strong>Auto-activation.</strong> Skills do not require the user to remember and type a command. Claude reads the skill’s <code>description</code> field and activates it when the description matches the user’s current intent. This makes skills feel like built-in capabilities rather than add-ons.</p>
+<p><strong>Tool scoping.</strong> Each skill declares exactly which tools it needs via the <code>allowed-tools</code> field. This provides a security boundary — a documentation-only skill cannot accidentally execute shell commands, and a code generation skill cannot read files it should not access.</p>
+<p><strong>Composability.</strong> Skills can reference supporting files, inject dynamic context from the environment, and delegate work to agents. This makes it possible to build complex, multi-step workflows from focused, single-purpose skill definitions.</p>
+<p><strong>Versioning and metadata.</strong> Skills carry version numbers, author information, license declarations, and compatibility tags. This metadata enables the marketplace to track quality, attribute contributions, and ensure compatibility.</p>
+<h2 id="anatomy-of-a-skillmd-file">Anatomy of a SKILL.md File</h2>
+<p>Every SKILL.md file has two parts: YAML frontmatter (delimited by <code>---</code>) and a markdown body containing the actual instructions.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="markdown"><code><span class="line"><span style="color:#E1E4E8">---</span></span>
+<span class="line"><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">react-testing</span></span>
+<span class="line"><span style="color:#85E89D">description</span><span style="color:#E1E4E8">: </span><span style="color:#F97583">|</span></span>
+<span class="line"><span style="color:#9ECBFF">  When writing or reviewing React component tests.</span></span>
+<span class="line"><span style="color:#9ECBFF">  Activates for Jest, React Testing Library, and Vitest test files.</span></span>
+<span class="line"><span style="color:#9ECBFF">  Trigger phrases: "write tests", "test this component", "add test coverage".</span></span>
+<span class="line"><span style="color:#85E89D">allowed-tools</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Read, Write, Edit, Bash(npm:*), Glob, Grep</span></span>
+<span class="line"><span style="color:#85E89D">version</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">1.0.0</span></span>
+<span class="line"><span style="color:#85E89D">author</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Jane Developer &#x3C;jane@example.com></span></span>
+<span class="line"><span style="color:#85E89D">license</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">MIT</span></span>
+<span class="line"><span style="color:#85E89D">tags</span><span style="color:#E1E4E8">: [</span><span style="color:#9ECBFF">react</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">testing</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">jest</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">vitest</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"><span style="color:#E1E4E8">---</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79B8FF;font-weight:bold">## Testing Philosophy</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">Write tests that verify behavior, not implementation details. Every test should</span></span>
+<span class="line"><span style="color:#E1E4E8">answer the question: "Does this component do what users expect?"</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79B8FF;font-weight:bold">## File Naming</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">Place test files adjacent to the component they test:</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FFAB70">-</span><span style="color:#79B8FF"> `Button.tsx`</span><span style="color:#E1E4E8"> -> </span><span style="color:#79B8FF">`Button.test.tsx`</span></span>
+<span class="line"><span style="color:#FFAB70">-</span><span style="color:#79B8FF"> `useAuth.ts`</span><span style="color:#E1E4E8"> -> </span><span style="color:#79B8FF">`useAuth.test.ts`</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79B8FF;font-weight:bold">## Test Structure</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">Use the Arrange-Act-Assert pattern:</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">```typescript</span></span>
+<span class="line"><span style="color:#F97583">import</span><span style="color:#E1E4E8"> { render, screen, fireEvent } </span><span style="color:#F97583">from</span><span style="color:#9ECBFF"> '@testing-library/react'</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">import</span><span style="color:#E1E4E8"> { Button } </span><span style="color:#F97583">from</span><span style="color:#9ECBFF"> './Button'</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">describe</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'Button'</span><span style="color:#E1E4E8">, () </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#B392F0">  it</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'calls onClick handler when clicked'</span><span style="color:#E1E4E8">, () </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#6A737D">    // Arrange</span></span>
+<span class="line"><span style="color:#F97583">    const</span><span style="color:#79B8FF"> handleClick</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> vi.</span><span style="color:#B392F0">fn</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#B392F0">    render</span><span style="color:#E1E4E8">(&#x3C;</span><span style="color:#B392F0">Button</span><span style="color:#B392F0"> onClick</span><span style="color:#E1E4E8">={</span><span style="color:#FFAB70">handleClick</span><span style="color:#E1E4E8">}>Submit</span><span style="color:#F97583">&#x3C;/</span><span style="color:#E1E4E8">Button</span><span style="color:#F97583">></span><span style="color:#E1E4E8">);</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">    // Act</span></span>
+<span class="line"><span style="color:#E1E4E8">    fireEvent.</span><span style="color:#B392F0">click</span><span style="color:#E1E4E8">(screen.</span><span style="color:#B392F0">getByRole</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'button'</span><span style="color:#E1E4E8">, { name:</span><span style="color:#9ECBFF"> /</span><span style="color:#DBEDFF">submit</span><span style="color:#9ECBFF">/</span><span style="color:#F97583">i</span><span style="color:#E1E4E8"> }));</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">    // Assert</span></span>
+<span class="line"><span style="color:#B392F0">    expect</span><span style="color:#E1E4E8">(handleClick).</span><span style="color:#B392F0">toHaveBeenCalledOnce</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#E1E4E8">  });</span></span>
+<span class="line"><span style="color:#E1E4E8">});</span></span></code></pre>
+<h2 id="coverage-requirements">Coverage Requirements</h2>
+<ul>
+<li>All exported components must have at least one test</li>
+<li>Event handlers must be tested with user interaction simulation</li>
+<li>Error states and loading states must be covered</li>
+<li>Accessibility: test with <code>screen.getByRole</code> over <code>getByTestId</code></li>
+</ul>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span></span></span>
+<span class="line"><span>## Frontmatter Fields</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>The frontmatter section defines the skill's metadata and behavioral constraints. Fields fall into two categories: required (for marketplace compliance) and optional (for advanced behavior).</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>### Required Fields</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>| Field | Type | Description |</span></span>
+<span class="line"><span>|-------|------|-------------|</span></span>
+<span class="line"><span>| `name` | string | Unique skill identifier within the plugin (kebab-case) |</span></span>
+<span class="line"><span>| `description` | string | When Claude should activate this skill. Include trigger phrases |</span></span>
+<span class="line"><span>| `allowed-tools` | string | Comma-separated list of tools this skill may use |</span></span>
+<span class="line"><span>| `version` | string | Semantic version of the skill |</span></span>
+<span class="line"><span>| `author` | string | Author name, optionally with email in angle brackets |</span></span>
+<span class="line"><span>| `license` | string | SPDX license identifier |</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>### Optional Fields</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>| Field | Type | Default | Description |</span></span>
+<span class="line"><span>|-------|------|---------|-------------|</span></span>
+<span class="line"><span>| `model` | string | (default model) | LLM model override: `sonnet`, `haiku`, or `opus` |</span></span>
+<span class="line"><span>| `context` | string | (inline) | Set to `fork` to run the skill in a subagent |</span></span>
+<span class="line"><span>| `agent` | string | (none) | Subagent type to use when `context: fork` |</span></span>
+<span class="line"><span>| `user-invocable` | boolean | true | Set to `false` to hide from the `/` menu |</span></span>
+<span class="line"><span>| `argument-hint` | string | (none) | Autocomplete hint shown in the `/` menu (e.g., `"&#x3C;file-path>"`) |</span></span>
+<span class="line"><span>| `hooks` | object | (none) | Lifecycle hooks (`pre-tool-call`, `post-tool-call`) |</span></span>
+<span class="line"><span>| `compatibility` | string | (none) | Environment requirements (e.g., `"Node.js >= 18"`) |</span></span>
+<span class="line"><span>| `compatible-with` | string | (none) | Platform compatibility (e.g., `claude-code, cursor`) |</span></span>
+<span class="line"><span>| `tags` | array | [] | Discovery tags for categorization and search |</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>### The Description Field</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>The `description` field is the most important field in the entire frontmatter. It controls when Claude activates the skill. Write it as a conditional statement that describes the situations where this skill applies, and include specific trigger phrases that users are likely to say.</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>**Good description:**</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>```yaml</span></span>
+<span class="line"><span>description: |</span></span>
+<span class="line"><span>  When writing or modifying Dockerfile or docker-compose.yml files.</span></span>
+<span class="line"><span>  When debugging container build failures or multi-stage build issues.</span></span>
+<span class="line"><span>  Trigger phrases: "dockerize this", "fix my Dockerfile", "add Docker support",</span></span>
+<span class="line"><span>  "container build failing", "optimize Docker image size".</span></span></code></pre>
+<p><strong>Poor description:</strong></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">description</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"Docker helper skill"</span></span></code></pre>
+<p>The first example gives Claude rich context for matching. The second is too vague to reliably activate.</p>
+<h3 id="the-allowed-tools-field">The allowed-tools Field</h3>
+<p>This field is a comma-separated list of tools the skill is permitted to use. It acts as an allowlist — Claude will only use the listed tools when this skill is active.</p>
+<p><strong>Valid tools:</strong></p>
+<p><code>Read</code>, <code>Write</code>, <code>Edit</code>, <code>Bash</code>, <code>Glob</code>, <code>Grep</code>, <code>WebFetch</code>, <code>WebSearch</code>, <code>Task</code>, <code>TodoWrite</code>, <code>NotebookEdit</code>, <code>AskUserQuestion</code>, <code>Skill</code></p>
+<p><strong>Tool scoping with Bash:</strong></p>
+<p>The <code>Bash</code> tool supports glob-style scoping to restrict which commands can be executed:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#6A737D"># Allow only npm and npx commands</span></span>
+<span class="line"><span style="color:#85E89D">allowed-tools</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Read, Edit, Bash(npm:*), Bash(npx:*)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Allow only git commands</span></span>
+<span class="line"><span style="color:#85E89D">allowed-tools</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Read, Glob, Grep, Bash(git:*)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Allow all bash commands (use sparingly)</span></span>
+<span class="line"><span style="color:#85E89D">allowed-tools</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Read, Write, Edit, Bash, Glob, Grep</span></span></code></pre>
+<p>Principle of least privilege applies: request only the tools your skill genuinely needs. A skill that analyzes code but never modifies it should not include <code>Write</code> or <code>Edit</code>.</p>
+<h2 id="the-skill-body">The Skill Body</h2>
+<p>Everything below the frontmatter delimiter is the skill body — the actual instructions Claude follows when the skill is active. This is where the substance lives.</p>
+<h3 id="writing-effective-instructions">Writing Effective Instructions</h3>
+<p>The body should be written in clear, directive markdown. Use second person (“Write tests that…”) or imperative mood (“Use the Arrange-Act-Assert pattern”). Avoid hedging language like “you might want to consider” — be direct.</p>
+<p><strong>Structure recommendations:</strong></p>
+<ul>
+<li>Use <code>## H2</code> headings to organize major sections</li>
+<li>Use <code>### H3</code> headings for subsections within a topic</li>
+<li>Include code blocks with language tags for all examples</li>
+<li>Use tables for reference data (configuration options, API fields, etc.)</li>
+<li>Use bold for key terms and inline code for identifiers, file names, and commands</li>
+</ul>
+<h3 id="supporting-file-references">Supporting File References</h3>
+<p>Skills can reference additional files that Claude will load on demand. Use standard markdown links with relative paths:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="markdown"><code><span class="line"><span style="color:#E1E4E8">For API details, see the API reference.</span></span>
+<span class="line"><span style="color:#E1E4E8">Review the examples directory for templates.</span></span></code></pre>
+<p>When Claude encounters these links while executing a skill, it uses the <code>Read</code> tool to load the referenced file. This allows you to keep the main SKILL.md focused while providing deep reference material in supporting files.</p>
+<h3 id="path-variables">Path Variables</h3>
+<p>Two path variables are available for use in skill bodies:</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Variable</th><th>Resolves To</th><th>Use Case</th></tr></thead><tbody><tr><td><code>${CLAUDE_SKILL_DIR}</code></td><td>The directory containing this SKILL.md</td><td>Referencing files relative to the skill</td></tr><tr><td><code>${CLAUDE_PLUGIN_ROOT}</code></td><td>The root directory of the plugin</td><td>Referencing files elsewhere in the plugin</td></tr><tr><td><code>${CLAUDE_PLUGIN_DATA}</code></td><td>Persistent data directory for the plugin</td><td>Storing state that survives updates</td></tr></tbody></table>
+<p>Use these in bash commands and DCI expressions:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="markdown"><code><span class="line"><span style="color:#E1E4E8">Load the configuration template:</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79B8FF">`cat ${CLAUDE_SKILL_DIR}/templates/config.yaml`</span></span></code></pre>
+<p>The <code>${CLAUDE_PLUGIN_DATA}</code> directory (available in Claude Code v2.1.78+) persists across plugin updates and reinstalls, making it suitable for caches, user preferences, or learned patterns.</p>
+<h3 id="string-substitutions">String Substitutions</h3>
+<p>Skills can accept arguments from users. When a user invokes a skill with arguments, these substitution variables are replaced before Claude processes the skill body:</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Variable</th><th>Description</th></tr></thead><tbody><tr><td><code>$ARGUMENTS</code></td><td>The full argument string</td></tr><tr><td><code>$0</code> through <code>$9</code></td><td>Individual positional arguments</td></tr><tr><td><code>${CLAUDE_SESSION_ID}</code></td><td>Current session identifier</td></tr></tbody></table>
+<p>Pair these with the <code>argument-hint</code> frontmatter field to guide users:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#B392F0">---</span></span>
+<span class="line"><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">analyze-file</span></span>
+<span class="line"><span style="color:#85E89D">argument-hint</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"&#x3C;file-path>"</span></span>
+<span class="line"><span style="color:#6A737D"># ...</span></span>
+<span class="line"><span style="color:#B392F0">---</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#9ECBFF">Analyze the file at `$ARGUMENTS` for security vulnerabilities.</span></span></code></pre>
+<h2 id="dynamic-context-injection-dci">Dynamic Context Injection (DCI)</h2>
+<p>Dynamic context injection is a powerful feature that lets skills run shell commands at activation time and inject the output directly into the skill body. This eliminates the need for Claude to spend tool-call rounds gathering environmental information.</p>
+<h3 id="syntax">Syntax</h3>
+<p>DCI expressions use the <code>!`command`</code> syntax on their own line:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="markdown"><code><span class="line"><span style="color:#79B8FF;font-weight:bold">## Current Environment</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">!</span><span style="color:#79B8FF">`node --version 2>/dev/null || echo 'Node.js not installed'`</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">!</span><span style="color:#79B8FF">`git branch --show-current 2>/dev/null || echo 'Not a git repository'`</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">!</span><span style="color:#79B8FF">`ls package.json 2>/dev/null &#x26;&#x26; echo 'Node.js project detected' || echo 'No package.json found'`</span></span></code></pre>
+<p>When Claude activates this skill, the commands execute and their output replaces the DCI expressions in the skill body. Claude then reads the enriched instructions with real-time environmental data already embedded.</p>
+<h3 id="best-practices-for-dci">Best Practices for DCI</h3>
+<p><strong>Always include fallbacks.</strong> Commands may fail if a tool is not installed or the context is wrong. Use <code>|| echo 'fallback message'</code> to ensure the skill body remains coherent:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="markdown"><code><span class="line"><span style="color:#E1E4E8">!</span><span style="color:#79B8FF">`terraform version 2>/dev/null || echo 'Terraform not installed'`</span></span></code></pre>
+<p><strong>Keep output small.</strong> DCI injects output verbatim into the skill body, consuming context window space. Use summaries and counts rather than full file contents:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="markdown"><code><span class="line"><span style="color:#79B8FF;font-weight:bold"># Good: summary</span></span>
+<span class="line"><span style="color:#E1E4E8">!</span><span style="color:#79B8FF">`wc -l src/**/*.ts 2>/dev/null | tail -1`</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79B8FF;font-weight:bold"># Bad: entire file contents</span></span>
+<span class="line"><span style="color:#E1E4E8">!</span><span style="color:#79B8FF">`cat src/config.ts`</span></span></code></pre>
+<p><strong>Use for discovery, not execution.</strong> DCI is designed to pre-load information that helps Claude make better decisions. Do not use it to perform the actual task — that is what the skill body instructions and tool calls are for.</p>
+<p><strong>Common DCI patterns:</strong></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="markdown"><code><span class="line"><span style="color:#79B8FF;font-weight:bold"># Detect package manager</span></span>
+<span class="line"><span style="color:#E1E4E8">!</span><span style="color:#79B8FF">`[ -f pnpm-lock.yaml ] &#x26;&#x26; echo 'pnpm' || ([ -f yarn.lock ] &#x26;&#x26; echo 'yarn' || echo 'npm')`</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79B8FF;font-weight:bold"># Get project language/framework</span></span>
+<span class="line"><span style="color:#E1E4E8">!</span><span style="color:#79B8FF">`cat package.json 2>/dev/null | grep -o '"react"\|"vue"\|"svelte"\|"angular"' | head -1`</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79B8FF;font-weight:bold"># List available scripts</span></span>
+<span class="line"><span style="color:#E1E4E8">!</span><span style="color:#79B8FF">`cat package.json 2>/dev/null | python3 -c "import sys,json; [print(k) for k in json.load(sys.stdin).get('scripts',{})]"`</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79B8FF;font-weight:bold"># Check CI status</span></span>
+<span class="line"><span style="color:#E1E4E8">!</span><span style="color:#79B8FF">`gh run list --limit 3 --json status,conclusion,name 2>/dev/null || echo 'gh CLI not available'`</span></span></code></pre>
+<h2 id="skill-activation-flow">Skill Activation Flow</h2>
+<p>Understanding how Claude decides to activate a skill helps you write better descriptions and structure your skills effectively.</p>
+<ol>
+<li>
+<p><strong>User sends a message.</strong> The user asks Claude to do something (e.g., “Write tests for the AuthProvider component”).</p>
+</li>
+<li>
+<p><strong>Description matching.</strong> Claude compares the user’s intent against the <code>description</code> fields of all installed skills. Skills whose descriptions mention relevant concepts (testing, React, components) score higher.</p>
+</li>
+<li>
+<p><strong>Skill loading.</strong> Claude loads the matching skill’s frontmatter and body into its context. If the skill has DCI expressions, they execute first and their output is injected.</p>
+</li>
+<li>
+<p><strong>Tool scoping.</strong> Claude’s available tools are constrained to those listed in <code>allowed-tools</code> for the duration of this skill’s execution.</p>
+</li>
+<li>
+<p><strong>Instruction following.</strong> Claude follows the instructions in the skill body, using the permitted tools to accomplish the task.</p>
+</li>
+<li>
+<p><strong>Supporting file loading.</strong> If the skill body contains markdown links to supporting files, Claude may load them on demand using the Read tool.</p>
+</li>
+</ol>
+<h2 id="skill-organization">Skill Organization</h2>
+<p>Skills live inside a plugin’s <code>skills/</code> directory, each in its own subdirectory:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>my-plugin/</span></span>
+<span class="line"><span>└── skills/</span></span>
+<span class="line"><span>    ├── code-review/</span></span>
+<span class="line"><span>    │   ├── SKILL.md           # Main skill file</span></span>
+<span class="line"><span>    │   ├── reference.md       # Supporting reference</span></span>
+<span class="line"><span>    │   └── examples/</span></span>
+<span class="line"><span>    │       └── patterns.md    # Example patterns</span></span>
+<span class="line"><span>    ├── security-scan/</span></span>
+<span class="line"><span>    │   └── SKILL.md</span></span>
+<span class="line"><span>    └── performance-audit/</span></span>
+<span class="line"><span>        └── SKILL.md</span></span></code></pre>
+<p>Each skill subdirectory must contain exactly one <code>SKILL.md</code> file. Supporting files (reference documents, templates, examples) can live alongside it in the same directory or in subdirectories.</p>
+<h3 id="naming-conventions">Naming Conventions</h3>
+<ul>
+<li>Skill directory names use kebab-case: <code>code-review</code>, <code>security-scan</code></li>
+<li>The skill file is always named <code>SKILL.md</code> (uppercase)</li>
+<li>The <code>name</code> field in frontmatter should match the directory name</li>
+<li>Supporting files use descriptive kebab-case names: <code>api-reference.md</code>, <code>common-patterns.md</code></li>
+</ul>
+<h2 id="quality-standards">Quality Standards</h2>
+<p>The Tons of Skills marketplace evaluates skills using a 100-point enterprise compliance rubric. High-scoring skills share these characteristics:</p>
+<ul>
+<li><strong>Substantive body content</strong> (500+ words of genuine instructions, not boilerplate)</li>
+<li><strong>Complete frontmatter</strong> with all required fields filled accurately</li>
+<li><strong>Specific descriptions</strong> with trigger phrases that enable reliable auto-activation</li>
+<li><strong>Minimal tool permissions</strong> requesting only what is needed</li>
+<li><strong>Code examples</strong> with language-tagged fenced code blocks</li>
+<li><strong>Structured sections</strong> using H2/H3 headings for scannable organization</li>
+<li><strong>No placeholder text</strong> — every section contains real, actionable content</li>
+</ul>
+<p>You can check your skill’s compliance score locally:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">python3</span><span style="color:#9ECBFF"> scripts/validate-skills-schema.py</span><span style="color:#79B8FF"> --enterprise</span><span style="color:#79B8FF"> --verbose</span><span style="color:#9ECBFF"> plugins/my-category/my-plugin/</span></span></code></pre>
+<p>Skills scoring below 70 points receive a D or F grade and are flagged for remediation. The marketplace displays grades on the <a href="/skills">Skills</a> page to help users identify high-quality skills.</p>
+<h2 id="common-patterns">Common Patterns</h2>
+<h3 id="the-domain-expert-skill">The Domain Expert Skill</h3>
+<p>Teaches Claude deep knowledge about a specific technology:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#B392F0">---</span></span>
+<span class="line"><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">kubernetes-troubleshoot</span></span>
+<span class="line"><span style="color:#85E89D">description</span><span style="color:#E1E4E8">: </span><span style="color:#F97583">|</span></span>
+<span class="line"><span style="color:#9ECBFF">  When debugging Kubernetes pod failures, CrashLoopBackOff errors,</span></span>
+<span class="line"><span style="color:#9ECBFF">  OOMKilled events, or cluster networking issues.</span></span>
+<span class="line"><span style="color:#85E89D">allowed-tools</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Read, Bash(kubectl:*), Bash(helm:*), Grep, Glob</span></span>
+<span class="line"><span style="color:#85E89D">version</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">1.0.0</span></span>
+<span class="line"><span style="color:#85E89D">author</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">DevOps Team</span></span>
+<span class="line"><span style="color:#85E89D">license</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">MIT</span></span>
+<span class="line"><span style="color:#85E89D">tags</span><span style="color:#E1E4E8">: [</span><span style="color:#9ECBFF">kubernetes</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">debugging</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">devops</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"><span style="color:#B392F0">---</span></span></code></pre>
+<h3 id="the-workflow-skill">The Workflow Skill</h3>
+<p>Guides Claude through a multi-step process:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#B392F0">---</span></span>
+<span class="line"><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">release-checklist</span></span>
+<span class="line"><span style="color:#85E89D">description</span><span style="color:#E1E4E8">: </span><span style="color:#F97583">|</span></span>
+<span class="line"><span style="color:#9ECBFF">  When preparing a production release, cutting a release branch,</span></span>
+<span class="line"><span style="color:#9ECBFF">  or running pre-release validation.</span></span>
+<span class="line"><span style="color:#85E89D">allowed-tools</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Read, Bash(git:*), Bash(npm:*), Glob, Grep</span></span>
+<span class="line"><span style="color:#85E89D">version</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">1.0.0</span></span>
+<span class="line"><span style="color:#85E89D">author</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Release Engineering</span></span>
+<span class="line"><span style="color:#85E89D">license</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">MIT</span></span>
+<span class="line"><span style="color:#85E89D">context</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">fork</span></span>
+<span class="line"><span style="color:#85E89D">agent</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Explore</span></span>
+<span class="line"><span style="color:#B392F0">---</span></span></code></pre>
+<h3 id="the-guard-rail-skill">The Guard Rail Skill</h3>
+<p>Enforces constraints without performing the main task:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#B392F0">---</span></span>
+<span class="line"><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">security-policy</span></span>
+<span class="line"><span style="color:#85E89D">description</span><span style="color:#E1E4E8">: </span><span style="color:#F97583">|</span></span>
+<span class="line"><span style="color:#9ECBFF">  When writing code that handles authentication, authorization,</span></span>
+<span class="line"><span style="color:#9ECBFF">  secrets, API keys, or user credentials.</span></span>
+<span class="line"><span style="color:#85E89D">allowed-tools</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Read, Grep, Glob</span></span>
+<span class="line"><span style="color:#85E89D">version</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">1.0.0</span></span>
+<span class="line"><span style="color:#85E89D">author</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Security Team</span></span>
+<span class="line"><span style="color:#85E89D">license</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">MIT</span></span>
+<span class="line"><span style="color:#85E89D">user-invocable</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">false</span></span>
+<span class="line"><span style="color:#B392F0">---</span></span></code></pre>
+<p>Setting <code>user-invocable: false</code> hides the skill from the <code>/</code> menu while allowing it to activate automatically when security-relevant work is detected.</p>
+<h2 id="next-steps">Next Steps</h2>
+<ul>
+<li>Understand how agents complement skills: <a href="/docs/concepts/agents">Claude Code Agents and Subagents</a></li>
+<li>Learn about explicit invocation with commands: <a href="/docs/concepts/commands-and-hooks">Slash Commands and Hooks</a></li>
+<li>Browse available skills: <a href="/skills">Skills Directory</a></li>
+<li>Explore plugins that contain skills: <a href="/explore">Explore Plugins</a></li>
+</ul>
+
+        </article>
+
+        <!-- Official Links Callout -->
+        <aside class="official-links" data-astro-cid-ya4srytn>
+            <h3 class="official-links-title" data-astro-cid-ya4srytn>Official Anthropic Documentation</h3>
+            <ul class="official-links-list" data-astro-cid-ya4srytn>
+              <li data-astro-cid-ya4srytn>
+                  <a href="https://docs.anthropic.com/en/docs/claude-code/skills" target="_blank" rel="noopener noreferrer" data-astro-cid-ya4srytn>
+                    Claude Code Skills Documentation
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-left:4px;vertical-align:middle;" data-astro-cid-ya4srytn><path d="M3.5 1.5H10.5V8.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-ya4srytn></path><path d="M10.5 1.5L1.5 10.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-ya4srytn></path></svg>
+                  </a>
+                </li><li data-astro-cid-ya4srytn>
+                  <a href="https://agentskills.io" target="_blank" rel="noopener noreferrer" data-astro-cid-ya4srytn>
+                    AgentSkills.io Specification
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-left:4px;vertical-align:middle;" data-astro-cid-ya4srytn><path d="M3.5 1.5H10.5V8.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-ya4srytn></path><path d="M10.5 1.5L1.5 10.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-ya4srytn></path></svg>
+                  </a>
+                </li><li data-astro-cid-ya4srytn>
+                  <a href="https://docs.anthropic.com/en/docs/claude-code/plugins" target="_blank" rel="noopener noreferrer" data-astro-cid-ya4srytn>
+                    Claude Code Plugins Overview
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-left:4px;vertical-align:middle;" data-astro-cid-ya4srytn><path d="M3.5 1.5H10.5V8.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-ya4srytn></path><path d="M10.5 1.5L1.5 10.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-ya4srytn></path></svg>
+                  </a>
+                </li>
+            </ul>
+          </aside>
+
+        <!-- Related Docs -->
+        <aside class="related-docs" data-astro-cid-ya4srytn>
+            <h3 class="related-title" data-astro-cid-ya4srytn>Related Documentation</h3>
+            <div class="related-grid" data-astro-cid-ya4srytn>
+              <a href="/docs/concepts/plugins" class="related-card" data-astro-cid-ya4srytn>
+                  <span class="related-section" data-astro-cid-ya4srytn>Concepts</span>
+                  <span class="related-name" data-astro-cid-ya4srytn>What Are Claude Code Plugins?</span>
+                </a><a href="/docs/concepts/agents" class="related-card" data-astro-cid-ya4srytn>
+                  <span class="related-section" data-astro-cid-ya4srytn>Concepts</span>
+                  <span class="related-name" data-astro-cid-ya4srytn>Claude Code Agents and Subagents</span>
+                </a><a href="/docs/concepts/commands-and-hooks" class="related-card" data-astro-cid-ya4srytn>
+                  <span class="related-section" data-astro-cid-ya4srytn>Concepts</span>
+                  <span class="related-name" data-astro-cid-ya4srytn>Slash Commands and Hooks</span>
+                </a><a href="/docs/reference/skill-frontmatter" class="related-card" data-astro-cid-ya4srytn>
+                  <span class="related-section" data-astro-cid-ya4srytn>Reference</span>
+                  <span class="related-name" data-astro-cid-ya4srytn>SKILL.md Frontmatter Reference</span>
+                </a>
+            </div>
+          </aside>
+
+        <!-- Prev/Next Navigation -->
+        <nav class="docs-nav-footer" data-astro-cid-ya4srytn>
+          <a href="/docs/concepts/plugins" class="nav-link nav-prev" data-astro-cid-ya4srytn>
+              <span class="nav-label" data-astro-cid-ya4srytn>Previous</span>
+              <span class="nav-title" data-astro-cid-ya4srytn>What Are Claude Code Plugins?</span>
+            </a>
+          <a href="/docs/concepts/agents" class="nav-link nav-next" data-astro-cid-ya4srytn>
+              <span class="nav-label" data-astro-cid-ya4srytn>Next</span>
+              <span class="nav-title" data-astro-cid-ya4srytn>Claude Code Agents and Subagents</span>
+            </a>
+        </nav>
+      </div>
+    </div>
+  </div>
+
+  
+
+  
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Propagation Day: When the CLAUDE.md Spec Becomes the Migration Plan — Tons of Skills Work Diary</title>
+    <meta name="description" content="Three CLAUDE.md spec entries hit critical mass on the same day across nine repos. The lesson is not the volume — it is that writing the spec first turned propagation from toil into a script run.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://startaitools.com/posts/propagation-day-when-the-spec-becomes-the-migration-plan/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/propagation-day-when-the-spec-becomes-the-migration-plan/">
+    <meta property="og:title" content="Propagation Day: When the CLAUDE.md Spec Becomes the Migration Plan — Tons of Skills Work Diary">
+    <meta property="og:description" content="Three CLAUDE.md spec entries hit critical mass on the same day across nine repos. The lesson is not the volume — it is that writing the spec first turned propagation from toil into a script run.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="Propagation Day: When the CLAUDE.md Spec Becomes the Migration Plan — Tons of Skills Work Diary">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/propagation-day-when-the-spec-becomes-the-migration-plan/">
+    <meta name="twitter:title" content="Propagation Day: When the CLAUDE.md Spec Becomes the Migration Plan — Tons of Skills Work Diary">
+    <meta name="twitter:description" content="Three CLAUDE.md spec entries hit critical mass on the same day across nine repos. The lesson is not the volume — it is that writing the spec first turned propagation from toil into a script run.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"Propagation Day: When the CLAUDE.md Spec Becomes the Migration Plan","description":"Three CLAUDE.md spec entries hit critical mass on the same day across nine repos. The lesson is not the volume — it is that writing the spec first turned propagation from toil into a script run.","datePublished":"2026-04-30","url":"https://tonsofskills.com/blog/undefined","author":{"@type":"Person","name":"Jeremy Longshore"},"publisher":{"@type":"Organization","name":"Tons of Skills","url":"https://tonsofskills.com"}}</script>
+  
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.post-header[data-astro-cid-7jjqptxk]{background:var(--panel);padding:4rem 1.5rem 3rem;border-bottom:1px solid var(--border)}.post-header-inner[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto}.back-link[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3);text-decoration:none;display:inline-block;margin-bottom:1.5rem;transition:color .2s}.back-link[data-astro-cid-7jjqptxk]:hover{color:var(--primary)}.post-meta[data-astro-cid-7jjqptxk]{display:flex;align-items:center;gap:.75rem;margin-bottom:1rem}time[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3)}.featured-badge[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.2rem .6rem;background:#ce114126;color:var(--red);border-radius:0;font-weight:600;text-transform:uppercase;letter-spacing:.05em}.post-header[data-astro-cid-7jjqptxk] h1[data-astro-cid-7jjqptxk]{font-family:var(--font-body);font-size:clamp(1.5rem,4vw,2.2rem);font-weight:700;color:var(--text);line-height:1.25;margin-bottom:.75rem;letter-spacing:0}.post-desc[data-astro-cid-7jjqptxk]{color:var(--text-2);font-size:1.05rem;line-height:1.6;margin-bottom:1rem}.post-tags[data-astro-cid-7jjqptxk]{display:flex;gap:.4rem;flex-wrap:wrap}.tag[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.15rem .5rem;background:var(--surface-3);color:var(--text-3);border-radius:0}.post-body[data-astro-cid-7jjqptxk]{padding:3rem 1.5rem 4rem}.prose[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto;color:var(--text-2);line-height:1.8;font-size:1rem}.prose[data-astro-cid-7jjqptxk] h2{font-family:var(--font-body);font-size:1.5rem;font-weight:700;color:var(--text);margin:2.5rem 0 1rem;letter-spacing:0}.prose[data-astro-cid-7jjqptxk] h3{font-size:1.2rem;font-weight:600;color:var(--text);margin:2rem 0 .75rem}.prose[data-astro-cid-7jjqptxk] p{margin-bottom:1rem}.prose[data-astro-cid-7jjqptxk] ul,.prose[data-astro-cid-7jjqptxk] ol{margin:.5rem 0 1rem 1.5rem}.prose[data-astro-cid-7jjqptxk] li{margin-bottom:.35rem}.prose[data-astro-cid-7jjqptxk] strong{color:var(--text);font-weight:600}.prose[data-astro-cid-7jjqptxk] code{font-family:var(--font-mono);font-size:.88em;background:var(--surface-3);padding:.15em .35em;border-radius:0;color:var(--primary)}.prose[data-astro-cid-7jjqptxk] a{color:var(--primary);text-decoration:none}.prose[data-astro-cid-7jjqptxk] a:hover{text-decoration:underline}@media(max-width:768px){.post-header[data-astro-cid-7jjqptxk]{padding:3rem 1rem 2rem}.post-body[data-astro-cid-7jjqptxk]{padding:2rem 1rem 3rem}}
+</style></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  <article class="post" data-astro-cid-7jjqptxk>
+    <header class="post-header" data-astro-cid-7jjqptxk>
+      <div class="post-header-inner" data-astro-cid-7jjqptxk>
+        <a href="/blog" class="back-link" data-astro-cid-7jjqptxk>Back to Work Diary</a>
+        <div class="post-meta" data-astro-cid-7jjqptxk>
+          <time datetime="2026-04-30" data-astro-cid-7jjqptxk>April 29, 2026</time>
+          
+        </div>
+        <h1 data-astro-cid-7jjqptxk>Propagation Day: When the CLAUDE.md Spec Becomes the Migration Plan</h1>
+        <p class="post-desc" data-astro-cid-7jjqptxk>Three CLAUDE.md spec entries hit critical mass on the same day across nine repos. The lesson is not the volume — it is that writing the spec first turned propagation from toil into a script run.</p>
+        <div class="post-tags" data-astro-cid-7jjqptxk>
+          <span class="tag" data-astro-cid-7jjqptxk>claudecode</span><span class="tag" data-astro-cid-7jjqptxk>engineering-management</span><span class="tag" data-astro-cid-7jjqptxk>secrets</span><span class="tag" data-astro-cid-7jjqptxk>testing</span><span class="tag" data-astro-cid-7jjqptxk>infrastructure</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="post-body" data-astro-cid-7jjqptxk>
+      <div class="prose" data-astro-cid-7jjqptxk>
+        <p>On April 30, three patterns that had been written into <code>~/.claude/CLAUDE.md</code> weeks or months earlier as “TO-DO: propagate to all repos, then delete this section” all reached critical mass on the same day. The bd-sync three-layer mirror got its first real-world execution against 24 beads at the Braves Booth repo. The SOPS+age secrets standard flipped on in six repos via one idempotent helper script. The marketplace <code>compatible-with</code> → <code>compatibility</code> rename swept across 2,849 skills in one batch run. The numbers add up to the kind of graph that looks impressive in a screenshot — 3,000+ files changed, 45 PRs merged, 9 repos touched.</p>
+<p>The numbers are not the lesson.</p>
+<p>The lesson is operational and unsexy. Writing the spec text first is what made every one of those propagations tractable. Each spec entry was load-bearing in a way that conventional documentation is not: the spec text <em>was</em> the migration plan. The validator <em>was</em> the gate. The “delete this section when 100% comply” line <em>was</em> the success criterion. Without that discipline up front, multi-repo propagation is hand-rolled toil — bespoke scripts, missed repos, drift four months later. With it, propagation is a script run.</p>
+<p>This is a post about what that looks like in practice across three different propagations on a single day, what it cost, and what it owes back. The counterweight at the end is not optional reading — one of the propagations was reactive, not proactive, and a separate audit on the same day handed back a D grade on the very methodology powering this kind of week. The discipline eats its own dogfood. The food is sometimes bitter.</p>
+<h2 id="spec-entry-1-bd-sync-three-layer-mirror">Spec entry #1: bd-sync three-layer mirror</h2>
+<p>The first propagation is the cleanest illustration of the pattern because it is the youngest. The spec entry was written less than a week earlier in <code>~/.claude/CLAUDE.md</code> under the heading “Bead ↔ GitHub Issue ↔ Plane three-layer mirror (MANDATORY).” It is roughly 80 lines long. It defines a rule, a tool, a data model, and a success criterion, in that order.</p>
+<p>The rule: every tracked unit of work has three correlated records — a bead (local source of truth), a GitHub issue (code-anchored, public), and (when the project uses Plane) a Plane issue (cross-project portfolio view). Every record carries the IDs of the other two. Every state change in any layer fans out to the others.</p>
+<p>The tool: a single bash script at <code>~/bin/bd-sync</code> (~250 LOC, dependencies <code>bd</code>, <code>gh</code>, <code>jq</code>, <code>curl</code>, <code>pass</code>). Four subcommands.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">bd-sync</span><span style="color:#9ECBFF"> link</span><span style="color:#F97583"> &#x3C;</span><span style="color:#9ECBFF">bea</span><span style="color:#E1E4E8">d</span><span style="color:#F97583">></span><span style="color:#79B8FF"> --gh</span><span style="color:#9ECBFF"> OWNER/REPO#N</span><span style="color:#E1E4E8"> [--plane </span><span style="color:#9ECBFF">PROJECT-N]</span><span style="color:#6A737D">   # one-shot link</span></span>
+<span class="line"><span style="color:#B392F0">bd-sync</span><span style="color:#9ECBFF"> note</span><span style="color:#F97583"> &#x3C;</span><span style="color:#9ECBFF">bea</span><span style="color:#E1E4E8">d</span><span style="color:#F97583">></span><span style="color:#9ECBFF"> "message"</span><span style="color:#6A737D">                               # mirrors note → GH comment → Plane comment</span></span>
+<span class="line"><span style="color:#B392F0">bd-sync</span><span style="color:#9ECBFF"> close</span><span style="color:#F97583"> &#x3C;</span><span style="color:#9ECBFF">bea</span><span style="color:#E1E4E8">d</span><span style="color:#F97583">></span><span style="color:#79B8FF"> --reason</span><span style="color:#9ECBFF"> "..."</span><span style="color:#E1E4E8"> [--also-close-gh] [--also-close-plane]</span></span>
+<span class="line"><span style="color:#B392F0">bd-sync</span><span style="color:#9ECBFF"> status</span><span style="color:#E1E4E8"> [&#x3C;bead>]                                     </span><span style="color:#6A737D"># show linkage / drift</span></span></code></pre>
+<p>The data model: cross-references live in the bead’s notes as plain <code>GitHub: &#x3C;owner>/&#x3C;repo>#&#x3C;N></code> and <code>Plane: &#x3C;project>-&#x3C;N></code> lines. The IDs themselves are the synchronization substrate — even if a single mirror operation is missed, the linkage is permanent. Drift is <em>detectable and recoverable</em> because every layer carries the other two IDs.</p>
+<p>The success criterion: <code>bd-sync status</code> exits non-zero when the IDs claimed in a bead don’t match the records they point at.</p>
+<p>That is the spec. It was committed to <code>~/.claude/CLAUDE.md</code> and then nothing happened with it for several days, which is the correct behavior. Specs without an execution context are documents; specs with an execution context become migration plans the first time the right work shows up.</p>
+<p>The right work showed up at the Braves Booth repo on April 30. A 7-layer test audit (issue #69) graded the dashboard at D (38/100) and filed 20 test-infrastructure gaps as beads. Six specialist findings from a live-streaming UX audit produced 35 fix findings labelled F-01 through F-35; eleven of them landed as PRs the same day:</p>
+<ul>
+<li>F-01 — mobile mode toggle</li>
+<li>F-04 — narrative cache key (fixing leakage between game days)</li>
+<li>F-06 — gumbo-poller liveness signal</li>
+<li>F-07 — per-LLM-call telemetry</li>
+<li>F-09 — per-call AbortController for stale-signal prevention</li>
+<li>F-10 — client-side heartbeat-ack watchdog</li>
+<li>F-11 — ID-based opponent detection with fade-in transitions</li>
+<li>F-12 + F-18 — dead <code>answerQuery</code> removal plus Vertex <code>VERTEX_ENABLED</code> gate</li>
+<li>F-14 — SSE client gauge plus 5xx error-rate counter</li>
+<li>F-17 — <code>game-lifecycle.ts</code> extraction giving game-over fan-out a single owner</li>
+</ul>
+<p>The rest stayed open as scoped beads. The canonical first execution of bd-sync was deliberately narrow: 24 beads in two coherent clusters — 16 test-infrastructure gaps under one cluster, 8 highest-priority audit follow-ups under the other. The remaining beads from both audits stay in the backlog, partitioned across the same two clusters, awaiting later sweeps.</p>
+<p>The pre-spec way to manage this would have been one of two losing options. Option A: file 24 GitHub issues, one per bead, drowning the issue tracker. Option B: file two GitHub issues with bullet lists in the body, losing per-bead granularity and traceability. The bd-sync spec defines option C, which is the one that actually works:</p>
+<ul>
+<li>One GitHub issue per logical cluster (<code>braves/#71</code> for the test-infra batch, <code>braves/#72</code> for the audit follow-ups).</li>
+<li>One Plane epic per cluster (<code>BRAVES-15</code> and <code>BRAVES-16</code>).</li>
+<li>Twenty-four beads, each cross-referenced into the same parent GH issue and Plane epic.</li>
+</ul>
+<p>The first execution of <code>bd-sync link</code> looked like this for one bead:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">bd-sync</span><span style="color:#9ECBFF"> link</span><span style="color:#9ECBFF"> bd-7c3f</span><span style="color:#79B8FF"> --gh</span><span style="color:#9ECBFF"> jeremylongshore/braves#71</span><span style="color:#79B8FF"> --plane</span><span style="color:#9ECBFF"> BRAVES-15</span></span>
+<span class="line"><span style="color:#6A737D"># → wrote "GitHub: jeremylongshore/braves#71" + "Plane: BRAVES-15" into bd-7c3f notes</span></span>
+<span class="line"><span style="color:#6A737D"># → posted "Linked from bead bd-7c3f" comment on GH #71</span></span>
+<span class="line"><span style="color:#6A737D"># → posted "Linked from bead bd-7c3f" comment on Plane BRAVES-15</span></span></code></pre>
+<p>Repeated 24 times. After that, every <code>bd note</code> became a <code>bd-sync note</code>, every <code>bd close</code> became a <code>bd-sync close</code>. Comments on the GH issue or the Plane epic mirror back to the bead via <code>bd-sync note</code> runs. The PR auto-close convention falls out cleanly: PR descriptions include <code>Refs jeremylongshore/braves#71</code> while children remain, and <code>Closes jeremylongshore/braves#71</code> only on the PR that retires the last child bead. GitHub auto-close fires on <code>Closes</code>; the agent then runs <code>bd-sync close --also-close-plane</code> so all three layers settle into the same terminal state.</p>
+<p>A concrete worked example: F-04, the narrative cache key fix. The bead carried the description (“cache key currently uses <code>gameId</code> only, leaks narrative across game days when MLB reuses gamePks”), the fix was implemented in PR #62, and the close ran:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">bd-sync</span><span style="color:#9ECBFF"> close</span><span style="color:#9ECBFF"> bd-9a1c</span><span style="color:#79B8FF"> --reason</span><span style="color:#9ECBFF"> "PR #62 merged: cache key now (gameDate, cohostId, gameId)"</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --also-close-gh</span></span>
+<span class="line"><span style="color:#6A737D"># → bead closed with evidence</span></span>
+<span class="line"><span style="color:#6A737D"># → GH issue #71 stays OPEN (15 other beads still tied to it)</span></span>
+<span class="line"><span style="color:#6A737D"># → Plane BRAVES-15 stays OPEN (same reason)</span></span>
+<span class="line"><span style="color:#6A737D"># → mirrored close-comment to GH #71 + Plane BRAVES-15</span></span></code></pre>
+<p>Note the <em>not closed</em> part: GH #71 and Plane BRAVES-15 stay open because they cover 15 other beads still in flight. The close cascade only fires when the closing bead is the last child of its parent epic. That partitioning is what makes the three-layer mirror tractable at scale — cluster issues do not flap open and closed every time a constituent bead retires; they retire once when the entire cluster is done. The spec text answered the question of <em>when do close cascades fire</em> before the first cascade ever needed to be reasoned about.</p>
+<p>What is interesting about this first execution is what <em>did not</em> happen. There was no bespoke “migrate beads to GitHub issues” script. There was no debate about granularity — the spec answered it (one GH issue per cluster, never per task bead). There was no post-hoc drift cleanup, because the IDs were planted at link-time. The cost was 24 invocations of a tool that already worked, plus reading the spec entry once at the start to remember the convention.</p>
+<p>The granularity rule deserves a closer look because it is the part that is hardest to retrofit. The spec text says: <em>cluster beads by module / feature / audit batch; an epic bead maps 1:1 to a GH issue (label <code>epic</code>) and a Plane epic; a task bead inside that epic does NOT get its own GH issue.</em> That is one paragraph, but it answers a question that every multi-tracker workflow eventually trips on. Without it, the failure mode is predictable: a few weeks in, the GH issue tracker has 200 issues, half of them duplicate the bead they correspond to, and the human cost of skimming the issue list to find anything has gone exponential. The spec dodges the failure mode by writing the rule down before any execution exists to drift from.</p>
+<p>The braves audit illustrated the cluster pattern at the right scale. Sixteen test-infrastructure beads — coverage gaps, missing E2E suite, no mutation testing — clustered cleanly under <code>braves/#71</code>. Eight audit follow-ups — observability gaps, performance findings — clustered under <code>braves/#72</code>. Splitting them across two issues kept each conversation thread coherent: the test-infra discussion lives in one place, the audit follow-ups in another. The Plane epics mirrored the same partitioning at <code>BRAVES-15</code> and <code>BRAVES-16</code>. A reader scanning Plane sees two epics with their own velocity numbers; a reader scanning GitHub sees two issues with their own comment threads; a reader scanning beads sees twenty-four task beads each pointing at exactly one cluster.</p>
+<p>That is the propagation pattern when it works. The spec was the plan. The tool was already written. The execution was bookkeeping. There is one caveat in the spec text that deserves to be quoted because it is the part that does <em>not</em> automate cleanly: <em>if a comment originates on the GH issue or Plane issue (e.g., a human or bot replies), the agent must mirror it back via <code>bd-sync note &#x3C;bead></code> for every linked bead so the worktable stays current.</em> That reverse direction is currently manual. It is in the backlog as <code>bd-sync pull</code> — webhook or polling-based ingest of new GH/Plane comments back into beads. Until that ships, the discipline is human: when a reviewer comments on the GH issue, mirror it back. The IDs make that possible; the spec acknowledges that mirror is currently one-way; the backlog item names the gap. Honest specs name their gaps.</p>
+<h2 id="spec-entry-2-sopsage-secrets-standard">Spec entry #2: SOPS+age secrets standard</h2>
+<p>The second propagation has more history. The spec entry was written into <code>~/.claude/CLAUDE.md</code> under “Initiative: SOPS+age secrets standard (TO-DO — propagate to all repos, then delete this section).” It still carries that “delete this section” line at the time of writing, which is the point — that line is the success criterion. When every active repo under <code>~/000-projects/</code> is compliant, the section disappears from the global CLAUDE.md. Until then it stays visible at the top of every session.</p>
+<p>The spec defines a clean global-vs-per-project split:</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Layer</th><th>Where it lives</th><th>Already done</th></tr></thead><tbody><tr><td><code>sops</code> + <code>age</code> + <code>age-keygen</code> binaries</td><td>Global — <code>~/bin/</code></td><td>yes</td></tr><tr><td>Jeremy’s age private key</td><td>Global — <code>~/.config/sops/age/keys.txt</code> (mode 600)</td><td>yes</td></tr><tr><td>Jeremy’s age public recipient</td><td>Global value, listed per-project in each repo’s <code>.sops.yaml</code></td><td>n/a</td></tr><tr><td>Bootstrap helper</td><td>Global — <code>~/bin/sops-init</code> (idempotent)</td><td>yes</td></tr><tr><td><code>.sops.yaml</code> + <code>.env.sops</code> + <code>secrets.example.yaml</code> + <code>scripts/sops-env</code></td><td>Per-project — copied in by <code>sops-init</code></td><td>per-repo, in progress</td></tr></tbody></table>
+<p>The bootstrap helper does the work. <code>sops-init</code> is idempotent, safe to re-run, and surgical. It writes only the four canonical files plus a fenced <code>.gitignore</code> block (only if <code>.env</code> is not already ignored — leaves hand-rolled <code>.gitignore</code> files alone). Never commits, never pushes. The engineer reviews the staged changes and commits.</p>
+<p>The full one-command bootstrap, copied verbatim from the spec:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#79B8FF">cd</span><span style="color:#F97583"> &#x3C;</span><span style="color:#9ECBFF">target-rep</span><span style="color:#E1E4E8">o</span><span style="color:#F97583">></span><span style="color:#E1E4E8"> &#x26;&#x26; </span><span style="color:#B392F0">sops-init</span><span style="color:#6A737D">           # idempotent; safe to re-run</span></span>
+<span class="line"><span style="color:#B392F0">sops-init</span><span style="color:#79B8FF"> --check</span><span style="color:#6A737D">                       # exit 0 if compliant, 1 if not</span></span>
+<span class="line"><span style="color:#B392F0">sops-init</span><span style="color:#79B8FF"> --recipient</span><span style="color:#9ECBFF"> age1abc...</span><span style="color:#6A737D">        # add another engineer's recipient</span></span></code></pre>
+<p>Three subcommands cover the full lifecycle. <code>sops-init</code> (no flags) is the bootstrap. <code>--check</code> is the gate. <code>--recipient</code> is the team-onboarding move — adding another engineer’s age public key to every <code>.sops.yaml</code> in the repo. There is no <code>sops-init --update</code>, on purpose: the four canonical files are not supposed to drift between repos, so updating the helper means updating every repo at once via re-running <code>sops-init</code> against each, not via patching individual files.</p>
+<p>The reference implementation lived at <code>mandy-real-estate-skills</code> for two weeks before the propagation day. That is not accidental. Reference implementations are how you discover the unwritten parts of the spec — the awkward edges that only show up when you actually use the thing. The first run at mandy turned up two unwritten rules that got written into the spec before the propagation day: the <code>.gitignore</code> fenced block must be opt-in (some repos already have hand-tuned <code>.gitignore</code> rules that should not be touched), and the <code>secrets.example.yaml</code> template must be project-agnostic (the real values live encrypted in <code>.env.sops</code>; the example file is shape-only). Both rules now appear in the spec text, which is why the propagation day’s six adoptions went without surprises.</p>
+<p>On April 30, the helper got run against six repos in sequence. Each adoption is a single commit titled <code>Adopt SOPS+age secrets standard</code>:</p>
+<ol>
+<li>braves</li>
+<li>contributions</li>
+<li>hybrid-ai-stack</li>
+<li>intentvision</li>
+<li>searchcarriers</li>
+<li>the-county-line</li>
+</ol>
+<p>Each invocation looks identical:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#79B8FF">cd</span><span style="color:#9ECBFF"> ~/000-projects/braves</span><span style="color:#E1E4E8"> &#x26;&#x26; </span><span style="color:#B392F0">sops-init</span></span>
+<span class="line"><span style="color:#6A737D"># → wrote .sops.yaml with recipient age1me3vkelljqe2u4...</span></span>
+<span class="line"><span style="color:#6A737D"># → wrote .env.sops (encrypted version of existing .env)</span></span>
+<span class="line"><span style="color:#6A737D"># → wrote secrets.example.yaml</span></span>
+<span class="line"><span style="color:#6A737D"># → wrote scripts/sops-env</span></span>
+<span class="line"><span style="color:#6A737D"># → appended fenced block to .gitignore (.env was not previously ignored)</span></span>
+<span class="line"><span style="color:#6A737D"># → reminder: review changes + remove plaintext .env after verifying decrypt round-trip</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79B8FF">cd</span><span style="color:#9ECBFF"> ~/000-projects/braves</span><span style="color:#E1E4E8"> &#x26;&#x26; </span><span style="color:#B392F0">sops-init</span><span style="color:#79B8FF"> --check</span></span>
+<span class="line"><span style="color:#6A737D"># → exit 0: compliant</span></span></code></pre>
+<p>The <code>--check</code> flag is the gate. It exits 0 if the four canonical files are present and the <code>.sops.yaml</code> recipient list is non-empty. It exits 1 otherwise. The failure mode it is designed to catch is the easy one: someone vendored the SOPS files months ago, then <code>git rm</code>’d a piece of them in a refactor, and now the repo is silently non-compliant. The check is one line of CI away from being a hard gate.</p>
+<p>The spec text <em>is</em> the propagation plan. The spec lists the four files. The helper writes those four files. The check verifies those four files. The success criterion (delete the section when 100% comply) is testable because compliance is testable. None of this needs a meeting or a status update. It needs a list of repos and one shell loop.</p>
+<p>What did <em>not</em> happen on propagation day for SOPS is also illustrative. There was no discussion about whether SOPS or sealed-secrets or doppler or 1Password CLI is the right tool. That decision was made when the spec was written. There was no per-repo customization — every repo got the same four files. There was no drift management because <code>--check</code> is the drift detector. The cost was six invocations of a helper that already worked, and engineer review of the resulting commits.</p>
+<p>The remaining work is small and visible. A run of <code>sops-init --check</code> across every repo under <code>~/000-projects/</code> enumerates the holdouts. Each holdout is one <code>cd &#x3C;repo> &#x26;&#x26; sops-init</code> away from compliance. When the count hits zero, the section gets deleted from <code>~/.claude/CLAUDE.md</code>. The standard becomes implicit — no documentation, just the universal presence of the four files.</p>
+<p>The anti-patterns section in the spec is worth quoting because it is the load-bearing piece for <em>new</em> repos rather than existing ones:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="markdown"><code><span class="line"><span style="color:#79B8FF;font-weight:bold">### Anti-patterns — refuse on sight, regardless of migration status</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FFAB70">-</span><span style="color:#E1E4E8"> ❌ Plaintext </span><span style="color:#79B8FF">`.env`</span><span style="color:#E1E4E8"> in any commit</span></span>
+<span class="line"><span style="color:#FFAB70">-</span><span style="color:#E1E4E8"> ❌ Hardcoded API keys in source files "for testing" — use </span><span style="color:#79B8FF">`tests/fixtures/`</span></span>
+<span class="line"><span style="color:#FFAB70">-</span><span style="color:#E1E4E8"> ❌ Decrypting SOPS files to disk for any reason (the wrapper uses </span><span style="color:#79B8FF">`/dev/shm`</span><span style="color:#E1E4E8"> tmpfs)</span></span>
+<span class="line"><span style="color:#FFAB70">-</span><span style="color:#E1E4E8"> ❌ Pasting secrets in chat: when it happens, encrypt to </span><span style="color:#79B8FF">`.env.sops`</span><span style="color:#E1E4E8"> immediately</span></span>
+<span class="line"><span style="color:#E1E4E8">  AND flag the leaked key for rotation (chat history is not erasable retroactively)</span></span></code></pre>
+<p>That last bullet is the one that gets quoted back the most often. The other three are hygiene; the secrets-in-chat clause is operational. It names a specific failure mode (the human pastes a real key into a Claude conversation), assigns a specific recovery (encrypt the leaked key into <code>.env.sops</code> so the new file is the canonical source, then rotate the leaked key out of every system that knows about it), and acknowledges a constraint (chat transcripts are not erasable retroactively, so containment is the only available move). Each propagation that flipped on April 30 inherits this clause for free, because the clause lives in the spec, and the spec is the propagation plan.</p>
+<h2 id="spec-entry-3-compatible-with--compatibility">Spec entry #3: <code>compatible-with</code> → <code>compatibility</code></h2>
+<p>The third propagation is the one that requires the most candor. The spec discipline that powered it was real, but the <em>trigger</em> was reactive, not proactive. Three days earlier on April 28, a schema-validator debacle had torn down the IS marketplace’s enterprise rubric on the wrong claim that the rubric should “realign to Anthropic’s permissive spec floor.” The full postmortem lives at <a href="/blog/schema-debacle-rubric-on-spec-postmortem/">/posts/schema-debacle-rubric-on-spec-postmortem/</a> and the upshot is documented in a NON-NEGOTIABLES section now pinned at the top of <code>SCHEMA_CHANGELOG.md</code>.</p>
+<p>What survived from that wrong direction was one genuinely correct rename. The <a href="https://agentskills.io/specification">AgentSkills.io spec</a> — the open standard Claude Code follows — uses a free-text field called <code>compatibility</code>. The IS rubric had been using a CSV-formatted field called <code>compatible-with</code>. That divergence was a real bug, the kind that should be fixed. The validator’s deprecation entry captures the rename:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#6A737D"># scripts/validate-skills-schema.py</span></span>
+<span class="line"><span style="color:#79B8FF">DEPRECATED_FIELDS</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#9ECBFF">    'compatible-with'</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"Use `compatibility` (free-text per AgentSkills.io spec) "</span></span>
+<span class="line"><span style="color:#9ECBFF">                       "instead. Example: `compatibility: Designed for Claude Code`."</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>A deprecation entry in a validator catches new violations. It does not migrate the existing 2,849 skills sitting in the marketplace catalog. That migration is what <code>batch-remediate.py --migrate-compatible-with</code> is for. The script translates the CSV-platform-list shape into the free-text shape: for input <code>compatible-with: claude-code, claude-desktop</code>, the renderer produces <code>compatibility: Designed for Claude Code, also compatible with Claude Desktop</code> — the first platform gets the <code>Designed for</code> prefix, additional platforms get folded into an <code>also compatible with</code> clause. Single-platform inputs collapse to just the prefix form.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#6A737D"># scripts/batch-remediate.py (signature)</span></span>
+<span class="line"><span style="color:#F97583">def</span><span style="color:#B392F0"> migrate_compatible_with</span><span style="color:#E1E4E8">(content: </span><span style="color:#79B8FF">str</span><span style="color:#E1E4E8">) -> Tuple[</span><span style="color:#79B8FF">str</span><span style="color:#E1E4E8">, Optional[</span><span style="color:#79B8FF">str</span><span style="color:#E1E4E8">]]:</span></span>
+<span class="line"><span style="color:#9ECBFF">    """Translate `compatible-with: claude-code, claude-desktop` (CSV) to</span></span>
+<span class="line"><span style="color:#9ECBFF">    `compatibility: Designed for Claude Code, also compatible with Claude Desktop`</span></span>
+<span class="line"><span style="color:#9ECBFF">    (free text per AgentSkills.io). Operates on raw file content; returns the</span></span>
+<span class="line"><span style="color:#9ECBFF">    rewritten content and a status string. Idempotent: skips files already</span></span>
+<span class="line"><span style="color:#9ECBFF">    using `compatibility`. See render_compatibility_value() for the renderer</span></span>
+<span class="line"><span style="color:#9ECBFF">    that produces the head/tail framing for multi-platform inputs."""</span></span>
+<span class="line"><span style="color:#79B8FF">    ...</span></span></code></pre>
+<p>The script ran across the marketplace catalog in eight tranches on propagation day:</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>PR</th><th>Scope</th><th>Skill count</th></tr></thead><tbody><tr><td>#622</td><td>18 categories</td><td>300</td></tr><tr><td>#620</td><td>ai-ml category</td><td>34</td></tr><tr><td>#623</td><td>saas-packs 2/6</td><td>438</td></tr><tr><td>#624</td><td>saas-packs 1/6</td><td>422</td></tr><tr><td>#625</td><td>saas-packs 3/6</td><td>408</td></tr><tr><td>#626</td><td>saas-packs 4/6</td><td>433</td></tr><tr><td>#627</td><td>saas-packs 5/6</td><td>398</td></tr><tr><td>#628</td><td>saas-packs 6/6</td><td>416</td></tr></tbody></table>
+<p>Total: roughly 2,849 skills migrated in one day with no data loss, no partial states, no rollbacks needed. The migration is idempotent — running <code>batch-remediate.py --migrate-compatible-with</code> against the same tree twice produces the same result on the second run.</p>
+<p>The CLI surface for the migration is intentionally narrow:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">python3</span><span style="color:#9ECBFF"> scripts/batch-remediate.py</span><span style="color:#79B8FF"> --migrate-compatible-with</span><span style="color:#79B8FF"> --root</span><span style="color:#9ECBFF"> packs/saas-1</span></span>
+<span class="line"><span style="color:#6A737D"># → scans packs/saas-1 recursively for SKILL.md files</span></span>
+<span class="line"><span style="color:#6A737D"># → for each: parses YAML frontmatter, applies migrate_compatible_with()</span></span>
+<span class="line"><span style="color:#6A737D"># → writes back only the files that changed</span></span>
+<span class="line"><span style="color:#6A737D"># → emits a summary: "Migrated 422 skills, 0 errors, 0 skipped"</span></span></code></pre>
+<p>A separate <code>--dry-run</code> flag prints the diff without writing anything, useful for CI gates. After the eight tranches landed, a single <code>--check</code> run across the entire marketplace catalog confirmed no <code>compatible-with</code> strings remained outside of test fixtures and migration documentation. That confirmation is the validator’s job, not the migration tool’s job — the validator at marketplace tier still rejects <code>compatible-with</code> as a deprecated field name, so any new submission carrying the old name will fail the marketplace gate before the migration tool ever needs to run again.</p>
+<p>What earned the propagation tractability was the spec discipline that survived the debacle. The validator had a clear deprecation entry. The migration tool’s signature was unambiguous. The CLAUDE.md “Claude Skills SOP” section pointed every future session at the canonical sources by path. The propagation step itself was a script run because the spec text — including the deprecation entry, the rationale, the migration helper invocation — had been committed three days earlier.</p>
+<p>The dishonest version of this story would frame the migration as pure foresight: <em>we wrote the spec, the propagation followed, look how clean the system is.</em> The honest version is that the propagation tool existed because the spec text had been correctly written, and the propagation <em>trigger</em> was a self-inflicted wound — a reframe attempt that should never have happened. The discipline that survived contact with the wound is what made the recovery clean, not the absence of the wound.</p>
+<p>The same propagation day shipped six other adjacent improvements in <code>claude-code-plugins</code> that ride on the same spec discipline:</p>
+<ul>
+<li>audit-harness installed at the marketplace repo with <code>tests/TESTING.md</code> and coverage thresholds (PR #621), bringing enforcement into the repo it audits.</li>
+<li>a11y for the marketplace site plus RTM/PERSONAS/JOURNEYS traceability and a CLI performance budget (PR #631).</li>
+<li>husky + lint-staged + commitlint + root ESLint/Prettier (PR #629), so quality gates run before every commit instead of in CI alone.</li>
+<li>Four ADRs declining specific audit-tests roadmap recommendations (PR #619), making the <em>no</em> decisions traceable in their own right.</li>
+<li>x-bug-triage: five SKILL.md files brought to marketplace compliance (PR #633).</li>
+<li>Catalog: orphaned <code>jeremy-google-adk</code> and <code>jeremy-vertex-ai</code> plugins exposed in the marketplace navigation (PR #634).</li>
+</ul>
+<p>Plus five small PRs (#635–#639) stabilizing the <code>sync-external</code> workflow that produces auto-PRs into downstream repos: pnpm version conflict, <code>--no-frozen-lockfile</code>, install workspace deps, handle empty/submodule/partial failures, disable husky pre-commit in auto-PR. Each one is a small fix; together they harden the propagation tooling itself, which is how propagation patterns mature. The migration script that ran across 2,849 skills on April 30 was usable because the surrounding tooling had been hardening in the background for weeks.</p>
+<h2 id="counterweight">Counterweight</h2>
+<p>Three patterns that all worked in one day is exactly the shape of a story that should be eyed with suspicion. Three things deserve naming as direct counterweight.</p>
+<p><strong>The Braves Booth dashboard scored a D (38/100) on its own 7-layer test audit on the same day.</strong> Twenty gaps filed. The audit ran against the very methodology that the bd-sync mirror was about to demonstrate beautifully. The methodology eats its own dogfood and the food is sometimes bitter — there is no version of this where the propagation patterns are mature and the codebases they govern are also mature. They are independent variables. The bd-sync mirror worked perfectly to file the 24 beads documenting how badly the dashboard tested. That is success and indictment in the same artifact.</p>
+<p><strong>The marketplace migration was reactive.</strong> Three days earlier, a validator reframe had torn down the enterprise rubric on a wrong reading of the underlying spec. The <code>compatible-with</code> → <code>compatibility</code> rename was the one piece worth keeping out of an otherwise-discarded plan. The propagation tool existed because the spec text was clear. The propagation trigger was a self-inflicted wound. Anyone framing this as a triumph of foresight is reading the story upside down.</p>
+<p><strong>Volume is not virtue.</strong> 3,000+ files changed across 9+ repos in one day is the same shape as a system about to break under its own weight if the discipline behind it is not consistent. Three patterns worked because three specs had been written down. The fourth pattern that <em>should</em> have shipped on the same day — a <code>validate-consistency</code> policy across all client repos — did not, because the spec for it had not been written down clearly enough. The day is a snapshot of where the discipline holds and where it is still owed.</p>
+<p>What is owed back, in order:</p>
+<ol>
+<li>The Braves Booth has 20 test-infra gaps and 35 UX audit findings (F-01 through F-35) to retire over time. Eleven shipped on April 30; 24 are linked through the bd-sync mirror’s first execution; the rest stay scoped under the same two clusters and will land in later sweeps. Each is its own bead. The bd-sync mirror is in place; the work is the work.</li>
+<li>The SOPS+age propagation has roughly half the repos in <code>~/000-projects/</code> still on plaintext <code>.env</code>. The helper is idempotent. The remaining work is mechanical — one <code>cd &#x3C;repo> &#x26;&#x26; sops-init</code> per holdout, then engineer review.</li>
+<li>The <code>validate-consistency</code> audit needs a written-down propagation spec before the next batch. Until then, the audits will land case-by-case rather than as a single propagation day.</li>
+</ol>
+<p>Volume in the absence of these follow-throughs would be theatre. Volume <em>with</em> the follow-throughs is the shape of the system maturing.</p>
+<p>There is a second-order counterweight worth naming. The <code>contributions</code> repo went through a major architectural pivot on the same day — the cloud-only bounty system was archived and replaced with a local-first, skill-only architecture. Ten phases of the rebrand from <code>bounty-system</code> to <code>contribute-system</code> landed across types, dashboard routes, orchestrator, docs, tracker, README, CLAUDE.md, INDEX, cloud + Firestore + GCS rebrand stage, log strings, and final cleanup. That work was structural enough that it could have eaten the entire day on its own. It did not, because the SOPS+age propagation was a single <code>sops-init</code> invocation against a repo that was already mid-pivot, and the bd-sync mirror does not care what the repo’s architecture looks like internally. The propagation patterns are <em>orthogonal</em> to the projects they apply to. That orthogonality is a property of the spec discipline, not a coincidence — every one of the three specs was written specifically to be project-agnostic, so that propagation day work could happen across nine repos without nine project-specific conversations.</p>
+<p>A third counterweight, smaller but worth flagging. Two new client-facing real-estate sites shipped placeholder pages on April 30 — <code>mandy-real-estate-skills</code> v0.0.3 and a brand-new <code>comehomealabama</code> (Astro 5 + Tailwind v4 + brand-token system, CNAME, dual licensure, IDX subdomain). Both sites adopted SOPS+age via the same <code>sops-init</code> invocation as every other repo. Both inherit bd-sync the moment their first beads get cross-linked. New repos are the easiest case for propagation patterns because they have no legacy to migrate from; the discipline is to onboard them on day one rather than retrofitting later.</p>
+<h2 id="also-shipped">Also shipped</h2>
+<p>A handful of smaller propagation-adjacent items rounded out the day. <code>github-profile</code> got a one-line rename from “Bounties” to “Contributions” to match the architectural pivot in the <code>contributions</code> repo — the kind of naming consistency that is invisible until it isn’t. <code>nixtla</code> dropped Python 3.9 support and reformatted <code>scaffold_plugin.py</code>, narrowing the support matrix in advance of the F1 SDK migration baseline that landed earlier in the week. <code>x-bug-triage-plugin</code> aligned its frontmatter with the agentskills.io spec and restructured several body sections, riding the same <code>compatible-with</code> → <code>compatibility</code> migration that the marketplace catalog had run minutes earlier.</p>
+<p>The <code>mandy-real-estate-skills</code> repo cut three releases in 24 hours — v0.0.1, v0.0.2, v0.0.3 — as the release engineering for that placeholder site got tightened. The <code>comehomealabama</code> site shipped its first commit. An architecture diagram routing fix at mandy ensured the orange Twilio→Slack path no longer crossed the SendGrid path. None of these items are propagation patterns in their own right, but each rides on the same spec discipline: every one of those repos inherited SOPS+age via the same helper, and every one will inherit bd-sync the moment it has beads worth tracking.</p>
+<h2 id="closing--write-the-spec-before-the-propagation">Closing — write the spec before the propagation</h2>
+<p>The transferable mental model is shorter than the post that surrounds it.</p>
+<blockquote>
+<p>Write the spec before the propagation. Make the spec text load-bearing. The validator becomes the gate. The “delete this section when done” line becomes the success criterion. Without this, multi-repo propagation is hand-rolled toil; with this, it is a script run.</p>
+</blockquote>
+<p>Each clause in that paragraph maps to one of the three propagations.</p>
+<p><em>The validator becomes the gate.</em> The marketplace migration shipped 2,849 skills in one day because <code>validate-skills-schema.py</code> already had a deprecation entry for <code>compatible-with</code>. The validator was the gate. The migration tool was the propagation. The validator did not become the gate on April 30; it had been the gate for weeks, which is why the gate was usable on propagation day.</p>
+<p><em>The spec text becomes the migration plan.</em> SOPS+age propagated to six repos in one day because the spec text in <code>~/.claude/CLAUDE.md</code> named the four canonical files, the bootstrap helper, and the success criterion. There was nothing to invent on propagation day. There was a list of repos and a helper that already worked.</p>
+<p><em>The “delete this section when done” line becomes the success criterion.</em> This is the part that takes discipline because it requires writing the closing condition into the opening text. Most documentation does not do this — it accretes, it never deletes itself. A propagation spec that does not name its own deletion condition is a spec that will be in the document forever, drifting from reality, becoming a monument to itself. The SOPS section says <em>delete this whole section when 100% comply.</em> That is the only sentence in the section that matters more than the others, because it is the one that closes the loop.</p>
+<p>The bd-sync mirror is the youngest of the three patterns and the one with the cleanest spec. Its first execution against 24 beads at the Braves Booth on April 30 was bookkeeping, not invention, because the spec text had answered the granularity question (one GH issue per cluster), the linkage question (IDs in bead notes), and the drift question (<code>bd-sync status</code> exits non-zero on mismatch) before a single execution had ever happened. The first run was not a pilot; it was a confirmation.</p>
+<p>There is a fourth, quieter clause worth naming. <em>Do not skip the reference implementation.</em> SOPS+age sat at <code>mandy-real-estate-skills</code> for two weeks before the propagation. That was not delay. That was the reference implementation discovering the unwritten parts of the spec — the awkward edges that only show up under real use. By the time <code>sops-init</code> ran against the second repo, those edges were already documented and handled. By the time it ran against the sixth repo, the helper was boring. Boring is the goal state for a propagation tool.</p>
+<p>A day that looked like chaos on a graph was actually three CLAUDE.md spec entries reaching critical mass simultaneously. The graph is not the story. The spec discipline is the story. Volume came for free once the specs were written down.</p>
+<p>One last reflection on what the <em>next</em> propagation day will require. The patterns that worked on April 30 were the ones whose specs had been pressure-tested by reference implementations weeks or months in advance. The bd-sync mirror lived in <code>~/.claude/CLAUDE.md</code> for several days before its first 24-bead execution. SOPS+age lived at <code>mandy-real-estate-skills</code> for two weeks before propagating to six repos. The marketplace migration tool had been in <code>batch-remediate.py</code> long enough to have its own deprecation entry in the validator. None of these were written-and-shipped in the same day. Each one had a maturation period during which the spec text got refined against real use, and the helper got hardened against real edge cases, and the success criterion got named explicitly enough to be testable.</p>
+<p>The patterns that did <em>not</em> propagate on April 30 are the ones whose specs are not yet pressure-tested. The <code>validate-consistency</code> audit policy is one. The unified <code>release</code> engineering standard across all client repos is another. Both have draft text in various places. Neither has been written down once, in one place, with the load-bearing structure of a propagation spec — global vs per-project split, idempotent helper, success criterion, anti-patterns. Until that text exists, those patterns will land case-by-case rather than as a single propagation day.</p>
+<p>The mental model is the post. The volume on the graph was a side effect of the model. The next propagation day is whatever the next spec entry is, plus the helper that already works, plus a list of repos. That is the entire pipeline. When it works, it looks like chaos. When it does not work, it looks like a meeting calendar.</p>
+<p>There is one final operational note worth preserving. Each of the three propagations on April 30 was effectively a single-engineer operation against many repos. There was no team coordination meeting, no shared spreadsheet of progress, no Slack channel for the migration. The spec text replaced all of those artifacts. A propagation that needs coordination overhead is a propagation whose spec was not written down clearly enough — every minute spent in a coordination meeting is a minute spent not editing the spec. The transferable rule that comes out of that observation is short: when a propagation feels like it needs a meeting, edit the spec instead.</p>
+<p>The CLAUDE.md spec was the meeting agenda for a meeting that never had to happen. Three propagations, nine repos, one day, no coordination overhead. The graph in the screenshot is the receipt for picking the durable artifact over the urgent one, several weeks earlier, when nobody was watching.</p>
+<p>A propagation pattern is not a graph of files changed. It is a sentence in a spec. When the sentence is load-bearing — when it names the helper, the success criterion, and the deletion condition — the graph follows for free.</p>
+<p>When the sentence is decorative, the graph never materializes regardless of how many meetings get scheduled to push it along. The discipline of writing the load-bearing sentence first is the entire discipline. Everything else is propagation.</p>
+<p>The next entry in <code>~/.claude/CLAUDE.md</code> that needs this treatment is already lined up. Whether it ships on a single propagation day or trickles in case-by-case is mostly a function of how clearly the sentence gets written down before the helper exists, not after.</p>
+<h2 id="related-posts">Related Posts</h2>
+<ul>
+<li><a href="/blog/schema-debacle-rubric-on-spec-postmortem/">The Rubric Sits On Top Of The Spec: A Schema Validator Postmortem</a> — what happens when the spec layering breaks down, three days before this post’s marketplace migration shipped.</li>
+<li><a href="/blog/broadcast-day-llm-fallback-jchads-challenge/">Forty-Four Minutes Before First Pitch: An LLM Fallback Chain and a Live Probability Gauge in One Session</a> — the same braves-booth dashboard, two days earlier, in incident-response mode.</li>
+<li><a href="/blog/audit-harness-v010-enforcement-travels-with-code/">audit-harness v0.10: Enforcement Travels With the Code</a> — the prior expression of the same mental model, applied to test enforcement infrastructure.</li>
+</ul>
+      </div>
+    </div>
+  </article>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

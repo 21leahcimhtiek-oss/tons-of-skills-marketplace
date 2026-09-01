@@ -1,0 +1,1142 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Slash Commands and Hooks | Docs</title>
+    <meta name="description" content="How to define slash commands in Claude Code plugins using commands/*.md files, and how to configure lifecycle hooks (pre-tool-call, post-tool-call) in SKILL.md frontmatter for automated behaviors.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://tonsofskills.com/tons-of-skills-marketplace/docs/concepts/commands-and-hooks/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/docs/concepts/commands-and-hooks/">
+    <meta property="og:title" content="Slash Commands and Hooks | Docs">
+    <meta property="og:description" content="How to define slash commands in Claude Code plugins using commands/*.md files, and how to configure lifecycle hooks (pre-tool-call, post-tool-call) in SKILL.md frontmatter for automated behaviors.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="Slash Commands and Hooks | Docs">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/docs/concepts/commands-and-hooks/">
+    <meta name="twitter:title" content="Slash Commands and Hooks | Docs">
+    <meta name="twitter:description" content="How to define slash commands in Claude Code plugins using commands/*.md files, and how to configure lifecycle hooks (pre-tool-call, post-tool-call) in SKILL.md frontmatter for automated behaviors.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Slash Commands and Hooks","description":"How to define slash commands in Claude Code plugins using commands/*.md files, and how to configure lifecycle hooks (pre-tool-call, post-tool-call) in SKILL.md frontmatter for automated behaviors.","author":{"@type":"Organization","name":"Intent Solutions","url":"https://intentsolutions.io"},"publisher":{"@type":"Organization","name":"Tons of Skills","url":"https://tonsofskills.com"},"url":"https://tonsofskills.com/docs/concepts/commands-and-hooks","keywords":"Claude Code commands, slash commands, Claude Code hooks, pre-tool-call, post-tool-call, lifecycle hooks, commands/*.md, CLAUDE_PLUGIN_ROOT","mainEntityOfPage":{"@type":"WebPage","@id":"https://tonsofskills.com/docs/concepts/commands-and-hooks"}}</script>
+  
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/_..B9N6JsV8.css"></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  <div class="docs-page" data-astro-cid-ya4srytn>
+    <div class="docs-container" data-astro-cid-ya4srytn>
+      <aside class="docs-sidebar" id="docs-sidebar" data-astro-cid-qrwn6rcr>
+  <div class="sidebar-sticky" data-astro-cid-qrwn6rcr>
+    <a href="/docs" class="sidebar-home" data-astro-cid-qrwn6rcr>Documentation</a>
+    <nav class="sidebar-nav" data-astro-cid-qrwn6rcr>
+      <div class="sidebar-section" data-astro-cid-qrwn6rcr>
+          <h3 class="sidebar-section-title" data-astro-cid-qrwn6rcr>Getting Started</h3>
+          <ul class="sidebar-list" data-astro-cid-qrwn6rcr>
+            <li data-astro-cid-qrwn6rcr>
+                <a href="/docs/getting-started/installation" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Install Claude Code Plugins
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/getting-started/first-plugin" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Install Your First Plugin
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/getting-started/first-skill" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Your First Agent Skill
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/getting-started/cli-reference" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  ccpi CLI Quick Reference
+                </a>
+              </li>
+          </ul>
+        </div><div class="sidebar-section" data-astro-cid-qrwn6rcr>
+          <h3 class="sidebar-section-title" data-astro-cid-qrwn6rcr>Concepts</h3>
+          <ul class="sidebar-list" data-astro-cid-qrwn6rcr>
+            <li data-astro-cid-qrwn6rcr>
+                <a href="/docs/concepts/plugins" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  What Are Claude Code Plugins?
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/concepts/skills" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Understanding Agent Skills (SKILL.md)
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/concepts/agents" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Claude Code Agents and Subagents
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/concepts/commands-and-hooks" class="sidebar-link active" data-astro-cid-qrwn6rcr>
+                  Slash Commands and Hooks
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/concepts/mcp-servers" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  MCP Servers in Claude Code Plugins
+                </a>
+              </li>
+          </ul>
+        </div><div class="sidebar-section" data-astro-cid-qrwn6rcr>
+          <h3 class="sidebar-section-title" data-astro-cid-qrwn6rcr>Guides</h3>
+          <ul class="sidebar-list" data-astro-cid-qrwn6rcr>
+            <li data-astro-cid-qrwn6rcr>
+                <a href="/docs/guides/write-a-skill" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  How to Write a Claude Code Skill
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/guides/build-a-plugin" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  How to Build a Claude Code Plugin
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/guides/create-an-agent" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  How to Create a Claude Code Agent
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/guides/saas-skill-packs" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  SaaS Skill Packs: Platform Integrations
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/guides/mcp-server-plugin" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Building an MCP Server Plugin
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/guides/publish-to-marketplace" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Publish a Plugin to the Marketplace
+                </a>
+              </li>
+          </ul>
+        </div><div class="sidebar-section" data-astro-cid-qrwn6rcr>
+          <h3 class="sidebar-section-title" data-astro-cid-qrwn6rcr>Reference</h3>
+          <ul class="sidebar-list" data-astro-cid-qrwn6rcr>
+            <li data-astro-cid-qrwn6rcr>
+                <a href="/docs/reference/skill-frontmatter" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  SKILL.md Frontmatter Reference
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/reference/plugin-json-schema" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  plugin.json Schema Reference
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/reference/plugin-categories" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Plugin Categories and Tags
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/reference/allowed-tools" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Allowed Tools Reference
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/reference/cli-commands" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  ccpi CLI Command Reference
+                </a>
+              </li>
+          </ul>
+        </div><div class="sidebar-section" data-astro-cid-qrwn6rcr>
+          <h3 class="sidebar-section-title" data-astro-cid-qrwn6rcr>Ecosystem</h3>
+          <ul class="sidebar-list" data-astro-cid-qrwn6rcr>
+            <li data-astro-cid-qrwn6rcr>
+                <a href="/docs/ecosystem/marketplace-overview" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Tons of Skills Marketplace Guide
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/ecosystem/official-anthropic-docs" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Official Anthropic Documentation Links
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/ecosystem/community-resources" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Claude Code Community and Resources
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/ecosystem/faq" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Claude Code Plugins FAQ
+                </a>
+              </li>
+          </ul>
+        </div>
+    </nav>
+  </div>
+</aside>
+
+      <div class="docs-main" data-astro-cid-ya4srytn>
+        <!-- Breadcrumbs -->
+        <nav class="docs-breadcrumbs" aria-label="Breadcrumb" data-astro-cid-ya4srytn>
+          <a href="/" data-astro-cid-ya4srytn>Home</a>
+          <span class="sep" data-astro-cid-ya4srytn>/</span>
+          <a href="/docs" data-astro-cid-ya4srytn>Docs</a>
+          <span class="sep" data-astro-cid-ya4srytn>/</span>
+          <a href="/docs#concepts" data-astro-cid-ya4srytn>Concepts</a>
+          <span class="sep" data-astro-cid-ya4srytn>/</span>
+          <span class="current" data-astro-cid-ya4srytn>Slash Commands and Hooks</span>
+        </nav>
+
+        <!-- Header -->
+        <header class="docs-header" data-astro-cid-ya4srytn>
+          <h1 class="docs-title" data-astro-cid-ya4srytn>Slash Commands and Hooks</h1>
+          <p class="docs-description" data-astro-cid-ya4srytn>How to define slash commands in Claude Code plugins using commands/*.md files, and how to configure lifecycle hooks (pre-tool-call, post-tool-call) in SKILL.md frontmatter for automated behaviors.</p>
+        </header>
+
+        <!-- Content -->
+        <article class="docs-content" id="docs-content" data-astro-cid-ya4srytn>
+          
+  <p>Slash commands and hooks are two complementary mechanisms for controlling Claude Code behavior. Commands give users explicit control — type <code>/deploy</code> and Claude runs your deployment workflow. Hooks give developers automated control — every time Claude calls a specific tool, your hook runs before or after it without any user intervention. Together, they cover both ends of the interaction spectrum: deliberate user actions and invisible guardrails.</p>
+<h2 id="slash-commands">Slash Commands</h2>
+<h3 id="what-they-are">What They Are</h3>
+<p>A slash command is a markdown file in a plugin’s <code>commands/</code> directory that defines an action users can invoke by typing <code>/command-name</code> in Claude Code. Unlike skills (which activate automatically based on context), commands require explicit invocation. This makes them ideal for workflows that should only run when the user specifically requests them.</p>
+<p><strong>Common use cases for commands:</strong></p>
+<ul>
+<li>Deployment workflows (<code>/deploy</code>, <code>/rollback</code>)</li>
+<li>Code generation from templates (<code>/scaffold</code>, <code>/generate-api</code>)</li>
+<li>Analysis and reporting (<code>/audit</code>, <code>/coverage-report</code>)</li>
+<li>Repository maintenance (<code>/clean</code>, <code>/update-deps</code>)</li>
+<li>Documentation generation (<code>/generate-docs</code>, <code>/api-docs</code>)</li>
+</ul>
+<h3 id="command-file-structure">Command File Structure</h3>
+<p>Command files live in the <code>commands/</code> directory of a plugin:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>my-plugin/</span></span>
+<span class="line"><span>└── commands/</span></span>
+<span class="line"><span>    ├── deploy.md</span></span>
+<span class="line"><span>    ├── scaffold.md</span></span>
+<span class="line"><span>    ├── audit.md</span></span>
+<span class="line"><span>    └── update-deps.md</span></span></code></pre>
+<p>Each file name (minus the <code>.md</code> extension) becomes the command name. A file named <code>deploy.md</code> creates the <code>/deploy</code> command. Use kebab-case for multi-word commands: <code>update-deps.md</code> creates <code>/update-deps</code>.</p>
+<h3 id="command-frontmatter">Command Frontmatter</h3>
+<p>Every command file begins with YAML frontmatter that defines its metadata:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#B392F0">---</span></span>
+<span class="line"><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">deploy</span></span>
+<span class="line"><span style="color:#85E89D">description</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"Deploy the current branch to staging or production with pre-flight checks"</span></span>
+<span class="line"><span style="color:#85E89D">user-invocable</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">true</span></span>
+<span class="line"><span style="color:#85E89D">argument-hint</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"&#x3C;environment>"</span></span>
+<span class="line"><span style="color:#B392F0">---</span></span></code></pre>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Field</th><th>Required</th><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>name</code></td><td>Yes</td><td>string</td><td>Command identifier (must match filename)</td></tr><tr><td><code>description</code></td><td>Yes</td><td>string</td><td>One-line summary shown in the <code>/</code> menu</td></tr><tr><td><code>user-invocable</code></td><td>No</td><td>boolean</td><td>Whether the command appears in the <code>/</code> menu (default: <code>true</code>)</td></tr><tr><td><code>argument-hint</code></td><td>No</td><td>string</td><td>Hint text shown after the command name in the menu</td></tr></tbody></table>
+<h4 id="the-description-field">The description Field</h4>
+<p>The description serves double duty: it is displayed in the Claude Code <code>/</code> menu as help text, and it helps Claude understand when to suggest the command. Write descriptions that are concise but informative:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#6A737D"># Good: tells the user what it does and when to use it</span></span>
+<span class="line"><span style="color:#85E89D">description</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"Run security audit on all source files and generate a SARIF report"</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Too vague</span></span>
+<span class="line"><span style="color:#85E89D">description</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"Security stuff"</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Too long for a menu item</span></span>
+<span class="line"><span style="color:#85E89D">description</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"This command performs a comprehensive security audit of the entire codebase including static analysis, dependency checking, secret scanning, and generates a detailed SARIF format report suitable for GitHub Advanced Security integration"</span></span></code></pre>
+<p>Aim for 50-100 characters. The description should answer “what does this do?” in one glance.</p>
+<h4 id="the-argument-hint-field">The argument-hint Field</h4>
+<p>When a command accepts arguments, the <code>argument-hint</code> field tells users what to provide:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#6A737D"># Single argument</span></span>
+<span class="line"><span style="color:#85E89D">argument-hint</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"&#x3C;environment>"</span><span style="color:#6A737D">       # /deploy staging</span></span>
+<span class="line"><span style="color:#85E89D">argument-hint</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"&#x3C;file-path>"</span><span style="color:#6A737D">         # /analyze src/index.ts</span></span>
+<span class="line"><span style="color:#85E89D">argument-hint</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"&#x3C;component-name>"</span><span style="color:#6A737D">    # /scaffold UserProfile</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Multiple arguments</span></span>
+<span class="line"><span style="color:#85E89D">argument-hint</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"&#x3C;source> &#x3C;target>"</span><span style="color:#6A737D">   # /migrate users orders</span></span></code></pre>
+<p>Inside the command body, arguments are accessible through substitution variables:</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Variable</th><th>Value</th></tr></thead><tbody><tr><td><code>$ARGUMENTS</code></td><td>The full argument string</td></tr><tr><td><code>$0</code></td><td>First argument</td></tr><tr><td><code>$1</code></td><td>Second argument</td></tr><tr><td><code>$2</code> through <code>$9</code></td><td>Subsequent arguments</td></tr></tbody></table>
+<h4 id="hidden-commands">Hidden Commands</h4>
+<p>Setting <code>user-invocable: false</code> hides a command from the <code>/</code> menu while keeping it available for programmatic invocation by other commands, skills, or agents:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#B392F0">---</span></span>
+<span class="line"><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">internal-validate</span></span>
+<span class="line"><span style="color:#85E89D">description</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"Internal validation step used by the deploy command"</span></span>
+<span class="line"><span style="color:#85E89D">user-invocable</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">false</span></span>
+<span class="line"><span style="color:#B392F0">---</span></span></code></pre>
+<p>This is useful for building multi-step workflows where a top-level command delegates to hidden helper commands.</p>
+<h3 id="command-body">Command Body</h3>
+<p>The body of a command file contains the instructions Claude follows when the command is invoked. Write it in the same directive style as skill bodies — clear, specific, and structured.</p>
+<p><strong>Example: A complete deploy command</strong></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="markdown"><code><span class="line"><span style="color:#E1E4E8">---</span></span>
+<span class="line"><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">deploy</span></span>
+<span class="line"><span style="color:#85E89D">description</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"Deploy current branch to staging or production with pre-flight checks"</span></span>
+<span class="line"><span style="color:#85E89D">argument-hint</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"&#x3C;environment>"</span></span>
+<span class="line"><span style="color:#E1E4E8">---</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79B8FF;font-weight:bold">## Pre-Flight Checks</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">Before deploying to </span><span style="color:#79B8FF">`$0`</span><span style="color:#E1E4E8">, verify all of the following:</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FFAB70">1.</span><span style="color:#E1E4E8;font-weight:bold"> **Clean working tree.**</span><span style="color:#E1E4E8"> Run </span><span style="color:#79B8FF">`git status`</span><span style="color:#E1E4E8"> and confirm no uncommitted changes.</span></span>
+<span class="line"><span style="color:#E1E4E8">   If there are uncommitted changes, stop and ask the user to commit or stash.</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FFAB70">2.</span><span style="color:#E1E4E8;font-weight:bold"> **Tests passing.**</span><span style="color:#E1E4E8"> Run </span><span style="color:#79B8FF">`npm test`</span><span style="color:#E1E4E8"> and confirm all tests pass. If any test</span></span>
+<span class="line"><span style="color:#E1E4E8">   fails, stop and report the failures. Do not deploy with failing tests.</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FFAB70">3.</span><span style="color:#E1E4E8;font-weight:bold"> **Build succeeds.**</span><span style="color:#E1E4E8"> Run </span><span style="color:#79B8FF">`npm run build`</span><span style="color:#E1E4E8"> and confirm it completes without</span></span>
+<span class="line"><span style="color:#E1E4E8">   errors. Check that the </span><span style="color:#79B8FF">`dist/`</span><span style="color:#E1E4E8"> directory is populated.</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FFAB70">4.</span><span style="color:#E1E4E8;font-weight:bold"> **Environment validation.**</span><span style="color:#E1E4E8"> Confirm the target environment is valid:</span></span>
+<span class="line"><span style="color:#FFAB70">   -</span><span style="color:#79B8FF"> `staging`</span><span style="color:#E1E4E8"> — deploys to staging.example.com</span></span>
+<span class="line"><span style="color:#FFAB70">   -</span><span style="color:#79B8FF"> `production`</span><span style="color:#E1E4E8"> — deploys to example.com (requires confirmation)</span></span>
+<span class="line"><span style="color:#FFAB70">   -</span><span style="color:#E1E4E8"> Any other value — reject with an error message</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79B8FF;font-weight:bold">## Deployment</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">If all pre-flight checks pass:</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79B8FF;font-weight:bold">### Staging</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">```bash</span></span>
+<span class="line"><span style="color:#B392F0">npm</span><span style="color:#9ECBFF"> run</span><span style="color:#9ECBFF"> deploy:staging</span></span></code></pre>
+<p>Verify the deployment by checking <a href="https://staging.example.com/health">https://staging.example.com/health</a>.</p>
+<h3 id="production">Production</h3>
+<p><strong>Production deployments require explicit user confirmation.</strong> Before running
+the deploy command, ask the user: “This will deploy to production. Continue?”</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">npm</span><span style="color:#9ECBFF"> run</span><span style="color:#9ECBFF"> deploy:production</span></span></code></pre>
+<p>After deployment:</p>
+<ol>
+<li>Check <a href="https://example.com/health">https://example.com/health</a></li>
+<li>Verify the deployed version matches the current git SHA</li>
+<li>Monitor error rates for 2 minutes using <code>npm run monitor</code></li>
+</ol>
+<h2 id="post-deploy">Post-Deploy</h2>
+<p>Report the deployment status:</p>
+<ul>
+<li>Environment deployed to</li>
+<li>Git SHA deployed</li>
+<li>Health check result</li>
+<li>Any warnings from the build or deploy process</li>
+</ul>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span></span></span>
+<span class="line"><span>### Command Design Patterns</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>#### The Workflow Command</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>Orchestrates a multi-step process with checkpoints:</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>```markdown</span></span>
+<span class="line"><span>---</span></span>
+<span class="line"><span>name: release</span></span>
+<span class="line"><span>description: "Prepare and publish a new release with changelog and tags"</span></span>
+<span class="line"><span>argument-hint: "&#x3C;version>"</span></span>
+<span class="line"><span>---</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>## Steps</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>1. Validate that `$0` is a valid semver version</span></span>
+<span class="line"><span>2. Update version in package.json</span></span>
+<span class="line"><span>3. Generate changelog from commits since last tag</span></span>
+<span class="line"><span>4. Create git tag v$0</span></span>
+<span class="line"><span>5. Push tag and trigger CI pipeline</span></span>
+<span class="line"><span>6. Wait for CI to pass, then publish to npm</span></span></code></pre>
+<h3 id="the-analysis-command">The Analysis Command</h3>
+<p>Gathers data and produces a report:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="markdown"><code><span class="line"><span style="color:#E1E4E8">---</span></span>
+<span class="line"><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">coverage-report</span></span>
+<span class="line"><span style="color:#85E89D">description</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"Generate test coverage report with gap analysis"</span></span>
+<span class="line"><span style="color:#E1E4E8">---</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79B8FF;font-weight:bold">## Analysis</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FFAB70">1.</span><span style="color:#E1E4E8"> Run test suite with coverage: </span><span style="color:#79B8FF">`npm run test -- --coverage`</span></span>
+<span class="line"><span style="color:#FFAB70">2.</span><span style="color:#E1E4E8"> Parse the coverage report from </span><span style="color:#79B8FF">`coverage/lcov-report/index.html`</span></span>
+<span class="line"><span style="color:#FFAB70">3.</span><span style="color:#E1E4E8"> Identify files below 80% line coverage</span></span>
+<span class="line"><span style="color:#FFAB70">4.</span><span style="color:#E1E4E8"> For each under-covered file, identify the specific untested code paths</span></span>
+<span class="line"><span style="color:#FFAB70">5.</span><span style="color:#E1E4E8"> Produce a prioritized list of files needing additional tests</span></span></code></pre>
+<h4 id="the-generator-command">The Generator Command</h4>
+<p>Creates files from templates or specifications:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="markdown"><code><span class="line"><span style="color:#E1E4E8">---</span></span>
+<span class="line"><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">scaffold</span></span>
+<span class="line"><span style="color:#85E89D">description</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"Generate a new feature module with tests, types, and documentation"</span></span>
+<span class="line"><span style="color:#85E89D">argument-hint</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"&#x3C;feature-name>"</span></span>
+<span class="line"><span style="color:#E1E4E8">---</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">Create the following files for the </span><span style="color:#79B8FF">`$0`</span><span style="color:#E1E4E8"> feature:</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FFAB70">1.</span><span style="color:#79B8FF"> `src/features/$0/index.ts`</span><span style="color:#E1E4E8"> — barrel export</span></span>
+<span class="line"><span style="color:#FFAB70">2.</span><span style="color:#79B8FF"> `src/features/$0/$0.ts`</span><span style="color:#E1E4E8"> — main implementation</span></span>
+<span class="line"><span style="color:#FFAB70">3.</span><span style="color:#79B8FF"> `src/features/$0/$0.test.ts`</span><span style="color:#E1E4E8"> — test file with basic structure</span></span>
+<span class="line"><span style="color:#FFAB70">4.</span><span style="color:#79B8FF"> `src/features/$0/$0.types.ts`</span><span style="color:#E1E4E8"> — TypeScript interfaces</span></span>
+<span class="line"><span style="color:#FFAB70">5.</span><span style="color:#79B8FF"> `src/features/$0/README.md`</span><span style="color:#E1E4E8"> — feature documentation</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">Follow the patterns established in </span><span style="color:#79B8FF">`src/features/auth/`</span><span style="color:#E1E4E8"> as a reference</span></span>
+<span class="line"><span style="color:#E1E4E8">implementation.</span></span></code></pre>
+<h2 id="hooks">Hooks</h2>
+<h3 id="what-they-are-1">What They Are</h3>
+<p>Hooks are lifecycle callbacks that execute automatically when Claude uses specific tools. They are configured in a skill’s YAML frontmatter and run shell commands before or after a tool call, without any user interaction.</p>
+<p>Hooks are conceptually similar to Git hooks or CI pipeline hooks: they are invisible guardrails that enforce policies, validate actions, or perform side effects automatically.</p>
+<p><strong>Common use cases for hooks:</strong></p>
+<ul>
+<li>Linting files before they are written</li>
+<li>Running tests after code is edited</li>
+<li>Validating configuration files before they are saved</li>
+<li>Logging tool usage for audit trails</li>
+<li>Formatting code after generation</li>
+</ul>
+<h3 id="hook-types">Hook Types</h3>
+<p>Two hook types are available:</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Hook</th><th>Timing</th><th>Use Case</th></tr></thead><tbody><tr><td><code>pre-tool-call</code></td><td>Before the tool executes</td><td>Validation, permission checks, input sanitization</td></tr><tr><td><code>post-tool-call</code></td><td>After the tool executes</td><td>Formatting, testing, logging, verification</td></tr></tbody></table>
+<h3 id="hook-configuration">Hook Configuration</h3>
+<p>Hooks are defined in the <code>hooks</code> field of a SKILL.md’s frontmatter:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#B392F0">---</span></span>
+<span class="line"><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">safe-writer</span></span>
+<span class="line"><span style="color:#85E89D">description</span><span style="color:#E1E4E8">: </span><span style="color:#F97583">|</span></span>
+<span class="line"><span style="color:#9ECBFF">  When writing TypeScript files. Automatically formats and lints</span></span>
+<span class="line"><span style="color:#9ECBFF">  all written files.</span></span>
+<span class="line"><span style="color:#85E89D">allowed-tools</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Read, Write, Edit, Bash(npm:*), Glob</span></span>
+<span class="line"><span style="color:#85E89D">version</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">1.0.0</span></span>
+<span class="line"><span style="color:#85E89D">author</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Dev Team</span></span>
+<span class="line"><span style="color:#85E89D">license</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">MIT</span></span>
+<span class="line"><span style="color:#85E89D">hooks</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  pre-tool-call</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#85E89D">tool</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Write</span></span>
+<span class="line"><span style="color:#85E89D">      command</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"echo 'Writing file: ${CLAUDE_TOOL_INPUT_FILE}'"</span></span>
+<span class="line"><span style="color:#85E89D">  post-tool-call</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#85E89D">tool</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Write</span></span>
+<span class="line"><span style="color:#85E89D">      command</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"${CLAUDE_PLUGIN_ROOT}/scripts/format-and-lint.sh ${CLAUDE_TOOL_INPUT_FILE}"</span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#85E89D">tool</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Edit</span></span>
+<span class="line"><span style="color:#85E89D">      command</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"${CLAUDE_PLUGIN_ROOT}/scripts/format-and-lint.sh ${CLAUDE_TOOL_INPUT_FILE}"</span></span>
+<span class="line"><span style="color:#B392F0">---</span></span></code></pre>
+<h3 id="hook-structure">Hook Structure</h3>
+<p>Each hook entry specifies:</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Field</th><th>Description</th></tr></thead><tbody><tr><td><code>tool</code></td><td>The tool name this hook applies to (e.g., <code>Write</code>, <code>Edit</code>, <code>Bash</code>)</td></tr><tr><td><code>command</code></td><td>Shell command to execute</td></tr></tbody></table>
+<h3 id="path-variables-in-hooks">Path Variables in Hooks</h3>
+<p>Hooks support the same path variables as skill bodies, plus tool-specific variables:</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Variable</th><th>Description</th></tr></thead><tbody><tr><td><code>${CLAUDE_PLUGIN_ROOT}</code></td><td>Root directory of the plugin</td></tr><tr><td><code>${CLAUDE_SKILL_DIR}</code></td><td>Directory containing the SKILL.md</td></tr><tr><td><code>${CLAUDE_TOOL_INPUT_FILE}</code></td><td>File path argument passed to the tool</td></tr></tbody></table>
+<p><strong>Always use <code>${CLAUDE_PLUGIN_ROOT}</code></strong> to reference scripts and resources within your plugin. This ensures hooks work correctly regardless of where the plugin is installed:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#6A737D"># Correct: portable path</span></span>
+<span class="line"><span style="color:#85E89D">command</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"${CLAUDE_PLUGIN_ROOT}/scripts/validate.sh"</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Wrong: hardcoded path</span></span>
+<span class="line"><span style="color:#85E89D">command</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"/home/user/.claude/plugins/my-plugin/scripts/validate.sh"</span></span></code></pre>
+<h3 id="hook-examples">Hook Examples</h3>
+<h4 id="auto-format-on-write">Auto-Format on Write</h4>
+<p>Format every file Claude writes using Prettier:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">hooks</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  post-tool-call</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#85E89D">tool</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Write</span></span>
+<span class="line"><span style="color:#85E89D">      command</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"npx prettier --write ${CLAUDE_TOOL_INPUT_FILE} 2>/dev/null || true"</span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#85E89D">tool</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Edit</span></span>
+<span class="line"><span style="color:#85E89D">      command</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"npx prettier --write ${CLAUDE_TOOL_INPUT_FILE} 2>/dev/null || true"</span></span></code></pre>
+<p>The <code>|| true</code> suffix prevents hook failures from blocking Claude’s workflow. Formatting is nice to have but should not stop execution.</p>
+<h4 id="test-after-edit">Test After Edit</h4>
+<p>Run relevant tests whenever Claude edits a source file:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">hooks</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  post-tool-call</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#85E89D">tool</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Edit</span></span>
+<span class="line"><span style="color:#85E89D">      command</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"${CLAUDE_PLUGIN_ROOT}/scripts/run-related-tests.sh ${CLAUDE_TOOL_INPUT_FILE}"</span></span></code></pre>
+<p>The helper script (<code>run-related-tests.sh</code>) might look like:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#6A737D">#!/bin/bash</span></span>
+<span class="line"><span style="color:#6A737D"># Find and run test file corresponding to the edited source file</span></span>
+<span class="line"><span style="color:#E1E4E8">SOURCE_FILE</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">"</span><span style="color:#79B8FF">$1</span><span style="color:#9ECBFF">"</span></span>
+<span class="line"><span style="color:#E1E4E8">TEST_FILE</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">"${</span><span style="color:#E1E4E8">SOURCE_FILE</span><span style="color:#F97583">%</span><span style="color:#9ECBFF">.</span><span style="color:#E1E4E8">ts</span><span style="color:#9ECBFF">}.test.ts"</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">if</span><span style="color:#E1E4E8"> [ </span><span style="color:#F97583">-f</span><span style="color:#9ECBFF"> "</span><span style="color:#E1E4E8">$TEST_FILE</span><span style="color:#9ECBFF">"</span><span style="color:#E1E4E8"> ]; </span><span style="color:#F97583">then</span></span>
+<span class="line"><span style="color:#B392F0">  npx</span><span style="color:#9ECBFF"> vitest</span><span style="color:#9ECBFF"> run</span><span style="color:#9ECBFF"> "</span><span style="color:#E1E4E8">$TEST_FILE</span><span style="color:#9ECBFF">"</span><span style="color:#79B8FF"> --reporter=verbose</span><span style="color:#F97583"> 2>&#x26;1</span><span style="color:#F97583"> |</span><span style="color:#B392F0"> tail</span><span style="color:#79B8FF"> -20</span></span>
+<span class="line"><span style="color:#F97583">fi</span></span></code></pre>
+<h4 id="validation-gate">Validation Gate</h4>
+<p>Prevent Claude from writing invalid configuration:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">hooks</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  pre-tool-call</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#85E89D">tool</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Write</span></span>
+<span class="line"><span style="color:#85E89D">      command</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"${CLAUDE_PLUGIN_ROOT}/scripts/validate-config.sh ${CLAUDE_TOOL_INPUT_FILE}"</span></span></code></pre>
+<p>If the pre-tool-call hook exits with a non-zero status, the tool call is blocked. This creates a hard gate that prevents invalid files from being written.</p>
+<h4 id="audit-logging">Audit Logging</h4>
+<p>Log every Bash command Claude executes for compliance:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">hooks</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  pre-tool-call</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#85E89D">tool</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Bash</span></span>
+<span class="line"><span style="color:#85E89D">      command</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"echo </span><span style="color:#79B8FF">\"</span><span style="color:#9ECBFF">$(date -Iseconds) BASH: ${CLAUDE_TOOL_INPUT_FILE}</span><span style="color:#79B8FF">\"</span><span style="color:#9ECBFF"> >> ${CLAUDE_PLUGIN_ROOT}/audit.log"</span></span></code></pre>
+<h3 id="hook-design-principles">Hook Design Principles</h3>
+<p><strong>Keep hooks fast.</strong> Hooks run synchronously — Claude waits for them to complete before proceeding. A hook that takes 30 seconds to run will make Claude feel sluggish. If you need long-running validation, consider running it asynchronously or only on specific file patterns.</p>
+<p><strong>Make hooks resilient.</strong> Add <code>2>/dev/null</code>, <code>|| true</code>, or explicit error handling to prevent hook failures from crashing Claude’s workflow. A formatting hook should not prevent Claude from completing a task because Prettier is not installed.</p>
+<p><strong>Scope hooks narrowly.</strong> Apply hooks to specific tools rather than all tools. A formatting hook should apply to <code>Write</code> and <code>Edit</code>, not to <code>Read</code> or <code>Glob</code>.</p>
+<p><strong>Use hooks for policies, not features.</strong> Hooks are best for enforcing invariants (code is always formatted, configs are always valid, actions are always logged). If the behavior is the primary purpose of the skill, put it in the skill body instructions instead.</p>
+<h2 id="commands-vs-skills-vs-hooks-choosing-the-right-mechanism">Commands vs Skills vs Hooks: Choosing the Right Mechanism</h2>
+<p>Understanding when to use each mechanism avoids confusion and produces cleaner plugin designs:</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Mechanism</th><th>Trigger</th><th>Visibility</th><th>Best For</th></tr></thead><tbody><tr><td>Command</td><td>User types <code>/name</code></td><td>Explicit, in menu</td><td>One-off workflows, generators, reports</td></tr><tr><td>Skill</td><td>Claude auto-detects relevance</td><td>Invisible to user</td><td>Domain expertise, coding patterns</td></tr><tr><td>Hook</td><td>Tool call occurs</td><td>Invisible to user</td><td>Validation, formatting, logging</td></tr></tbody></table>
+<p><strong>Practical example:</strong> Consider a plugin for a Go project.</p>
+<ul>
+<li><strong>Command</strong> (<code>/go-bench</code>): User explicitly requests a benchmark run with specific parameters.</li>
+<li><strong>Skill</strong> (<code>go-patterns/SKILL.md</code>): Automatically activates when Claude writes Go code, guiding it to follow idiomatic patterns.</li>
+<li><strong>Hook</strong> (<code>post-tool-call</code> on <code>Write</code>): Runs <code>gofmt</code> on every <code>.go</code> file Claude writes, ensuring consistent formatting without the user asking.</li>
+</ul>
+<p>All three can coexist in the same plugin, each handling a different aspect of the Go development workflow.</p>
+<h2 id="building-reusable-commands">Building Reusable Commands</h2>
+<h3 id="commands-that-call-other-commands">Commands That Call Other Commands</h3>
+<p>Commands can reference other commands in their instructions:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="markdown"><code><span class="line"><span style="color:#E1E4E8">---</span></span>
+<span class="line"><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">full-release</span></span>
+<span class="line"><span style="color:#85E89D">description</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"Run the complete release pipeline"</span></span>
+<span class="line"><span style="color:#85E89D">argument-hint</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"&#x3C;version>"</span></span>
+<span class="line"><span style="color:#E1E4E8">---</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">Execute these steps in order:</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FFAB70">1.</span><span style="color:#E1E4E8"> Run </span><span style="color:#79B8FF">`/lint-check`</span><span style="color:#E1E4E8"> to ensure code quality</span></span>
+<span class="line"><span style="color:#FFAB70">2.</span><span style="color:#E1E4E8"> Run </span><span style="color:#79B8FF">`/test-all`</span><span style="color:#E1E4E8"> to verify all tests pass</span></span>
+<span class="line"><span style="color:#FFAB70">3.</span><span style="color:#E1E4E8"> Run </span><span style="color:#79B8FF">`/changelog $0`</span><span style="color:#E1E4E8"> to generate the changelog</span></span>
+<span class="line"><span style="color:#FFAB70">4.</span><span style="color:#E1E4E8"> Run </span><span style="color:#79B8FF">`/deploy production`</span><span style="color:#E1E4E8"> to deploy the release</span></span></code></pre>
+<h3 id="commands-that-delegate-to-agents">Commands That Delegate to Agents</h3>
+<p>Commands can delegate work to specialized agents:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="markdown"><code><span class="line"><span style="color:#E1E4E8">---</span></span>
+<span class="line"><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">security-review</span></span>
+<span class="line"><span style="color:#85E89D">description</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"Comprehensive security audit of the current codebase"</span></span>
+<span class="line"><span style="color:#E1E4E8">---</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">Delegate this work to the security-auditor agent. Pass all findings back</span></span>
+<span class="line"><span style="color:#E1E4E8">as a structured report with severity ratings.</span></span></code></pre>
+<h3 id="commands-with-dynamic-context">Commands with Dynamic Context</h3>
+<p>Commands can use DCI to adapt behavior based on the current environment:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="markdown"><code><span class="line"><span style="color:#E1E4E8">---</span></span>
+<span class="line"><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">setup</span></span>
+<span class="line"><span style="color:#85E89D">description</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"Initialize development environment based on project type"</span></span>
+<span class="line"><span style="color:#E1E4E8">---</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79B8FF;font-weight:bold">## Detected Environment</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">!</span><span style="color:#79B8FF">`[ -f package.json ] &#x26;&#x26; echo 'Node.js project' || echo 'Not a Node.js project'`</span></span>
+<span class="line"><span style="color:#E1E4E8">!</span><span style="color:#79B8FF">`[ -f requirements.txt ] &#x26;&#x26; echo 'Python project' || echo 'Not a Python project'`</span></span>
+<span class="line"><span style="color:#E1E4E8">!</span><span style="color:#79B8FF">`[ -f go.mod ] &#x26;&#x26; echo 'Go project' || echo 'Not a Go project'`</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">Based on the detected project type above, run the appropriate setup sequence.</span></span></code></pre>
+<h2 id="script-conventions">Script Conventions</h2>
+<p>When plugins include shell scripts referenced by hooks or commands, follow these conventions:</p>
+<ol>
+<li>
+<p><strong>Make scripts executable.</strong> All <code>.sh</code> files must have <code>chmod +x</code> set. CI validation enforces this.</p>
+</li>
+<li>
+<p><strong>Use portable paths.</strong> Always reference scripts via <code>${CLAUDE_PLUGIN_ROOT}</code>:</p>
+</li>
+</ol>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">command</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"${CLAUDE_PLUGIN_ROOT}/scripts/my-hook.sh"</span></span></code></pre>
+<ol>
+<li>
+<p><strong>Include shebangs.</strong> Every script should start with <code>#!/bin/bash</code> or <code>#!/usr/bin/env bash</code>.</p>
+</li>
+<li>
+<p><strong>Handle missing dependencies.</strong> Scripts should check for required tools and fail gracefully:</p>
+</li>
+</ol>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#6A737D">#!/bin/bash</span></span>
+<span class="line"><span style="color:#F97583">if</span><span style="color:#F97583"> !</span><span style="color:#79B8FF"> command</span><span style="color:#79B8FF"> -v</span><span style="color:#9ECBFF"> prettier</span><span style="color:#E1E4E8"> &#x26;</span><span style="color:#F97583">></span><span style="color:#E1E4E8"> /dev/null; </span><span style="color:#F97583">then</span></span>
+<span class="line"><span style="color:#79B8FF">  echo</span><span style="color:#9ECBFF"> "prettier not found, skipping formatting"</span></span>
+<span class="line"><span style="color:#79B8FF">  exit</span><span style="color:#79B8FF"> 0</span></span>
+<span class="line"><span style="color:#F97583">fi</span></span>
+<span class="line"><span style="color:#B392F0">prettier</span><span style="color:#79B8FF"> --write</span><span style="color:#9ECBFF"> "</span><span style="color:#79B8FF">$1</span><span style="color:#9ECBFF">"</span></span></code></pre>
+<h2 id="next-steps">Next Steps</h2>
+<ul>
+<li>Learn about the plugin structure that contains commands and hooks: <a href="/docs/concepts/plugins">What Are Claude Code Plugins?</a></li>
+<li>Understand auto-activating skills: <a href="/docs/concepts/skills">Understanding Agent Skills (SKILL.md)</a></li>
+<li>Explore how agents handle autonomous workflows: <a href="/docs/concepts/agents">Claude Code Agents and Subagents</a></li>
+<li>See how MCP servers expose external tools: <a href="/docs/concepts/mcp-servers">MCP Servers in Claude Code Plugins</a></li>
+</ul>
+
+        </article>
+
+        <!-- Official Links Callout -->
+        <aside class="official-links" data-astro-cid-ya4srytn>
+            <h3 class="official-links-title" data-astro-cid-ya4srytn>Official Anthropic Documentation</h3>
+            <ul class="official-links-list" data-astro-cid-ya4srytn>
+              <li data-astro-cid-ya4srytn>
+                  <a href="https://docs.anthropic.com/en/docs/claude-code/slash-commands" target="_blank" rel="noopener noreferrer" data-astro-cid-ya4srytn>
+                    Claude Code Custom Slash Commands
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-left:4px;vertical-align:middle;" data-astro-cid-ya4srytn><path d="M3.5 1.5H10.5V8.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-ya4srytn></path><path d="M10.5 1.5L1.5 10.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-ya4srytn></path></svg>
+                  </a>
+                </li><li data-astro-cid-ya4srytn>
+                  <a href="https://docs.anthropic.com/en/docs/claude-code/hooks" target="_blank" rel="noopener noreferrer" data-astro-cid-ya4srytn>
+                    Claude Code Hooks
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-left:4px;vertical-align:middle;" data-astro-cid-ya4srytn><path d="M3.5 1.5H10.5V8.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-ya4srytn></path><path d="M10.5 1.5L1.5 10.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-ya4srytn></path></svg>
+                  </a>
+                </li><li data-astro-cid-ya4srytn>
+                  <a href="https://docs.anthropic.com/en/docs/claude-code/plugins" target="_blank" rel="noopener noreferrer" data-astro-cid-ya4srytn>
+                    Claude Code Plugins Overview
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-left:4px;vertical-align:middle;" data-astro-cid-ya4srytn><path d="M3.5 1.5H10.5V8.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-ya4srytn></path><path d="M10.5 1.5L1.5 10.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-ya4srytn></path></svg>
+                  </a>
+                </li>
+            </ul>
+          </aside>
+
+        <!-- Related Docs -->
+        <aside class="related-docs" data-astro-cid-ya4srytn>
+            <h3 class="related-title" data-astro-cid-ya4srytn>Related Documentation</h3>
+            <div class="related-grid" data-astro-cid-ya4srytn>
+              <a href="/docs/concepts/plugins" class="related-card" data-astro-cid-ya4srytn>
+                  <span class="related-section" data-astro-cid-ya4srytn>Concepts</span>
+                  <span class="related-name" data-astro-cid-ya4srytn>What Are Claude Code Plugins?</span>
+                </a><a href="/docs/concepts/skills" class="related-card" data-astro-cid-ya4srytn>
+                  <span class="related-section" data-astro-cid-ya4srytn>Concepts</span>
+                  <span class="related-name" data-astro-cid-ya4srytn>Understanding Agent Skills (SKILL.md)</span>
+                </a><a href="/docs/concepts/agents" class="related-card" data-astro-cid-ya4srytn>
+                  <span class="related-section" data-astro-cid-ya4srytn>Concepts</span>
+                  <span class="related-name" data-astro-cid-ya4srytn>Claude Code Agents and Subagents</span>
+                </a><a href="/docs/reference/skill-frontmatter" class="related-card" data-astro-cid-ya4srytn>
+                  <span class="related-section" data-astro-cid-ya4srytn>Reference</span>
+                  <span class="related-name" data-astro-cid-ya4srytn>SKILL.md Frontmatter Reference</span>
+                </a>
+            </div>
+          </aside>
+
+        <!-- Prev/Next Navigation -->
+        <nav class="docs-nav-footer" data-astro-cid-ya4srytn>
+          <a href="/docs/concepts/agents" class="nav-link nav-prev" data-astro-cid-ya4srytn>
+              <span class="nav-label" data-astro-cid-ya4srytn>Previous</span>
+              <span class="nav-title" data-astro-cid-ya4srytn>Claude Code Agents and Subagents</span>
+            </a>
+          <a href="/docs/concepts/mcp-servers" class="nav-link nav-next" data-astro-cid-ya4srytn>
+              <span class="nav-label" data-astro-cid-ya4srytn>Next</span>
+              <span class="nav-title" data-astro-cid-ya4srytn>MCP Servers in Claude Code Plugins</span>
+            </a>
+        </nav>
+      </div>
+    </div>
+  </div>
+
+  
+
+  
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

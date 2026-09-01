@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Noise-Robust LLM-Judge Evals: Don&#39;t Sign a Coin Flip — Tons of Skills Work Diary</title>
+    <meta name="description" content="An un-seeded LLM judge is a coin flip even at temperature 0. How we made signed eval verdicts replayable instead of attesting noise.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://startaitools.com/posts/noise-robust-signed-llm-judge-evals/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/noise-robust-signed-llm-judge-evals/">
+    <meta property="og:title" content="Noise-Robust LLM-Judge Evals: Don't Sign a Coin Flip — Tons of Skills Work Diary">
+    <meta property="og:description" content="An un-seeded LLM judge is a coin flip even at temperature 0. How we made signed eval verdicts replayable instead of attesting noise.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="Noise-Robust LLM-Judge Evals: Don't Sign a Coin Flip — Tons of Skills Work Diary">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/noise-robust-signed-llm-judge-evals/">
+    <meta name="twitter:title" content="Noise-Robust LLM-Judge Evals: Don't Sign a Coin Flip — Tons of Skills Work Diary">
+    <meta name="twitter:description" content="An un-seeded LLM judge is a coin flip even at temperature 0. How we made signed eval verdicts replayable instead of attesting noise.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"Noise-Robust LLM-Judge Evals: Don't Sign a Coin Flip","description":"An un-seeded LLM judge is a coin flip even at temperature 0. How we made signed eval verdicts replayable instead of attesting noise.","datePublished":"2026-07-07","url":"https://tonsofskills.com/blog/undefined","author":{"@type":"Person","name":"Jeremy Longshore"},"publisher":{"@type":"Organization","name":"Tons of Skills","url":"https://tonsofskills.com"}}</script>
+  
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.post-header[data-astro-cid-7jjqptxk]{background:var(--panel);padding:4rem 1.5rem 3rem;border-bottom:1px solid var(--border)}.post-header-inner[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto}.back-link[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3);text-decoration:none;display:inline-block;margin-bottom:1.5rem;transition:color .2s}.back-link[data-astro-cid-7jjqptxk]:hover{color:var(--primary)}.post-meta[data-astro-cid-7jjqptxk]{display:flex;align-items:center;gap:.75rem;margin-bottom:1rem}time[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3)}.featured-badge[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.2rem .6rem;background:#ce114126;color:var(--red);border-radius:0;font-weight:600;text-transform:uppercase;letter-spacing:.05em}.post-header[data-astro-cid-7jjqptxk] h1[data-astro-cid-7jjqptxk]{font-family:var(--font-body);font-size:clamp(1.5rem,4vw,2.2rem);font-weight:700;color:var(--text);line-height:1.25;margin-bottom:.75rem;letter-spacing:0}.post-desc[data-astro-cid-7jjqptxk]{color:var(--text-2);font-size:1.05rem;line-height:1.6;margin-bottom:1rem}.post-tags[data-astro-cid-7jjqptxk]{display:flex;gap:.4rem;flex-wrap:wrap}.tag[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.15rem .5rem;background:var(--surface-3);color:var(--text-3);border-radius:0}.post-body[data-astro-cid-7jjqptxk]{padding:3rem 1.5rem 4rem}.prose[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto;color:var(--text-2);line-height:1.8;font-size:1rem}.prose[data-astro-cid-7jjqptxk] h2{font-family:var(--font-body);font-size:1.5rem;font-weight:700;color:var(--text);margin:2.5rem 0 1rem;letter-spacing:0}.prose[data-astro-cid-7jjqptxk] h3{font-size:1.2rem;font-weight:600;color:var(--text);margin:2rem 0 .75rem}.prose[data-astro-cid-7jjqptxk] p{margin-bottom:1rem}.prose[data-astro-cid-7jjqptxk] ul,.prose[data-astro-cid-7jjqptxk] ol{margin:.5rem 0 1rem 1.5rem}.prose[data-astro-cid-7jjqptxk] li{margin-bottom:.35rem}.prose[data-astro-cid-7jjqptxk] strong{color:var(--text);font-weight:600}.prose[data-astro-cid-7jjqptxk] code{font-family:var(--font-mono);font-size:.88em;background:var(--surface-3);padding:.15em .35em;border-radius:0;color:var(--primary)}.prose[data-astro-cid-7jjqptxk] a{color:var(--primary);text-decoration:none}.prose[data-astro-cid-7jjqptxk] a:hover{text-decoration:underline}@media(max-width:768px){.post-header[data-astro-cid-7jjqptxk]{padding:3rem 1rem 2rem}.post-body[data-astro-cid-7jjqptxk]{padding:2rem 1rem 3rem}}
+</style></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  <article class="post" data-astro-cid-7jjqptxk>
+    <header class="post-header" data-astro-cid-7jjqptxk>
+      <div class="post-header-inner" data-astro-cid-7jjqptxk>
+        <a href="/blog" class="back-link" data-astro-cid-7jjqptxk>Back to Work Diary</a>
+        <div class="post-meta" data-astro-cid-7jjqptxk>
+          <time datetime="2026-07-07" data-astro-cid-7jjqptxk>July 6, 2026</time>
+          
+        </div>
+        <h1 data-astro-cid-7jjqptxk>Noise-Robust LLM-Judge Evals: Don&#39;t Sign a Coin Flip</h1>
+        <p class="post-desc" data-astro-cid-7jjqptxk>An un-seeded LLM judge is a coin flip even at temperature 0. How we made signed eval verdicts replayable instead of attesting noise.</p>
+        <div class="post-tags" data-astro-cid-7jjqptxk>
+          <span class="tag" data-astro-cid-7jjqptxk>ai-agents</span><span class="tag" data-astro-cid-7jjqptxk>evals</span><span class="tag" data-astro-cid-7jjqptxk>llm-as-judge</span><span class="tag" data-astro-cid-7jjqptxk>testing</span><span class="tag" data-astro-cid-7jjqptxk>provenance</span><span class="tag" data-astro-cid-7jjqptxk>ci-cd</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="post-body" data-astro-cid-7jjqptxk>
+      <div class="prose" data-astro-cid-7jjqptxk>
+        <p>An un-seeded LLM judge is nondeterministic even at temperature 0. So a single-call binary verdict is a coin flip. And when you sign that verdict into a public transparency log, you have cryptographically attested one noisy draw as if it were ground truth.</p>
+<p>That is the integrity bug at the center of this post. It sits underneath every “LLM-as-judge” eval pipeline that gates a rollout, and it gets worse the moment you add a signature, because a <a href="https://docs.sigstore.dev/logging/overview/">Rekor entry</a> is permanent. You cannot retract a coin flip once a stranger can verify it.</p>
+<p>The fix is not “make the judge deterministic” — you can’t, the API gives you no seed. The fix is to stop signing the judge’s word and start signing a deterministic fold over N recorded votes. Sign the arithmetic, not the oracle. Put the votes inside the signed bytes. Decompose judge noise from execution-sampling noise so you know which layer you’re fighting. Gate blockers on measured agreement instead of a single “no”. And label your replay fidelity honestly, so silence doesn’t imply a guarantee you don’t have.</p>
+<p>Here is the method as built, the three-arm experiment that proved each layer, and the signed, stranger-verifiable evidence — including an honest BLOCK of our own published skill.</p>
+<h2 id="the-problem-measured">The problem, measured</h2>
+<p>The harness is <code>j-rig</code>. It evaluates each AI skill against roughly 10 to 20 binary criteria. Some criteria are marked <em>blocker</em>, and the rollout gate BLOCKs on any single blocker “no”. Judge-method criteria called an LLM judge once per criterion, un-seeded, at temperature 0.</p>
+<p>Three failures compound here, and they compound multiplicatively.</p>
+<p><strong>A single temperature-0 API call is not a measurement.</strong> Temperature 0 removes sampling noise from the token distribution. It does not remove serving-stack nondeterminism: batch-composition-dependent kernels and floating-point accumulation order change the logits before the argmax. Two identical requests can land in different batches and produce different tokens. Temperature 0 is a knob on one noise source, not a guarantee of determinism.</p>
+<p><strong>An any-blocker AND-gate is a noise amplifier.</strong> Take ten subjective criteria, each with a judge reliability around 85%. A truly passing skill has to survive all ten:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>P(clean pass) = 0.85^10 ≈ 0.20</span></span></code></pre>
+<p>Roughly 80% of runs BLOCK a genuinely-good skill from judge noise alone. The gate doesn’t measure the skill. It measures the judge’s worst day, ten times in a row, and reports the union of every misfire.</p>
+<p><strong>The signature laminated hidden state.</strong> The signed artifact carried only the folded decision. So “we decided BLOCK” was indistinguishable from “the batch scheduler decided BLOCK.” The provenance was real and the verdict was noise, which is the worst possible combination: a trustworthy wrapper around an untrustworthy number.</p>
+<p>Then we measured it live. Seven identical re-runs of the skill <code>coreweave-gpu-cost-leak-hunter</code>, no code changes, same inputs:</p>
+<p><strong>6 BLOCK / 1 SHIP.</strong></p>
+<p>Same skill. Same harness. Same prompt. The verdict flip-flopped across runs. An earlier run had scored it 10/10 and shipped it. That 10/10 was a lucky draw, and we had signed nothing yet — which, in retrospect, was the only piece of good luck in the story.</p>
+<h2 id="what-the-research-settled">What the research settled</h2>
+<p>Before writing code we ran a 12-agent research pass (positions recorded in an internal research brief, <code>025-RA-ANLY</code>, with 16 citations). Five findings survived and became the design.</p>
+<p><strong>Majority voting beats seed-determinism, definitively.</strong> Anthropic’s <a href="https://docs.anthropic.com/en/api/messages">Messages API</a> exposes no seed parameter. Where seeds exist on other providers they are best-effort and get voided by backend fingerprint drift. Repeat-and-aggregate — the self-consistency pattern — is the only approach that works on every provider, so it is the only approach worth building on.</p>
+<p><strong>N = 5 samples meets the false-BLOCK budget</strong> at a 0.8 agreement quorum. The binomial majority-error works out to ≈ 0.0022 against a 0.005 budget. For blockers we default to N = 11 — deliberate over-provisioning against vote correlation, held as a config default rather than a claim of independence.</p>
+<p><strong>The agreement fraction is evidence, not confidence.</strong> It gets labeled “agreement (votes)” with small-sample intervals. It is never presented as a calibrated probability, and it is <em>never</em> the judge’s self-reported confidence, which is uncalibrated and should be treated as decoration.</p>
+<p><strong>Sign the deterministic fold over the recorded votes.</strong> A signature must attest “the majority of these N recorded votes,” never “the judge said so.” That means the fold inputs — the votes themselves — belong inside the signed predicate.</p>
+<p><strong>Label replay fidelity honestly.</strong> An un-seeded API judge caps the artifact below reproducible-from-scratch. So the signed statement says exactly that: <code>replay_fidelity_level: RF-1</code>. Silence would let every reader assume the strongest claim. State the weaker true one.</p>
+<h2 id="the-method-layer-by-layer">The method, layer by layer</h2>
+<p>This shipped to <code>jeremylongshore/j-rig-skill-binary-eval</code> main across PRs #184 and #193 (cluster issue #183). Six layers.</p>
+<h3 id="1-n-sample-majority-voting-per-judge-criterion">1. N-sample majority voting per judge criterion</h3>
+<p>The verdict for a judge criterion is the majority of N independent samples. The measured agreement fraction replaces the judge’s self-reported confidence. Plurality ties abstain to “unsure.” An errored sample votes “unsure” too — which is the load-bearing detail.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#6A737D">// One judge criterion, N independent samples.</span></span>
+<span class="line"><span style="color:#6A737D">// The verdict is the fold, not any single sample's word.</span></span>
+<span class="line"><span style="color:#F97583">function</span><span style="color:#B392F0"> aggregate</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">votes</span><span style="color:#F97583">:</span><span style="color:#B392F0"> Vote</span><span style="color:#E1E4E8">[], </span><span style="color:#FFAB70">blocker</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> boolean</span><span style="color:#E1E4E8">)</span><span style="color:#F97583">:</span><span style="color:#B392F0"> CriterionResult</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> tally</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> { yes: </span><span style="color:#79B8FF">0</span><span style="color:#E1E4E8">, no: </span><span style="color:#79B8FF">0</span><span style="color:#E1E4E8">, unsure: </span><span style="color:#79B8FF">0</span><span style="color:#E1E4E8"> };</span></span>
+<span class="line"><span style="color:#F97583">  for</span><span style="color:#E1E4E8"> (</span><span style="color:#F97583">const</span><span style="color:#79B8FF"> v</span><span style="color:#F97583"> of</span><span style="color:#E1E4E8"> votes) {</span></span>
+<span class="line"><span style="color:#6A737D">    // An errored sample is NOT a missing sample. It votes "unsure",</span></span>
+<span class="line"><span style="color:#6A737D">    // so a degraded run lands in the quorum DENOMINATOR and weakens</span></span>
+<span class="line"><span style="color:#6A737D">    // agreement — a 1-of-5 run can never report false certainty.</span></span>
+<span class="line"><span style="color:#E1E4E8">    tally[v.error </span><span style="color:#F97583">?</span><span style="color:#9ECBFF"> "unsure"</span><span style="color:#F97583"> :</span><span style="color:#E1E4E8"> v.verdict] </span><span style="color:#F97583">+=</span><span style="color:#79B8FF"> 1</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> n</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> votes.</span><span style="color:#79B8FF">length</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> top</span><span style="color:#F97583"> =</span><span style="color:#B392F0"> maxKey</span><span style="color:#E1E4E8">(tally);           </span><span style="color:#6A737D">// "yes" | "no" | "unsure"</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> agreement</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> tally[top] </span><span style="color:#F97583">/</span><span style="color:#E1E4E8"> n;    </span><span style="color:#6A737D">// measured, not self-reported</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">  // Plurality tie abstains — the judge does not get to guess under a tie.</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> tied</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> Object.</span><span style="color:#B392F0">values</span><span style="color:#E1E4E8">(tally).</span><span style="color:#B392F0">filter</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">c</span><span style="color:#F97583"> =></span><span style="color:#E1E4E8"> c </span><span style="color:#F97583">===</span><span style="color:#E1E4E8"> tally[top]).</span><span style="color:#79B8FF">length</span><span style="color:#F97583"> ></span><span style="color:#79B8FF"> 1</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> verdict</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> tied </span><span style="color:#F97583">?</span><span style="color:#9ECBFF"> "unsure"</span><span style="color:#F97583"> :</span><span style="color:#E1E4E8"> top;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">  return</span><span style="color:#E1E4E8"> { verdict, agreement, samples: n, votes, blocker };</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>The direction of the error handling is the whole point. Missing evidence has to weaken confidence, never strengthen it. If an errored sample silently dropped out of the count, five samples with three errors would report “2/2 agreement, unanimous” — false certainty manufactured by failure. Putting errors in the denominator makes a degraded run <em>look</em> degraded.</p>
+<p>One compatibility note that mattered for adoption: <code>samples = 1</code> stays byte-identical to the legacy path. The whole legacy behavior is just this function with N = 1, so nothing downstream had to change to keep working.</p>
+<h3 id="2-the-stability-gate">2. The stability gate</h3>
+<p>A multi-sampled blocker “no” that can’t clear the agreement quorum is noise, not a finding. It downgrades to a warning. Never a noise-BLOCK. Never a false SHIP either.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#6A737D">// A blocker "no" that can't clear the quorum is too unstable to act on.</span></span>
+<span class="line"><span style="color:#F97583">function</span><span style="color:#B392F0"> applyGate</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">c</span><span style="color:#F97583">:</span><span style="color:#B392F0"> CriterionResult</span><span style="color:#E1E4E8">, </span><span style="color:#FFAB70">cfg</span><span style="color:#F97583">:</span><span style="color:#B392F0"> GateConfig</span><span style="color:#E1E4E8">)</span><span style="color:#F97583">:</span><span style="color:#B392F0"> Decision</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> quorum</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> cfg.blockerQuorum;            </span><span style="color:#6A737D">// default 0.8</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">  // One draw carries no stability evidence — the legacy rule stands.</span></span>
+<span class="line"><span style="color:#F97583">  if</span><span style="color:#E1E4E8"> (c.samples </span><span style="color:#F97583">===</span><span style="color:#79B8FF"> 1</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">return</span><span style="color:#B392F0"> legacyGate</span><span style="color:#E1E4E8">(c);</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">  if</span><span style="color:#E1E4E8"> (c.blocker </span><span style="color:#F97583">&#x26;&#x26;</span><span style="color:#E1E4E8"> c.verdict </span><span style="color:#F97583">===</span><span style="color:#9ECBFF"> "no"</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#F97583">    return</span><span style="color:#E1E4E8"> c.agreement </span><span style="color:#F97583">>=</span><span style="color:#E1E4E8"> quorum</span></span>
+<span class="line"><span style="color:#F97583">      ?</span><span style="color:#9ECBFF"> "block"</span><span style="color:#6A737D">    // stable, reproducible "no" — a real finding</span></span>
+<span class="line"><span style="color:#F97583">      :</span><span style="color:#9ECBFF"> "warn"</span><span style="color:#E1E4E8">;    </span><span style="color:#6A737D">// too unstable to block on, and too unstable to pass</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#F97583">  return</span><span style="color:#E1E4E8"> c.verdict </span><span style="color:#F97583">===</span><span style="color:#9ECBFF"> "yes"</span><span style="color:#F97583"> ?</span><span style="color:#9ECBFF"> "pass"</span><span style="color:#F97583"> :</span><span style="color:#9ECBFF"> "warn"</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>The asymmetry is deliberate. A single-call or deterministic result is never downgraded, because one sample carries no stability evidence to downgrade <em>on</em>. Only a multi-sampled result has earned the right to be called unstable. A verdict too unstable to reproduce is too unstable to block on, and it is equally too unstable to pass — so it routes to “warn” and asks a human, instead of silently picking a side.</p>
+<h3 id="3-execution-pinned-to-greedy-decoding">3. Execution pinned to greedy decoding</h3>
+<p>This is the layer we didn’t know we needed until the judge stabilized and the noise didn’t go away.</p>
+<p>The judge was now steady, but re-runs still flipped. The skill-under-test was executing at the API default temperature, around 1.0. So the <em>output being judged</em> was a fresh random draw every run. The judge was reliably evaluating a different artifact each time. No amount of judge stabilization can absorb variance in the thing being judged — you have to pin the source.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="jsonc"><code><span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#6A737D">  // Pin the skill-under-test to greedy decoding. Otherwise the OUTPUT</span></span>
+<span class="line"><span style="color:#6A737D">  // being judged is a fresh random draw every run — variance the judge</span></span>
+<span class="line"><span style="color:#6A737D">  // cannot absorb because it is downstream of the judge.</span></span>
+<span class="line"><span style="color:#79B8FF">  "execution_temperature"</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">0.0</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79B8FF">  "judge"</span><span style="color:#E1E4E8">: {</span></span>
+<span class="line"><span style="color:#79B8FF">    "provider"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"deepseek"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">    "samples"</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">5</span><span style="color:#E1E4E8">,           </span><span style="color:#6A737D">// per non-blocker judge criterion</span></span>
+<span class="line"><span style="color:#79B8FF">    "blocker_samples"</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">11</span><span style="color:#E1E4E8">,  </span><span style="color:#6A737D">// over-provisioned against vote correlation</span></span>
+<span class="line"><span style="color:#79B8FF">    "blocker_quorum"</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">0.8</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>Making <code>execution_temperature</code> an explicit spec field, defaulting to greedy, means sampling variance in the subject is now a deliberate decision you can point at — not an invisible inherited API default that silently randomizes your ground truth.</p>
+<h3 id="4-vote-evidence-inside-the-signed-artifact">4. Vote evidence inside the signed artifact</h3>
+<p>The <code>gate-result/v1</code> predicate — an <a href="https://github.com/in-toto/attestation/blob/main/spec/v1/statement.md">in-toto attestation</a> — carries, per criterion-evaluation: the blocker flag, the verdict, the sample count, the agreement fraction, and the per-sample votes in dispatch order. Plus the aggregation rule in force. A verifier re-derives the verdict from the signed bytes without trusting us.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="json"><code><span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#79B8FF">  "_type"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"https://in-toto.io/Statement/v1"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">  "predicateType"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"https://evals.intentsolutions.io/gate-result/v1"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">  "predicate"</span><span style="color:#E1E4E8">: {</span></span>
+<span class="line"><span style="color:#79B8FF">    "gate_decision"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"fail"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">    "rollout_decision"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"block"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">    "replay_fidelity_level"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"RF-1"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">    "metadata"</span><span style="color:#E1E4E8">: {</span></span>
+<span class="line"><span style="color:#79B8FF">      "aggregation"</span><span style="color:#E1E4E8">: {</span></span>
+<span class="line"><span style="color:#79B8FF">        "rule"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"majority-vote"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">        "errored_samples"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"count-as-unsure"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">        "blocker_quorum"</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">0.8</span></span>
+<span class="line"><span style="color:#E1E4E8">      },</span></span>
+<span class="line"><span style="color:#79B8FF">      "criteria"</span><span style="color:#E1E4E8">: [</span></span>
+<span class="line"><span style="color:#E1E4E8">        {</span></span>
+<span class="line"><span style="color:#79B8FF">          "criterion_id"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"produces-cfo-grokkable-report"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">          "blocker"</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">true</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">          "verdict"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"no"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">          "samples"</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">5</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">          "agreement"</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">1.0</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">          "sample_verdicts"</span><span style="color:#E1E4E8">: [</span><span style="color:#9ECBFF">"no"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"no"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"no"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"no"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"no"</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"><span style="color:#E1E4E8">        },</span></span>
+<span class="line"><span style="color:#E1E4E8">        {</span></span>
+<span class="line"><span style="color:#79B8FF">          "criterion_id"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"produces-cfo-grokkable-report"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">          "blocker"</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">true</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">          "verdict"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"no"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">          "samples"</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">5</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">          "agreement"</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">1.0</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">          "sample_verdicts"</span><span style="color:#E1E4E8">: [</span><span style="color:#9ECBFF">"no"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"no"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"no"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"no"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"no"</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"><span style="color:#E1E4E8">        }</span></span>
+<span class="line"><span style="color:#E1E4E8">      ],</span></span>
+<span class="line"><span style="color:#79B8FF">      "stability"</span><span style="color:#E1E4E8">: { </span><span style="color:#79B8FF">"min_blocker_agreement"</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">0.8</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">"unstable_blocker_failures"</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">0</span><span style="color:#E1E4E8"> }</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>That is trimmed to the load-bearing fields — the live bundle carries more — but the shape is the real one: the fold inputs live under <code>metadata</code>, and the top-level <code>gate_decision</code>/<code>rollout_decision</code> are re-derivable from them. Two subtleties. The <code>stability</code> object is present <em>if and only if</em> multi-sampling actually ran — its absence means “no stability evidence was gathered,” never a fake measured zero. And <code>replay_fidelity_level: RF-1</code> is stamped on every artifact, saying out loud that the fold is replayable from the recorded votes but the votes themselves are not reproducible from scratch. A verifier reading this predicate re-derives <code>block</code> from two blocker criterion-evaluations at agreement 1.0 ≥ the 0.8 quorum recorded in the same document. The verdict is a function of signed inputs, not an assertion.</p>
+<h3 id="5-a-decoupled-priced-judge">5. A decoupled, priced judge</h3>
+<p>The judge model is independently swappable — <code>--judge-provider</code> accepts DeepSeek, Groq, NVIDIA NIM, Anthropic, and others. And every eval reports its real cost per phase: trigger, execution, judge, with the judge’s N-multiplier visible.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>phase      calls</span></span>
+<span class="line"><span>judge         50   ← N=5 × 10 judge criteria; the ONLY phase that multiplies</span></span>
+<span class="line"><span>other         12   ← trigger + execution (unmultiplied)</span></span>
+<span class="line"><span>------------------------------------------------------------------</span></span>
+<span class="line"><span>total         62   74,157 in / 24,695 out tokens   →   $0.017</span></span></code></pre>
+<p>Multi-sampling multiplies only the judge phase. That makes “which judge, at what N” a quality-per-dollar decision you make with a number in front of you, instead of a vibe. Judge quality stops being an article of faith and becomes a line item.</p>
+<h3 id="6-the-noise-is-observable">6. The noise is observable</h3>
+<p>Every judge sample emits an OpenTelemetry event, and every criterion event carries its sample count and agreement. That is the audit trail of the noise the majority decision absorbed — capturable to NDJSON.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="jsonc"><code><span class="line"><span style="color:#6A737D">// one line per judge sample, capturable to NDJSON</span></span>
+<span class="line"><span style="color:#E1E4E8">{</span><span style="color:#79B8FF">"event"</span><span style="color:#E1E4E8">:</span><span style="color:#9ECBFF">"judge.sample"</span><span style="color:#E1E4E8">,</span><span style="color:#79B8FF">"criterion"</span><span style="color:#E1E4E8">:</span><span style="color:#9ECBFF">"produces-cfo-grokkable-report"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF"> "sample"</span><span style="color:#E1E4E8">:</span><span style="color:#79B8FF">3</span><span style="color:#E1E4E8">,</span><span style="color:#79B8FF">"of"</span><span style="color:#E1E4E8">:</span><span style="color:#79B8FF">5</span><span style="color:#E1E4E8">,</span><span style="color:#79B8FF">"verdict"</span><span style="color:#E1E4E8">:</span><span style="color:#9ECBFF">"no"</span><span style="color:#E1E4E8">,</span><span style="color:#79B8FF">"dispatch_ms"</span><span style="color:#E1E4E8">:</span><span style="color:#79B8FF">812</span><span style="color:#E1E4E8">,</span><span style="color:#79B8FF">"agreement_so_far"</span><span style="color:#E1E4E8">:</span><span style="color:#79B8FF">1.0</span><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>You can watch a criterion converge, or watch it fail to. The <code>dispatch_ms</code> field also feeds the open question about vote correlation — more on that below.</p>
+<h2 id="the-experiment">The experiment</h2>
+<p>Three arms. Seven identical re-runs each. DeepSeek judge. A frozen copy of the skill so nothing drifts between arms. Every criterion — the blocker included — ran at N = 5 here, so the arms compare apples-to-apples; the N = 11 blocker default is production over-provisioning, not exercised in this worked example.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Arm</th><th>Judge</th><th>Execution</th><th>Distribution</th></tr></thead><tbody><tr><td><strong>Before (legacy)</strong></td><td>single call, un-seeded, temp 0</td><td>API default (~1.0)</td><td>6 BLOCK / 1 SHIP — the flip-flop</td></tr><tr><td><strong>Judge fix only</strong></td><td>5-sample majority, 0.8 gate</td><td>API default (~1.0)</td><td>5 BLOCK / 2 WARN — judge stable, output not</td></tr><tr><td><strong>Full fix</strong></td><td>5-sample majority, 0.8 gate</td><td>pinned greedy</td><td>7/7 BLOCK — unanimous</td></tr></tbody></table>
+<p>The middle arm is the load-bearing result. It is the proof that verdict noise decomposes into layers. With the judge stabilized but execution still sampling, the runs reported <code>unstable_blocker_failures: 0</code> with unanimous votes — the judge had stopped flip-flopping. But two runs landed WARN instead of BLOCK, because the <em>output</em> was still a fresh random draw. Stabilizing the judge didn’t remove the variance; it moved the variance upstream and made it attributable. <code>[5/5 no]</code> unanimous votes on a genuinely degraded output is the fingerprint of execution sampling, cleanly separated from judging noise. You cannot see the second layer until you’ve killed the first.</p>
+<p>The honest residual: one additional run outside the protocol landed WARN even under greedy decoding. Greedy decoding still carries temperature-0 API nondeterminism — the batch and kernel effects from the very first failure mode. That is structural, and it is exactly why the signed claim is RF-1. The fold is replayable from the recorded votes. The votes are not reproducible from scratch. Claiming otherwise would be the lie the whole method exists to avoid.</p>
+<p>And the verdict itself is a real finding, not a lab artifact. The blocker <code>produces-cfo-grokkable-report</code> fails unanimously — <code>[5/5 votes, agreement 1.0]</code> — on two reporting test cases. Under reproducible conditions the skill leads with credential and PromQL requests instead of the CFO-legible dollar headline its own criterion demands. The earlier 10/10 SHIP was a favorable draw at sampling temperature. Pin the temperature and the skill genuinely fails its own bar.</p>
+<h2 id="the-working-proof">The working proof</h2>
+<p>Everything above is a claim until a stranger can check it. Here is where the strangers check it:</p>
+<p><strong><a href="https://labs.intentsolutions.io/eval-sets/iep-self-eval-dogfood/">https://labs.intentsolutions.io/eval-sets/iep-self-eval-dogfood/</a></strong></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Skill</th><th>Verdict</th><th>Rekor log index</th></tr></thead><tbody><tr><td><code>coreweave-gpu-node-forensics</code></td><td><strong>SHIP</strong></td><td><a href="https://rekor.sigstore.dev/api/v1/log/entries?logIndex=2085904207">2085904207</a></td></tr><tr><td><code>coreweave-gpu-cost-leak-hunter</code></td><td><strong>BLOCK (7/7 re-runs)</strong></td><td><a href="https://rekor.sigstore.dev/api/v1/log/entries?logIndex=2091983416">2091983416</a></td></tr></tbody></table>
+<p>The first row is a second dogfood skill, <code>coreweave-gpu-node-forensics</code>, that passed cleanly — a SHIP signed to the same standard — so the board carries an honest pass right next to the honest fail. Both verdicts are signed and anchored in the public Rekor transparency log. A stranger with <a href="https://docs.sigstore.dev/cosign/verifying/verify/"><code>cosign</code></a> — no account, no keys — downloads the two files from the page and runs the printed command:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#6A737D"># No account. No keys. Just cosign + the bundle from the page.</span></span>
+<span class="line"><span style="color:#6A737D"># (The page prints the exact --certificate-identity for each artifact.)</span></span>
+<span class="line"><span style="color:#B392F0">cosign</span><span style="color:#9ECBFF"> verify-blob</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --new-bundle-format</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --bundle</span><span style="color:#9ECBFF"> coreweave-gpu-cost-leak-hunter.bundle.sigstore.json</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --certificate-identity-regexp</span><span style="color:#9ECBFF"> '^https://github.com/jeremylongshore/.*'</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --certificate-oidc-issuer</span><span style="color:#9ECBFF"> https://token.actions.githubusercontent.com</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#9ECBFF">  coreweave-gpu-cost-leak-hunter.bundle.json</span></span>
+<span class="line"><span style="color:#6A737D"># → Verified OK</span></span></code></pre>
+<p>Then they fetch the Rekor inclusion proof and re-derive the verdict from the signed bytes: two blocker criterion-evaluations, unanimous “no” at agreement 1.0 ≥ the 0.8 quorum recorded in the same predicate → block. They never trust our conclusion. They recompute it.</p>
+<p>The signing ran under a reviewer-gated GitHub Actions identity — <a href="https://docs.sigstore.dev/certificate_authority/overview/">keyless Fulcio</a>, with the git ref frozen into the certificate — approved by a human at a protected environment. The one-way door to a permanent public log stays human-held. No automated job walks through it alone.</p>
+<p>Before the page went live it was adversarially verified by a three-lens pass: stranger-cosign, claims-versus-data, and internal consistency, 30-plus checks total. That pass executed the verify commands verbatim, decoded the certificates, and checked every number against the artifact. It caught a would-be broken link and four honesty imprecisions before they shipped. The verification harness is itself part of the product — if the proof page can lie, the method is theater.</p>
+<p>The verdict that made all of this worth doing is the second row of the table. It is a BLOCK of our own published skill. Signed, anchored, and published anyway — because a gate that only fires outward is theater. A <code>coreweave-gpu-cost-leak-hunter</code> we ship with a public failing grade is worth more to the method’s credibility than a wall of green badges.</p>
+<h2 id="what-honesty-costs">What honesty costs</h2>
+<p>Reproducibility is not free, but at this quality it is cents.</p>
+<p><strong>~$0.017 per full eval at N = 5 on DeepSeek.</strong> That is 74,157 input and 24,695 output tokens across 62 calls, 50 of them judge samples. Multi-sampling multiplies only the judge phase. Buying a replayable verdict instead of a coin flip costs, at this judge and this N, less than two cents.</p>
+<p><strong>“Free” judges carry a throughput tax.</strong> Groq’s free tier (~30 requests/minute, as observed) rate-limited a 5×10 sample burst. That failure degraded honestly — the errored samples became “unsure” votes and weakened agreement rather than manufacturing false certainty, exactly as the denominator rule intends. NVIDIA NIM hung a judge call for over an hour, which exposed that judge calls need timeouts and pacing before any free-tier judge can be fairly benchmarked. The cheap judge isn’t cheap until you’ve built the plumbing to survive it.</p>
+<h2 id="what-wed-tell-anyone-signing-eval-verdicts">What we’d tell anyone signing eval verdicts</h2>
+<ol>
+<li><strong>Never sign a single draw.</strong> Sign a deterministic fold over recorded samples, and put the samples in the signed artifact. Retrofitting provenance onto a published transparency-log corpus is the one recovery you cannot make. Get the shape right before the first <code>cosign</code> call, not after.</li>
+<li><strong>Decompose your noise before you fix it.</strong> Judge noise and execution sampling are different layers with different fixes. A stabilized judge is the instrument that lets you <em>see</em> the second layer. Fix them in the wrong order and you’ll conclude your judge is broken when your subject is the one flipping.</li>
+<li><strong>Any-blocker AND-gates amplify noise exponentially.</strong> Gate blockers on measured agreement, and route unstable failures to “warn.” A verdict too unstable to reproduce is too unstable to block on — and too unstable to pass.</li>
+<li><strong>Missing evidence weakens confidence; it never strengthens it.</strong> Errored samples belong in the denominator. Any code path where a failure quietly raises your agreement fraction is a bug that will eventually sign a lie.</li>
+<li><strong>State the replay-fidelity level.</strong> Silence defaults every reader to the strongest, and usually false, claim. RF-1 is not a weakness in the artifact. It is the artifact refusing to overstate itself.</li>
+<li><strong>Publish your failing grades.</strong> The signed BLOCK of your own skill does more for the method’s credibility than another SHIP badge ever will.</li>
+</ol>
+<h2 id="limits-and-open-work">Limits and open work</h2>
+<p>This is where the method earns trust — by being explicit about what it does not yet cover.</p>
+<p><strong>Vote correlation is real and unquantified.</strong> Same-judge samples are not fully independent; burst dispatch likely increases co-batching, which correlates errors. That is why blocker N = 11 is over-provisioned rather than derived from a clean binomial. Per-sample timing (<code>dispatch_ms</code>) now lands in the evidence so effective sample size can eventually be estimated, but today it’s a margin, not a measurement.</p>
+<p><strong>Judge-versus-human validity is unmeasured here.</strong> Agreement measures stability, not correctness. A judge can be perfectly stable and perfectly wrong. The next experiment is Cohen’s κ against a human-anchored gold set, target ≥ 0.8. Until that runs, this method guarantees you’ll get the <em>same</em> verdict twice — not that it’s the <em>right</em> verdict.</p>
+<p><strong>The evidence store is append-only by convention, not by invariant.</strong> Freeze triggers and hash chaining are specified and tracked, not yet enforced. Convention is a promise; an invariant is a proof. This one is still a promise.</p>
+<p><strong>Telemetry has a home only locally</strong> — NDJSON capture. An OTLP collector on prod plus <code>gen_ai.*</code> dual-emit is recommended and tracked. The noise is observable on the dev box; making it observable in production is open work.</p>
+<p>None of these are reasons to distrust the signed verdicts. They are the reasons the signed verdicts say RF-1 and “agreement,” not “reproducible” and “confidence.” The method’s honesty is load-bearing precisely because the limits are stated in the artifact.</p>
+<h2 id="also-shipped">Also shipped</h2>
+<p>Same day, a separate estate-hygiene artifact landed in intent-os: a hand-maintained <strong>automations and notifications registry</strong> (<code>mission-control/automations.md</code>, PRs #32/#33) — a single index of every unattended job across cloud routines, GitHub Actions crons, dev-box crons, and production VPS daemons, plus the Slack channel matrix and notification-channel reachability (cloud routines can’t reach the tailnet ntfy topics; there is no Slack <em>read</em> path, so asks living only in Slack are invisible to agents). The governing rule: an automation that isn’t in the registry effectively doesn’t exist. Same instinct as the eval work — make the hidden machinery legible before it surprises you.</p>
+<h2 id="related-posts">Related posts</h2>
+<ul>
+<li><a href="/blog/eval-gated-model-swap-gpt-5-4/">Eval-gated model swaps: shipping gpt-5.4 as a one-line config switch</a></li>
+<li><a href="/blog/the-moat-is-the-trust-layer-nexus-byok-rag/">The moat is the trust layer: enforced egress, code-enforced citations, tamper-evident audit</a></li>
+<li><a href="/blog/every-safety-gate-has-a-failure-direction/">Every safety gate has a failure direction</a></li>
+</ul>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "Noise-Robust LLM-Judge Evals: Don't Sign a Coin Flip",
+  "description": "An un-seeded LLM judge is a coin flip even at temperature 0. How we made signed eval verdicts replayable instead of attesting noise.",
+  "datePublished": "2026-07-07T10:00:00-05:00",
+  "dateModified": "2026-07-07T10:00:00-05:00",
+  "author": { "@type": "Person", "name": "Jeremy Longshore" },
+  "publisher": { "@type": "Organization", "name": "Start AI Tools", "url": "https://startaitools.com" },
+  "url": "https://startaitools.com/posts/noise-robust-signed-llm-judge-evals/",
+  "mainEntityOfPage": "https://startaitools.com/posts/noise-robust-signed-llm-judge-evals/",
+  "articleSection": "AI Engineering",
+  "keywords": ["ai-agents", "evals", "llm-as-judge", "testing", "provenance", "ci-cd"]
+}
+</script>
+      </div>
+    </div>
+  </article>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

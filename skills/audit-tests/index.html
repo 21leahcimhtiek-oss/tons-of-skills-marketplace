@@ -1,0 +1,1128 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>audit-tests - Agent Skill</title>
+    <meta name="description" content="Diagnostic-only test suite auditor. Classifies repo type, maps against 7-layer testing taxonomy (git hooks → static → unit → integration → system → E2E → acceptance), runs deterministic quality gates (coverage, mutation, CRAP, architecture, escape-scan), builds RTM / personas / journeys traceability, produces TEST_AUDIT.md, updates tests/TESTING.md, and mandatorily hands off to implement-tests when gaps are found. Use when auditing test quality, finding test gaps, or running the full 7-layer sweep. Trigger with &quot;audit tests&quot;, &quot;find gaps&quot;, &quot;test audit&quot;, &quot;check test quality&quot;, &quot;full sweep&quot;, &quot;7-layer audit&quot;, &quot;rtm check&quot;.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://tonsofskills.com/tons-of-skills-marketplace/skills/audit-tests/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/audit-tests/">
+    <meta property="og:title" content="audit-tests - Agent Skill">
+    <meta property="og:description" content="Diagnostic-only test suite auditor. Classifies repo type, maps against 7-layer testing taxonomy (git hooks → static → unit → integration → system → E2E → acceptance), runs deterministic quality gates (coverage, mutation, CRAP, architecture, escape-scan), builds RTM / personas / journeys traceability, produces TEST_AUDIT.md, updates tests/TESTING.md, and mandatorily hands off to implement-tests when gaps are found. Use when auditing test quality, finding test gaps, or running the full 7-layer sweep. Trigger with &quot;audit tests&quot;, &quot;find gaps&quot;, &quot;test audit&quot;, &quot;check test quality&quot;, &quot;full sweep&quot;, &quot;7-layer audit&quot;, &quot;rtm check&quot;.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="audit-tests - Agent Skill">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/audit-tests/">
+    <meta name="twitter:title" content="audit-tests - Agent Skill">
+    <meta name="twitter:description" content="Diagnostic-only test suite auditor. Classifies repo type, maps against 7-layer testing taxonomy (git hooks → static → unit → integration → system → E2E → acceptance), runs deterministic quality gates (coverage, mutation, CRAP, architecture, escape-scan), builds RTM / personas / journeys traceability, produces TEST_AUDIT.md, updates tests/TESTING.md, and mandatorily hands off to implement-tests when gaps are found. Use when auditing test quality, finding test gaps, or running the full 7-layer sweep. Trigger with &quot;audit tests&quot;, &quot;find gaps&quot;, &quot;test audit&quot;, &quot;check test quality&quot;, &quot;full sweep&quot;, &quot;7-layer audit&quot;, &quot;rtm check&quot;.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"audit-tests","description":"Diagnostic-only test suite auditor. Classifies repo type, maps against 7-layer testing taxonomy (git hooks → static → unit → integration → system → E2E → acceptance), runs deterministic quality gates (coverage, mutation, CRAP, architecture, escape-scan), builds RTM / personas / journeys traceability, produces TEST_AUDIT.md, updates tests/TESTING.md, and mandatorily hands off to implement-tests when gaps are found. Use when auditing test quality, finding test gaps, or running the full 7-layer sweep. Trigger with \"audit tests\", \"find gaps\", \"test audit\", \"check test quality\", \"full sweep\", \"7-layer audit\", \"rtm check\".","version":"7.2.0","author":{"@type":"Person","name":"Jeremy Longshore"},"license":"MIT","programmingLanguage":"Claude Code Agent Skill","isPartOf":{"@type":"SoftwareApplication","name":"intent-labs-pack","applicationCategory":"unknown"}}</script>
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.breadcrumbs[data-astro-cid-ilhxcym7]{margin-bottom:var(--space-5)}.breadcrumbs__list[data-astro-cid-ilhxcym7]{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;list-style:none;padding:0;margin:0;font-family:var(--font-mono);font-size:var(--text-sm, .8rem)}.breadcrumbs__item[data-astro-cid-ilhxcym7]{display:flex;align-items:center;gap:.375rem}.breadcrumbs__link[data-astro-cid-ilhxcym7]{color:var(--text-3);text-decoration:none;transition:color var(--duration-fast, .2s) var(--ease-out)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:hover{color:var(--primary)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:0}.breadcrumbs__sep[data-astro-cid-ilhxcym7]{color:var(--text-3);user-select:none;font-size:.7em;line-height:1}.breadcrumbs__current[data-astro-cid-ilhxcym7]{color:var(--text-2)}.detail-cta[data-astro-cid-qcigfm7x]{background:var(--surface-3, var(--brand-light-gray));border-top:1px solid var(--border, var(--brand-light-gray));border-radius:var(--radius-lg);padding:2rem 1.5rem;margin-top:2rem;text-align:center}.detail-cta__headline[data-astro-cid-qcigfm7x]{font-family:var(--font-display);font-weight:700;font-size:1.35rem;color:var(--text, var(--brand-dark));margin-bottom:1.25rem}.detail-cta__actions[data-astro-cid-qcigfm7x]{display:flex;justify-content:center;gap:.75rem;flex-wrap:wrap}.detail-cta__primary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:var(--primary);color:#0a0a0c;border:none;border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;cursor:pointer;transition:background var(--duration-fast) var(--ease-out),transform var(--duration-fast) var(--ease-out)}.detail-cta__primary[data-astro-cid-qcigfm7x]:hover{background:var(--primary-dark, var(--primary-dark));transform:translateY(-1px)}.detail-cta__primary[data-astro-cid-qcigfm7x].copied{background:var(--positive, var(--brand-green))}.detail-cta__secondary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:transparent;color:var(--text, var(--brand-dark));border:1px solid var(--border, var(--brand-mid-gray));border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;text-decoration:none;transition:border-color var(--duration-fast) var(--ease-out),color var(--duration-fast) var(--ease-out)}.detail-cta__secondary[data-astro-cid-qcigfm7x]:hover{border-color:var(--primary);color:var(--primary)}@media(max-width:480px){.detail-cta__actions[data-astro-cid-qcigfm7x]{flex-direction:column;align-items:stretch}.detail-cta__primary[data-astro-cid-qcigfm7x],.detail-cta__secondary[data-astro-cid-qcigfm7x]{justify-content:center}}
+</style>
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/_slug_@_@astro.wF9emvVq.css"></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  
+  
+
+  <div class="skill-detail" data-astro-cid-jrlgpo3w>
+    <!-- 1. Breadcrumbs -->
+    <nav aria-label="Breadcrumb" class="breadcrumbs" data-astro-cid-ilhxcym7>
+  <ol class="breadcrumbs__list" itemscope itemtype="https://schema.org/BreadcrumbList" data-astro-cid-ilhxcym7>
+    <li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Home</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="1">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/skills/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Skills</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="2">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          <span class="breadcrumbs__current" aria-current="page" itemprop="name" data-astro-cid-ilhxcym7>
+              audit-tests
+            </span>
+          <meta itemprop="position" content="3">
+        </li>
+  </ol>
+</nav>
+
+    <!-- 2. Header (enhanced) -->
+    <header class="skill-header" data-astro-cid-jrlgpo3w>
+      <h1 data-astro-cid-jrlgpo3w>audit-tests</h1>
+      <p class="skill-description" data-astro-cid-jrlgpo3w>Diagnostic-only test suite auditor. Classifies repo type, maps against 7-layer testing taxonomy (git hooks → static → unit → integration → system → E2E → acceptance), runs deterministic quality gates (coverage, mutation, CRAP, architecture, escape-scan), builds RTM / personas / journeys traceability, produces TEST_AUDIT.md, updates tests/TESTING.md, and mandatorily hands off to implement-tests when gaps are found. Use when auditing test quality, finding test gaps, or running the full 7-layer sweep. Trigger with &quot;audit tests&quot;, &quot;find gaps&quot;, &quot;test audit&quot;, &quot;check test quality&quot;, &quot;full sweep&quot;, &quot;7-layer audit&quot;, &quot;rtm check&quot;.</p>
+
+      <div class="skill-metadata" data-astro-cid-jrlgpo3w>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>v7.2.0</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>Jeremy Longshore</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>MIT</span>
+        </div>
+      </div>
+
+      
+    </header>
+
+    <!-- 4. Allowed Tools -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Allowed Tools</h2>
+      <div class="tools-grid" data-astro-cid-jrlgpo3w>
+        <span class="tool-badge" data-astro-cid-jrlgpo3w>Read</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Glob</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Grep</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(find:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(git:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(gh:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(ls:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(pnpm:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(npx:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(pytest:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(go:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(cargo:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(bash:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(sha256sum:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(python:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(python3:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(radon:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(gocyclo:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(depcruise:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(gherkin-lint:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Task</span><span class="tool-badge" data-astro-cid-jrlgpo3w>AskUserQuestion</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Skill</span>
+      </div>
+      
+    </section>
+
+    <!-- 5. Provided by Plugin -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Provided by Plugin</h2>
+      <div class="plugin-info" data-astro-cid-jrlgpo3w>
+        <div class="plugin-details" data-astro-cid-jrlgpo3w>
+          <h3 data-astro-cid-jrlgpo3w>
+            <a href="/plugins/intent-labs-pack/" data-astro-cid-jrlgpo3w>intent-labs-pack</a>
+          </h3>
+          <p data-astro-cid-jrlgpo3w>Intent Solutions labs skills for the nightly eval roster: audit-tests and validate-skillmd — the dogfood surface for running our own gates on our own marketplace.</p>
+          <div class="plugin-meta" data-astro-cid-jrlgpo3w>
+            <span data-astro-cid-jrlgpo3w>unknown</span>
+            <span data-astro-cid-jrlgpo3w>v7.2.0</span>
+          </div>
+        </div>
+        <a href="/plugins/intent-labs-pack/" class="btn-primary" data-astro-cid-jrlgpo3w>View Plugin</a>
+      </div>
+    </section>
+
+    <!-- 6. Installation -->
+    <section class="section-box dark" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Installation</h2>
+      <p class="install-note" style="color: var(--brand-light-gray); margin-bottom: 0.75rem;" data-astro-cid-jrlgpo3w>This skill is included in the intent-labs-pack plugin:</p>
+      <pre class="install-command" data-copy="/plugin install intent-labs-pack@claude-code-plugins-plus" data-astro-cid-jrlgpo3w><code data-astro-cid-jrlgpo3w>/plugin install intent-labs-pack@claude-code-plugins-plus</code></pre>
+      <p class="install-note" data-astro-cid-jrlgpo3w>Click to copy</p>
+    </section>
+
+    <!-- 7. Skill Content (Markdown) -->
+    <section class="skill-content-section" data-astro-cid-jrlgpo3w>
+      <h2 data-astro-cid-jrlgpo3w>Instructions</h2>
+      <div class="skill-content" data-astro-cid-jrlgpo3w>
+        <div data-astro-cid-jrlgpo3w><h1>audit-tests — Diagnostic Test Auditor (7-Layer + RTM)</h1>
+<p><strong>Invocation</strong>: &quot;audit tests&quot; · &quot;find gaps&quot; · &quot;full sweep&quot; · &quot;7-layer audit&quot; · &quot;rtm check&quot; · &quot;test quality&quot;.</p>
+<p>&gt; <strong>Enforcement harness</strong>: this skill delegates all deterministic checks (hash-pin, escape-scan, CRAP, architecture, bias, Gherkin lint) to the in-repo installation of <a href="https://www.npmjs.com/package/@intentsolutions/audit-harness"><code>@intentsolutions/audit-harness</code></a>. Node repos install via <code>pnpm add -D @intentsolutions/audit-harness</code>; other languages vendor via the package&#39;s <code>install.sh</code>. <strong>Never reference <code>~/.claude/...</code> paths from a target repo&#39;s hooks or CI</strong> — the enforcement must travel with the code.</p>
+<p>Read-only diagnostic skill. Classifies the repo, maps applicable layers from the 7-layer testing taxonomy, runs deterministic gates, builds requirements traceability (RTM / personas / journeys), writes <code>TEST_AUDIT.md</code> + updates <code>tests/TESTING.md</code>, and <strong>mandatorily hands off</strong> to <code>implement-tests</code> when P0/P1 gaps exist.</p>
+<p>No filesystem mutations other than <code>TEST_AUDIT.md</code> (transient) and the observational sections of <code>tests/TESTING.md</code>, <code>tests/RTM.md</code>, <code>tests/PERSONAS.md</code>, <code>tests/JOURNEYS.md</code>.</p>
+<h2>Overview</h2>
+<p>Diagnostic-only test suite auditor for any Intent Solutions (or compatible) repo. Classifies the repository, maps the 7-layer testing taxonomy, runs deterministic gates via in-repo <code>@intentsolutions/audit-harness</code>, builds RTM/personas/journeys traceability, and writes <code>TEST_AUDIT.md</code> plus observational sections of <code>tests/TESTING.md</code>. When P0/P1 gaps exist it <strong>hands off</strong> to <code>implement-tests</code> instead of implementing tests itself.</p>
+<h2>Prerequisites</h2>
+<ul>
+<li>A git working tree for the target repository</li>
+<li>Ability to run <code>Read</code>/<code>Glob</code>/<code>Grep</code>/<code>Bash</code> against that tree</li>
+<li>For deterministic gates: in-repo <code>audit-harness</code> (or install path documented for the language) — <strong>never</strong> wire target CI/hooks to <code>~/.claude/...</code></li>
+</ul>
+<h2>You are the engineer</h2>
+<p>Deterministic tools do the grading. The engineer owns the walls (<code>features/*.feature</code>, coverage thresholds, architecture rules, <code>TESTING.md</code> policy sections, <code>RTM.md</code> MoSCoW tags). The AI operates inside them and never grades itself — every gate is a tool that returns exit 0.</p>
+<h2>Ownership (audit-tests may READ; never modify)</h2>
+<table><thead><tr>
+<th>Artifact</th>
+<th>Owner</th>
+</tr></thead><tbody>
+<tr>
+<td><code>features/*.feature</code></td>
+<td>Engineer — hash-pinned</td>
+</tr>
+<tr>
+<td>Policy sections of <code>tests/TESTING.md</code></td>
+<td>Engineer — hash-pinned</td>
+</tr>
+<tr>
+<td>Coverage / mutation / CRAP thresholds</td>
+<td>Engineer (policy)</td>
+</tr>
+<tr>
+<td><code>.dependency-cruiser.js</code>, <code>.importlinter</code>, <code>deptrac.yaml</code>, ArchUnit rules</td>
+<td>Engineer — hash-pinned</td>
+</tr>
+<tr>
+<td><code>RTM.md</code> MoSCoW tag overrides</td>
+<td>Engineer — hash-pinned; AI never lowers a MUST</td>
+</tr>
+<tr>
+<td>Test code, step glue, fixtures</td>
+<td>AI — edits allowed (in implement-tests only)</td>
+</tr>
+</tbody></table>
+<h2>The 7-layer taxonomy (canonical)</h2>
+<table><thead><tr>
+<th>Layer</th>
+<th>Name</th>
+<th>Reference</th>
+</tr></thead><tbody>
+<tr>
+<td>L1</td>
+<td>Git hooks &amp; CI enforcement</td>
+<td><code>shared-refs/hooks-and-ci.md</code></td>
+</tr>
+<tr>
+<td>L2</td>
+<td>Static analysis &amp; linting</td>
+<td><code>shared-refs/linters-formatters-types.md</code> + <code>shared-refs/security-testing.md</code></td>
+</tr>
+<tr>
+<td>L3</td>
+<td>Unit &amp; function (walls 2–7 live here)</td>
+<td><code>shared-refs/frameworks.md</code>, <code>shared-refs/crap-and-complexity.md</code>, <code>shared-refs/architecture-constraints.md</code>, <code>shared-refs/property-and-fuzz.md</code>, <code>test-quality-deep-audit.md</code></td>
+</tr>
+<tr>
+<td>L4</td>
+<td>Integration &amp; regression (contract, migration, fakes, IaC)</td>
+<td><code>shared-refs/integration-and-infra.md</code>, <code>shared-refs/specialized-testing.md</code></td>
+</tr>
+<tr>
+<td>L5</td>
+<td>System quality (perf, sec, a11y, compat, chaos)</td>
+<td><code>shared-refs/security-testing.md</code>, <code>shared-refs/specialized-testing.md</code>, <code>shared-refs/property-and-fuzz.md</code> § Chaos</td>
+</tr>
+<tr>
+<td>L6</td>
+<td>E2E / BDD / Gherkin (smoke, visual)</td>
+<td><code>shared-refs/e2e-testing.md</code>, <code>shared-refs/acceptance-tests-gherkin.md</code></td>
+</tr>
+<tr>
+<td>L7</td>
+<td>Acceptance &amp; business validation (UAT)</td>
+<td><code>shared-refs/acceptance-tests-gherkin.md</code></td>
+</tr>
+</tbody></table>
+<p>Full definitions and gap-fill rationale: <code>{baseDir}/references/taxonomy.md</code>. Classification → applicable layers: <code>{baseDir}/references/layer-applicability.md</code>.</p>
+<p><strong>Walls live inside layers.</strong> Wall 1 (Acceptance) = L7 spec + L6 glue. Walls 2–7 = L3. See <code>taxonomy.md</code> § &quot;Walls inside layers&quot;.</p>
+<h2>Instructions</h2>
+<h3>Step 0.5 — Harness freshness check (automatic, ≤ 500ms, cache 24h)</h3>
+<p>Run this early so drift surfaces without remembering to invoke <code>/sync-testing-harness</code>:</p>
+<pre data-lang="bash"><code>
+
+CACHE=~/.cache/audit-harness/freshness-check
+mkdir -p &quot;$(dirname &quot;$CACHE&quot;)&quot;
+
+# Skip if checked in last 24h
+
+if [[ -f &quot;$CACHE&quot; ]] &amp;&amp; [[ $(($(date +%s) - $(date -r &quot;$CACHE&quot; +%s))) -lt 86400 ]]; then
+  cat &quot;$CACHE&quot;
+else
+  latest=$(curl -fsS --max-time 3 https://registry.npmjs.org/@intentsolutions/audit-harness/latest 2&gt;/dev/null | python3 -c &#39;import sys,json;print(json.load(sys.stdin)[&quot;version&quot;])&#39; 2&gt;/dev/null || echo &quot;unknown&quot;)
+  installed=$(pnpm list @intentsolutions/audit-harness --depth=0 --json 2&gt;/dev/null | python3 -c &#39;import sys,json;d=json.load(sys.stdin);print(d[0].get(&quot;devDependencies&quot;,{}).get(&quot;@intentsolutions/audit-harness&quot;,{}).get(&quot;version&quot;,&quot;none&quot;))&#39; 2&gt;/dev/null || echo &quot;none&quot;)
+  if [[ &quot;$latest&quot; != &quot;unknown&quot; &amp;&amp; &quot;$latest&quot; != &quot;$installed&quot; &amp;&amp; &quot;$installed&quot; != &quot;none&quot; ]]; then
+    msg=&quot;⚠ audit-harness drift: installed=$installed → latest=$latest. Run /sync-testing-harness or: pnpm up @intentsolutions/audit-harness&quot;
+  else
+    msg=&quot;✓ audit-harness: $installed (latest: $latest)&quot;
+  fi
+  echo &quot;$msg&quot; | tee &quot;$CACHE&quot;
+fi
+
+</code></pre>
+<ul>
+<li>Cache hit (&lt; 24h old) → instant, no network</li>
+<li>Network failure → silently skipped (offline-safe)</li>
+<li>Drift detected → surfaced in <code>TEST_AUDIT.md</code> under <code>## Freshness</code></li>
+<li><strong>Not blocking</strong> — audit continues regardless</li>
+</ul>
+<h3>Step 1 — Read context</h3>
+<ol>
+<li>Check for <code>tests/TESTING.md</code>. If absent → proceed to discovery. If present → read <code>## Classification</code>, <code>## Thresholds</code>, <code>## Waived layers</code>. <strong>Engineer policy wins.</strong></li>
+<li>Verify the target repo has <code>@intentsolutions/audit-harness</code> installed (Node: <code>package.json</code> devDep; other langs: <code>.audit-harness/</code> directory exists). If absent, add to the handoff payload as L0 install. <strong>Hooks and CI reference the in-repo harness, never <code>~/.claude/</code> paths.</strong></li>
+<li>Verify hash manifest via <code>pnpm exec audit-harness verify</code> (Node) or <code>scripts/audit-harness verify</code> (vendored). Interpret exit code:</li>
+</ol>
+<ul>
+<li><strong>0</strong> (OK) — pinned hashes match; continue.</li>
+<li><strong>2</strong> (<code>HARNESS_TAMPERED</code>) — pinned artifact changed; halt the pipeline; flag in <code>TEST_AUDIT.md</code> and do not proceed.</li>
+<li><strong>3</strong> (no manifest) — fresh repo or never initialized; continue. Log &quot;no hash manifest — fresh repo&quot; in the report. This is NOT a halt condition.</li>
+</ul>
+<ol>
+<li>Check current branch. On <code>main</code> / <code>develop</code> / protected branches, any handoff at Step 8 will prompt via <code>AskUserQuestion</code>. On <code>feat/*</code> branches, handoff runs autonomously.</li>
+</ol>
+<h3>Step 2 — Classify</h3>
+<p><strong>Deterministic floor first (the harness brain).</strong> Run <code>pnpm exec audit-harness classify</code> (Node) / <code>scripts/audit-harness classify</code> (vendored) / <code>audit-harness classify</code> to emit the read-only <code>audit-profile/v1</code> value — the UNION of detected classifications (service / api / library / cli / frontend / embedded / monorepo + skill / agent / hook / mcp / plugin / marketplace / action), the resolved gate set (a projection of <code>registry.v1.json</code>, recorded by <code>registry_hash</code>), and an explicit <code>unresolved[]</code>.</p>
+<p>Then dispatch <code>test-discovery-agent</code> (via Task tool) <strong>only to refine the <code>unresolved[]</code> residue</strong> (ambiguous/novel repos) — it proposes classification patches a human pins in <code>.audit-harness.yml</code>/<code>TESTING.md</code>; it <strong>never overrides the deterministic classification value</strong> (keeps CI reproducible). Matrix + signals: <code>{baseDir}/references/layer-applicability.md</code> (itself generated from the registry datum via <code>audit-harness gen-layer-applicability</code>).</p>
+<p>Monorepo: the profile carries <code>per-package-classify</code>; classify each package independently and run the full pipeline per-package.</p>
+<h3>Step 3 — Map applicable layers</h3>
+<p>The applicable gates are <strong>already resolved in the <code>audit-profile/v1</code></strong> from Step 2 (dimension + applicability + enforcement per gate). Dispatch <code>taxonomy-mapper-agent</code> to map presence/absence/configured/enforced <strong>on top of the profile&#39;s gate set</strong> + the <code>TESTING.md</code> compliance overlay.</p>
+<p>Output: gap list tagged P0/P1/P2 per <code>layer-applicability.md</code> severity symbols.</p>
+<h3>Step 4 — Run deterministic quality gates</h3>
+<p><strong>Run the harness gate-runners</strong> — each is read-only and emits <code>gate-result/v1</code> Evidence Bundle rows the <code>quality-gate-runner-agent</code> consumes:</p>
+<table><thead><tr>
+<th>Verb</th>
+<th>Dimension</th>
+<th>Notes</th>
+</tr></thead><tbody>
+<tr>
+<td><code>audit-harness conform</code></td>
+<td>conformance</td>
+<td>SKILL.md / .mcp.json / plugin / agent vs bundled content-addressed schemas</td>
+</tr>
+<tr>
+<td><code>audit-harness audit [--deep]</code></td>
+<td>testing-depth</td>
+<td>crap-score + per-layer presence (does NOT execute the repo&#39;s suite)</td>
+</tr>
+<tr>
+<td><code>audit-harness scan</code></td>
+<td>security / hygiene / skill-quality</td>
+<td>shells out to gitleaks/osv/semgrep/syft/markdownlint/lychee; consumes j-rig verdict</td>
+</tr>
+<tr>
+<td><code>audit-harness currency</code></td>
+<td>upstream currency</td>
+<td>advisory report only (no exit authority)</td>
+</tr>
+</tbody></table>
+<p>New gates ship <code>enforcement: advisory</code>; blocking is engineer-pinned in <code>TESTING.md</code>, FP-rate-gated (<code>audit-harness fp-rate</code>, ≤ 5% bar — see <code>docs/gate-promotion.md</code>). Then dispatch <code>quality-gate-runner-agent</code> for the L3 measurement tools and capture exit-code + report:</p>
+<table><thead><tr>
+<th>Gate</th>
+<th>Command</th>
+</tr></thead><tbody>
+<tr>
+<td>Coverage</td>
+<td><code>pytest --cov --cov-fail-under=$(TESTING.md coverage.line)</code> or framework equivalent</td>
+</tr>
+<tr>
+<td>Mutation</td>
+<td><code>mutmut run</code> / <code>npx stryker run</code> / <code>cargo mutants run</code></td>
+</tr>
+<tr>
+<td>CRAP &amp; complexity</td>
+<td><code>python3 {baseDir}/scripts/crap-score.py --target both --out reports/crap/</code></td>
+</tr>
+<tr>
+<td>Architecture</td>
+<td><code>bash {baseDir}/scripts/arch-check.sh</code></td>
+</tr>
+<tr>
+<td>Bias count</td>
+<td><code>bash {baseDir}/scripts/bias-count.sh</code></td>
+</tr>
+<tr>
+<td>Gherkin lint</td>
+<td><code>bash {baseDir}/scripts/gherkin-lint.sh</code></td>
+</tr>
+</tbody></table>
+<p>Gate failure on prod CRAP &gt; 30, test CRAP &gt; 15, project average &gt; 10, architecture violation &gt; 0, or coverage below policy floor → halt the pipeline; record in <code>TEST_AUDIT.md</code>.</p>
+<h3>Step 5 — Meta-audit (RTM / personas / journeys)</h3>
+<p>Dispatch three specialists in parallel (Task tool):</p>
+<ul>
+<li><code>rtm-builder-agent</code> — rebuild <code>tests/RTM.md</code> from Gherkin scenarios, ADRs, product docs, engineer-declared REQs, commit tags. Apply MoSCoW precedence (explicit tag → source default → engineer override → SHOULD fallback). Preserve engineer overrides. See <code>{baseDir}/references/rtm-personas-journeys.md</code>.</li>
+<li><code>persona-coverage-agent</code> — rebuild <code>tests/PERSONAS.md</code>; compute per-persona flow coverage; flag personas below threshold.</li>
+<li><code>journey-mapper-agent</code> — rebuild <code>tests/JOURNEYS.md</code>; per-step layer mapping; flag untested steps.</li>
+</ul>
+<p>Classify findings:</p>
+<table><thead><tr>
+<th>Finding</th>
+<th>Severity</th>
+</tr></thead><tbody>
+<tr>
+<td>Uncovered MUST requirement</td>
+<td>P0 (blocks audit — triggers handoff)</td>
+</tr>
+<tr>
+<td>Uncovered SHOULD requirement</td>
+<td>P1 (advisory; regulated overlay escalates to P0)</td>
+</tr>
+<tr>
+<td>Uncovered COULD requirement</td>
+<td>P2 (logged only)</td>
+</tr>
+<tr>
+<td>WON&#39;T requirement</td>
+<td>excluded from coverage math</td>
+</tr>
+<tr>
+<td>Orphaned test (no linked REQ)</td>
+<td>P1 advisory (regulated: P1; normal: P1)</td>
+</tr>
+<tr>
+<td>Persona below flow-coverage threshold</td>
+<td>P1 advisory</td>
+</tr>
+<tr>
+<td>Journey step untested (step linked to a MUST REQ)</td>
+<td>P0; (linked to SHOULD) P1; (COULD) P2</td>
+</tr>
+</tbody></table>
+<h3>Step 6 — Escape-scan on any pending diff</h3>
+<p>Dispatch <code>escape-detection-agent</code>:</p>
+<pre data-lang="bash"><code>
+
+bash {baseDir}/scripts/escape-scan.sh --staged    # reads policy floors from tests/TESTING.md
+
+</code></pre>
+<p>Exit grammar: 0 clean · 1 CHALLENGE · 2 REFUSE. Any REFUSE halts the audit with the specific pattern recorded in <code>TEST_AUDIT.md</code>.</p>
+<h3>Step 7 — Write reports</h3>
+<ol>
+<li><strong><code>TEST_AUDIT.md</code></strong> at repo root (transient; short-lived):</li>
+</ol>
+<ul>
+<li>Grade (letter + numeric)</li>
+<li>Classification confirmed + applicable layers + waived layers</li>
+<li>Per-layer presence / config / enforcement table</li>
+<li>P0/P1/P2 gap list</li>
+<li>RTM summary (by MoSCoW tier)</li>
+<li>Persona + journey coverage summary</li>
+<li>Escape-scan result</li>
+</ul>
+<ol>
+<li><strong><code>tests/TESTING.md</code></strong> — update observational sections only (<code>## Installed gates</code>, <code>## Frameworks</code>, <code>## Last audit</code>, <code>## Traceability</code>) via <code>Edit</code> tool, never <code>Write</code>. Policy sections untouched. Schema: <code>{baseDir}/references/testing-md-spec.md</code>.</li>
+</ol>
+<h3>Step 8 — Mandatory handoff to implement-tests</h3>
+<pre><code>
+
+if any(P0 gaps) OR any(P1 gaps):
+    payload = {
+        &quot;classification&quot;: {...},
+        &quot;tests_md_path&quot;: &quot;tests/TESTING.md&quot;,
+        &quot;p0_gaps&quot;: [...],
+        &quot;p1_gaps&quot;: [...],
+        &quot;rtm_gaps&quot;: [...],         # uncovered MUSTs
+        &quot;persona_gaps&quot;: [...],
+        &quot;journey_gaps&quot;: [...],
+        &quot;install_order&quot;: [L1, L2, L3, ...]   # from scaffold-architect-agent
+    }
+    if branch in {main, develop, protected}:
+        confirm = AskUserQuestion(&quot;P0/P1 gaps found. Run implement-tests now?&quot;)
+        if not confirm: exit with report
+    Skill(&quot;implement-tests&quot;, args=payload)
+else:
+    print &quot;✓ No P0/P1 gaps. Audit clean.&quot;
+
+</code></pre>
+<p>Handoff pattern mirrors <code>repo-sweep → gist-auditor</code> — no silent escalation, but autonomous on feature branches per global git policy.</p>
+<h2>Escape-detection response grammar</h2>
+<table><thead><tr>
+<th>Severity</th>
+<th>Exit</th>
+<th>Action</th>
+</tr></thead><tbody>
+<tr>
+<td>FLAG</td>
+<td>0</td>
+<td>logged; pipeline continues</td>
+</tr>
+<tr>
+<td>CHALLENGE</td>
+<td>1</td>
+<td>halts until engineer-approved comment</td>
+</tr>
+<tr>
+<td>REFUSE</td>
+<td>2</td>
+<td>pipeline halted</td>
+</tr>
+</tbody></table>
+<p>Patterns that REFUSE (non-exhaustive — full list in <code>{baseDir}/shared-refs/security-testing.md</code> and the script itself):</p>
+<table><thead><tr>
+<th>Pattern</th>
+<th>Why</th>
+</tr></thead><tbody>
+<tr>
+<td>Coverage threshold lowered below <code>TESTING.md</code> floor</td>
+<td>Policy violation</td>
+</tr>
+<tr>
+<td><code>.feature</code> file mutated</td>
+<td>Wall 1, hash-pinned</td>
+</tr>
+<tr>
+<td><code>MUST</code> → weaker tier in <code>RTM.md</code></td>
+<td>Requirements downgrade</td>
+</tr>
+<tr>
+<td>Architecture-rule config edited</td>
+<td>Wall 7, hash-pinned</td>
+</tr>
+<tr>
+<td>Wholesale test-file deletion</td>
+<td>Suite weakening</td>
+</tr>
+<tr>
+<td>Mutation bypass (<code>pragma: no mutate</code>, <code>// Stryker disable</code>)</td>
+<td>Wall 4 evasion (CHALLENGE)</td>
+</tr>
+</tbody></table>
+<p>Deep reference for the full grammar, rationale, and wall derivations: <code>{baseDir}/references/philosophy.md</code>.</p>
+<h2>Specialist agents (Phase 1 — single-file)</h2>
+<p>Each lives at <code>~/.claude/agents/{agent-name}.md</code>. Audit-tests dispatches via Task tool.</p>
+<table><thead><tr>
+<th>Agent</th>
+<th>Responsibility</th>
+</tr></thead><tbody>
+<tr>
+<td><code>test-discovery-agent</code></td>
+<td>Walk repo; detect frameworks + stack; classify repo type; map source↔test files</td>
+</tr>
+<tr>
+<td><code>taxonomy-mapper-agent</code></td>
+<td>Presence / config / enforcement per-layer map given classification</td>
+</tr>
+<tr>
+<td><code>quality-gate-runner-agent</code></td>
+<td>Execute coverage / mutation / CRAP / arch / bias / gherkin scripts; parse outputs</td>
+</tr>
+<tr>
+<td><code>escape-detection-agent</code></td>
+<td>Run <code>escape-scan.sh</code> + <code>harness-hash.sh --verify</code>; report REFUSE / CHALLENGE / FLAG</td>
+</tr>
+<tr>
+<td><code>rtm-builder-agent</code></td>
+<td>Build/update <code>RTM.md</code>; apply MoSCoW precedence; flag orphans + uncovered</td>
+</tr>
+<tr>
+<td><code>persona-coverage-agent</code></td>
+<td>Compute per-persona flow coverage in <code>PERSONAS.md</code></td>
+</tr>
+<tr>
+<td><code>journey-mapper-agent</code></td>
+<td>Map journey steps to layer-tests in <code>JOURNEYS.md</code></td>
+</tr>
+</tbody></table>
+<p><strong>Phase 2</strong> (deferred): each agent may be upgraded to a full skill bundle with its own references/ scripts/ evals/ — see the implementation plan&#39;s &quot;Phase 2 Roadmap&quot;.</p>
+<h2>Discovery and pre-flight</h2>
+<p>Full discovery logic (config-file scan, language detection, package-manager detection, monorepo detection): <code>{baseDir}/references/discovery-preflight.md</code>.</p>
+<h2>Quality gate deep-dives</h2>
+<p>Catalog of every gate tool across 10 sweep categories (aligned to 7-layer taxonomy): <code>{baseDir}/references/quality-gates-sweep.md</code>.</p>
+<p>Per-layer test-quality bias rules, OWASP mapping, mutation interpretation: <code>{baseDir}/references/test-quality-deep-audit.md</code>.</p>
+<p>GitHub-scoped audit (CI health, branch protection, coverage-threshold enforcement): <code>{baseDir}/references/github-audit.md</code>.</p>
+<h2>Output</h2>
+<h3>Clean audit</h3>
+<pre><code>
+
+AUDIT COMPLETE — {repo-name}
+Grade:            A (92/100)
+Classification:   service
+Applicable:       L1, L2, L3, L4-integ, L4-contract, L5-sec, L6-smoke
+Waived:           L5-a11y (no UI), L7-UAT
+P0 gaps:          0
+P1 gaps:          0
+RTM:              22 MUST / all covered · 14 SHOULD / 14 covered
+Escape-scan:      clean
+Report:           TEST_AUDIT.md
+TESTING.md:       updated (observational sections)
+Handoff:          none needed
+
+</code></pre>
+<h3>Gaps found (feat branch — autonomous)</h3>
+<pre><code>
+
+AUDIT COMPLETE — {repo-name}
+Grade:            C (68/100)
+P0 gaps:          2 (L3 coverage below 80; REQ-002 MUST uncovered)
+P1 gaps:          5
+Handoff →         implement-tests (autonomous; feat branch)
+
+</code></pre>
+<h3>Gaps found (main branch — confirmation prompt)</h3>
+<pre><code>
+
+AUDIT COMPLETE — {repo-name}
+Grade:            C (68/100)
+P0 gaps:          2
+P1 gaps:          5
+Branch:           main (protected) — prompting for handoff confirmation...
+
+</code></pre>
+<h2>Examples</h2>
+<p><strong>Example 1 — Fresh Python library, no tests yet.</strong> Run <code>audit tests</code> → <code>test-discovery-agent</code> classifies as <code>library</code>, no <code>TESTING.md</code> present → <code>taxonomy-mapper-agent</code> reports L1, L2, L3 all absent (P0), L4–L7 waived per library applicability → <code>rtm-scaffolder</code> schedules skeleton creation → handoff payload: <code>install_order: [L1, L2, L3]</code> → autonomous handoff fires (feat branch) → <code>implement-tests</code> scaffolds pytest + coverage + mutmut + ruff + pre-commit + starter tests.</p>
+<p><strong>Example 2 — Mature service, previously audited.</strong> Run <code>full sweep</code>. All layers report <code>installed</code>; coverage 82% (above 80 floor); mutation kill rate 74% (above 70 floor); CRAP max 22 (below 30). Grade: A (92/100). <code>TESTING.md#Last audit</code> updated with today&#39;s date. No handoff.</p>
+<p><strong>Example 3 — Monorepo with three packages.</strong> Run <code>audit tests</code>. <code>test-discovery-agent</code> returns <code>monorepo: true, packages: [a, b, c]</code>. Each package classified independently (<code>packages/a</code> = service, <code>packages/b</code> = library, <code>packages/c</code> = cli). Each gets a per-package <code>TESTING.md</code>. Aggregate <code>TEST_AUDIT.md</code> at repo root has three sections. Handoff payload includes per-package <code>install_order</code> arrays.</p>
+<p><strong>Example 4 — PR lowers coverage threshold to bypass gate.</strong> A PR proposes <code>[tool.coverage.report] fail_under = 60</code> in <code>pyproject.toml</code>. <code>TESTING.md#Thresholds</code> has <code>coverage.line: 80</code>. <code>escape-detection-agent</code> runs <code>escape-scan.sh --staged</code>. The script reads floor 80 from <code>TESTING.md</code>, sees fail_under dropped to 60, emits <code>[REFUSE] coverage fail_under lowered below policy floor (80)</code>, exits 2. Audit halts. No <code>TEST_AUDIT.md</code> produced. No handoff. Engineer must revert the threshold edit or run <code>harness-hash.sh --init</code> to legitimize a policy change.</p>
+<p><strong>Example 5 — HIPAA-compliant service with uncovered SHOULD.</strong> Repo has <code>Compliance overlay: HIPAA</code> in <code>TESTING.md</code>. <code>RTM.md</code> has one uncovered <code>SHOULD</code> (error-message retry logic). Normally P1 advisory, but the regulated overlay promotes it to P0. Handoff fires with <code>p0_gaps: [{layer: L3, gap: REQ-034 retry logic uncovered (SHOULD, HIPAA overlay)}]</code>. On <code>main</code> branch → <code>AskUserQuestion</code> prompts; engineer approves; <code>implement-tests</code> proceeds.</p>
+<h2>Troubleshooting</h2>
+<table><thead><tr>
+<th>Symptom</th>
+<th>Diagnosis</th>
+<th>Fix</th>
+</tr></thead><tbody>
+<tr>
+<td><code>rg: error parsing flag -E: grep config error: unknown encoding</code></td>
+<td>Shell has <code>grep</code> aliased to <code>rg</code> (ripgrep); flag grammar differs.</td>
+<td>Use <code>/usr/bin/grep</code> explicitly, or <code>command grep</code>, or call the native <code>Grep</code> tool. All detection examples in this SKILL assume GNU <code>grep</code>.</td>
+</tr>
+<tr>
+<td><code>error: unexpected argument &#39;-m&#39; found</code> (from <code>find</code>)</td>
+<td>Shell has <code>find</code> aliased to <code>fd</code>; flag grammar differs.</td>
+<td>Use <code>/usr/bin/find</code> explicitly, or <code>command find</code>, or call the native <code>Glob</code> tool. All detection examples assume GNU <code>find</code>.</td>
+</tr>
+<tr>
+<td><code>gh label create</code> appears to succeed but label already existed</td>
+<td><code>gh label create</code> is a silent no-op without <code>--force</code>.</td>
+<td>Use <code>gh label create &lt;name&gt; --description &quot;...&quot; --color &lt;hex&gt; --force</code> when creating labels idempotently in automation.</td>
+</tr>
+<tr>
+<td><code>HARNESS_TAMPERED</code> at Step 1</td>
+<td>A hash-pinned file was modified since last <code>--init</code>.</td>
+<td>Review the diff; if legitimate, run <code>pnpm exec audit-harness init</code> (Node) / <code>scripts/audit-harness init</code> (vendored) to re-pin; if unexpected, investigate the diff before re-init.</td>
+</tr>
+<tr>
+<td><code>escape-scan</code> REFUSES on a legitimate threshold change</td>
+<td>Thresholds are policy — lowering triggers REFUSE.</td>
+<td>Engineer edits <code>tests/TESTING.md#Thresholds</code>, then runs <code>harness-hash.sh --init</code>. AI cannot do this step.</td>
+</tr>
+<tr>
+<td><code>test-discovery-agent</code> returns <code>repo_type: unknown</code></td>
+<td>No recognizable manifest (package.json, pyproject.toml, etc.).</td>
+<td>Add the correct manifest for your language; or set <code>Repo type:</code> manually in <code>tests/TESTING.md#Classification</code>.</td>
+</tr>
+<tr>
+<td>Handoff does not fire on feat branch</td>
+<td>Branch name does not match <code>feat/*</code> pattern, or no P0/P1 gaps found.</td>
+<td>Check branch name; if gaps exist and handoff still does not fire, check that <code>Skill</code> tool is in the allowed-tools frontmatter.</td>
+</tr>
+<tr>
+<td><code>AskUserQuestion</code> prompt loops on main</td>
+<td>Engineer keeps declining handoff — expected behavior.</td>
+<td>Decline is logged; <code>TEST_AUDIT.md</code> still produced. To force handoff, merge to a feat branch first.</td>
+</tr>
+<tr>
+<td><code>rtm-builder-agent</code> keeps re-promoting a MUST</td>
+<td>Engineer override was not preserved because <code>RTM.md</code> was rewritten (Write instead of Edit).</td>
+<td>Ensure the agent uses <code>Edit</code> tool on RTM.md; engineer override is detected by row-level MoSCoW value diff.</td>
+</tr>
+<tr>
+<td>Missing <code>coverage.py</code> / <code>mutmut</code> / other tool</td>
+<td>Measurement tool not installed.</td>
+<td>Handoff to <code>implement-tests</code> with the specific layer; it installs the measurement tool per the L3 playbook.</td>
+</tr>
+<tr>
+<td>Monorepo produces only root-level audit</td>
+<td><code>pnpm-workspace.yaml</code> / <code>turbo.json</code> / <code>nx.json</code> not present or unrecognized.</td>
+<td>Confirm workspace config is at repo root; or manually declare per-package <code>TESTING.md</code> files.</td>
+</tr>
+</tbody></table>
+<h2>Edge cases</h2>
+<ul>
+<li><strong>Missing framework</strong>: record gap; skip the measurement; emit <code>install_order: [framework]</code> in handoff.</li>
+<li><strong>Docker unavailable</strong> for integration tests: skip L4 integration measurement; still report the gap as &quot;unmeasured — Docker missing&quot;.</li>
+<li><strong>Hash mismatch</strong>: <code>HARNESS_TAMPERED</code> — halt before any other work; do not write <code>TEST_AUDIT.md</code>.</li>
+<li><strong>Engineer-declared waiver</strong>: any layer listed in <code>TESTING.md#Waived layers</code> is skipped silently; appears in report under &quot;Waived (per engineer policy)&quot;.</li>
+<li><strong>Regulated overlay</strong>: HIPAA/SOX/PCI/SOC2/GDPR/FedRAMP tag in <code>TESTING.md</code> promotes <code>SHOULD</code> uncovered to P0 — see <code>rtm-personas-journeys.md</code> § &quot;Regulated overlay&quot;.</li>
+</ul>
+<h2>Resources</h2>
+<ul>
+<li><code>{baseDir}/references/taxonomy.md</code> — 7-layer canonical definitions</li>
+<li><code>{baseDir}/references/layer-applicability.md</code> — classification → layer matrix</li>
+<li><code>{baseDir}/references/testing-md-spec.md</code> — <code>tests/TESTING.md</code> schema</li>
+<li><code>{baseDir}/references/rtm-personas-journeys.md</code> — RTM / personas / journeys spec</li>
+<li><code>{baseDir}/references/discovery-preflight.md</code> — discovery and pre-flight checks</li>
+<li><code>{baseDir}/references/github-audit.md</code> — repo-scoped audit engine</li>
+<li><code>{baseDir}/references/test-quality-deep-audit.md</code> — bias, mutation, OWASP</li>
+<li><code>{baseDir}/references/quality-gates-sweep.md</code> — tool catalog aligned to taxonomy</li>
+<li><code>{baseDir}/references/philosophy.md</code> — Seven Walls derivations, escape-grammar state machine, Human/AI ownership rationale</li>
+<li><code>{baseDir}/scripts/arch-check.sh</code> — architecture rule dispatcher</li>
+<li><code>{baseDir}/scripts/bias-count.sh</code> — bias-pattern counter</li>
+<li><code>{baseDir}/scripts/crap-score.py</code> — CRAP calculator</li>
+<li><code>{baseDir}/scripts/gherkin-lint.sh</code> — advisory Gherkin quality check</li>
+<li><code>{baseDir}/scripts/escape-scan.sh</code> — diff-based escape-attempt detector (reads floors from <code>tests/TESTING.md</code>)</li>
+<li><code>{baseDir}/shared-refs/harness-hash.sh</code> — SHA-256 manifest verifier</li>
+<li><code>{baseDir}/shared-refs/*.md</code> — per-concern deep references (frameworks, architecture, security, etc.) shared with <code>implement-tests</code></li>
+</ul></div>
+      </div>
+    </section>
+
+    <!-- 8. Bottom CTA -->
+    <section class="detail-cta" data-astro-cid-qcigfm7x>
+  <h2 class="detail-cta__headline" data-astro-cid-qcigfm7x>Ready to use intent-labs-pack?</h2>
+  <div class="detail-cta__actions" data-astro-cid-qcigfm7x>
+    <button class="detail-cta__primary" data-copy-install="/plugin install intent-labs-pack@claude-code-plugins-plus" data-astro-cid-qcigfm7x>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" data-astro-cid-qcigfm7x>
+        <rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" stroke-width="1.5" data-astro-cid-qcigfm7x></rect>
+        <path d="M3 11V3a1 1 0 011-1h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" data-astro-cid-qcigfm7x></path>
+      </svg>
+      <span class="detail-cta__btn-text" data-astro-cid-qcigfm7x>Copy Install Command</span>
+    </button>
+    
+  </div>
+</section>
+
+<script type="module">document.querySelectorAll("[data-copy-install]").forEach(t=>{t.addEventListener("click",async()=>{const a=t.dataset.copyInstall||"";await navigator.clipboard.writeText(a);const e=t.querySelector(".detail-cta__btn-text");if(e){const o=e.textContent;e.textContent="Copied!",t.classList.add("copied"),window.trackEvent&&window.trackEvent("install_copied",{plugin_name:a.split(" ").pop()||"",source:"detail_cta"}),setTimeout(()=>{e.textContent=o,t.classList.remove("copied")},2e3)}})});</script>
+
+    <!-- 9. Related Skills (6, with tool pills) -->
+    <section class="related-skills-section" data-astro-cid-jrlgpo3w>
+        <h2 class="related-skills-heading" data-astro-cid-jrlgpo3w>Related Skills</h2>
+        <div class="related-skills-grid" data-astro-cid-jrlgpo3w>
+          <a href="/skills/abridge-ci-integration/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-ci-integration</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Configure CI/CD pipeline for Abridge clinical AI integrations with GitHub Actions.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-common-errors/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-common-errors</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Diagnose and fix common Abridge clinical AI integration errors.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-a/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-a</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge ambient clinical documentation capture-to-note pipeline.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-b/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-b</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge patient-facing documentation and after-visit summary generation.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-cost-tuning/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-cost-tuning</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Optimize Abridge clinical AI costs through tier selection, session management, and usage monitoring for healthcare organizations.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-debug-bundle/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-debug-bundle</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Collect Abridge debug evidence for support tickets and troubleshooting.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a>
+        </div>
+      </section>
+
+  </div>
+
+  
+  <script>
+    document.querySelectorAll('.install-command').forEach(el => {
+      el.addEventListener('click', function() {
+        const text = this.dataset.copy || this.textContent;
+        navigator.clipboard.writeText(text).then(() => {
+          const originalText = this.textContent;
+          this.textContent = 'Copied to clipboard!';
+          this.style.color = 'var(--brand-green)';
+          setTimeout(() => {
+            this.textContent = originalText;
+            this.style.color = '';
+          }, 2000);
+        });
+      });
+    });
+  </script>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

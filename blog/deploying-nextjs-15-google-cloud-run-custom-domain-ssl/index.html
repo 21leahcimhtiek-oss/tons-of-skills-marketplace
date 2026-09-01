@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deploying Next.js 15 to Google Cloud Run: From Zero to HTTPS in 2 Hours — Tons of Skills Work Diary</title>
+    <meta name="description" content="Complete guide to deploying Next.js 15 with Docker to Google Cloud Run, configuring custom domains, SSL certificates, and global load balancing. Real troubleshooting included.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://tonsofskills.com/tons-of-skills-marketplace/blog/deploying-nextjs-15-google-cloud-run-custom-domain-ssl/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/deploying-nextjs-15-google-cloud-run-custom-domain-ssl/">
+    <meta property="og:title" content="Deploying Next.js 15 to Google Cloud Run: From Zero to HTTPS in 2 Hours — Tons of Skills Work Diary">
+    <meta property="og:description" content="Complete guide to deploying Next.js 15 with Docker to Google Cloud Run, configuring custom domains, SSL certificates, and global load balancing. Real troubleshooting included.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="Deploying Next.js 15 to Google Cloud Run: From Zero to HTTPS in 2 Hours — Tons of Skills Work Diary">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/deploying-nextjs-15-google-cloud-run-custom-domain-ssl/">
+    <meta name="twitter:title" content="Deploying Next.js 15 to Google Cloud Run: From Zero to HTTPS in 2 Hours — Tons of Skills Work Diary">
+    <meta name="twitter:description" content="Complete guide to deploying Next.js 15 with Docker to Google Cloud Run, configuring custom domains, SSL certificates, and global load balancing. Real troubleshooting included.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"Deploying Next.js 15 to Google Cloud Run: From Zero to HTTPS in 2 Hours","description":"Complete guide to deploying Next.js 15 with Docker to Google Cloud Run, configuring custom domains, SSL certificates, and global load balancing. Real troubleshooting included.","datePublished":"2025-10-11","url":"https://tonsofskills.com/blog/undefined","author":{"@type":"Person","name":"Jeremy Longshore"},"publisher":{"@type":"Organization","name":"Tons of Skills","url":"https://tonsofskills.com"}}</script>
+  
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.post-header[data-astro-cid-7jjqptxk]{background:var(--panel);padding:4rem 1.5rem 3rem;border-bottom:1px solid var(--border)}.post-header-inner[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto}.back-link[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3);text-decoration:none;display:inline-block;margin-bottom:1.5rem;transition:color .2s}.back-link[data-astro-cid-7jjqptxk]:hover{color:var(--primary)}.post-meta[data-astro-cid-7jjqptxk]{display:flex;align-items:center;gap:.75rem;margin-bottom:1rem}time[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3)}.featured-badge[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.2rem .6rem;background:#ce114126;color:var(--red);border-radius:0;font-weight:600;text-transform:uppercase;letter-spacing:.05em}.post-header[data-astro-cid-7jjqptxk] h1[data-astro-cid-7jjqptxk]{font-family:var(--font-body);font-size:clamp(1.5rem,4vw,2.2rem);font-weight:700;color:var(--text);line-height:1.25;margin-bottom:.75rem;letter-spacing:0}.post-desc[data-astro-cid-7jjqptxk]{color:var(--text-2);font-size:1.05rem;line-height:1.6;margin-bottom:1rem}.post-tags[data-astro-cid-7jjqptxk]{display:flex;gap:.4rem;flex-wrap:wrap}.tag[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.15rem .5rem;background:var(--surface-3);color:var(--text-3);border-radius:0}.post-body[data-astro-cid-7jjqptxk]{padding:3rem 1.5rem 4rem}.prose[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto;color:var(--text-2);line-height:1.8;font-size:1rem}.prose[data-astro-cid-7jjqptxk] h2{font-family:var(--font-body);font-size:1.5rem;font-weight:700;color:var(--text);margin:2.5rem 0 1rem;letter-spacing:0}.prose[data-astro-cid-7jjqptxk] h3{font-size:1.2rem;font-weight:600;color:var(--text);margin:2rem 0 .75rem}.prose[data-astro-cid-7jjqptxk] p{margin-bottom:1rem}.prose[data-astro-cid-7jjqptxk] ul,.prose[data-astro-cid-7jjqptxk] ol{margin:.5rem 0 1rem 1.5rem}.prose[data-astro-cid-7jjqptxk] li{margin-bottom:.35rem}.prose[data-astro-cid-7jjqptxk] strong{color:var(--text);font-weight:600}.prose[data-astro-cid-7jjqptxk] code{font-family:var(--font-mono);font-size:.88em;background:var(--surface-3);padding:.15em .35em;border-radius:0;color:var(--primary)}.prose[data-astro-cid-7jjqptxk] a{color:var(--primary);text-decoration:none}.prose[data-astro-cid-7jjqptxk] a:hover{text-decoration:underline}@media(max-width:768px){.post-header[data-astro-cid-7jjqptxk]{padding:3rem 1rem 2rem}.post-body[data-astro-cid-7jjqptxk]{padding:2rem 1rem 3rem}}
+</style></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  <article class="post" data-astro-cid-7jjqptxk>
+    <header class="post-header" data-astro-cid-7jjqptxk>
+      <div class="post-header-inner" data-astro-cid-7jjqptxk>
+        <a href="/blog" class="back-link" data-astro-cid-7jjqptxk>Back to Work Diary</a>
+        <div class="post-meta" data-astro-cid-7jjqptxk>
+          <time datetime="2025-10-11" data-astro-cid-7jjqptxk>October 10, 2025</time>
+          
+        </div>
+        <h1 data-astro-cid-7jjqptxk>Deploying Next.js 15 to Google Cloud Run: From Zero to HTTPS in 2 Hours</h1>
+        <p class="post-desc" data-astro-cid-7jjqptxk>Complete guide to deploying Next.js 15 with Docker to Google Cloud Run, configuring custom domains, SSL certificates, and global load balancing. Real troubleshooting included.</p>
+        <div class="post-tags" data-astro-cid-7jjqptxk>
+          <span class="tag" data-astro-cid-7jjqptxk>google-cloud-run</span><span class="tag" data-astro-cid-7jjqptxk>nextjs-15</span><span class="tag" data-astro-cid-7jjqptxk>docker-deployment</span><span class="tag" data-astro-cid-7jjqptxk>ssl-certificates</span><span class="tag" data-astro-cid-7jjqptxk>load-balancer</span><span class="tag" data-astro-cid-7jjqptxk>cloud-infrastructure</span><span class="tag" data-astro-cid-7jjqptxk>devops</span><span class="tag" data-astro-cid-7jjqptxk>production-deployment</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="post-body" data-astro-cid-7jjqptxk>
+      <div class="prose" data-astro-cid-7jjqptxk>
+        <p>I originally deployed the marketplace now known as Tons of Skills from scratch to production on Google Cloud Run with custom domain and SSL. The commands below preserve the original deployment lessons while redacting the retired host.</p>
+<h2 id="the-goal">The Goal</h2>
+<p>Deploy a Next.js 15 application to Google Cloud Run with:</p>
+<ul>
+<li>Custom domain ([retired legacy public domain])</li>
+<li>Google-managed SSL certificate</li>
+<li>Global load balancer with HTTP/2</li>
+<li>Serverless auto-scaling (0-10 instances)</li>
+<li>Production-grade infrastructure as code</li>
+</ul>
+<p>Starting point: A working Next.js 15 app on localhost.</p>
+<p>Target: Live site with HTTPS at a custom domain.</p>
+<p>Time budget: Get it done today.</p>
+<h2 id="the-stack">The Stack</h2>
+<p><strong>Application:</strong></p>
+<ul>
+<li>Next.js 15 (App Router) with standalone mode</li>
+<li>React 19 + TypeScript</li>
+<li>Node 20 runtime</li>
+<li>Docker multi-stage build</li>
+</ul>
+<p><strong>Infrastructure:</strong></p>
+<ul>
+<li>Google Cloud Run (serverless containers)</li>
+<li>Cloud Build (CI/CD)</li>
+<li>Artifact Registry (container images)</li>
+<li>Global Load Balancer (anycast IP)</li>
+<li>Google-managed SSL certificates</li>
+</ul>
+<p><strong>Domain:</strong> Porkbun DNS pointing to Google Cloud</p>
+<h2 id="part-1-docker-configuration">Part 1: Docker Configuration</h2>
+<p>Next.js 15 requires <code>output: 'standalone'</code> in <code>next.config.js</code> for Docker deployment. This creates a minimal production build without node_modules bloat.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="javascript"><code><span class="line"><span style="color:#6A737D">// next.config.js</span></span>
+<span class="line"><span style="color:#79B8FF">module</span><span style="color:#E1E4E8">.</span><span style="color:#79B8FF">exports</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  output: </span><span style="color:#9ECBFF">'standalone'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  images: {</span></span>
+<span class="line"><span style="color:#E1E4E8">    remotePatterns: [</span></span>
+<span class="line"><span style="color:#E1E4E8">      { protocol: </span><span style="color:#9ECBFF">'https'</span><span style="color:#E1E4E8">, hostname: </span><span style="color:#9ECBFF">'storage.googleapis.com'</span><span style="color:#E1E4E8"> },</span></span>
+<span class="line"><span style="color:#E1E4E8">      { protocol: </span><span style="color:#9ECBFF">'https'</span><span style="color:#E1E4E8">, hostname: </span><span style="color:#9ECBFF">'*.googleusercontent.com'</span><span style="color:#E1E4E8"> },</span></span>
+<span class="line"><span style="color:#E1E4E8">    ],</span></span>
+<span class="line"><span style="color:#E1E4E8">  },</span></span>
+<span class="line"><span style="color:#E1E4E8">};</span></span></code></pre>
+<h3 id="multi-stage-dockerfile">Multi-Stage Dockerfile</h3>
+<p>I used a three-stage build: deps → builder → runner.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="dockerfile"><code><span class="line"><span style="color:#6A737D"># Stage 1: Dependencies</span></span>
+<span class="line"><span style="color:#F97583">FROM</span><span style="color:#E1E4E8"> node:20-alpine </span><span style="color:#F97583">AS</span><span style="color:#E1E4E8"> deps</span></span>
+<span class="line"><span style="color:#F97583">WORKDIR</span><span style="color:#E1E4E8"> /app</span></span>
+<span class="line"><span style="color:#F97583">COPY</span><span style="color:#E1E4E8"> package*.json ./</span></span>
+<span class="line"><span style="color:#F97583">RUN</span><span style="color:#E1E4E8"> npm ci --legacy-peer-deps</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Stage 2: Builder</span></span>
+<span class="line"><span style="color:#F97583">FROM</span><span style="color:#E1E4E8"> node:20-alpine </span><span style="color:#F97583">AS</span><span style="color:#E1E4E8"> builder</span></span>
+<span class="line"><span style="color:#F97583">WORKDIR</span><span style="color:#E1E4E8"> /app</span></span>
+<span class="line"><span style="color:#F97583">COPY</span><span style="color:#E1E4E8"> --from=deps /app/node_modules ./node_modules</span></span>
+<span class="line"><span style="color:#F97583">COPY</span><span style="color:#E1E4E8"> . .</span></span>
+<span class="line"><span style="color:#F97583">ENV</span><span style="color:#E1E4E8"> NODE_ENV=production</span></span>
+<span class="line"><span style="color:#F97583">ENV</span><span style="color:#E1E4E8"> NEXT_TELEMETRY_DISABLED=1</span></span>
+<span class="line"><span style="color:#F97583">RUN</span><span style="color:#E1E4E8"> npm run build</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Stage 3: Runner</span></span>
+<span class="line"><span style="color:#F97583">FROM</span><span style="color:#E1E4E8"> node:20-alpine </span><span style="color:#F97583">AS</span><span style="color:#E1E4E8"> runner</span></span>
+<span class="line"><span style="color:#F97583">WORKDIR</span><span style="color:#E1E4E8"> /app</span></span>
+<span class="line"><span style="color:#F97583">ENV</span><span style="color:#E1E4E8"> NODE_ENV=production</span></span>
+<span class="line"><span style="color:#F97583">ENV</span><span style="color:#E1E4E8"> PORT=3000</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">RUN</span><span style="color:#E1E4E8"> addgroup --system --gid 1001 nodejs</span></span>
+<span class="line"><span style="color:#F97583">RUN</span><span style="color:#E1E4E8"> adduser --system --uid 1001 nextjs</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">COPY</span><span style="color:#E1E4E8"> --from=builder /app/public ./public</span></span>
+<span class="line"><span style="color:#F97583">COPY</span><span style="color:#E1E4E8"> --from=builder /app/.next/standalone ./</span></span>
+<span class="line"><span style="color:#F97583">COPY</span><span style="color:#E1E4E8"> --from=builder /app/.next/static ./.next/static</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">RUN</span><span style="color:#E1E4E8"> chown -R nextjs:nodejs /app</span></span>
+<span class="line"><span style="color:#F97583">USER</span><span style="color:#E1E4E8"> nextjs</span></span>
+<span class="line"><span style="color:#F97583">EXPOSE</span><span style="color:#E1E4E8"> 3000</span></span>
+<span class="line"><span style="color:#F97583">CMD</span><span style="color:#E1E4E8"> [</span><span style="color:#9ECBFF">"node"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"server.js"</span><span style="color:#E1E4E8">]</span></span></code></pre>
+<p><strong>Key decisions:</strong></p>
+<ul>
+<li>Alpine Linux for small image size (saves bandwidth and startup time)</li>
+<li>Non-root user (security best practice)</li>
+<li>Standalone mode copies only what’s needed to run</li>
+<li>Environment variable PORT for Cloud Run compatibility</li>
+</ul>
+<h2 id="part-2-the-first-deployment-attempt">Part 2: The First Deployment Attempt</h2>
+<p>I started with the simplest approach: direct Cloud Run deployment.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">gcloud</span><span style="color:#9ECBFF"> run</span><span style="color:#9ECBFF"> deploy</span><span style="color:#9ECBFF"> claudecodeplugins-web</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --source</span><span style="color:#9ECBFF"> .</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --region</span><span style="color:#9ECBFF"> us-central1</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --allow-unauthenticated</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --port</span><span style="color:#79B8FF"> 3000</span></span></code></pre>
+<p><strong>Error 1: Tailwind CSS TypeScript Error</strong></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>Type '["class"]' is not assignable to type 'DarkModeStrategy | undefined'</span></span></code></pre>
+<p>The build failed because Tailwind CSS 4 changed darkMode syntax. Quick fix in <code>tailwind.config.ts</code>:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#6A737D">// Before: darkMode: ["class"]</span></span>
+<span class="line"><span style="color:#6A737D">// After:</span></span>
+<span class="line"><span style="color:#B392F0">darkMode</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"class"</span></span></code></pre>
+<p><strong>Error 2: Missing Public Directory</strong></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>COPY failed: stat app/public: file does not exist</span></span></code></pre>
+<p>The Dockerfile expected a public directory that didn’t exist. Created it:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">mkdir</span><span style="color:#79B8FF"> -p</span><span style="color:#9ECBFF"> apps/web/public</span></span>
+<span class="line"><span style="color:#B392F0">touch</span><span style="color:#9ECBFF"> apps/web/public/.gitkeep</span></span></code></pre>
+<h2 id="part-3-container-registry-nightmares">Part 3: Container Registry Nightmares</h2>
+<p>Now the build succeeded but the push failed.</p>
+<p><strong>Error 3: Container Registry Permission Denied</strong></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>denied: Permission "artifactregistry.repositories.uploadArtifacts" denied</span></span></code></pre>
+<p>I initially tried to use the old Container Registry (gcr.io), which has known permission issues. The fix: migrate to Artifact Registry.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#6A737D"># Create Artifact Registry repository</span></span>
+<span class="line"><span style="color:#B392F0">gcloud</span><span style="color:#9ECBFF"> artifacts</span><span style="color:#9ECBFF"> repositories</span><span style="color:#9ECBFF"> create</span><span style="color:#9ECBFF"> app</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --repository-format=docker</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --location=us-central1</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Update image path from:</span></span>
+<span class="line"><span style="color:#6A737D"># gcr.io/PROJECT/IMAGE</span></span>
+<span class="line"><span style="color:#6A737D"># To:</span></span>
+<span class="line"><span style="color:#6A737D"># us-central1-docker.pkg.dev/PROJECT/REPO/IMAGE</span></span></code></pre>
+<p><strong>Error 4: Organization Policy Blocking Public Access</strong></p>
+<p>Cloud Run deployed successfully but returned 403 Forbidden. The error:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>One or more users named in the policy do not belong to a permitted customer</span></span></code></pre>
+<p>This was an organization-level IAM policy restricting <code>allUsers</code> access. I needed to override it at the project level:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#6A737D"># org-policy-override.yaml</span></span>
+<span class="line"><span style="color:#85E89D">constraint</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">constraints/iam.allowedPolicyMemberDomains</span></span>
+<span class="line"><span style="color:#85E89D">listPolicy</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  allValues</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">ALLOW</span></span></code></pre>
+<p>Applied with:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">gcloud</span><span style="color:#9ECBFF"> resource-manager</span><span style="color:#9ECBFF"> org-policies</span><span style="color:#9ECBFF"> set-policy</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#9ECBFF">  org-policy-override.yaml</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --project=PROJECT_ID</span></span></code></pre>
+<p>Then set the IAM policy directly:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="json"><code><span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#79B8FF">  "bindings"</span><span style="color:#E1E4E8">: [{</span></span>
+<span class="line"><span style="color:#79B8FF">    "role"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"roles/run.invoker"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">    "members"</span><span style="color:#E1E4E8">: [</span><span style="color:#9ECBFF">"allUsers"</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"><span style="color:#E1E4E8">  }]</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">gcloud</span><span style="color:#9ECBFF"> run</span><span style="color:#9ECBFF"> services</span><span style="color:#9ECBFF"> set-iam-policy</span><span style="color:#9ECBFF"> claudecodeplugins-web</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#9ECBFF">  iam-policy.json</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --region=us-central1</span></span></code></pre>
+<p><strong>Success!</strong> The Cloud Run service was now publicly accessible.</p>
+<h2 id="part-4-custom-domain-and-load-balancer">Part 4: Custom Domain and Load Balancer</h2>
+<p>Google Cloud Run supports custom domains two ways:</p>
+<ol>
+<li><strong>Cloud Run Domain Mapping</strong> - Simple, but requires Google Search Console verification</li>
+<li><strong>Load Balancer + Serverless NEG</strong> - More complex, but no Search Console needed</li>
+</ol>
+<p>I chose the Load Balancer approach because:</p>
+<ul>
+<li>No domain verification required</li>
+<li>Global anycast IP (faster worldwide)</li>
+<li>Built-in CDN support</li>
+<li>More control over routing</li>
+</ul>
+<h3 id="architecture">Architecture</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>Internet (Port 443/80)</span></span>
+<span class="line"><span>       ↓</span></span>
+<span class="line"><span>Global Load Balancer (35.201.66.187)</span></span>
+<span class="line"><span>       ↓</span></span>
+<span class="line"><span>SSL Certificate (Google-managed)</span></span>
+<span class="line"><span>       ↓</span></span>
+<span class="line"><span>Serverless NEG (Network Endpoint Group)</span></span>
+<span class="line"><span>       ↓</span></span>
+<span class="line"><span>Cloud Run Service</span></span></code></pre>
+<h3 id="setting-up-the-load-balancer">Setting Up the Load Balancer</h3>
+<p><strong>Step 1: Create Serverless Network Endpoint Group</strong></p>
+<p>This connects the Load Balancer to Cloud Run.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">gcloud</span><span style="color:#9ECBFF"> compute</span><span style="color:#9ECBFF"> network-endpoint-groups</span><span style="color:#9ECBFF"> create</span><span style="color:#9ECBFF"> claudecodeplugins-neg</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --region=us-central1</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --network-endpoint-type=serverless</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --cloud-run-service=claudecodeplugins-web</span></span></code></pre>
+<p><strong>Step 2: Create Backend Service</strong></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">gcloud</span><span style="color:#9ECBFF"> compute</span><span style="color:#9ECBFF"> backend-services</span><span style="color:#9ECBFF"> create</span><span style="color:#9ECBFF"> claudecodeplugins-backend</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --global</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --load-balancing-scheme=EXTERNAL_MANAGED</span></span></code></pre>
+<p><strong>Error 5: Backend Service Port Name Conflict</strong></p>
+<p>I initially tried to specify <code>--protocol=HTTPS</code> but got:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>Port name is not supported for Serverless NEG</span></span></code></pre>
+<p>Serverless NEGs automatically determine ports. Just create the backend service without protocol specifications.</p>
+<p><strong>Step 3: Add Backend</strong></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">gcloud</span><span style="color:#9ECBFF"> compute</span><span style="color:#9ECBFF"> backend-services</span><span style="color:#9ECBFF"> add-backend</span><span style="color:#9ECBFF"> claudecodeplugins-backend</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --global</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --network-endpoint-group=claudecodeplugins-neg</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --network-endpoint-group-region=us-central1</span></span></code></pre>
+<p><strong>Step 4: Create URL Map</strong></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">gcloud</span><span style="color:#9ECBFF"> compute</span><span style="color:#9ECBFF"> url-maps</span><span style="color:#9ECBFF"> create</span><span style="color:#9ECBFF"> claudecodeplugins-lb</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --default-service=claudecodeplugins-backend</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --global</span></span></code></pre>
+<p><strong>Step 5: Reserve Static IP</strong></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">gcloud</span><span style="color:#9ECBFF"> compute</span><span style="color:#9ECBFF"> addresses</span><span style="color:#9ECBFF"> create</span><span style="color:#9ECBFF"> claudecodeplugins-ip</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --ip-version=IPV4</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --global</span></span></code></pre>
+<p>This gave me: <code>35.201.66.187</code></p>
+<p><strong>Step 6: Create SSL Certificate</strong></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#6A737D"># Historical command shape; the reserved host intentionally does not resolve.</span></span>
+<span class="line"><span style="color:#B392F0">gcloud</span><span style="color:#9ECBFF"> compute</span><span style="color:#9ECBFF"> ssl-certificates</span><span style="color:#9ECBFF"> create</span><span style="color:#9ECBFF"> claudecodeplugins-cert</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --domains=retired-domain.invalid</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --global</span></span></code></pre>
+<p>Google-managed certificates are free and auto-renewing. But they require domain verification via HTTP challenge on port 80.</p>
+<p><strong>Step 7: Create HTTPS Proxy</strong></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">gcloud</span><span style="color:#9ECBFF"> compute</span><span style="color:#9ECBFF"> target-https-proxies</span><span style="color:#9ECBFF"> create</span><span style="color:#9ECBFF"> claudecodeplugins-https-proxy</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --url-map=claudecodeplugins-lb</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --ssl-certificates=claudecodeplugins-cert</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --global</span></span></code></pre>
+<p><strong>Step 8: Create Forwarding Rule (HTTPS)</strong></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">gcloud</span><span style="color:#9ECBFF"> compute</span><span style="color:#9ECBFF"> forwarding-rules</span><span style="color:#9ECBFF"> create</span><span style="color:#9ECBFF"> claudecodeplugins-https-rule</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --address=claudecodeplugins-ip</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --target-https-proxy=claudecodeplugins-https-proxy</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --global</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --ports=443</span></span></code></pre>
+<h2 id="part-5-the-ssl-certificate-problem">Part 5: The SSL Certificate Problem</h2>
+<p>After configuring everything, I checked the SSL certificate status:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">gcloud</span><span style="color:#9ECBFF"> compute</span><span style="color:#9ECBFF"> ssl-certificates</span><span style="color:#9ECBFF"> describe</span><span style="color:#9ECBFF"> claudecodeplugins-cert</span><span style="color:#79B8FF"> --global</span></span></code></pre>
+<p>Status: <code>PROVISIONING</code> with domain status <code>FAILED_NOT_VISIBLE</code></p>
+<p>This means Google’s verification bot couldn’t reach my domain on HTTP port 80 to complete the challenge.</p>
+<p><strong>The Issue:</strong> I only configured HTTPS (port 443), but Google needs HTTP (port 80) for verification.</p>
+<p><strong>The Fix:</strong> Add HTTP forwarding.</p>
+<p><strong>Step 9: Create HTTP Proxy and Forwarding Rule</strong></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">gcloud</span><span style="color:#9ECBFF"> compute</span><span style="color:#9ECBFF"> target-http-proxies</span><span style="color:#9ECBFF"> create</span><span style="color:#9ECBFF"> claudecodeplugins-http-proxy</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --url-map=claudecodeplugins-lb</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --global</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">gcloud</span><span style="color:#9ECBFF"> compute</span><span style="color:#9ECBFF"> forwarding-rules</span><span style="color:#9ECBFF"> create</span><span style="color:#9ECBFF"> claudecodeplugins-http-rule</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --address=claudecodeplugins-ip</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --target-http-proxy=claudecodeplugins-http-proxy</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --global</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --ports=80</span></span></code></pre>
+<p>Now both ports 80 and 443 route to the same backend.</p>
+<h2 id="part-6-dns-configuration">Part 6: DNS Configuration</h2>
+<p>In Porkbun, I added A records pointing to the static IP:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>Type: A</span></span>
+<span class="line"><span>Host: www</span></span>
+<span class="line"><span>Answer: 35.201.66.187</span></span>
+<span class="line"><span>TTL: 3600</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>Type: A</span></span>
+<span class="line"><span>Host: @</span></span>
+<span class="line"><span>Answer: 35.201.66.187</span></span>
+<span class="line"><span>TTL: 3600</span></span></code></pre>
+<p>Verified DNS propagation:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#6A737D"># Historical verification shape; the reserved host intentionally does not resolve.</span></span>
+<span class="line"><span style="color:#B392F0">dig</span><span style="color:#9ECBFF"> +short</span><span style="color:#9ECBFF"> retired-domain.invalid</span><span style="color:#9ECBFF"> @8.8.8.8</span></span>
+<span class="line"><span style="color:#6A737D"># Historical output: 35.201.66.187</span></span></code></pre>
+<h2 id="part-7-waiting-for-ssl">Part 7: Waiting for SSL</h2>
+<p>SSL certificate provisioning takes 15-60 minutes after DNS propagation. I monitored it with:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">gcloud</span><span style="color:#9ECBFF"> compute</span><span style="color:#9ECBFF"> ssl-certificates</span><span style="color:#9ECBFF"> describe</span><span style="color:#9ECBFF"> claudecodeplugins-cert</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --global</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --format=</span><span style="color:#9ECBFF">"yaml(managed.status, managed.domainStatus)"</span></span></code></pre>
+<p>Progression:</p>
+<ol>
+<li><code>PROVISIONING</code> + <code>FAILED_NOT_VISIBLE</code> (DNS not propagated)</li>
+<li><code>PROVISIONING</code> + <code>PROVISIONING</code> (Google verifying domain)</li>
+<li><code>ACTIVE</code> + <code>ACTIVE</code> (Ready!)</li>
+</ol>
+<p>After about 30 minutes, the certificate became active.</p>
+<h2 id="part-8-testing-the-live-site">Part 8: Testing the Live Site</h2>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">curl</span><span style="color:#79B8FF"> -I</span><span style="color:#9ECBFF"> https://retired-domain.invalid</span></span></code></pre>
+<p>Historical output (the reserved host no longer reproduces this response):</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>HTTP/2 200</span></span>
+<span class="line"><span>vary: rsc, next-router-state-tree, next-router-prefetch</span></span>
+<span class="line"><span>x-nextjs-cache: HIT</span></span>
+<span class="line"><span>x-powered-by: Next.js</span></span>
+<span class="line"><span>cache-control: s-maxage=31536000</span></span>
+<span class="line"><span>content-type: text/html; charset=utf-8</span></span></code></pre>
+<p><strong>Success!</strong> The site was live with:</p>
+<ul>
+<li>✅ HTTPS with valid SSL certificate</li>
+<li>✅ HTTP/2 protocol</li>
+<li>✅ Next.js static pre-rendering</li>
+<li>✅ CDN edge caching</li>
+<li>✅ 75ms response time</li>
+</ul>
+<h2 id="part-9-infrastructure-as-code">Part 9: Infrastructure as Code</h2>
+<p>I documented everything in a comprehensive runbook (<code>gcp-cloud-run-launch.md</code>) and created:</p>
+<ol>
+<li><strong>cloudbuild.yaml</strong> - Automated CI/CD pipeline</li>
+</ol>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">steps</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">  - </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"gcr.io/cloud-builders/docker"</span></span>
+<span class="line"><span style="color:#85E89D">    args</span><span style="color:#E1E4E8">: [</span><span style="color:#9ECBFF">"build"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"-t"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_REPO_NAME}/${_IMAGE_NAME}:${_TAG}"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"apps/web"</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">  - </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"gcr.io/cloud-builders/docker"</span></span>
+<span class="line"><span style="color:#85E89D">    args</span><span style="color:#E1E4E8">: [</span><span style="color:#9ECBFF">"push"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_REPO_NAME}/${_IMAGE_NAME}:${_TAG}"</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">  - </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"gcr.io/google.com/cloudsdktool/cloud-sdk"</span></span>
+<span class="line"><span style="color:#85E89D">    entrypoint</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">gcloud</span></span>
+<span class="line"><span style="color:#85E89D">    args</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#9ECBFF">"run"</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#9ECBFF">"deploy"</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#9ECBFF">"${_SERVICE_NAME}"</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#9ECBFF">"--image=${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_REPO_NAME}/${_IMAGE_NAME}:${_TAG}"</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#9ECBFF">"--region=${_REGION}"</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#9ECBFF">"--allow-unauthenticated"</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#9ECBFF">"--port=3000"</span></span></code></pre>
+<ol>
+<li><strong>Makefile</strong> - Convenience commands</li>
+</ol>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="makefile"><code><span class="line"><span style="color:#B392F0">deploy</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">\tgcloud builds submit --config=cloudbuild.yaml</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">url</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">\t@gcloud run services describe </span><span style="color:#9ECBFF">$(</span><span style="color:#E1E4E8">SERVICE_NAME</span><span style="color:#9ECBFF">)</span><span style="color:#E1E4E8"> --region </span><span style="color:#9ECBFF">$(</span><span style="color:#E1E4E8">REGION</span><span style="color:#9ECBFF">)</span><span style="color:#E1E4E8"> --format='value(status.url)'</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">logs</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">\tgcloud run services logs read </span><span style="color:#9ECBFF">$(</span><span style="color:#E1E4E8">SERVICE_NAME</span><span style="color:#9ECBFF">)</span><span style="color:#E1E4E8"> --region </span><span style="color:#9ECBFF">$(</span><span style="color:#E1E4E8">REGION</span><span style="color:#9ECBFF">)</span><span style="color:#E1E4E8"> --limit=100</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">rollback</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">\t</span><span style="color:#6A737D"># Roll back to previous revision</span></span></code></pre>
+<ol>
+<li>
+<p><strong>.gcloud.env.example</strong> - Environment variable documentation</p>
+</li>
+<li>
+<p><strong>README_DEPLOY.md</strong> - 15-line quickstart guide</p>
+</li>
+</ol>
+<p>Future deployments are now just:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">make</span><span style="color:#9ECBFF"> deploy</span></span></code></pre>
+<h2 id="key-learnings">Key Learnings</h2>
+<h3 id="what-worked">What Worked</h3>
+<ol>
+<li><strong>Multi-stage Docker builds</strong> - Reduced final image size by 70%</li>
+<li><strong>Artifact Registry over Container Registry</strong> - Better permissions, modern tooling</li>
+<li><strong>Load Balancer approach</strong> - No Search Console verification needed</li>
+<li><strong>Comprehensive documentation</strong> - Made second deployment trivial</li>
+</ol>
+<h3 id="what-didnt-work-at-first">What Didn’t Work (At First)</h3>
+<ol>
+<li><strong>Missing HTTP port 80</strong> - SSL verification requires it</li>
+<li><strong>Organization policies</strong> - Required project-level override</li>
+<li><strong>Container Registry permissions</strong> - Migrated to Artifact Registry instead</li>
+<li><strong>Tailwind CSS array syntax</strong> - Changed to string format</li>
+<li><strong>Serverless NEG with port names</strong> - Let Google auto-detect ports</li>
+</ol>
+<h3 id="cost-breakdown">Cost Breakdown</h3>
+<p>Monthly estimate:</p>
+<ul>
+<li>Cloud Run: $0-20 (pay per use, 0 min instances)</li>
+<li>Load Balancer: ~$18/month (global)</li>
+<li>SSL Certificate: $0 (Google-managed)</li>
+<li><strong>Total: ~$20-40/month</strong></li>
+</ul>
+<p>For comparison, a single $5 VPS would be cheaper but:</p>
+<ul>
+<li>No auto-scaling</li>
+<li>Manual SSL certificate management</li>
+<li>No global CDN</li>
+<li>Manual deployments</li>
+<li>Single point of failure</li>
+</ul>
+<p>The serverless approach is worth it for production sites.</p>
+<h2 id="the-complete-command-sequence">The Complete Command Sequence</h2>
+<p>For reference, here’s the exact order of commands that worked:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#6A737D"># 1. Set up project</span></span>
+<span class="line"><span style="color:#B392F0">gcloud</span><span style="color:#9ECBFF"> config</span><span style="color:#9ECBFF"> set</span><span style="color:#9ECBFF"> project</span><span style="color:#9ECBFF"> PROJECT_ID</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># 2. Enable APIs</span></span>
+<span class="line"><span style="color:#B392F0">gcloud</span><span style="color:#9ECBFF"> services</span><span style="color:#9ECBFF"> enable</span><span style="color:#9ECBFF"> run.googleapis.com</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#9ECBFF">  cloudbuild.googleapis.com</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#9ECBFF">  artifactregistry.googleapis.com</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#9ECBFF">  compute.googleapis.com</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># 3. Create Artifact Registry</span></span>
+<span class="line"><span style="color:#B392F0">gcloud</span><span style="color:#9ECBFF"> artifacts</span><span style="color:#9ECBFF"> repositories</span><span style="color:#9ECBFF"> create</span><span style="color:#9ECBFF"> app</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --repository-format=docker</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --location=us-central1</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># 4. Build and push Docker image</span></span>
+<span class="line"><span style="color:#B392F0">gcloud</span><span style="color:#9ECBFF"> builds</span><span style="color:#9ECBFF"> submit</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --tag</span><span style="color:#9ECBFF"> us-central1-docker.pkg.dev/PROJECT_ID/app/web:latest</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># 5. Deploy to Cloud Run</span></span>
+<span class="line"><span style="color:#B392F0">gcloud</span><span style="color:#9ECBFF"> run</span><span style="color:#9ECBFF"> deploy</span><span style="color:#9ECBFF"> claudecodeplugins-web</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --image</span><span style="color:#9ECBFF"> us-central1-docker.pkg.dev/PROJECT_ID/app/web:latest</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --region</span><span style="color:#9ECBFF"> us-central1</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --allow-unauthenticated</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --port</span><span style="color:#79B8FF"> 3000</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># 6. Create load balancer infrastructure</span></span>
+<span class="line"><span style="color:#6A737D"># (Serverless NEG, backend service, URL map, SSL cert, static IP, proxies, forwarding rules)</span></span>
+<span class="line"><span style="color:#6A737D"># See full commands in article above</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># 7. Configure DNS</span></span>
+<span class="line"><span style="color:#6A737D"># Add A records in DNS provider pointing to static IP</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># 8. Wait for SSL certificate provisioning (15-60 minutes)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># 9. Test</span></span>
+<span class="line"><span style="color:#B392F0">curl</span><span style="color:#79B8FF"> -I</span><span style="color:#9ECBFF"> https://retired-domain.invalid</span></span>
+<span class="line"><span style="color:#6A737D"># Historical verification shape; the reserved host intentionally does not resolve.</span></span></code></pre>
+<h2 id="conclusion">Conclusion</h2>
+<p>Total time from “I need to deploy this” to “site is live with HTTPS”: <strong>2 hours</strong>.</p>
+<p>Most of that was waiting for SSL certificate provisioning (30 minutes) and troubleshooting permissions (45 minutes). The actual configuration took about 45 minutes.</p>
+<p>The result: A production-grade deployment with auto-scaling, global CDN, managed SSL, and one-command future deployments.</p>
+<p>The full runbook and all configuration files are in the project repository. Future deployments are literally just <code>make deploy</code>.</p>
+<h2 id="related-posts">Related Posts</h2>
+<ul>
+<li>Debugging Slack Integration: From 6 Duplicate Responses to Instant Acknowledgment</li>
+<li>Building a 254-Table BigQuery Schema in 72 Hours</li>
+<li>Building Production Testing Suite with Playwright and GitHub Actions</li>
+</ul>
+<h2 id="links">Links</h2>
+<ul>
+<li><strong>Historical live site:</strong> [retired legacy public domain]</li>
+<li><strong>Architecture:</strong> Global Load Balancer → Serverless NEG → Cloud Run</li>
+<li><strong>Response Time:</strong> 75ms average</li>
+<li><strong>Stack:</strong> Next.js 15 + Docker + Google Cloud Run</li>
+</ul>
+      </div>
+    </div>
+  </article>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

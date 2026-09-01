@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Adversarial Review: The Six Lenses That Halted a Rollout — Tons of Skills Work Diary</title>
+    <meta name="description" content="A six-lens adversarial review checked a team knowledge system against live state, broke three shipped assumptions, and gated 18 risks to halt the rollout.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://startaitools.com/posts/adversarial-review-before-team-rollout/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/adversarial-review-before-team-rollout/">
+    <meta property="og:title" content="Adversarial Review: The Six Lenses That Halted a Rollout — Tons of Skills Work Diary">
+    <meta property="og:description" content="A six-lens adversarial review checked a team knowledge system against live state, broke three shipped assumptions, and gated 18 risks to halt the rollout.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="Adversarial Review: The Six Lenses That Halted a Rollout — Tons of Skills Work Diary">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/adversarial-review-before-team-rollout/">
+    <meta name="twitter:title" content="Adversarial Review: The Six Lenses That Halted a Rollout — Tons of Skills Work Diary">
+    <meta name="twitter:description" content="A six-lens adversarial review checked a team knowledge system against live state, broke three shipped assumptions, and gated 18 risks to halt the rollout.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"Adversarial Review: The Six Lenses That Halted a Rollout","description":"A six-lens adversarial review checked a team knowledge system against live state, broke three shipped assumptions, and gated 18 risks to halt the rollout.","datePublished":"2026-07-09","url":"https://tonsofskills.com/blog/undefined","author":{"@type":"Person","name":"Jeremy Longshore"},"publisher":{"@type":"Organization","name":"Tons of Skills","url":"https://tonsofskills.com"}}</script>
+  
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.post-header[data-astro-cid-7jjqptxk]{background:var(--panel);padding:4rem 1.5rem 3rem;border-bottom:1px solid var(--border)}.post-header-inner[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto}.back-link[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3);text-decoration:none;display:inline-block;margin-bottom:1.5rem;transition:color .2s}.back-link[data-astro-cid-7jjqptxk]:hover{color:var(--primary)}.post-meta[data-astro-cid-7jjqptxk]{display:flex;align-items:center;gap:.75rem;margin-bottom:1rem}time[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3)}.featured-badge[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.2rem .6rem;background:#ce114126;color:var(--red);border-radius:0;font-weight:600;text-transform:uppercase;letter-spacing:.05em}.post-header[data-astro-cid-7jjqptxk] h1[data-astro-cid-7jjqptxk]{font-family:var(--font-body);font-size:clamp(1.5rem,4vw,2.2rem);font-weight:700;color:var(--text);line-height:1.25;margin-bottom:.75rem;letter-spacing:0}.post-desc[data-astro-cid-7jjqptxk]{color:var(--text-2);font-size:1.05rem;line-height:1.6;margin-bottom:1rem}.post-tags[data-astro-cid-7jjqptxk]{display:flex;gap:.4rem;flex-wrap:wrap}.tag[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.15rem .5rem;background:var(--surface-3);color:var(--text-3);border-radius:0}.post-body[data-astro-cid-7jjqptxk]{padding:3rem 1.5rem 4rem}.prose[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto;color:var(--text-2);line-height:1.8;font-size:1rem}.prose[data-astro-cid-7jjqptxk] h2{font-family:var(--font-body);font-size:1.5rem;font-weight:700;color:var(--text);margin:2.5rem 0 1rem;letter-spacing:0}.prose[data-astro-cid-7jjqptxk] h3{font-size:1.2rem;font-weight:600;color:var(--text);margin:2rem 0 .75rem}.prose[data-astro-cid-7jjqptxk] p{margin-bottom:1rem}.prose[data-astro-cid-7jjqptxk] ul,.prose[data-astro-cid-7jjqptxk] ol{margin:.5rem 0 1rem 1.5rem}.prose[data-astro-cid-7jjqptxk] li{margin-bottom:.35rem}.prose[data-astro-cid-7jjqptxk] strong{color:var(--text);font-weight:600}.prose[data-astro-cid-7jjqptxk] code{font-family:var(--font-mono);font-size:.88em;background:var(--surface-3);padding:.15em .35em;border-radius:0;color:var(--primary)}.prose[data-astro-cid-7jjqptxk] a{color:var(--primary);text-decoration:none}.prose[data-astro-cid-7jjqptxk] a:hover{text-decoration:underline}@media(max-width:768px){.post-header[data-astro-cid-7jjqptxk]{padding:3rem 1rem 2rem}.post-body[data-astro-cid-7jjqptxk]{padding:2rem 1rem 3rem}}
+</style></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  <article class="post" data-astro-cid-7jjqptxk>
+    <header class="post-header" data-astro-cid-7jjqptxk>
+      <div class="post-header-inner" data-astro-cid-7jjqptxk>
+        <a href="/blog" class="back-link" data-astro-cid-7jjqptxk>Back to Work Diary</a>
+        <div class="post-meta" data-astro-cid-7jjqptxk>
+          <time datetime="2026-07-09" data-astro-cid-7jjqptxk>July 8, 2026</time>
+          
+        </div>
+        <h1 data-astro-cid-7jjqptxk>Adversarial Review: The Six Lenses That Halted a Rollout</h1>
+        <p class="post-desc" data-astro-cid-7jjqptxk>A six-lens adversarial review checked a team knowledge system against live state, broke three shipped assumptions, and gated 18 risks to halt the rollout.</p>
+        <div class="post-tags" data-astro-cid-7jjqptxk>
+          <span class="tag" data-astro-cid-7jjqptxk>ai-agents</span><span class="tag" data-astro-cid-7jjqptxk>security</span><span class="tag" data-astro-cid-7jjqptxk>architecture</span><span class="tag" data-astro-cid-7jjqptxk>authentication</span><span class="tag" data-astro-cid-7jjqptxk>claude-code</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="post-body" data-astro-cid-7jjqptxk>
+      <div class="prose" data-astro-cid-7jjqptxk>
+        <p>“We shipped the safety work” is a feeling, not a fact. Before you hand a shared, governed system to a team, the only thing that converts that feeling into the truth is a structured adversarial review that verifies claims against live state — not against the design doc, and not against the diff.</p>
+<p>On 2026-07-09 that review ran against an internal team knowledge system being prepared to open to six people all at once. It validated two judgment calls, broke three, and produced a list of eighteen real risks the plan had not named. The verdict: do not go all-at-once, and do not email anyone a token, until the first gate clears.</p>
+<p>That halt was the correct output. This is the story of the method that produced it, the three assumptions it demolished, and the fixes that shipped the same day — every one of which enforces a single boundary: <strong>the model proposes; the deterministic system owns identity, trust, and durable state.</strong></p>
+<h2 id="the-system-in-one-paragraph">The system, in one paragraph</h2>
+<p>The subject is a “second brain”: a governed team knowledge base. Content is captured, run through a deterministic govern pipeline, and — if it survives the gates — promoted into durable memory. Every state change writes a receipt into an append-only, hash-chained ledger, so the store is tamper-evident: you can recompute the chain and detect any row that was altered out of band. Two surfaces front it. A private, tailnet-bound HTTP API is the control plane — it holds the write-gate, the tenant guard, and the audit-actor stamp. A Claude Code plugin (an MCP server) is how people actually talk to it from their editor. Six teammates were about to get access: two admins, four members.</p>
+<h2 id="what-shipped-and-why-it-wasnt-enough">What shipped, and why it wasn’t enough</h2>
+<p>A “safety before people” pass had already landed. It was real work, not theater: bearer tokens were hashed at rest instead of stored as plaintext; per-user tokens were minted so each teammate carried a distinct identity; an onboarding runbook was written; several hardening items were verified against the running service. On paper, the box marked “make it safe for a team” was checked.</p>
+<p>The instinct to stop there is the trap. A safety pass tells you what you <em>did</em>. It does not tell you what you <em>have</em> — the residual risk, the assumptions you smuggled in, the interactions between a fix and the rest of the system. Those only surface when someone hostile to the plan goes and looks at the live thing. So before flipping the switch, that is exactly what happened.</p>
+<h2 id="the-review-that-verified-against-live-state">The review that verified against live state</h2>
+<p>An adversarial review checks claims against the running system, not the design doc and not the diff. Independent reviewers each inspect the live service, its databases, and its deployment through a different lens — security, operations, reliability, integrity, rollout, threat model — so an assumption that is locally true but globally false has nowhere to hide.</p>
+<p>Six independent engineer agents ran in parallel on the Fable model. Each got the same design brief and one distinct lens. The instruction that made the difference was not “review the plan.” It was <strong>verify against real code and live state</strong>: read the repos, query the live databases, recompute the hash chain yourself, check org membership yourself, inspect the running service unit yourself. A review that only reads a diff can confirm the diff does what it says. It cannot catch a claim that is locally true and globally false — and all three of the broken assumptions were exactly that shape.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Lens</th><th>Question it was forced to answer</th></tr></thead><tbody><tr><td>Data integrity &#x26; correctness</td><td>Recompute every hash. Does the store actually verify? Can any path write a durable row without its receipt?</td></tr><tr><td>Security &#x26; secrets</td><td>Where do the still-live secrets exist, in every location, including backups?</td></tr><tr><td>Deployment &#x26; operations</td><td>What does the service actually run from? What happens on crash-restart or rollback?</td></tr><tr><td>Reliability &#x26; concurrency</td><td>Who can write concurrently, and what lock — if any — serializes them?</td></tr><tr><td>Rollout completeness &#x26; teammate UX</td><td>What does a real member experience on a bad token, a dead API, or off-network?</td></tr><tr><td>Adversarial / threat model</td><td>Assume a leaked member token. What can it forge, escalate, or clear?</td></tr></tbody></table>
+<p>Independence is the other half of the method, and it is not optional. One reviewer with a six-item checklist shares one set of blind spots across all six items — if their mental model of the system is wrong in a given place, it is wrong for every lens they apply. Six agents that never see each other’s work cannot collude into a shared assumption. The security lens does not know the reliability lens exists, so it has no reason to defer to it, and that is exactly why one of them looked at the backups while another looked at the write lock. Deduplication happens <em>after</em> independent discovery, never before.</p>
+<p>The integrity lens recomputed all 2,186 candidate content hashes rather than trusting the “verified” label. The security lens enumerated every place a live secret’s plaintext could exist rather than trusting “we hashed the file.”</p>
+<p>That is the entire discipline: independent lenses, each grounded in the running system. It cost six agent-runs and the humility to let them contradict the plan. It was worth it, because it broke three things everyone believed were done.</p>
+<h2 id="what-the-review-left-standing">What the review left standing</h2>
+<p>Before the breakage, credit where the design earned it — because a review that only ever confirms your fears is as miscalibrated as one that only ever flatters you. The review’s two headline validations were calls of <em>restraint</em>: it endorsed holding the riskiest feature — the auto-govern path that drives broken call #3 below — as design-only rather than rushing it into the rollout, and it blessed the sequencing that checked migration safety before restarting the live service. In both cases, not shipping yet was the correct instinct.</p>
+<p>Two foundational design bets also held up under every lens, and they are worth naming because the fixes below lean on them.</p>
+<p>The first is <strong>per-user token identities</strong>. Minting a distinct token per teammate, rather than a shared team secret, looked like extra onboarding friction at the time. It is what makes the entire server-side intake override (below) possible: every request carries a resolvable actor, so the server has something to re-derive trust and authorship <em>from</em>. A shared secret would have left it nothing to distinguish — you cannot own identity you cannot tell apart. The friction bought the security model.</p>
+<p>The second is the <strong>append-only, hash-chained receipt ledger</strong> itself. The integrity lens recomputed the whole chain and confirmed it does what it claims: alter any promoted row out of band and the recomputation detects it. The atomicity fix that follows does not replace that design — it <em>protects</em> it, by closing the one window where a durable row could exist without its receipt. A weaker audit design would have had nothing worth protecting.</p>
+<p>Naming what held is not politeness. It is calibration: it tells you the review’s “broken” verdicts are signal, not a reviewer reflexively torching everything to look thorough.</p>
+<h2 id="three-calls-the-review-broke">Three calls the review broke</h2>
+<p>This is the spine of the story. Two shipped decisions survived scrutiny; three did not — and the three that fell are the transferable lessons, because each was a locally reasonable call that the live state proved wrong.</p>
+<h3 id="broken-call-1-hashing-in-place-is-not-rotation">Broken call #1: hashing in place is not rotation</h3>
+<p>The safety pass hashed the existing tokens <em>in place</em>. It kept the same secret values and just stored their hashes instead of their plaintext, specifically to avoid the churn of re-issuing tokens to everyone. Locally, that reasoning is sound: the credential file no longer holds plaintext, so a read of that file at rest yields nothing usable.</p>
+<p>The security lens went and looked at <em>every</em> place those secret values lived. Retained encrypted backups — one local, one off-host, and at least one target with no retention limit — already held the <strong>plaintext</strong> of those same still-live secrets, captured before the hashing change. Hashing the file protected it going forward, at rest, in one location. It did nothing for a secret whose plaintext sits in a backup you can restore.</p>
+<blockquote>
+<p>Re-hashing a value you have already exposed is not protection. Retiring an exposed secret requires <strong>credential rotation</strong> — a genuinely new value — <strong>plus purging the exposure</strong>. If the plaintext still exists anywhere you can restore from, the old secret is live, and hashing its current home is a false sense of safety.</p>
+</blockquote>
+<p>The fix was not “hash harder.” It was rotate the tokens to new values and treat the pre-hash backups as compromised. Hash-at-rest was necessary; it was not sufficient, and believing it was sufficient is precisely the failure a live-state review exists to catch.</p>
+<h3 id="broken-call-2-local-mode-is-a-single-writer-design">Broken call #2: local mode is a single-writer design</h3>
+<p>To let the system’s founder query the brain from any editor session, the plugin was enabled in user-scope <em>local mode</em>. Convenient, and locally reasonable: one person, their own machine, direct access. The reliability lens asked the question the plan never did — what does local mode actually <em>do</em>?</p>
+<p>Local mode runs in-process as owner/admin. It does not go through the HTTP API. That means it bypasses the entire control plane: the write-gate, the tenant guard, and the audit-actor stamp all live on the API surface, and local mode is a side door around all three. Worse, “any editor session” is not one writer. Up to roughly eleven concurrent interactive sessions became <strong>unlocked writers</strong> — none of them taking the single-writer file lock that the nightly cron jobs depend on to serialize their writes.</p>
+<p>The concrete failure: a backup taken mid-write, with no lock held, can capture a torn state. Restore it and the brain’s own tamper-evidence machinery reports <strong>TAMPER DETECTED</strong> — not because anyone tampered with anything, but because the hash chain was snapshotted between two writes. The safety mechanism fires on its own operator.</p>
+<blockquote>
+<p>A design built for one writer and one user silently becomes a concurrency-and-authorization surface the instant you make it multi-session. The reach goal — “query from anywhere” — was right. Routing it <em>around</em> the single writer was wrong. It should have gone <em>through</em> the API’s single writer, inheriting the write-gate, the tenant guard, the audit stamp, and the lock.</p>
+</blockquote>
+<h3 id="broken-call-3-deleting-durable-rows-needs-a-data-classification-check-and-an-all-consumers-review">Broken call #3: deleting durable rows needs a data-classification check and an all-consumers review</h3>
+<p>A planned feature — the next thing on the roadmap — would DELETE candidate proposals after they were governed. The reasoning read cleanly if you looked only at the write path: the candidate has been governed, its outcome is recorded, so the row is spent; delete it to keep the table lean.</p>
+<p>The integrity lens read the <em>data-classification doc</em> and <em>every consumer</em> of that table, not just the code that does the delete. The candidates table is documented as insert-only, immutable, and a <strong>non-reproducible source of truth</strong>. Three consumers depend on that:</p>
+<ol>
+<li><strong>Provenance.</strong> Remote captures write nowhere else. The candidate row is the <em>only</em> copy of what was seen. Delete it and the provenance back-link points at nothing.</li>
+<li><strong>The human-review queue</strong> depends on flagged and rejected candidates <em>staying in place</em> so a person can adjudicate them later. Delete-on-govern empties the queue out from under the reviewer.</li>
+<li><strong>Re-ingest idempotency.</strong> The nightly re-ingest path dedupes against that table. Delete a governed row and the next night re-ingests it as new, re-rejects it, and deletes it again — a permanent nightly re-ingest/re-reject loop.</li>
+</ol>
+<p>The plan proposed a “second run is a no-op” test to prove safety. That test would have <strong>passed while missing the loop entirely</strong>, because it seeded the <em>table</em> rather than the upstream spool files — so the dedupe it exercised was not the dedupe the loop breaks. A green test against the wrong fixture is worse than no test; it launders the bug.</p>
+<blockquote>
+<p>A design that deletes durable rows must be checked against the data-classification doc <em>and</em> every consumer of that data — review queue, re-ingest idempotency, provenance back-links — not just the code path that performs the write. “Is this row still needed by the thing that wrote it?” is the wrong question. “Who else reads this row, and what is the only copy of it?” is the right one.</p>
+</blockquote>
+<h2 id="the-18-risk-register-gated">The 18-risk register, gated</h2>
+<p>Deduplicated across the six engineers, the findings collapsed to eighteen distinct risks. Where two lenses hit the same issue, severity was taken as the <strong>max</strong> across engineers — you do not average a “critical” with a “medium” and call it “high.” A flat wall of eighteen findings is not actionable; it is a demoralizing to-do list with no critical path. So the register was <strong>gated</strong> into three tiers, and the gating is what made it usable.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Gate</th><th>Meaning</th><th>Representative risks</th></tr></thead><tbody><tr><td><strong>Gate 0</strong></td><td>Must clear <em>before any teammate onboards or any token email is sent</em></td><td>Rotate exposed secrets + purge backups; hash tokens at rest; immutable deploy with lockout guard; durable revoke-by-actor</td></tr><tr><td><strong>Gate 1</strong></td><td>Must clear <em>before the auto-govern feature ships</em></td><td>Server-side candidate-intake override; atomic promotion; the delete-on-govern redesign</td></tr><tr><td><strong>Gate 2</strong></td><td>Hardening — soon, but non-blocking</td><td>Additional plugin observability; expiry policy; ancillary rate limits</td></tr></tbody></table>
+<p>Gating converts “here are eighteen problems” into “here is the one blocking set standing between you and a safe rollout.” It also makes the halt legible: the verdict “do not go all-at-once and do not email tokens until Gate 0 clears” is a statement about a <em>specific</em> tier, not a vague unease. No emails were sent. No teammate was onboarded. That was the correct state to be in, and the gate model is what let everyone agree on it in one sentence.</p>
+<h2 id="the-fixes-that-shipped">The fixes that shipped</h2>
+<p>Gate 0 and the first Gate 1 items landed the same day. Each is a small, well-reasoned change. Shown below are the ones where the design decision is the point.</p>
+<h3 id="tokens-hashed-at-rest-with-a-safe-fallback">Tokens hashed at rest, with a safe fallback</h3>
+<p>The token registry now accepts an already-salted <code>scrypt$salt$hash</code> value in a record’s token field and uses it verbatim, so the credential file can store hashes instead of plaintext bearer secrets. scrypt is a deliberately expensive, memory-hard key-derivation function — a stolen hash is costly to brute-force, unlike a bare SHA-256 digest. Plaintext still works, for operator convenience — and a value that merely <em>looks</em> hashed but has non-hex segments falls back to being hashed as plaintext rather than being trusted as a hash.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="js"><code><span class="line"><span style="color:#6A737D">// A registry record's token field may already be a hashed secret.</span></span>
+<span class="line"><span style="color:#6A737D">// Accept a well-formed scrypt$salt$hash verbatim; otherwise hash it as plaintext.</span></span>
+<span class="line"><span style="color:#F97583">function</span><span style="color:#B392F0"> resolveToken</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">field</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> parts</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> field.</span><span style="color:#B392F0">split</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'$'</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> isHashed</span><span style="color:#F97583"> =</span></span>
+<span class="line"><span style="color:#E1E4E8">    parts.</span><span style="color:#79B8FF">length</span><span style="color:#F97583"> ===</span><span style="color:#79B8FF"> 3</span><span style="color:#F97583"> &#x26;&#x26;</span></span>
+<span class="line"><span style="color:#E1E4E8">    parts[</span><span style="color:#79B8FF">0</span><span style="color:#E1E4E8">] </span><span style="color:#F97583">===</span><span style="color:#9ECBFF"> 'scrypt'</span><span style="color:#F97583"> &#x26;&#x26;</span></span>
+<span class="line"><span style="color:#9ECBFF">    /</span><span style="color:#F97583">^</span><span style="color:#79B8FF">[0-9a-f]</span><span style="color:#F97583">+$</span><span style="color:#9ECBFF">/</span><span style="color:#E1E4E8">.</span><span style="color:#B392F0">test</span><span style="color:#E1E4E8">(parts[</span><span style="color:#79B8FF">1</span><span style="color:#E1E4E8">]) </span><span style="color:#F97583">&#x26;&#x26;</span><span style="color:#6A737D">   // salt segment must be hex</span></span>
+<span class="line"><span style="color:#9ECBFF">    /</span><span style="color:#F97583">^</span><span style="color:#79B8FF">[0-9a-f]</span><span style="color:#F97583">+$</span><span style="color:#9ECBFF">/</span><span style="color:#E1E4E8">.</span><span style="color:#B392F0">test</span><span style="color:#E1E4E8">(parts[</span><span style="color:#79B8FF">2</span><span style="color:#E1E4E8">]);     </span><span style="color:#6A737D">// hash segment must be hex</span></span>
+<span class="line"><span style="color:#F97583">  return</span><span style="color:#E1E4E8"> isHashed </span><span style="color:#F97583">?</span><span style="color:#E1E4E8"> field </span><span style="color:#F97583">:</span><span style="color:#B392F0"> hashToken</span><span style="color:#E1E4E8">(field);</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>Necessary — but, per broken call #1, <strong>not sufficient on its own.</strong> This fix protects the file at rest. It does nothing about the plaintext already sitting in backups. Rotation plus purge was the other half, and shipping the hash without the rotation would have been the exact false-safety the review flagged. The tension is the lesson: a real fix and an incomplete fix can look identical in a diff.</p>
+<h3 id="immutable-tag-pinned-deploy-with-a-lockout-floor-guard-and-auto-rollback">Immutable, tag-pinned deploy with a lockout floor-guard and auto-rollback</h3>
+<p>The service had been running from a <em>mutable working checkout</em>. That is three latent failures at once: any rebuild in that repo mutates the live service, a crash-restart can relaunch from a torn or feature-branch build, and there is no immutable artifact to roll back <em>to</em>. And there was a sharper trap hiding inside it. Rolling the checkout back <em>past</em> the token-hashing change would rebuild the pre-hash registry, which would then double-hash the now-hashed credential file — and lock out all six users at once.</p>
+<p>The fix builds immutable, self-contained release directories behind an atomic <code>current</code> symlink, and refuses to deploy anything older than the migration that would cause the lockout.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#6A737D"># Floor guard: never deploy a commit that predates the lockout-inducing token-hash migration.</span></span>
+<span class="line"><span style="color:#E1E4E8">FLOOR_TAG</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">"token-hash-floor"</span></span>
+<span class="line"><span style="color:#F97583">if</span><span style="color:#F97583"> !</span><span style="color:#B392F0"> git</span><span style="color:#9ECBFF"> merge-base</span><span style="color:#79B8FF"> --is-ancestor</span><span style="color:#9ECBFF"> "</span><span style="color:#E1E4E8">$FLOOR_TAG</span><span style="color:#9ECBFF">"</span><span style="color:#9ECBFF"> "</span><span style="color:#E1E4E8">$TARGET_REF</span><span style="color:#9ECBFF">"</span><span style="color:#E1E4E8">; </span><span style="color:#F97583">then</span></span>
+<span class="line"><span style="color:#79B8FF">  echo</span><span style="color:#9ECBFF"> "REFUSE: </span><span style="color:#E1E4E8">$TARGET_REF</span><span style="color:#9ECBFF"> predates </span><span style="color:#E1E4E8">$FLOOR_TAG</span><span style="color:#9ECBFF"> — deploying it would rebuild the"</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#9ECBFF">       "pre-hash registry, double-hash the credential file, and lock out every user."</span></span>
+<span class="line"><span style="color:#79B8FF">  exit</span><span style="color:#79B8FF"> 1</span></span>
+<span class="line"><span style="color:#F97583">fi</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Build an immutable, self-contained release dir: no .git, frozen deps, built once.</span></span>
+<span class="line"><span style="color:#E1E4E8">REL</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">"/opt/brain/releases/$(</span><span style="color:#B392F0">date</span><span style="color:#79B8FF"> -u</span><span style="color:#9ECBFF"> +%Y%m%dT%H%M%SZ)-$(</span><span style="color:#B392F0">git</span><span style="color:#9ECBFF"> rev-parse </span><span style="color:#79B8FF">--short</span><span style="color:#9ECBFF"> "</span><span style="color:#E1E4E8">$TARGET_REF</span><span style="color:#9ECBFF">")"</span></span>
+<span class="line"><span style="color:#B392F0">mkdir</span><span style="color:#79B8FF"> -p</span><span style="color:#9ECBFF"> "</span><span style="color:#E1E4E8">$REL</span><span style="color:#9ECBFF">"</span></span>
+<span class="line"><span style="color:#B392F0">git</span><span style="color:#9ECBFF"> archive</span><span style="color:#9ECBFF"> "</span><span style="color:#E1E4E8">$TARGET_REF</span><span style="color:#9ECBFF">"</span><span style="color:#F97583"> |</span><span style="color:#B392F0"> tar</span><span style="color:#79B8FF"> -x</span><span style="color:#79B8FF"> -C</span><span style="color:#9ECBFF"> "</span><span style="color:#E1E4E8">$REL</span><span style="color:#9ECBFF">"</span></span>
+<span class="line"><span style="color:#E1E4E8">( </span><span style="color:#79B8FF">cd</span><span style="color:#9ECBFF"> "</span><span style="color:#E1E4E8">$REL</span><span style="color:#9ECBFF">"</span><span style="color:#E1E4E8"> &#x26;&#x26; </span><span style="color:#B392F0">install_frozen_deps</span><span style="color:#E1E4E8"> &#x26;&#x26; </span><span style="color:#B392F0">build</span><span style="color:#E1E4E8"> )</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Lockout preflight: the built artifact MUST contain the hash parser, or it will double-hash.</span></span>
+<span class="line"><span style="color:#B392F0">grep</span><span style="color:#79B8FF"> -q</span><span style="color:#9ECBFF"> 'scrypt'</span><span style="color:#9ECBFF"> "</span><span style="color:#E1E4E8">$REL</span><span style="color:#9ECBFF">/dist/token-registry.js"</span><span style="color:#F97583"> ||</span><span style="color:#E1E4E8"> { </span><span style="color:#79B8FF">echo</span><span style="color:#9ECBFF"> "REFUSE: hash parser missing from build"</span><span style="color:#E1E4E8">; </span><span style="color:#79B8FF">exit</span><span style="color:#79B8FF"> 1</span><span style="color:#E1E4E8">; }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">PREV_REL</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">"$(</span><span style="color:#B392F0">readlink</span><span style="color:#79B8FF"> -f</span><span style="color:#9ECBFF"> /opt/brain/current </span><span style="color:#F97583">||</span><span style="color:#79B8FF"> true</span><span style="color:#9ECBFF">)"</span><span style="color:#6A737D">   # capture the current target FIRST, for rollback</span></span>
+<span class="line"><span style="color:#B392F0">ln</span><span style="color:#79B8FF"> -sfn</span><span style="color:#9ECBFF"> "</span><span style="color:#E1E4E8">$REL</span><span style="color:#9ECBFF">"</span><span style="color:#9ECBFF"> /opt/brain/current</span><span style="color:#6A737D">                       # atomic promotion via symlink swap</span></span>
+<span class="line"><span style="color:#B392F0">systemctl</span><span style="color:#9ECBFF"> restart</span><span style="color:#9ECBFF"> brain-api</span></span></code></pre>
+<p>Then a health gate with auto-rollback, so a bad release un-ships itself:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#F97583">if</span><span style="color:#F97583"> !</span><span style="color:#B392F0"> curl</span><span style="color:#79B8FF"> -fsS</span><span style="color:#79B8FF"> --max-time</span><span style="color:#79B8FF"> 5</span><span style="color:#9ECBFF"> "</span><span style="color:#E1E4E8">$HEALTH_ENDPOINT</span><span style="color:#9ECBFF">"</span><span style="color:#F97583"> ></span><span style="color:#9ECBFF">/dev/null</span><span style="color:#E1E4E8">; </span><span style="color:#F97583">then</span></span>
+<span class="line"><span style="color:#79B8FF">  echo</span><span style="color:#9ECBFF"> "post-restart health gate failed — rolling back to previous release"</span></span>
+<span class="line"><span style="color:#B392F0">  ln</span><span style="color:#79B8FF"> -sfn</span><span style="color:#9ECBFF"> "</span><span style="color:#E1E4E8">$PREV_REL</span><span style="color:#9ECBFF">"</span><span style="color:#9ECBFF"> /opt/brain/current</span></span>
+<span class="line"><span style="color:#B392F0">  systemctl</span><span style="color:#9ECBFF"> restart</span><span style="color:#9ECBFF"> brain-api</span></span>
+<span class="line"><span style="color:#79B8FF">  exit</span><span style="color:#79B8FF"> 1</span></span>
+<span class="line"><span style="color:#F97583">fi</span></span></code></pre>
+<p>The <code>git merge-base --is-ancestor &#x3C;floor-tag> &#x3C;target></code> check is a <strong>named, transferable ops pattern</strong>: a <em>floor guard against a lockout-inducing rollback</em>. Any time a migration makes older code actively dangerous to redeploy — not just wrong, but destructive — pin a floor tag at the migration and refuse to deploy beneath it. Immutability gives you a rollback target; the floor guard makes sure the rollback target can’t itself be the disaster.</p>
+<h3 id="durable-revoke-by-actor-with-a-persisted-revocation-list">Durable revoke-by-actor with a persisted revocation list</h3>
+<p>Tokens had no expiry, and the only revoke path was in-memory — lost on restart. And now that tokens are hashed at rest, an admin no longer holds any teammate’s plaintext bearer secret, so “revoke by value” is impossible for the realistic incident: <em>a teammate’s laptop was stolen.</em> You cannot revoke a secret you deliberately no longer possess.</p>
+<p>So revocation keys off the <strong>audit identity the token already carries</strong>, and persists to an append-only file read at boot.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="js"><code><span class="line"><span style="color:#6A737D">// Tokens are hashed at rest, so no admin holds a plaintext bearer secret to revoke by value.</span></span>
+<span class="line"><span style="color:#6A737D">// Revoke by the audit identity the token carries; persist it so it survives a restart.</span></span>
+<span class="line"><span style="color:#F97583">function</span><span style="color:#B392F0"> revokeByActor</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">actor</span><span style="color:#E1E4E8">, </span><span style="color:#FFAB70">reason</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#E1E4E8">  revoked.</span><span style="color:#B392F0">add</span><span style="color:#E1E4E8">(actor);                                   </span><span style="color:#6A737D">// in-memory guard, effective immediately</span></span>
+<span class="line"><span style="color:#B392F0">  appendFileSync</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">REVOCATION_LIST</span><span style="color:#E1E4E8">,                       </span><span style="color:#6A737D">// append-only ban-list: durable + audit trail</span></span>
+<span class="line"><span style="color:#79B8FF">    JSON</span><span style="color:#E1E4E8">.</span><span style="color:#B392F0">stringify</span><span style="color:#E1E4E8">({ actor, reason, at: </span><span style="color:#F97583">new</span><span style="color:#B392F0"> Date</span><span style="color:#E1E4E8">().</span><span style="color:#B392F0">toISOString</span><span style="color:#E1E4E8">() }) </span><span style="color:#F97583">+</span><span style="color:#9ECBFF"> '</span><span style="color:#79B8FF">\n</span><span style="color:#9ECBFF">'</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">// At boot, replay the ban-list so a revoked actor stays revoked across restarts.</span></span>
+<span class="line"><span style="color:#F97583">function</span><span style="color:#B392F0"> loadRevocations</span><span style="color:#E1E4E8">() {</span></span>
+<span class="line"><span style="color:#F97583">  for</span><span style="color:#E1E4E8"> (</span><span style="color:#F97583">const</span><span style="color:#79B8FF"> line</span><span style="color:#F97583"> of</span><span style="color:#B392F0"> readLines</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">REVOCATION_LIST</span><span style="color:#E1E4E8">)) revoked.</span><span style="color:#B392F0">add</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">JSON</span><span style="color:#E1E4E8">.</span><span style="color:#B392F0">parse</span><span style="color:#E1E4E8">(line).actor);</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>The design choice worth naming: a <strong>separate append-only ban-list file</strong> was chosen over mutating the source token file on every incident. Rewriting the credential store during an active incident — the highest-stress moment — is how you fat-finger a lockout. Append-only is safer than rewrite, and it doubles as a revocation audit trail: who was revoked, when, and why, in order, forever.</p>
+<h3 id="server-side-candidate-intake-override-with-a-provenance-receipt">Server-side candidate-intake override with a provenance receipt</h3>
+<p>This is the clearest instance of the whole thesis. In team mode the <em>client</em> built the entire candidate object, and the server trusted it verbatim. That means a member — or a leaked member token — could self-assert <code>trustLevel: 'high'</code> to clear a minimum-trust gate, forge the <code>author</code>, set an arbitrary <code>tenant</code>, and clear the “potential secret” flag on their own content. And intake wrote no audit event, so none of it left a trace.</p>
+<p>The fix: the server re-derives the fields that decide trust, authorship, and tenancy from the <strong>bearer-token identity</strong>, ignoring the body for exactly those fields, and writes a provenance receipt on every proposal.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="js"><code><span class="line"><span style="color:#6A737D">// TEAM MODE: the client builds the whole candidate, but the server trusts NONE of it</span></span>
+<span class="line"><span style="color:#6A737D">// for the fields that decide trust, authorship, and tenancy. Re-derive from the token.</span></span>
+<span class="line"><span style="color:#F97583">function</span><span style="color:#B392F0"> intake</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">reqBody</span><span style="color:#E1E4E8">, </span><span style="color:#FFAB70">auth</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> candidate</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">    ...</span><span style="color:#E1E4E8">reqBody,</span></span>
+<span class="line"><span style="color:#E1E4E8">    trustLevel:      auth.trustLevel,          </span><span style="color:#6A737D">// NOT reqBody — client cannot self-assert 'high'</span></span>
+<span class="line"><span style="color:#E1E4E8">    author:          auth.actor,               </span><span style="color:#6A737D">// NOT reqBody — no forging provenance</span></span>
+<span class="line"><span style="color:#E1E4E8">    tenant:          auth.tenant,              </span><span style="color:#6A737D">// NOT reqBody — no cross-tenant writes</span></span>
+<span class="line"><span style="color:#E1E4E8">    potentialSecret: </span><span style="color:#B392F0">scan</span><span style="color:#E1E4E8">(reqBody.content),    </span><span style="color:#6A737D">// server re-scans; client cannot clear the flag</span></span>
+<span class="line"><span style="color:#E1E4E8">  };</span></span>
+<span class="line"><span style="color:#B392F0">  writeReceipt</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'candidate.intake'</span><span style="color:#E1E4E8">, candidate, auth);   </span><span style="color:#6A737D">// every proposal leaves a receipt</span></span>
+<span class="line"><span style="color:#F97583">  return</span><span style="color:#B392F0"> store</span><span style="color:#E1E4E8">(candidate);</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>Two alternatives were considered and rejected:</p>
+<ul>
+<li><strong>Reject any candidate that asserts non-default fields.</strong> Brittle. The client always sends a full body, including those fields, on every legitimate proposal — so this would reject every real submission, not just malicious ones.</li>
+<li><strong>Trim the client body to a minimal DTO at the boundary.</strong> A bigger cross-surface contract change — new schema, new client code, new failure modes — for <em>no additional safety</em>, because the override already neutralizes every one of those fields. More work, more blast radius, same result.</li>
+</ul>
+<p>The override wins because it is the smallest change that makes the guarantee true: the client proposes a candidate; the server decides what that candidate <em>is</em>. Identity, trust, and tenant are server-owned. That sentence is the whole security model in miniature.</p>
+<h3 id="atomic-promotion">Atomic promotion</h3>
+<p>The promotion path — moving a governed candidate into durable memory — did roughly five separate autocommits: a supersession update and its event, the memory insert, the graph-edge links, and the “promoted” receipt. A kill mid-promote — the compile cron hitting its timeout, or a plain SIGTERM — could leave a promoted memory with <strong>no “promoted” receipt</strong>. A durable row without its audit receipt violates the product’s core promise — every state change has a receipt — and it never self-heals, because nothing re-derives a receipt for a row that already exists.</p>
+<p>The fix wraps the whole write block in one <a href="https://www.sqlite.org/lang_transaction.html"><code>BEGIN IMMEDIATE</code></a> transaction — SQLite’s mode for taking the write lock up front instead of deferring it to the first write statement — so the memory and its receipt commit together or not at all.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="js"><code><span class="line"><span style="color:#6A737D">// Memory row + its "promoted" receipt must commit atomically, or the</span></span>
+<span class="line"><span style="color:#6A737D">// append-only-receipts promise breaks and never self-heals.</span></span>
+<span class="line"><span style="color:#F97583">function</span><span style="color:#B392F0"> promote</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">candidateId</span><span style="color:#E1E4E8">, </span><span style="color:#FFAB70">auth</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> db</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> this</span><span style="color:#E1E4E8">.</span><span style="color:#B392F0">getDb</span><span style="color:#E1E4E8">();               </span><span style="color:#6A737D">// read-only getter over the shared connection</span></span>
+<span class="line"><span style="color:#E1E4E8">  db.</span><span style="color:#B392F0">exec</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'BEGIN IMMEDIATE'</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#F97583">  try</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#B392F0">    supersedePrior</span><span style="color:#E1E4E8">(candidateId);         </span><span style="color:#6A737D">// supersession update + its event</span></span>
+<span class="line"><span style="color:#F97583">    const</span><span style="color:#79B8FF"> memId</span><span style="color:#F97583"> =</span><span style="color:#B392F0"> insertMemory</span><span style="color:#E1E4E8">(candidateId);</span></span>
+<span class="line"><span style="color:#B392F0">    linkGraphEdges</span><span style="color:#E1E4E8">(memId);</span></span>
+<span class="line"><span style="color:#B392F0">    writeReceipt</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'promoted'</span><span style="color:#E1E4E8">, memId, auth);   </span><span style="color:#6A737D">// nested audit inserts degrade to SAVEPOINTs here</span></span>
+<span class="line"><span style="color:#E1E4E8">    db.</span><span style="color:#B392F0">exec</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'COMMIT'</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#E1E4E8">  } </span><span style="color:#F97583">catch</span><span style="color:#E1E4E8"> (e) {</span></span>
+<span class="line"><span style="color:#E1E4E8">    db.</span><span style="color:#B392F0">exec</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'ROLLBACK'</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#F97583">    throw</span><span style="color:#E1E4E8"> e;</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>Two design details carry their own rationale. First, the shared DB connection was exposed via a <strong>read-only getter</strong> rather than threading a new <code>db</code> handle through the constructor — so every existing caller’s signature stays unchanged, keeping the blast radius small. Second, the nested audit inserts each open their own <code>BEGIN IMMEDIATE</code>; inside the outer transaction those degrade to <strong>savepoints</strong>, which preserves the audit chain’s anti-fork guarantee rather than fighting it. And the negative control matters: with the outer transaction bypassed, the atomicity tests <em>fail</em> — the memory is orphaned — and with it in place they pass. The test catches the real regression, not a tautology that would pass either way.</p>
+<h3 id="plugin-hardening-shipped-alongside">Plugin hardening, shipped alongside</h3>
+<p>The plugin got its own Gate 0 work, because it is the surface six people will actually touch:</p>
+<ul>
+<li><strong>Local-mode writers now take the same single-writer <a href="https://man7.org/linux/man-pages/man2/flock.2.html"><code>flock(2)</code></a> advisory lock the cron jobs use</strong> — a real kernel <code>flock(2)</code> on the same file, so it interoperates with the cron’s <code>flock(1)</code>. A PID-lockfile library was rejected precisely because it shares no kernel lock with <code>flock(1)</code>; two “locks” that don’t see each other are not a lock.</li>
+</ul>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="js"><code><span class="line"><span style="color:#6A737D">// Local-mode writers take the SAME kernel lock the cron holds (flock(2) &#x3C;-> flock(1)).</span></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> fd</span><span style="color:#F97583"> =</span><span style="color:#B392F0"> openSync</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">LOCK_PATH</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">'r'</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#B392F0">flockSync</span><span style="color:#E1E4E8">(fd, </span><span style="color:#9ECBFF">'ex'</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#F97583">try</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">  await</span><span style="color:#B392F0"> writeToBrain</span><span style="color:#E1E4E8">(payload);</span></span>
+<span class="line"><span style="color:#E1E4E8">} </span><span style="color:#F97583">finally</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#B392F0">  flockSync</span><span style="color:#E1E4E8">(fd, </span><span style="color:#9ECBFF">'un'</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<ul>
+<li><strong>Team-mode search now surfaces errors instead of swallowing them into an empty result.</strong> Previously a bad token, a dead API, and being off-network all rendered identically as “the brain found nothing.” For a tool whose entire value is <em>trust by receipts</em>, silently returning empty on failure is the worst possible failure mode — it teaches the user the brain has no answer when the truth is it never got the question.</li>
+<li><strong>A new read-only <code>brain_status</code> probe</strong> answers “am I connected, in which mode, and do I have a token?” — the three things a confused teammate needs before they can even ask for help.</li>
+<li><strong>The plugin got its first unit test, lint, and CI gate — <em>before</em> it received the review’s riskiest changes.</strong> You do not hand new safety-critical code to a surface with no test wall.</li>
+</ul>
+<h2 id="the-tradeoffs">The tradeoffs</h2>
+<p>None of this was free, and pretending otherwise would undercut the point.</p>
+<ul>
+<li><strong>The rollout got slower.</strong> All-at-once for six people became “one person proves the path end-to-end, Gate 0 clears, then six.” That is the right call, but it is a real delay against a plan that was a switch-flip away from done.</li>
+<li><strong>There is more operational machinery to maintain now.</strong> Immutable release directories, a floor tag to keep current, a revocation-list file to back up, a health gate and rollback path. Every one of those is a thing that can itself break or drift. Determinism and durability cost surface area; the bet is that the surface is cheaper than the incidents it prevents.</li>
+<li><strong>Hash-at-rest was a false sense of security until rotation happened.</strong> This is the honest one. For a window, the credential file looked safe while the live secrets sat in plaintext in backups. Anyone reading only the “we hashed the tokens” line would have believed the job was done. The review is the only reason that gap was named before it was a breach instead of after.</li>
+<li><strong>The review itself has a cost, and it is not just compute.</strong> Six independent agent-runs is the cheap part. The expensive part is the discipline to accept a halt the day before launch — to let a review overrule a plan that felt finished, hold the line on “no tokens emailed until Gate 0 clears,” and eat the schedule slip. A review you are unwilling to act on is theater with a receipt. The value was realized only because the verdict was allowed to stop the rollout.</li>
+</ul>
+<h2 id="the-boundary-underneath-all-of-it">The boundary underneath all of it</h2>
+<p>Read the Gate 0 and Gate 1 fixes together and they are not five unrelated patches. They are five expressions of one boundary:</p>
+<ul>
+<li>The server derives identity, trust, and tenant from the token, <strong>not</strong> the request body. <em>(intake override)</em></li>
+<li>Receipts commit atomically with the data they describe. <em>(atomic promotion)</em></li>
+<li>Deploys are immutable artifacts, <strong>not</strong> a mutable checkout. <em>(tag-pinned release + floor guard)</em></li>
+<li>Revocation is durable and keyed to identity, <strong>not</strong> to a plaintext value you no longer hold. <em>(revoke-by-actor)</em></li>
+<li>Credentials live at rest as hashes the system re-derives, <strong>not</strong> as plaintext a disk or a backup can hand back. <em>(hash-at-rest, paired with rotation)</em></li>
+</ul>
+<p><strong>The model — or the client, or the convenient side door — proposes. The deterministic system owns identity, trust, and durable state.</strong> Every place the old design let the proposer also decide what its proposal <em>was</em>, the review found a hole, and every fix closed it by moving that decision back to the deterministic side. That boundary is not specific to this system. It is the load-bearing wall of any governed AI system where something upstream is allowed to be creative and something downstream has to be trustworthy.</p>
+<p>And there is a standing invariant the review left behind, worth more than any single fix: all-at-once is the right rollout <em>for six people</em> — but only after one person has walked the entire path end-to-end and Gate 0 is clear. Confidence at team scale is earned by one proof at individual scale, not asserted by a completed checklist.</p>
+<p>The meta-lesson is the method itself. Six independent lenses, each forced to <strong>verify against live state</strong> rather than read the design, are what caught “the backup still holds the plaintext” and “local mode runs as admin, in-process, unlocked.” A review that only read the diff would have blessed all three broken calls — because in the diff, all three looked done. The difference between shipping the safety work and <em>knowing</em> you shipped it is whether someone went and looked at the running thing with hostile intent, before the people arrived.</p>
+<h2 id="related-posts">Related Posts</h2>
+<ul>
+<li><a href="/blog/the-moat-is-the-trust-layer-nexus-byok-rag/">The Moat Is the Trust Layer: Turning a Local-RAG App into a BYOK Document-Intelligence Platform</a> — where adversarially reviewing the <em>graders</em> caught the eval suite lying green.</li>
+<li><a href="/blog/every-safety-gate-has-a-failure-direction/">Every Safety Gate Has a Failure Direction</a> — why one gate crashes fail-closed on bad data while a swallowed error lets another pass fail-open.</li>
+<li><a href="/blog/noise-robust-signed-llm-judge-evals/">Noise-Robust LLM-Judge Evals: Don’t Sign a Coin Flip</a> — on not trusting a measurement you haven’t proven can go red.</li>
+</ul>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "Adversarial Review: The Six Lenses That Halted a Rollout",
+  "description": "A six-lens adversarial review checked a team knowledge system against live state, broke three shipped assumptions, and gated 18 risks to halt the rollout.",
+  "author": { "@type": "Person", "name": "Jeremy Longshore" },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Start AI Tools",
+    "logo": { "@type": "ImageObject", "url": "https://startaitools.com/favicon.ico" }
+  },
+  "url": "https://startaitools.com/posts/adversarial-review-before-team-rollout/",
+  "datePublished": "2026-07-09",
+  "keywords": "adversarial review, security review, governed AI system, team rollout, authentication, claude-code",
+  "articleSection": "Architecture"
+}
+</script>
+      </div>
+    </div>
+  </article>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

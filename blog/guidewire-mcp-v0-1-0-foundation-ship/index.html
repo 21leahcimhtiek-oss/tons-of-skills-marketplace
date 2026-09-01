@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guidewire MCP v0.1.0: Carrier-Native Server Blueprint — Tons of Skills Work Diary</title>
+    <meta name="description" content="How v0.1.0 of guidewire-mcp-for-claude shipped six foundation packages, five carrier-vocabulary tools, and a 30k-word blueprint in one day.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://startaitools.com/posts/guidewire-mcp-v0-1-0-foundation-ship/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/guidewire-mcp-v0-1-0-foundation-ship/">
+    <meta property="og:title" content="Guidewire MCP v0.1.0: Carrier-Native Server Blueprint — Tons of Skills Work Diary">
+    <meta property="og:description" content="How v0.1.0 of guidewire-mcp-for-claude shipped six foundation packages, five carrier-vocabulary tools, and a 30k-word blueprint in one day.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="Guidewire MCP v0.1.0: Carrier-Native Server Blueprint — Tons of Skills Work Diary">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/guidewire-mcp-v0-1-0-foundation-ship/">
+    <meta name="twitter:title" content="Guidewire MCP v0.1.0: Carrier-Native Server Blueprint — Tons of Skills Work Diary">
+    <meta name="twitter:description" content="How v0.1.0 of guidewire-mcp-for-claude shipped six foundation packages, five carrier-vocabulary tools, and a 30k-word blueprint in one day.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"Guidewire MCP v0.1.0: Carrier-Native Server Blueprint","description":"How v0.1.0 of guidewire-mcp-for-claude shipped six foundation packages, five carrier-vocabulary tools, and a 30k-word blueprint in one day.","datePublished":"2026-05-04","url":"https://tonsofskills.com/blog/undefined","author":{"@type":"Person","name":"Jeremy Longshore"},"publisher":{"@type":"Organization","name":"Tons of Skills","url":"https://tonsofskills.com"}}</script>
+  
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.post-header[data-astro-cid-7jjqptxk]{background:var(--panel);padding:4rem 1.5rem 3rem;border-bottom:1px solid var(--border)}.post-header-inner[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto}.back-link[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3);text-decoration:none;display:inline-block;margin-bottom:1.5rem;transition:color .2s}.back-link[data-astro-cid-7jjqptxk]:hover{color:var(--primary)}.post-meta[data-astro-cid-7jjqptxk]{display:flex;align-items:center;gap:.75rem;margin-bottom:1rem}time[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3)}.featured-badge[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.2rem .6rem;background:#ce114126;color:var(--red);border-radius:0;font-weight:600;text-transform:uppercase;letter-spacing:.05em}.post-header[data-astro-cid-7jjqptxk] h1[data-astro-cid-7jjqptxk]{font-family:var(--font-body);font-size:clamp(1.5rem,4vw,2.2rem);font-weight:700;color:var(--text);line-height:1.25;margin-bottom:.75rem;letter-spacing:0}.post-desc[data-astro-cid-7jjqptxk]{color:var(--text-2);font-size:1.05rem;line-height:1.6;margin-bottom:1rem}.post-tags[data-astro-cid-7jjqptxk]{display:flex;gap:.4rem;flex-wrap:wrap}.tag[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.15rem .5rem;background:var(--surface-3);color:var(--text-3);border-radius:0}.post-body[data-astro-cid-7jjqptxk]{padding:3rem 1.5rem 4rem}.prose[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto;color:var(--text-2);line-height:1.8;font-size:1rem}.prose[data-astro-cid-7jjqptxk] h2{font-family:var(--font-body);font-size:1.5rem;font-weight:700;color:var(--text);margin:2.5rem 0 1rem;letter-spacing:0}.prose[data-astro-cid-7jjqptxk] h3{font-size:1.2rem;font-weight:600;color:var(--text);margin:2rem 0 .75rem}.prose[data-astro-cid-7jjqptxk] p{margin-bottom:1rem}.prose[data-astro-cid-7jjqptxk] ul,.prose[data-astro-cid-7jjqptxk] ol{margin:.5rem 0 1rem 1.5rem}.prose[data-astro-cid-7jjqptxk] li{margin-bottom:.35rem}.prose[data-astro-cid-7jjqptxk] strong{color:var(--text);font-weight:600}.prose[data-astro-cid-7jjqptxk] code{font-family:var(--font-mono);font-size:.88em;background:var(--surface-3);padding:.15em .35em;border-radius:0;color:var(--primary)}.prose[data-astro-cid-7jjqptxk] a{color:var(--primary);text-decoration:none}.prose[data-astro-cid-7jjqptxk] a:hover{text-decoration:underline}@media(max-width:768px){.post-header[data-astro-cid-7jjqptxk]{padding:3rem 1rem 2rem}.post-body[data-astro-cid-7jjqptxk]{padding:2rem 1rem 3rem}}
+</style></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  <article class="post" data-astro-cid-7jjqptxk>
+    <header class="post-header" data-astro-cid-7jjqptxk>
+      <div class="post-header-inner" data-astro-cid-7jjqptxk>
+        <a href="/blog" class="back-link" data-astro-cid-7jjqptxk>Back to Work Diary</a>
+        <div class="post-meta" data-astro-cid-7jjqptxk>
+          <time datetime="2026-05-04" data-astro-cid-7jjqptxk>May 3, 2026</time>
+          
+        </div>
+        <h1 data-astro-cid-7jjqptxk>Guidewire MCP v0.1.0: Carrier-Native Server Blueprint</h1>
+        <p class="post-desc" data-astro-cid-7jjqptxk>How v0.1.0 of guidewire-mcp-for-claude shipped six foundation packages, five carrier-vocabulary tools, and a 30k-word blueprint in one day.</p>
+        <div class="post-tags" data-astro-cid-7jjqptxk>
+          <span class="tag" data-astro-cid-7jjqptxk>mcp</span><span class="tag" data-astro-cid-7jjqptxk>enterprise-integration</span><span class="tag" data-astro-cid-7jjqptxk>guidewire</span><span class="tag" data-astro-cid-7jjqptxk>architecture</span><span class="tag" data-astro-cid-7jjqptxk>claude-code</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="post-body" data-astro-cid-7jjqptxk>
+      <div class="prose" data-astro-cid-7jjqptxk>
+        <p><a href="https://github.com/jeremylongshore/guidewire-mcp-for-claude">Guidewire MCP for Claude</a> v0.1.0 is a carrier-native <a href="https://modelcontextprotocol.io">Model Context Protocol</a> (MCP) server that lets a Claude Code session ask a Guidewire PolicyCenter, BillingCenter, or ClaimCenter tenant questions in the language an underwriter or claims handler would actually use — <code>find-submissions-waiting-on-me</code>, <code>summarize-this-submission</code>, <code>did-we-lose-this-account</code> — instead of the API verbs an integration engineer would reach for. The v0.1.0 cut shipped on 2026-05-04 as 30 merged PRs (+14,521 / -819 lines), comprising six foundation packages, five read-only PolicyCenter tools, a Claude Code plugin manifest, and a live architecture diagram on a custom subdomain. Alongside the code, ~30k words of blueprint documents — business case, PRD, architecture, user journey, technical spec, roadmap — landed in <code>blueprint/</code> on the same day. (All 30 merged PRs are visible at <a href="https://github.com/jeremylongshore/guidewire-mcp-for-claude/pulls?q=is%3Apr+is%3Amerged">github.com/jeremylongshore/guidewire-mcp-for-claude/pulls?q=is%3Apr+is%3Amerged</a>.)</p>
+<p>The thesis: shipping a v0.1.0 carrier-native MCP server in one day is only possible when the blueprint, the foundation packages, and the safety harness are designed as one system from the start — not bolted on after. Each piece in the v0.1.0 cut depends on architectural decisions that were locked into the blueprint <em>before</em> any package code was written. That sequencing — design as an artifact, not a retrofit — is what made the parallel construction of six independently-versioned packages tractable on a one-day clock.</p>
+<p>This post walks through what’s actually in v0.1.0, how the blueprint set functions as load-bearing infrastructure rather than after-the-fact documentation, why the harness pattern (<code>plan → policy → approval → execute → audit → rollback</code>) is the spine of the entire writes story, and where the limits of the cut sit honestly. There is also a parallel sister-pack rebuild that landed the same day in a separate repo, which is worth covering because the two artifacts compose in ways that matter for anyone trying to ship enterprise integrations on a Claude Code substrate.</p>
+<h2 id="what-v010-actually-contains">What v0.1.0 actually contains</h2>
+<p>The v0.1.0 cut is best read as four concentric layers that correspond to the four epics opened in the roadmap: foundation (E1), read-only tools (E2), harness scaffold (E3), and on-disk profile loader (E4). The package boundaries are deliberate — each one stands alone, has its own README, owns its own tests, and is consumed only through its public exports.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Layer</th><th>Artifact</th><th>What it does</th></tr></thead><tbody><tr><td>E1</td><td><code>@gw/schemas</code></td><td>Zod schemas for every Guidewire payload the runtime touches. Type errors become validation errors at the boundary, not crashes deep in tool code.</td></tr><tr><td>E1</td><td><code>@gw/observability</code></td><td>OpenTelemetry tracing + pino structured logs + Sentry error sink. Wired in from day 1, defaulted off until the operator points them somewhere.</td></tr><tr><td>E1</td><td><code>@gw/auth</code></td><td>Guidewire Hub OAuth client + JWT propagation. Actor identity flows through every tool call — there is no shared service-account key with read-all scopes.</td></tr><tr><td>E1</td><td><code>@gw/audit</code></td><td>Postgres-backed audit log with hash-chain. Each row’s hash includes the previous row’s hash, so tampering is detectable.</td></tr><tr><td>E1</td><td><code>@gw/client-sdk</code></td><td>Cloud API client built on undici. Two-key idempotency: client-side request key plus Cloud API native idempotency header.</td></tr><tr><td>E1</td><td><code>@gw/mcp-runtime</code></td><td>MCP protocol implementation with both stdio and HTTP transports. Tools register themselves through a typed factory; runtime handles dispatch, validation, and observability.</td></tr><tr><td>E2</td><td>5 PolicyCenter tools</td><td><code>find-submissions-waiting-on-me</code>, <code>show-policies-for-this-insured</code>, <code>summarize-this-submission</code>, <code>did-we-lose-this-account</code>, <code>pull-this-submission</code>. All read-only. All speak carrier vocabulary, not REST verbs.</td></tr><tr><td>E3</td><td>Harness library + CLI</td><td>Plan / policy / approval / execute / audit / rollback pipeline. Skeleton in #80 — wiring real writes to this is E3+ work.</td></tr><tr><td>E4</td><td><code>--profile &#x3C;path></code> loader</td><td>On-disk profile scaffold (#75). Loads tenant connection details, role mappings, and per-tool overrides from a YAML file the operator maintains.</td></tr></tbody></table>
+<p>Fifty-four tests pass across the foundation packages. The plugin manifest landed in #76, which means installation is a single command in any Claude Code session:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">/plugin</span><span style="color:#9ECBFF"> install</span><span style="color:#9ECBFF"> jeremylongshore/guidewire-mcp-for-claude</span></span></code></pre>
+<p>Once installed, the runtime expects four environment variables to talk to a tenant:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#F97583">export</span><span style="color:#E1E4E8"> GUIDEWIRE_OAUTH_CLIENT_ID</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">"your-client-id"</span></span>
+<span class="line"><span style="color:#F97583">export</span><span style="color:#E1E4E8"> GUIDEWIRE_OAUTH_CLIENT_SECRET</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">"your-client-secret"</span></span>
+<span class="line"><span style="color:#F97583">export</span><span style="color:#E1E4E8"> GUIDEWIRE_TOKEN_ENDPOINT</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">"https://&#x3C;your-hub>.guidewire.net/oauth2/v1/token"</span></span>
+<span class="line"><span style="color:#F97583">export</span><span style="color:#E1E4E8"> GUIDEWIRE_PC_BASE_URL</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">"https://&#x3C;your-tenant>.pc.guidewire.net/pc/api"</span></span></code></pre>
+<p>A live architecture diagram of the whole stack is published at <a href="https://guidewire-mcp.intentsolutions.io/">guidewire-mcp.intentsolutions.io</a> (PR <a href="https://github.com/jeremylongshore/guidewire-mcp-for-claude/pull/53">#53</a>). The page is itself a credibility artifact — the architecture is not just documented in markdown inside the repo, it is rendered as a public artifact a prospect can read without cloning anything.</p>
+<h2 id="carrier-vocabulary-as-the-dominant-abstraction">Carrier vocabulary as the dominant abstraction</h2>
+<p>The five tools in v0.1.0 are deliberately named the way an underwriter or claims handler would describe them in a hallway conversation, not the way a Cloud API endpoint is named. That is D-001 in the architecture document, and it is the most consequential design decision in the whole cut. Every other surface — the schema names in <code>@gw/schemas</code>, the registration API in <code>@gw/mcp-runtime</code>, the user-journey scenarios in <code>04-USER-JOURNEY.md</code> — derives from it.</p>
+<p>The contrast matters. A naive MCP server over Guidewire would expose tools that map 1:1 to Cloud API operations: <code>get_submission</code>, <code>list_policies_by_account</code>, <code>get_account_by_producer_code</code>. That surface is technically correct and operationally useless. An underwriter does not think “I need to call <code>list_policies_by_account</code> with the producer code I derived from the agency lookup.” An underwriter thinks “show me the policies for this insured.” The vocabulary gap is the integration’s value proposition.</p>
+<p>Concretely, <code>find-submissions-waiting-on-me</code> is not a single Cloud API call. It is a composed query: fetch the operator’s role, resolve the queues they’re assigned to, fetch open submissions in those queues filtered by status <code>Pending Underwriter Review</code> or <code>Returned for Information</code>, sort by SLA breach risk, and return a structured summary. The composition logic lives inside the tool. The operator never sees the underlying Cloud API plumbing.</p>
+<p>The Zod schema for the tool’s response reflects the same vocabulary discipline:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#F97583">export</span><span style="color:#F97583"> const</span><span style="color:#79B8FF"> SubmissionWaitingOnMe</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> z.</span><span style="color:#B392F0">object</span><span style="color:#E1E4E8">({</span></span>
+<span class="line"><span style="color:#E1E4E8">  submissionNumber: z.</span><span style="color:#B392F0">string</span><span style="color:#E1E4E8">(),</span></span>
+<span class="line"><span style="color:#E1E4E8">  insuredName: z.</span><span style="color:#B392F0">string</span><span style="color:#E1E4E8">(),</span></span>
+<span class="line"><span style="color:#E1E4E8">  effectiveDate: z.</span><span style="color:#B392F0">string</span><span style="color:#E1E4E8">(),</span></span>
+<span class="line"><span style="color:#E1E4E8">  premiumEstimate: z.</span><span style="color:#B392F0">number</span><span style="color:#E1E4E8">().</span><span style="color:#B392F0">nullable</span><span style="color:#E1E4E8">(),</span></span>
+<span class="line"><span style="color:#E1E4E8">  daysWaitingForMe: z.</span><span style="color:#B392F0">number</span><span style="color:#E1E4E8">(),</span></span>
+<span class="line"><span style="color:#E1E4E8">  slaBreachIn: z.</span><span style="color:#B392F0">string</span><span style="color:#E1E4E8">().</span><span style="color:#B392F0">nullable</span><span style="color:#E1E4E8">(),</span></span>
+<span class="line"><span style="color:#E1E4E8">  whyItIsWaiting: z.</span><span style="color:#B392F0">enum</span><span style="color:#E1E4E8">([</span></span>
+<span class="line"><span style="color:#9ECBFF">    'pending-underwriter-review'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">    'returned-for-information'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">    'awaiting-broker-response'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  ]),</span></span>
+<span class="line"><span style="color:#E1E4E8">});</span></span></code></pre>
+<p><code>whyItIsWaiting</code> is a denormalized, vocabulary-correct enum. The Cloud API exposes this as a status code with carrier-specific extensions — the schema flattens that into the three states an operator actually distinguishes between. Two months from now when the underwriter is asking “why is this one still on my plate,” the answer comes back in their language.</p>
+<p>This is also what makes the harness pattern feasible later. A write tool named <code>bind-this-quote-with-these-changes</code> can produce a plan that is reviewable by a human approver in <em>the operator’s terms</em>. A write tool named <code>submit_quote_binding_request_with_overrides</code> produces a plan that requires translation. The vocabulary discipline at the read layer is what unlocks the approval UX at the write layer.</p>
+<h2 id="the-blueprint-set-is-load-bearing-infrastructure-not-documentation">The blueprint set is load-bearing infrastructure, not documentation</h2>
+<p>The instinct on a one-day ship is to skip docs and write code. That instinct is wrong here, and the structure of the day’s commits shows why. The blueprint set landed <em>first</em>, as its own PR sequence, before the bulk of E1 package code merged:</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Doc</th><th>Words</th><th>PR</th></tr></thead><tbody><tr><td>01-BUSINESS-CASE.md</td><td>3.0k</td><td><a href="https://github.com/jeremylongshore/guidewire-mcp-for-claude/pull/39">#39</a></td></tr><tr><td>02-PRD.md</td><td>8.2k</td><td><a href="https://github.com/jeremylongshore/guidewire-mcp-for-claude/pull/35">#35</a></td></tr><tr><td>03-ARCHITECTURE.md</td><td>5.3k</td><td><a href="https://github.com/jeremylongshore/guidewire-mcp-for-claude/pull/38">#38</a></td></tr><tr><td>04-USER-JOURNEY.md</td><td>5.4k</td><td><a href="https://github.com/jeremylongshore/guidewire-mcp-for-claude/pull/42">#42</a></td></tr><tr><td>05-TECHNICAL-SPEC.md</td><td>7.4k</td><td><a href="https://github.com/jeremylongshore/guidewire-mcp-for-claude/pull/41">#41</a></td></tr><tr><td>07-ROADMAP.md + E2.5 sub-epic</td><td>—</td><td><a href="https://github.com/jeremylongshore/guidewire-mcp-for-claude/pull/30">#30</a>, <a href="https://github.com/jeremylongshore/guidewire-mcp-for-claude/pull/43">#43</a></td></tr><tr><td>Phase 0 specialist memos</td><td>16,963</td><td><a href="https://github.com/jeremylongshore/guidewire-mcp-for-claude/pull/27">#27</a></td></tr></tbody></table>
+<p>The blueprint pre-commits the architecture decisions — labeled <a href="https://github.com/jeremylongshore/guidewire-mcp-for-claude/blob/main/000-docs/004-DR-DEC-architecture-decisions.md">D-001 through D-022</a> in <code>004-DR-DEC-architecture-decisions.md</code> and referenced by anchor link from <code>03-ARCHITECTURE.md</code> — that the package code then implements. Without that pre-commitment, six packages cannot be built in parallel, because each package’s public surface depends on assumptions the other five also have to honor. The blueprint <em>is</em> the contract between the packages.</p>
+<p>A concrete example: D-005 (“every write passes through plan → policy → approval → execute → audit → rollback hint”) and D-006 (“HARD RULE: no audit, no write”) together fix the shape of <code>@gw/audit</code>’s public API <em>and</em> the contract between <code>@gw/mcp-runtime</code> and the harness <em>and</em> the shape of every future write tool’s signature. If those decisions had been deferred to “we’ll figure it out when we get to writes,” <code>@gw/audit</code> would have shipped with an API that the harness later had to adapt around. By writing the architecture document first and committing to D-005/D-006 explicitly, every downstream package was built against a stable contract.</p>
+<p>The same pattern holds for D-001 (carrier vocabulary as the dominant abstraction) — that decision shapes the tool naming convention in <code>@gw/mcp-runtime</code>’s registration API, the schema names in <code>@gw/schemas</code>, and the user-journey scenarios in <code>04-USER-JOURNEY.md</code>. One decision, four files, all consistent because the decision was a written artifact before any of them got built.</p>
+<p>The Phase 0 specialist memos (16,963 words across four memos) covered the harder questions that would have stalled package construction if discovered mid-build: which Guidewire APIs are actually stable across InsuranceSuite versions, what the real OAuth flow looks like with Hub, what the carrier-vocabulary mapping should be for the operator queries the PRD enumerates, and what the harness runtime needs to look like to support the eventual write surface. Those memos became the librarian KB entries <code>005-DR-REF-guidewire-public-resources</code> through <code>009-DR-MEMO-harness-runtime</code>, which means the same content is reachable both from the blueprint’s narrative reading order and from the librarian’s topic-keyed lookup. Two access paths, one source of truth.</p>
+<h2 id="the-five-read-only-tools-in-operator-language">The five read-only tools, in operator language</h2>
+<p>The tools shipped in v0.1.0 cover the high-frequency PolicyCenter operator queries. Each one takes natural-language-ish parameters that match how an underwriter would describe the question, not how the Cloud API expresses it. A short tour:</p>
+<p><strong><code>find-submissions-waiting-on-me</code></strong> — the morning-coffee query. Returns the operator’s queue of submissions where the next required action is theirs. The tool resolves the operator’s role and queue assignments from the JWT, fetches the queue contents, and ranks results by SLA breach risk. No parameters needed beyond the implicit identity. Sample session interaction:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>> use find-submissions-waiting-on-me</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>Found 7 submissions waiting on you:</span></span>
+<span class="line"><span>  1. SUB-2398471 — Acme Manufacturing — 3 days waiting — SLA breach in 2 days</span></span>
+<span class="line"><span>  2. SUB-2398502 — Bayside Logistics — 2 days waiting — returned for information</span></span>
+<span class="line"><span>  ...</span></span></code></pre>
+<p><strong><code>show-policies-for-this-insured</code></strong> — the account-context query. Takes an insured name or account number and returns the active policy book, including effective dates, premium, lines of business, and producer of record. Resolves the account first (with a fuzzy match that surfaces ambiguity rather than guessing), then pulls the policy list.</p>
+<p><strong><code>summarize-this-submission</code></strong> — the deep-dive query. Takes a submission number and returns a structured summary that an underwriter would want before opening the full submission UI: insured, broker, lines of business requested, current quote (if any), open underwriting questions, attachments, and the latest activity entry. The summary structure is pinned to the underwriter’s mental model of “what do I need to decide about this submission?” not to the Cloud API’s resource hierarchy.</p>
+<p><strong><code>did-we-lose-this-account</code></strong> — the loss-context query. Takes an account number or insured name and returns whether any of the account’s submissions ended in <code>Not Taken</code> or <code>Declined</code> over the last N days, with the recorded reason. This is the kind of query that takes three or four Cloud API calls to assemble and that an underwriter asks several times a week — perfect candidate for a single tool.</p>
+<p><strong><code>pull-this-submission</code></strong> — the deep-fetch query. The escape hatch when the structured summary is not enough. Returns the full submission payload as the Cloud API renders it, with no flattening or vocabulary mapping. Useful for the rare case where the operator needs to see something the structured tools don’t surface.</p>
+<p>The five tools cover roughly 70% of the read-side queries enumerated in the PRD’s user-journey section. The remaining 30% — the long-tail queries that BillingCenter and ClaimCenter operators run, plus the more specialized PolicyCenter queries around portfolio analysis and producer performance — are the E2.5 and E3 work. Five tools is enough to make the runtime useful for a real PolicyCenter operator from day one; it is not enough to be a complete operator workbench, and the README says so.</p>
+<h2 id="the-harness-pattern-plan--policy--approval--execute--audit--rollback">The harness pattern: plan → policy → approval → execute → audit → rollback</h2>
+<p>Read-only tools are the easy part. The interesting design question is what happens when v0.2.0 starts adding write tools that can issue a quote, bind a policy, or post a payment. The harness pattern — scaffolded in <a href="https://github.com/jeremylongshore/guidewire-mcp-for-claude/pull/80">#80</a> — is the answer.</p>
+<p>Every write call passes through six stages:</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Stage</th><th>What it does</th><th>Failure mode</th></tr></thead><tbody><tr><td><strong>plan</strong></td><td>Tool produces a structured proposal of the intended change. No mutation yet.</td><td>Plan rejected → no write, no audit row needed.</td></tr><tr><td><strong>policy</strong></td><td>Policy engine evaluates the plan against tenant rules (role, dollar threshold, business hours, blackout dates).</td><td>Policy denial → no write, audit row records the denial.</td></tr><tr><td><strong>approval</strong></td><td>If policy requires human approval, the request is queued and the tool returns. Approval can come from another Claude Code session, a UI, or a Slack/email channel.</td><td>Timeout or denial → audit row records outcome, no write.</td></tr><tr><td><strong>execute</strong></td><td>Cloud API call with two-key idempotency. The plan’s structure constrains what the executor is allowed to do — no off-plan side effects.</td><td>Cloud API error → audit row records full request/response, executor returns structured error.</td></tr><tr><td><strong>audit</strong></td><td>Append a hash-chained row to Postgres covering the actor, plan, policy decision, approval (if any), and the execute result.</td><td>Audit insert failure → <strong>the entire write is rolled back</strong>. No audit row, no completed write.</td></tr><tr><td><strong>rollback hint</strong></td><td>Tool returns a structured rollback descriptor the operator can later use to undo the change if something downstream goes wrong.</td><td>Tool may decline to provide a rollback (e.g., for irreversibly-bound policies) — the hint is then “manual reversal required” with full context.</td></tr></tbody></table>
+<p>The hard rule from D-006 is the load-bearing one: <strong>no audit, no write</strong>. If the audit insert fails, the executor’s state-change must not survive. In practice that means the executor wraps the Cloud API call and the audit insert in a coordination boundary — for non-transactional Cloud API endpoints, the rollback step has to fire to undo the executed change before reporting failure. The alternative — let writes happen with no audit row — would mean a tenant could accumulate state changes that have no provenance, which destroys the entire trust model.</p>
+<p>Why is this pattern in v0.1.0 even though there are no write tools yet? Because the harness library has to exist, with its public API stable, before any write tool can be built. The scaffold landed in #80 as a deliberate pre-commitment. When the first write tool gets written, the harness contract is already there — the tool author cannot accidentally ship a tool that bypasses any stage, because the runtime’s tool-registration API for write tools requires a plan/policy/audit hook set.</p>
+<p>Karate adopted in <a href="https://github.com/jeremylongshore/guidewire-mcp-for-claude/pull/79">#79</a> covers the contract layer for the Cloud API client. Karate scenarios pin the request/response shapes of the underlying Cloud API endpoints, so that a Guidewire-side schema drift surfaces as a contract test failure rather than a runtime error in production. The contract layer is scaffolded but not yet exercised against a real tenant — that’s E3+ work.</p>
+<h2 id="observability-wired-in-defaulted-off">Observability wired in, defaulted off</h2>
+<p>D-013 is one of the smaller-looking decisions in the architecture document and one of the most consequential in practice: observability is wired in from day 1, not bolted on. The <code>@gw/observability</code> package provides OpenTelemetry trace context, pino structured logs, and a Sentry error sink — and every tool call, every Cloud API request, every audit insert flows through those instruments by default.</p>
+<p>The “defaulted off” half of the decision matters as much as the “wired in” half. The runtime ships with no OTel collector endpoint, no Sentry DSN, and pino’s transport set to a local file. The instruments are alive but they are silent until the operator points them somewhere. A prospect cloning the repo and running it locally does not need to decide on an observability stack to make the runtime work — and the runtime is not phoning home through some default-on telemetry channel that would compromise the local-first trust story.</p>
+<p>When the operator is ready, the standard OTel and Sentry environment variables turn the instruments on:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#F97583">export</span><span style="color:#E1E4E8"> OTEL_EXPORTER_OTLP_ENDPOINT</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">"https://your-collector:4318"</span></span>
+<span class="line"><span style="color:#F97583">export</span><span style="color:#E1E4E8"> SENTRY_DSN</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">"https://your-sentry-key@sentry.io/your-project"</span></span></code></pre>
+<p>Bolting observability on later is the path the design avoided. A package that has no trace context at the boundaries cannot retroactively gain it without rewriting every call site. A package that does not log structured fields cannot retroactively gain them without changing every log line. Wiring observability through <code>@gw/observability</code> from the first commit means every package built on top of it inherits the same boundary instrumentation, with no per-package work.</p>
+<p>The audit and observability layers are deliberately separate. The audit log is the legally-relevant record of what happened, lives in the customer’s Postgres, and has a hash chain. The observability stack is the operational record of how things are running, lives wherever the operator points OTel and Sentry, and has no integrity guarantees. Conflating the two — using Sentry as the audit trail, for example — would be a category error: Sentry is for the operator running the system, not for the compliance team auditing it.</p>
+<h2 id="why-local-first-changes-the-oss-calculus">Why local-first changes the OSS calculus</h2>
+<p>The trust model decision in <code>03-ARCHITECTURE.md</code> is short and consequential: the runtime is local-first and customer-hosted. There is no “Intent Solutions cloud” zone in the architecture. The OSS repo does not phone home. The audit database is in the customer’s own Postgres. The tenant credentials live in the customer’s own secret store. When a Claude Code session uses the MCP server, the only network traffic is between the session, the local MCP runtime, and the customer’s own Guidewire tenant.</p>
+<p>That decision changes what the OSS repo <em>does</em> in a sales motion. A vendor-hosted integration product would need a security-review cycle, a SOC 2 review, a legal review of the data-processing agreement, and a procurement cycle before any prospect could even try it. A local-first OSS repo collapses that to “clone the repo, point it at your sandbox tenant, run a tool against your own data.” The credibility artifact is not a slide deck — it is the artifact itself, on the prospect’s own machine, talking to their own tenant, with a public architecture diagram explaining exactly what it is and is not doing.</p>
+<p>D-009 and D-010 in the architecture doc make this explicit: the OSS repo is not a complete product. It is a credibility artifact and a lead magnet for custom build engagements. The full carrier-specific build — the 39-tool catalog from the PRD, the harness wired to real writes, the on-disk profiles validated against a specific tenant’s role model — is the engagement. The OSS repo is what convinces the prospect the engagement is worth scoping.</p>
+<p>This is also why the JWT-propagated actor identity decision matters. Every tool call carries the operator’s JWT, and the audit row records <em>who</em> asked. There is no shared service-account key whose audit trail collapses every action into “the integration did it.” When a carrier’s compliance team asks “who pulled this submission?”, the answer is the actual human, not “the MCP server.” That property is non-negotiable for any regulated insurance workload, and it had to be wired through <code>@gw/auth</code> from day 1 — adding it later would have required reworking every tool call’s signature.</p>
+<p>The two-key idempotency in <code>@gw/client-sdk</code> is a quieter but related decision. The client generates a deterministic request key from the tool call’s plan (or, for read calls, from the canonicalized query parameters) and passes it both as a client-tracked dedup key and as the Cloud API’s native idempotency header. If the same request retries — because the operator’s session was interrupted, because the network blipped, because the harness’s executor stage retried after a transient failure — the Cloud API recognizes the duplicate and returns the original response rather than executing the call twice. That property matters enormously for any future write tool: a retry that succeeds twice could double-bind a policy or double-post a payment. Wiring two-key idempotency into the SDK at v0.1.0, when there are no writes, is what makes write tools safe to add at v0.2.0 without a per-tool retry-safety review.</p>
+<h2 id="the-parallel-sister-pack-rebuild">The parallel sister-pack rebuild</h2>
+<p>A second thread ran in parallel the same day in <a href="https://github.com/jeremylongshore/claude-code-plugins-plus-skills"><code>claude-code-plugins-plus-skills</code></a>: twelve commits rebuilt the <code>guidewire</code> skill pack to A-grade across every skill in the marketplace, prepared for the v4.30.0 release.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Skill</th><th>PR</th><th>What changed</th></tr></thead><tbody><tr><td><code>install-auth</code></td><td><a href="https://github.com/jeremylongshore/claude-code-plugins-plus-skills/pull/668">#668</a></td><td>Production-grade Hub OAuth + tenant connection.</td></tr><tr><td><code>sdk-patterns</code></td><td><a href="https://github.com/jeremylongshore/claude-code-plugins-plus-skills/pull/669">#669</a></td><td>Cloud API client patterns lifted to A-grade.</td></tr><tr><td><code>local-dev-loop</code></td><td><a href="https://github.com/jeremylongshore/claude-code-plugins-plus-skills/pull/670">#670</a></td><td>Fast Gosu iteration loop for tenant-side rule changes.</td></tr><tr><td><code>core-workflow-a</code></td><td><a href="https://github.com/jeremylongshore/claude-code-plugins-plus-skills/pull/671">#671</a></td><td>PolicyCenter end-to-end workflow.</td></tr><tr><td><code>core-workflow-b</code></td><td><a href="https://github.com/jeremylongshore/claude-code-plugins-plus-skills/pull/672">#672</a></td><td>ClaimCenter end-to-end workflow.</td></tr><tr><td><code>security-and-rbac</code></td><td><a href="https://github.com/jeremylongshore/claude-code-plugins-plus-skills/pull/673">#673</a></td><td>Merge of <code>security-basics</code> + <code>enterprise-rbac</code> — single source for RBAC patterns.</td></tr><tr><td><code>observability-and-incident-response</code></td><td><a href="https://github.com/jeremylongshore/claude-code-plugins-plus-skills/pull/674">#674</a></td><td>Merge of three observability skills into one.</td></tr><tr><td><code>ci-cd-pipeline</code></td><td><a href="https://github.com/jeremylongshore/claude-code-plugins-plus-skills/pull/675">#675</a></td><td>Merge of four CI/CD skills into a single coherent pipeline.</td></tr><tr><td><code>webhooks-integrations</code></td><td><a href="https://github.com/jeremylongshore/claude-code-plugins-plus-skills/pull/676">#676</a></td><td>Renamed and deepened — covers the actual Guidewire webhook event shapes.</td></tr><tr><td><code>migration-and-upgrade</code></td><td><a href="https://github.com/jeremylongshore/claude-code-plugins-plus-skills/pull/677">#677</a></td><td>Merge of two migration skills.</td></tr><tr><td>Pack v2.0.0 cleanup</td><td><a href="https://github.com/jeremylongshore/claude-code-plugins-plus-skills/pull/678">#678</a></td><td>Pack-level metadata, version bump, README sync.</td></tr><tr><td><code>chore(release): prepare v4.30.0</code></td><td><code>3a2d27d63</code></td><td>Marketplace release prep.</td></tr></tbody></table>
+<p>The two repos compose. The MCP server (<code>guidewire-mcp-for-claude</code>) is the runtime — the thing that talks to a tenant. The skill pack (<code>guidewire</code> in the marketplace) is the body of operator know-how — patterns for how to use the runtime, how to debug Guidewire integrations, how to set up CI/CD around a Cloud API project, how to think about RBAC on top of carrier identity. Installing both gives a Claude Code session the runtime <em>and</em> the operator playbook in one go. Neither one is sufficient on its own; together they’re the carrier integrator’s working environment.</p>
+<p>The same-day timing matters. If the MCP server had shipped without the skill-pack rebuild, an operator installing the runtime would still have been operating against the previous pack’s lower-grade material. Pulling both threads on the same clock means the v0.1.0 announcement carries both artifacts at once.</p>
+<h2 id="what-didnt-ship--the-limits-of-v010">What didn’t ship — the limits of v0.1.0</h2>
+<p>Honest scoping. v0.1.0 is not the full product. The cut is deliberately a foundation, and it stops at well-defined boundaries:</p>
+<ul>
+<li><strong>All five tools are read-only.</strong> No writes in v0.1.0. The harness scaffold exists; no tool uses it yet.</li>
+<li><strong>The Karate contract layer is scaffolded, not exercised.</strong> A real run against a sandbox tenant is E2.5 work.</li>
+<li><strong>The <code>--profile &#x3C;path></code> loader is scaffolded, not validated against a real tenant.</strong> The YAML schema is defined; the integration test that loads a profile and uses it to talk to a live sandbox is E4 follow-up.</li>
+<li><strong>The PRD’s full 39-tool catalog is mostly future work.</strong> Five tools is enough to make the runtime useful for the most common PolicyCenter operator queries; it is not enough to be a complete underwriting workbench.</li>
+<li><strong>BillingCenter and ClaimCenter tools are not in v0.1.0.</strong> PolicyCenter only. The other centers have schema scaffolding in <code>@gw/schemas</code> but no live tools yet.</li>
+<li><strong>The audit hash-chain is not yet wired to an external anchor (e.g., periodic notarization).</strong> Tampering is detectable within the chain, but the chain’s tip is not yet anchored anywhere external. That’s a v0.3.0+ concern.</li>
+<li><strong>No formal carrier reference deployment yet.</strong> The runtime has been exercised against synthetic tenants and the public Guidewire developer sandbox shapes; a real carrier production deployment would require its own engagement.</li>
+</ul>
+<p>These limits are stated in the README and in <code>07-ROADMAP.md</code>. A prospect reading the repo gets an accurate picture of where the line is between “shipped and usable” and “promised in the roadmap.”</p>
+<h2 id="read-only-first-the-alternatives-that-lost">Read-only first: the alternatives that lost</h2>
+<p>A reasonable critique of v0.1.0 is “five read-only tools is not very impressive — write tools are the real value.” The critique is fair on its face and wrong on the substance. Read-only first was a deliberate choice over two alternatives, both of which would have produced a more impressive-looking v0.1.0 and a less defensible one.</p>
+<p><strong>Alternative 1: ship one or two write tools to demonstrate the harness.</strong> A v0.1.0 that includes <code>bind-this-quote</code> or <code>post-this-payment</code> would have been a louder announcement. It would also have required exercising the harness’s policy stage, approval stage, and rollback stage against a real tenant — none of which the day’s clock allowed. Shipping write tools without the harness fully exercised would have meant shipping write tools whose safety story was an unverified assertion. The credibility cost of that — particularly in a regulated insurance context — would have outweighed the announcement value.</p>
+<p><strong>Alternative 2: ship the full PRD’s 39-tool catalog as read-only stubs.</strong> A v0.1.0 with 39 tools registered, even if most were unimplemented, would have looked like more progress on the catalog. It would also have meant shipping a surface that an operator could call and get back a “not yet implemented” error from. That is the kind of artifact that erodes trust: the prospect tries the tool that matters most to them, gets a stub error, and concludes the product is not real. Five tools that all work end-to-end against a real PolicyCenter shape are a stronger artifact than 39 tools where 34 are scaffolds.</p>
+<p>The lesson generalizes: when shipping an enterprise integration on a one-day clock, the shape of the cut matters more than the surface area. A small, tight, fully working surface is a credibility artifact. A large, partial, mostly-stubbed surface is a credibility liability. Five working PolicyCenter tools is the right v0.1.0 cut for both.</p>
+<h2 id="tests-as-a-precondition-not-a-follow-up">Tests as a precondition, not a follow-up</h2>
+<p>Fifty-four tests pass across the foundation packages in v0.1.0. That number is not a vanity metric — it is the gating condition for letting six packages ship together. Each foundation package has its own test suite covering its public surface in isolation, plus a small set of integration tests that exercise the contract between packages (e.g., that <code>@gw/mcp-runtime</code> correctly threads a JWT from <code>@gw/auth</code> into a tool call, that <code>@gw/audit</code>’s hash chain survives a write under load, that <code>@gw/client-sdk</code>’s idempotency keys are deterministic across retries).</p>
+<p>The discipline that mattered: no foundation package was allowed to merge without its own README, its own tests, and its own CI green. A package that ships without tests becomes a package that other packages have to defensively wrap, which destroys the composition story. Holding the line at the package level — every package independently green — is what kept the parallel construction from collapsing into a tangled coupled mess at the end of the day.</p>
+<p>The Karate contract layer is the next rung up. Once it is exercised against a real sandbox tenant, a Cloud API schema drift will surface as a contract test failure during CI rather than as a production runtime error against a customer’s tenant. That gap between “shipped contract layer” and “exercised contract layer” is named explicitly in the roadmap so an operator reading the repo knows what coverage they actually have.</p>
+<h2 id="the-audit-register-closed-the-same-day">The audit register closed the same day</h2>
+<p>The audit follow-ups from the GW-1.9 register all closed the same day across four themes:</p>
+<ul>
+<li><a href="https://github.com/jeremylongshore/guidewire-mcp-for-claude/pull/74">#74</a>: manifest schema cluster — tightened the plugin manifest schema and resolved drift between declared and actual capabilities.</li>
+<li><a href="https://github.com/jeremylongshore/guidewire-mcp-for-claude/pull/78">#78</a>: audit-DB role separation — the role that writes audit rows has insert-only privilege, separate from the role that reads them.</li>
+<li><a href="https://github.com/jeremylongshore/guidewire-mcp-for-claude/pull/73">#73</a>: doc-set hygiene — cross-reference fixes and stale-link cleanup across the blueprint set.</li>
+<li><a href="https://github.com/jeremylongshore/guidewire-mcp-for-claude/pull/81">#81</a>: final theme — closed the rest of the GW-1.9 register.</li>
+</ul>
+<p>A separate librarian-audit fix landed in <a href="https://github.com/jeremylongshore/guidewire-mcp-for-claude/pull/44">#44</a>: D-016, a rename-lag patch applied across the PRD and memos so that a terminology rename done mid-day did not leave a half-renamed surface for later readers to trip on. The whole GW-1.9 register went to zero open items by end of day.</p>
+<p>The librarian KB itself deserves a moment. The five memos — <code>005-DR-REF-guidewire-public-resources</code> (the catalog of public Guidewire reference material worth pinning), <code>006-DR-MEMO-mcp-safety</code> (the safety patterns that informed the harness), <code>007-DR-MEMO-carrier-vocabulary</code> (the vocabulary mapping that became D-001), <code>008-DR-MEMO-guidewire-api</code> (the Cloud API surface analysis that informed the SDK), and <code>009-DR-MEMO-harness-runtime</code> (the harness runtime design that became E3) — are reachable both through the blueprint’s narrative reading order and through the librarian’s topic-keyed index. That dual access matters because the blueprint is the right entry point for a new contributor reading the architecture top-down, and the librarian KB is the right entry point for a contributor who needs to re-find a specific decision later. Same content, two indexes, no duplication.</p>
+<p>Closing the audit register the same day the cut shipped matters because an audit register left open is a known-bad signal to anyone reading the repo as a credibility artifact. A v0.1.0 with zero open audit items is a different artifact from a v0.1.0 with a backlog of “we’ll fix this later” items. The operator reading the repo can take it at face value.</p>
+<h2 id="the-implication-for-shipping-enterprise-integrations">The implication for shipping enterprise integrations</h2>
+<p>The composability of the v0.1.0 cut is the point. The architecture decisions, the package boundaries, the harness pattern, the audit semantics, the JWT propagation — none of these were retrofitted. Each one was a written commitment in the blueprint before any package code merged, which is what made the parallel construction tractable.</p>
+<p>For anyone trying to ship enterprise integrations on a similar clock, the pattern that travels:</p>
+<ol>
+<li><strong>Write the architecture as a committed artifact before writing the packages.</strong> Decisions like “actor identity propagates through every call” or “audit failure rolls back the write” cannot be retrofitted without reworking every tool. Pre-commit them in writing.</li>
+<li><strong>Make the design doc the contract between packages.</strong> Six packages cannot be built in parallel unless the contract between them is locked into a document everyone can read. The blueprint isn’t a deliverable; it’s the substrate.</li>
+<li><strong>Scaffold the safety pattern even when you have no writes yet.</strong> A harness library that exists in v0.1.0 with zero callers is a hard constraint on every future write tool. A harness library that doesn’t exist is a constraint on nothing.</li>
+<li><strong>Local-first changes the sales motion.</strong> A repo that runs entirely on the prospect’s own infrastructure collapses the procurement cycle. The architecture decision and the go-to-market motion are the same decision.</li>
+<li><strong>Compose runtime and operator know-how on the same release clock.</strong> The MCP server and the skill pack are the same product viewed from two angles. Shipping one without the other ships half a product.</li>
+<li><strong>Pick the cut shape that earns trust, not the cut shape that maximizes surface.</strong> Five working tools beat thirty-nine stubs. A foundation that holds beats a feature that breaks. The shape of the v0.1.0 cut is the prospect’s first impression of what the product <em>is</em> — make that impression accurate.</li>
+<li><strong>Close the audit register the same day.</strong> A v0.1.0 with a backlog of “we’ll fix this later” items is a different artifact from a v0.1.0 with zero open items. Operators reading the repo as a credibility artifact can take the second one at face value and have to discount the first.</li>
+</ol>
+<p>The v0.1.0 cut is foundation work — by design. The real test is whether the foundation holds when v0.2.0 starts wiring real writes through the harness and the first carrier-side engagement starts pressure-testing the on-disk profile loader against a live tenant role model. Three things are likely to surface:</p>
+<ul>
+<li><strong>Policy expressiveness.</strong> The harness’s policy stage will need to express tenant rules that don’t reduce to “role + dollar threshold.” Real carrier rules involve combinations of underwriting authority, line of business, geographic restrictions, treaty constraints, and time-of-day. The policy language has to be expressive enough to encode those without becoming a Turing-complete DSL nobody can review.</li>
+<li><strong>Profile schema durability.</strong> The <code>--profile</code> YAML schema is opinionated about how tenant connection details, role mappings, and per-tool overrides are structured. The first real tenant may push on that schema in ways the synthetic test fixtures didn’t predict. Schema versioning is in place; schema migration is not yet rehearsed against a live profile.</li>
+<li><strong>Audit-row volume.</strong> The hash-chain audit table works fine at low volume. At a real carrier’s submission flow rate, the chain’s tip-anchor question becomes pressing, and the read query patterns for the compliance team’s audit access surface real index requirements. Both are anticipated in the roadmap; neither is exercised yet.</li>
+</ul>
+<p>Each of those is a known unknown that the v0.1.0 foundation was deliberately built to allow room for. None of them require rewriting the package boundaries. That property — extensibility at the seams that matter — is the test of whether the architecture decisions held up. The next post in this arc covers that test when it happens.</p>
+<p>The carrier-native vocabulary discipline, the harness pattern, the local-first trust model, the audit-as-precondition rule — none of these are novel in isolation. The composition is what’s load-bearing. v0.1.0 ships with all of them already wired together because the blueprint forced the wiring decisions to land before the code did. Anyone reaching for the same shape on a similar clock will benefit from doing the blueprint work first, even when the instinct is to skip it and start coding.</p>
+<p>The repo is at <a href="https://github.com/jeremylongshore/guidewire-mcp-for-claude">github.com/jeremylongshore/guidewire-mcp-for-claude</a>. The architecture diagram is at <a href="https://guidewire-mcp.intentsolutions.io/">guidewire-mcp.intentsolutions.io</a>. Plugin install is <code>/plugin install jeremylongshore/guidewire-mcp-for-claude</code> from any Claude Code session. Sandbox tenant credentials are required to exercise the tools end-to-end; the README documents the four environment variables and points to the Guidewire developer portal for sandbox provisioning.</p>
+<p>Issue tracker, blueprint set, and roadmap are all in the repo. The next cut is E2.5 (BillingCenter and ClaimCenter read tools) plus the first harness-wired write tool, on a clock that is yet to be named.</p>
+<h2 id="related-posts">Related Posts</h2>
+<ul>
+<li><a href="https://startaitools.com/posts/claude-code-plugin-marketplace-launch/">Claude Code Plugin Marketplace Launch</a> — the marketplace this plugin and its sister-pack ship through</li>
+<li><a href="/blog/building-production-ready-research-tool-outperforms-anthropic/">Building a Production-Ready Research Tool That Outperforms Anthropic’s</a> — another MCP-fronted system, different domain</li>
+<li><a href="https://startaitools.com/irsb-ecosystem/">IRSB Ecosystem</a> — companion ecosystem hub for the broader Intent Solutions integration story</li>
+</ul>
+      </div>
+    </div>
+  </article>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

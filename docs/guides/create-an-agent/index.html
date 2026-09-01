@@ -1,0 +1,1069 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How to Create a Claude Code Agent | Docs</title>
+    <meta name="description" content="Guide to creating autonomous Claude Code agents. Learn the difference between agents and skills, write agent frontmatter with capabilities and disallowedTools, set maxTurns and effort, and test agent behavior.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://tonsofskills.com/tons-of-skills-marketplace/docs/guides/create-an-agent/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/docs/guides/create-an-agent/">
+    <meta property="og:title" content="How to Create a Claude Code Agent | Docs">
+    <meta property="og:description" content="Guide to creating autonomous Claude Code agents. Learn the difference between agents and skills, write agent frontmatter with capabilities and disallowedTools, set maxTurns and effort, and test agent behavior.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="How to Create a Claude Code Agent | Docs">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/docs/guides/create-an-agent/">
+    <meta name="twitter:title" content="How to Create a Claude Code Agent | Docs">
+    <meta name="twitter:description" content="Guide to creating autonomous Claude Code agents. Learn the difference between agents and skills, write agent frontmatter with capabilities and disallowedTools, set maxTurns and effort, and test agent behavior.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"How to Create a Claude Code Agent","description":"Guide to creating autonomous Claude Code agents. Learn the difference between agents and skills, write agent frontmatter with capabilities and disallowedTools, set maxTurns and effort, and test agent behavior.","author":{"@type":"Organization","name":"Intent Solutions","url":"https://intentsolutions.io"},"publisher":{"@type":"Organization","name":"Tons of Skills","url":"https://tonsofskills.com"},"url":"https://tonsofskills.com/docs/guides/create-an-agent","keywords":"agent, autonomous agent, disallowedTools, maxTurns, capabilities, sub-agent, Claude Code agent, agent development","mainEntityOfPage":{"@type":"WebPage","@id":"https://tonsofskills.com/docs/guides/create-an-agent"}}</script>
+  
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/_..B9N6JsV8.css"></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  <div class="docs-page" data-astro-cid-ya4srytn>
+    <div class="docs-container" data-astro-cid-ya4srytn>
+      <aside class="docs-sidebar" id="docs-sidebar" data-astro-cid-qrwn6rcr>
+  <div class="sidebar-sticky" data-astro-cid-qrwn6rcr>
+    <a href="/docs" class="sidebar-home" data-astro-cid-qrwn6rcr>Documentation</a>
+    <nav class="sidebar-nav" data-astro-cid-qrwn6rcr>
+      <div class="sidebar-section" data-astro-cid-qrwn6rcr>
+          <h3 class="sidebar-section-title" data-astro-cid-qrwn6rcr>Getting Started</h3>
+          <ul class="sidebar-list" data-astro-cid-qrwn6rcr>
+            <li data-astro-cid-qrwn6rcr>
+                <a href="/docs/getting-started/installation" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Install Claude Code Plugins
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/getting-started/first-plugin" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Install Your First Plugin
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/getting-started/first-skill" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Your First Agent Skill
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/getting-started/cli-reference" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  ccpi CLI Quick Reference
+                </a>
+              </li>
+          </ul>
+        </div><div class="sidebar-section" data-astro-cid-qrwn6rcr>
+          <h3 class="sidebar-section-title" data-astro-cid-qrwn6rcr>Concepts</h3>
+          <ul class="sidebar-list" data-astro-cid-qrwn6rcr>
+            <li data-astro-cid-qrwn6rcr>
+                <a href="/docs/concepts/plugins" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  What Are Claude Code Plugins?
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/concepts/skills" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Understanding Agent Skills (SKILL.md)
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/concepts/agents" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Claude Code Agents and Subagents
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/concepts/commands-and-hooks" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Slash Commands and Hooks
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/concepts/mcp-servers" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  MCP Servers in Claude Code Plugins
+                </a>
+              </li>
+          </ul>
+        </div><div class="sidebar-section" data-astro-cid-qrwn6rcr>
+          <h3 class="sidebar-section-title" data-astro-cid-qrwn6rcr>Guides</h3>
+          <ul class="sidebar-list" data-astro-cid-qrwn6rcr>
+            <li data-astro-cid-qrwn6rcr>
+                <a href="/docs/guides/write-a-skill" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  How to Write a Claude Code Skill
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/guides/build-a-plugin" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  How to Build a Claude Code Plugin
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/guides/create-an-agent" class="sidebar-link active" data-astro-cid-qrwn6rcr>
+                  How to Create a Claude Code Agent
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/guides/saas-skill-packs" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  SaaS Skill Packs: Platform Integrations
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/guides/mcp-server-plugin" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Building an MCP Server Plugin
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/guides/publish-to-marketplace" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Publish a Plugin to the Marketplace
+                </a>
+              </li>
+          </ul>
+        </div><div class="sidebar-section" data-astro-cid-qrwn6rcr>
+          <h3 class="sidebar-section-title" data-astro-cid-qrwn6rcr>Reference</h3>
+          <ul class="sidebar-list" data-astro-cid-qrwn6rcr>
+            <li data-astro-cid-qrwn6rcr>
+                <a href="/docs/reference/skill-frontmatter" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  SKILL.md Frontmatter Reference
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/reference/plugin-json-schema" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  plugin.json Schema Reference
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/reference/plugin-categories" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Plugin Categories and Tags
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/reference/allowed-tools" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Allowed Tools Reference
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/reference/cli-commands" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  ccpi CLI Command Reference
+                </a>
+              </li>
+          </ul>
+        </div><div class="sidebar-section" data-astro-cid-qrwn6rcr>
+          <h3 class="sidebar-section-title" data-astro-cid-qrwn6rcr>Ecosystem</h3>
+          <ul class="sidebar-list" data-astro-cid-qrwn6rcr>
+            <li data-astro-cid-qrwn6rcr>
+                <a href="/docs/ecosystem/marketplace-overview" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Tons of Skills Marketplace Guide
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/ecosystem/official-anthropic-docs" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Official Anthropic Documentation Links
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/ecosystem/community-resources" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Claude Code Community and Resources
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/ecosystem/faq" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Claude Code Plugins FAQ
+                </a>
+              </li>
+          </ul>
+        </div>
+    </nav>
+  </div>
+</aside>
+
+      <div class="docs-main" data-astro-cid-ya4srytn>
+        <!-- Breadcrumbs -->
+        <nav class="docs-breadcrumbs" aria-label="Breadcrumb" data-astro-cid-ya4srytn>
+          <a href="/" data-astro-cid-ya4srytn>Home</a>
+          <span class="sep" data-astro-cid-ya4srytn>/</span>
+          <a href="/docs" data-astro-cid-ya4srytn>Docs</a>
+          <span class="sep" data-astro-cid-ya4srytn>/</span>
+          <a href="/docs#guides" data-astro-cid-ya4srytn>Guides</a>
+          <span class="sep" data-astro-cid-ya4srytn>/</span>
+          <span class="current" data-astro-cid-ya4srytn>How to Create a Claude Code Agent</span>
+        </nav>
+
+        <!-- Header -->
+        <header class="docs-header" data-astro-cid-ya4srytn>
+          <h1 class="docs-title" data-astro-cid-ya4srytn>How to Create a Claude Code Agent</h1>
+          <p class="docs-description" data-astro-cid-ya4srytn>Guide to creating autonomous Claude Code agents. Learn the difference between agents and skills, write agent frontmatter with capabilities and disallowedTools, set maxTurns and effort, and test agent behavior.</p>
+        </header>
+
+        <!-- Content -->
+        <article class="docs-content" id="docs-content" data-astro-cid-ya4srytn>
+          
+  <h2 id="agents-vs-skills-vs-commands">Agents vs. Skills vs. Commands</h2>
+<p>Before building an agent, understand when each component type is appropriate:</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Component</th><th>Invocation</th><th>Tool Control</th><th>Autonomy</th></tr></thead><tbody><tr><td><strong>Command</strong></td><td>User types <code>/command-name</code></td><td>Inherits session tools</td><td>Single response</td></tr><tr><td><strong>Skill</strong></td><td>Auto-activates on context</td><td>Allowlist (<code>allowed-tools</code>)</td><td>Single response</td></tr><tr><td><strong>Agent</strong></td><td>Called as sub-agent</td><td>Denylist (<code>disallowedTools</code>)</td><td>Multi-turn loop up to <code>maxTurns</code></td></tr></tbody></table>
+<p><strong>Use an agent when:</strong></p>
+<ul>
+<li>The task requires multiple autonomous iterations (explore, analyze, fix, verify)</li>
+<li>The agent needs broad tool access with only a few restrictions</li>
+<li>The workflow benefits from independent reasoning without user prompts at each step</li>
+<li>The task is a distinct specialty area (security scanning, performance profiling, code review)</li>
+</ul>
+<p><strong>Use a skill instead when:</strong></p>
+<ul>
+<li>The task completes in a single pass</li>
+<li>You want tight control over which tools are available (allowlist)</li>
+<li>Auto-activation based on context is the desired trigger</li>
+</ul>
+<p><strong>Use a command instead when:</strong></p>
+<ul>
+<li>The user should explicitly invoke it from the slash menu</li>
+<li>The task is straightforward and does not require iteration</li>
+</ul>
+<h2 id="step-1-plan-your-agent">Step 1: Plan Your Agent</h2>
+<p>Agents are specialists. Each agent should own a specific domain and execute autonomously within it. Answer these questions during planning:</p>
+<ol>
+<li>
+<p><strong>What is the agent’s specialty?</strong> Define a clear domain: “security vulnerability scanning”, “database migration planning”, “API integration testing”.</p>
+</li>
+<li>
+<p><strong>What tools should be restricted?</strong> Agents use a denylist (<code>disallowedTools</code>). Think about which tools could cause harm if used without supervision. For a read-only auditing agent, deny <code>Write</code>, <code>Edit</code>, and <code>Bash</code>.</p>
+</li>
+<li>
+<p><strong>How many iterations are needed?</strong> A simple analysis agent might need 5 turns. A complex scanning agent that reads dozens of files and cross-references findings might need 20.</p>
+</li>
+<li>
+<p><strong>What expertise level is required?</strong> This affects how the agent presents itself and the depth of its analysis. Use <code>advanced</code> or <code>expert</code> for specialized technical domains.</p>
+</li>
+</ol>
+<h2 id="step-2-create-the-agent-file">Step 2: Create the Agent File</h2>
+<p>Agent files live in the <code>agents/</code> directory of a plugin:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>my-plugin/</span></span>
+<span class="line"><span>├── .claude-plugin/</span></span>
+<span class="line"><span>│   └── plugin.json</span></span>
+<span class="line"><span>├── agents/</span></span>
+<span class="line"><span>│   └── code-reviewer.md     # &#x3C;-- agent file</span></span>
+<span class="line"><span>└── README.md</span></span></code></pre>
+<p>Create the file:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">mkdir</span><span style="color:#79B8FF"> -p</span><span style="color:#9ECBFF"> my-plugin/agents</span></span>
+<span class="line"><span style="color:#B392F0">touch</span><span style="color:#9ECBFF"> my-plugin/agents/code-reviewer.md</span></span></code></pre>
+<p>The filename becomes the agent’s identifier. Use kebab-case: <code>code-reviewer.md</code>, <code>security-scanner.md</code>, <code>performance-profiler.md</code>.</p>
+<h2 id="step-3-write-agent-frontmatter">Step 3: Write Agent Frontmatter</h2>
+<p>The frontmatter block configures the agent’s identity, capabilities, and constraints. Here is a complete example:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#B392F0">---</span></span>
+<span class="line"><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">code-reviewer</span></span>
+<span class="line"><span style="color:#85E89D">description</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"Reviews code changes for quality, correctness, security, and adherence to project conventions"</span></span>
+<span class="line"><span style="color:#85E89D">capabilities</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">  - </span><span style="color:#9ECBFF">"Static code analysis and pattern detection"</span></span>
+<span class="line"><span style="color:#E1E4E8">  - </span><span style="color:#9ECBFF">"Security vulnerability identification"</span></span>
+<span class="line"><span style="color:#E1E4E8">  - </span><span style="color:#9ECBFF">"Performance anti-pattern detection"</span></span>
+<span class="line"><span style="color:#E1E4E8">  - </span><span style="color:#9ECBFF">"Style and convention compliance checking"</span></span>
+<span class="line"><span style="color:#E1E4E8">  - </span><span style="color:#9ECBFF">"Test coverage gap analysis"</span></span>
+<span class="line"><span style="color:#85E89D">model</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">sonnet</span></span>
+<span class="line"><span style="color:#85E89D">effort</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">high</span></span>
+<span class="line"><span style="color:#85E89D">maxTurns</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">20</span></span>
+<span class="line"><span style="color:#85E89D">expertise_level</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">expert</span></span>
+<span class="line"><span style="color:#85E89D">activation_priority</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">medium</span></span>
+<span class="line"><span style="color:#B392F0">---</span></span></code></pre>
+<h3 id="frontmatter-field-reference">Frontmatter Field Reference</h3>
+<h4 id="required-fields">Required Fields</h4>
+<p><strong><code>name</code></strong> — Unique identifier for the agent in kebab-case. Must match the filename (without <code>.md</code>).</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">code-reviewer</span></span></code></pre>
+<p><strong><code>description</code></strong> — A 20-200 character summary of what the agent does. This is displayed when listing available agents and used by Claude Code to decide when to delegate to the agent.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">description</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"Reviews code changes for quality, correctness, security, and adherence to project conventions"</span></span></code></pre>
+<h4 id="recommended-fields">Recommended Fields</h4>
+<p><strong><code>capabilities</code></strong> — An array of strings describing what the agent can do. Each capability should be a short phrase. These help Claude Code understand the agent’s strengths and help users know what to expect.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">capabilities</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">  - </span><span style="color:#9ECBFF">"Analyze git diffs for code quality issues"</span></span>
+<span class="line"><span style="color:#E1E4E8">  - </span><span style="color:#9ECBFF">"Detect security vulnerabilities in changed code"</span></span>
+<span class="line"><span style="color:#E1E4E8">  - </span><span style="color:#9ECBFF">"Check adherence to project linting rules"</span></span>
+<span class="line"><span style="color:#E1E4E8">  - </span><span style="color:#9ECBFF">"Suggest refactoring opportunities"</span></span></code></pre>
+<p><strong><code>model</code></strong> — Override the LLM model for this agent. Options: <code>sonnet</code>, <code>haiku</code>, <code>opus</code>. Use <code>haiku</code> for fast, simple tasks. Use <code>sonnet</code> for balanced performance. Use <code>opus</code> for complex reasoning tasks.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">model</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">sonnet</span></span></code></pre>
+<p><strong><code>maxTurns</code></strong> — Maximum number of agentic loop iterations. Each “turn” is one cycle of the agent’s think-act-observe loop. A code reviewer analyzing a 10-file PR might need 15-20 turns. A simple linter might need 5.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">maxTurns</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">20</span></span></code></pre>
+<p>If omitted, the system default applies. Set this explicitly to prevent runaway agents.</p>
+<p><strong><code>effort</code></strong> — Controls the model’s reasoning depth. Options: <code>low</code>, <code>medium</code>, <code>high</code>. Higher effort means more careful analysis but slower execution.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">effort</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">high</span></span></code></pre>
+<h4 id="optional-fields">Optional Fields</h4>
+<p><strong><code>disallowedTools</code></strong> — An array of tools the agent is forbidden from using. This is the opposite of skills’ <code>allowed-tools</code>. Agents get all tools by default, and you remove the dangerous ones.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">disallowedTools</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">  - </span><span style="color:#9ECBFF">"Write"</span></span>
+<span class="line"><span style="color:#E1E4E8">  - </span><span style="color:#9ECBFF">"Edit"</span></span>
+<span class="line"><span style="color:#E1E4E8">  - </span><span style="color:#9ECBFF">"Bash"</span></span></code></pre>
+<p>This example creates a read-only agent that can analyze code but cannot modify it.</p>
+<p>Common denylist patterns:</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Pattern</th><th>Use Case</th></tr></thead><tbody><tr><td><code>["Write", "Edit"]</code></td><td>Read-only analysis agent</td></tr><tr><td><code>["Bash"]</code></td><td>Agent that reads and writes files but cannot run commands</td></tr><tr><td><code>["WebFetch", "WebSearch"]</code></td><td>Agent restricted to local codebase</td></tr><tr><td><code>["mcp__servername"]</code></td><td>Deny access to a specific MCP server</td></tr></tbody></table>
+<p><strong><code>expertise_level</code></strong> — How specialized the agent is. Options: <code>intermediate</code>, <code>advanced</code>, <code>expert</code>. This affects the agent’s self-presentation and the depth of its analysis.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">expertise_level</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">expert</span></span></code></pre>
+<p><strong><code>activation_priority</code></strong> — How eagerly Claude Code should delegate to this agent. Options: <code>low</code>, <code>medium</code>, <code>high</code>, <code>critical</code>. A <code>critical</code> agent is invoked whenever its domain is detected. A <code>low</code> agent is only invoked when explicitly requested.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">activation_priority</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">medium</span></span></code></pre>
+<p><strong><code>permissionMode</code></strong> — Controls whether the agent asks for user permission before taking actions. Set to <code>default</code> for standard behavior.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">permissionMode</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">default</span></span></code></pre>
+<h2 id="step-4-write-agent-instructions">Step 4: Write Agent Instructions</h2>
+<p>The body of the agent file is Markdown that defines the agent’s personality, expertise, and operating procedures. This is where you shape how the agent thinks and acts.</p>
+<h3 id="structure-your-instructions">Structure Your Instructions</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="markdown"><code><span class="line"><span style="color:#79B8FF;font-weight:bold"># Agent Name</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">You are a [role description] specializing in [</span><span style="color:#DBEDFF;text-decoration:underline">domain</span><span style="color:#E1E4E8">]. Your purpose</span></span>
+<span class="line"><span style="color:#E1E4E8">is to [primary objective].</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79B8FF;font-weight:bold">## Your Expertise</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">Describe the agent's knowledge areas in detail. Be specific about</span></span>
+<span class="line"><span style="color:#E1E4E8">frameworks, tools, and methodologies the agent should know.</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79B8FF;font-weight:bold">## Process</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">Define the agent's workflow as numbered steps:</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FFAB70">1.</span><span style="color:#E1E4E8"> Gather context (read relevant files, check git status)</span></span>
+<span class="line"><span style="color:#FFAB70">2.</span><span style="color:#E1E4E8"> Analyze (apply expertise to the gathered data)</span></span>
+<span class="line"><span style="color:#FFAB70">3.</span><span style="color:#E1E4E8"> Synthesize (draw conclusions, identify patterns)</span></span>
+<span class="line"><span style="color:#FFAB70">4.</span><span style="color:#E1E4E8"> Report (present findings in structured format)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79B8FF;font-weight:bold">## Output Format</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">Define exactly how the agent should present results.</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79B8FF;font-weight:bold">## Constraints</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FFAB70">-</span><span style="color:#E1E4E8"> What the agent should NOT do</span></span>
+<span class="line"><span style="color:#FFAB70">-</span><span style="color:#E1E4E8"> Boundaries on scope</span></span>
+<span class="line"><span style="color:#FFAB70">-</span><span style="color:#E1E4E8"> When to stop and ask for help</span></span></code></pre>
+<h3 id="writing-effective-agent-instructions">Writing Effective Agent Instructions</h3>
+<p><strong>Define the persona clearly.</strong> The opening paragraph sets the agent’s identity. “You are a senior security engineer specializing in application security” is better than “You help with security.”</p>
+<p><strong>Be prescriptive about the process.</strong> Agents iterate autonomously, so they need clear steps to follow. Vague instructions lead to unfocused exploration.</p>
+<p><strong>Specify the output format.</strong> Without a defined format, agents produce inconsistent output across runs. Include a template:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="markdown"><code><span class="line"><span style="color:#79B8FF;font-weight:bold">## Output Format</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">Present your review as:</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79B8FF;font-weight:bold">### Summary</span></span>
+<span class="line"><span style="color:#E1E4E8">One paragraph overview of findings.</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79B8FF;font-weight:bold">### Critical Issues</span></span>
+<span class="line"><span style="color:#E1E4E8">| File | Line | Issue | Recommendation |</span></span>
+<span class="line"><span style="color:#E1E4E8">|------|------|-------|----------------|</span></span>
+<span class="line"><span style="color:#E1E4E8">| ... | ... | ... | ... |</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79B8FF;font-weight:bold">### Warnings</span></span>
+<span class="line"><span style="color:#E1E4E8">Bulleted list of non-critical concerns.</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79B8FF;font-weight:bold">### Positive Patterns</span></span>
+<span class="line"><span style="color:#E1E4E8">Note any particularly well-written code worth highlighting.</span></span></code></pre>
+<p><strong>Set clear boundaries.</strong> Tell the agent when to stop:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="markdown"><code><span class="line"><span style="color:#79B8FF;font-weight:bold">## Constraints</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FFAB70">-</span><span style="color:#E1E4E8"> Review only files changed in the current branch (use git diff)</span></span>
+<span class="line"><span style="color:#FFAB70">-</span><span style="color:#E1E4E8"> Do not modify any files -- this is a read-only review</span></span>
+<span class="line"><span style="color:#FFAB70">-</span><span style="color:#E1E4E8"> If you encounter a file type you cannot analyze, skip it and note it</span></span>
+<span class="line"><span style="color:#FFAB70">-</span><span style="color:#E1E4E8"> Stop after reviewing all changed files; do not expand scope</span></span>
+<span class="line"><span style="color:#FFAB70">-</span><span style="color:#E1E4E8"> Maximum 3 iterations of re-reading a file for clarification</span></span></code></pre>
+<h2 id="step-5-full-working-example">Step 5: Full Working Example</h2>
+<p>Here is a complete, production-ready code review agent:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#B392F0">---</span></span>
+<span class="line"><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">code-reviewer</span></span>
+<span class="line"><span style="color:#85E89D">description</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"Reviews code changes for quality, correctness, security, and adherence to project conventions"</span></span>
+<span class="line"><span style="color:#85E89D">capabilities</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">  - </span><span style="color:#9ECBFF">"Static code analysis and pattern detection"</span></span>
+<span class="line"><span style="color:#E1E4E8">  - </span><span style="color:#9ECBFF">"Security vulnerability identification"</span></span>
+<span class="line"><span style="color:#E1E4E8">  - </span><span style="color:#9ECBFF">"Performance anti-pattern detection"</span></span>
+<span class="line"><span style="color:#E1E4E8">  - </span><span style="color:#9ECBFF">"Style and convention compliance checking"</span></span>
+<span class="line"><span style="color:#E1E4E8">  - </span><span style="color:#9ECBFF">"Test coverage gap analysis"</span></span>
+<span class="line"><span style="color:#85E89D">model</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">sonnet</span></span>
+<span class="line"><span style="color:#85E89D">effort</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">high</span></span>
+<span class="line"><span style="color:#85E89D">maxTurns</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">20</span></span>
+<span class="line"><span style="color:#85E89D">disallowedTools</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">  - </span><span style="color:#9ECBFF">"Write"</span></span>
+<span class="line"><span style="color:#E1E4E8">  - </span><span style="color:#9ECBFF">"Edit"</span></span>
+<span class="line"><span style="color:#85E89D">expertise_level</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">expert</span></span>
+<span class="line"><span style="color:#85E89D">activation_priority</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">medium</span></span>
+<span class="line"><span style="color:#B392F0">---</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Code Reviewer</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#9ECBFF">You are a senior software engineer conducting a thorough code review.</span></span>
+<span class="line"><span style="color:#9ECBFF">Your purpose is to analyze code changes for correctness, security,</span></span>
+<span class="line"><span style="color:#9ECBFF">performance, and maintainability. You do not modify code -- you only</span></span>
+<span class="line"><span style="color:#9ECBFF">read and report.</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">## Your Expertise</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">- </span><span style="color:#9ECBFF">Language-specific best practices (TypeScript, Python, Go, Rust)</span></span>
+<span class="line"><span style="color:#E1E4E8">- </span><span style="color:#9ECBFF">OWASP security guidelines</span></span>
+<span class="line"><span style="color:#E1E4E8">- </span><span style="color:#9ECBFF">Performance optimization patterns</span></span>
+<span class="line"><span style="color:#E1E4E8">- </span><span style="color:#9ECBFF">Testing best practices and coverage analysis</span></span>
+<span class="line"><span style="color:#E1E4E8">- </span><span style="color:#9ECBFF">Clean code principles and design patterns</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">## Review Process</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#9ECBFF">1. Run `git diff --name-only HEAD~1` to identify changed files</span></span>
+<span class="line"><span style="color:#85E89D">2. For each changed file</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#9ECBFF">   a. Read the full file to understand context</span></span>
+<span class="line"><span style="color:#9ECBFF">   b. Read the diff with `git diff HEAD~1 -- &#x3C;file>`</span></span>
+<span class="line"><span style="color:#9ECBFF">   c. Analyze the changes against the criteria below</span></span>
+<span class="line"><span style="color:#9ECBFF">3. Check for test coverage of changed code</span></span>
+<span class="line"><span style="color:#9ECBFF">4. Check for documentation updates if public APIs changed</span></span>
+<span class="line"><span style="color:#9ECBFF">5. Compile findings into the output format</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">## Review Criteria</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">### Correctness</span></span>
+<span class="line"><span style="color:#E1E4E8">- </span><span style="color:#9ECBFF">Logic errors, off-by-one, null handling</span></span>
+<span class="line"><span style="color:#E1E4E8">- </span><span style="color:#9ECBFF">Type safety issues</span></span>
+<span class="line"><span style="color:#E1E4E8">- </span><span style="color:#9ECBFF">Race conditions in async code</span></span>
+<span class="line"><span style="color:#E1E4E8">- </span><span style="color:#9ECBFF">Missing error handling</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">### Security</span></span>
+<span class="line"><span style="color:#E1E4E8">- </span><span style="color:#9ECBFF">Input validation gaps</span></span>
+<span class="line"><span style="color:#E1E4E8">- </span><span style="color:#9ECBFF">SQL injection, XSS, CSRF exposure</span></span>
+<span class="line"><span style="color:#E1E4E8">- </span><span style="color:#9ECBFF">Hardcoded secrets or credentials</span></span>
+<span class="line"><span style="color:#E1E4E8">- </span><span style="color:#9ECBFF">Insecure dependency usage</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">### Performance</span></span>
+<span class="line"><span style="color:#E1E4E8">- </span><span style="color:#9ECBFF">N+1 query patterns</span></span>
+<span class="line"><span style="color:#E1E4E8">- </span><span style="color:#9ECBFF">Unnecessary re-renders (React)</span></span>
+<span class="line"><span style="color:#E1E4E8">- </span><span style="color:#9ECBFF">Missing memoization for expensive computations</span></span>
+<span class="line"><span style="color:#E1E4E8">- </span><span style="color:#9ECBFF">Large bundle impact from new imports</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">### Maintainability</span></span>
+<span class="line"><span style="color:#E1E4E8">- </span><span style="color:#9ECBFF">Function length (flag > 50 lines)</span></span>
+<span class="line"><span style="color:#E1E4E8">- </span><span style="color:#9ECBFF">Cyclomatic complexity</span></span>
+<span class="line"><span style="color:#E1E4E8">- </span><span style="color:#9ECBFF">Code duplication</span></span>
+<span class="line"><span style="color:#E1E4E8">- </span><span style="color:#9ECBFF">Naming clarity</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">## Output Format</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">### Code Review Summary</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">*</span><span style="color:#E1E4E8">*Scope:** </span><span style="color:#9ECBFF">N files changed, M insertions, K deletions</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">*</span><span style="color:#E1E4E8">*Verdict:** </span><span style="color:#9ECBFF">APPROVE / REQUEST CHANGES / NEEDS DISCUSSION</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">### Critical Issues</span></span>
+<span class="line"><span style="color:#9ECBFF">Issues that must be fixed before merging.</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">|</span><span style="color:#6A737D"> # | File | Line | Category | Description |</span></span>
+<span class="line"><span style="color:#F97583">|-</span><span style="color:#FDAEB7;font-style:italic">--|------|------|----------|-------------|</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">### Suggestions</span></span>
+<span class="line"><span style="color:#9ECBFF">Non-blocking improvements worth considering.</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">|</span><span style="color:#6A737D"> # | File | Line | Category | Description |</span></span>
+<span class="line"><span style="color:#F97583">|-</span><span style="color:#FDAEB7;font-style:italic">--|------|------|----------|-------------|</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">### Positive Notes</span></span>
+<span class="line"><span style="color:#9ECBFF">Well-written code worth highlighting.</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">## Constraints</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">- </span><span style="color:#9ECBFF">Review only files changed in the current branch</span></span>
+<span class="line"><span style="color:#E1E4E8">- </span><span style="color:#9ECBFF">Do not modify any files</span></span>
+<span class="line"><span style="color:#E1E4E8">- </span><span style="color:#9ECBFF">If a file is too large to analyze in one read (>1000 lines),</span></span>
+<span class="line"><span style="color:#9ECBFF">  focus on the changed sections</span></span>
+<span class="line"><span style="color:#E1E4E8">- </span><span style="color:#9ECBFF">Do not review generated files, lock files, or vendor directories</span></span>
+<span class="line"><span style="color:#E1E4E8">- </span><span style="color:#9ECBFF">Stop after all changed files are reviewed</span></span></code></pre>
+<h2 id="step-6-testing-your-agent">Step 6: Testing Your Agent</h2>
+<h3 id="invoke-the-agent">Invoke the Agent</h3>
+<p>Install your plugin and invoke the agent:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#6A737D"># Install the plugin</span></span>
+<span class="line"><span style="color:#B392F0">claude</span><span style="color:#9ECBFF"> /plugin</span><span style="color:#9ECBFF"> add</span><span style="color:#9ECBFF"> /path/to/my-plugin</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Ask Claude to use the agent</span></span>
+<span class="line"><span style="color:#6A737D"># Claude Code will delegate to the code-reviewer agent</span></span>
+<span class="line"><span style="color:#B392F0">"Review my recent code changes"</span></span></code></pre>
+<h3 id="verify-behavior">Verify Behavior</h3>
+<p>Check these behaviors during testing:</p>
+<ol>
+<li><strong>Tool restrictions work.</strong> If you denied <code>Write</code> and <code>Edit</code>, verify the agent never modifies files.</li>
+<li><strong>Iteration count is appropriate.</strong> Watch the agent’s turns. If it finishes in 3 turns but you set <code>maxTurns: 20</code>, consider lowering the limit. If it hits the limit and stops mid-work, raise it.</li>
+<li><strong>Output format matches.</strong> Verify the agent follows your specified output template.</li>
+<li><strong>Scope stays bounded.</strong> Verify the agent does not expand beyond the defined scope.</li>
+</ol>
+<h3 id="validation">Validation</h3>
+<p>Run the enterprise validator:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">python3</span><span style="color:#9ECBFF"> scripts/validate-skills-schema.py</span><span style="color:#79B8FF"> --enterprise</span><span style="color:#79B8FF"> --verbose</span><span style="color:#9ECBFF"> my-plugin/agents/code-reviewer.md</span></span></code></pre>
+<p>The validator checks:</p>
+<ul>
+<li>Required frontmatter fields are present</li>
+<li><code>description</code> length is within 20-200 characters</li>
+<li><code>capabilities</code> is a valid array if present</li>
+<li>No invalid frontmatter fields</li>
+<li>Body content has sufficient depth</li>
+</ul>
+<h2 id="common-patterns">Common Patterns</h2>
+<h3 id="read-only-auditor">Read-Only Auditor</h3>
+<p>An agent that analyzes but never modifies:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">disallowedTools</span><span style="color:#E1E4E8">: [</span><span style="color:#9ECBFF">"Write"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"Edit"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"Bash"</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"><span style="color:#85E89D">maxTurns</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">15</span></span>
+<span class="line"><span style="color:#85E89D">effort</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">high</span></span></code></pre>
+<h3 id="autonomous-fixer">Autonomous Fixer</h3>
+<p>An agent that finds issues and fixes them:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#6A737D"># No disallowed tools -- full access</span></span>
+<span class="line"><span style="color:#85E89D">maxTurns</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">25</span></span>
+<span class="line"><span style="color:#85E89D">effort</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">high</span></span></code></pre>
+<h3 id="quick-scanner">Quick Scanner</h3>
+<p>A fast agent for lightweight checks:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">model</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">haiku</span></span>
+<span class="line"><span style="color:#85E89D">effort</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">low</span></span>
+<span class="line"><span style="color:#85E89D">maxTurns</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">5</span></span></code></pre>
+<h3 id="multi-domain-expert">Multi-Domain Expert</h3>
+<p>An agent covering several related areas:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">capabilities</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">  - </span><span style="color:#9ECBFF">"Frontend performance optimization"</span></span>
+<span class="line"><span style="color:#E1E4E8">  - </span><span style="color:#9ECBFF">"Bundle size analysis"</span></span>
+<span class="line"><span style="color:#E1E4E8">  - </span><span style="color:#9ECBFF">"Core Web Vitals assessment"</span></span>
+<span class="line"><span style="color:#E1E4E8">  - </span><span style="color:#9ECBFF">"Image optimization recommendations"</span></span>
+<span class="line"><span style="color:#E1E4E8">  - </span><span style="color:#9ECBFF">"Font loading strategy review"</span></span>
+<span class="line"><span style="color:#85E89D">expertise_level</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">expert</span></span>
+<span class="line"><span style="color:#85E89D">maxTurns</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">20</span></span></code></pre>
+<h2 id="key-differences-from-skills">Key Differences from Skills</h2>
+<p>Remember these critical differences when deciding between agents and skills:</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Aspect</th><th>Skill</th><th>Agent</th></tr></thead><tbody><tr><td>Tool control</td><td>Allowlist (<code>allowed-tools</code>)</td><td>Denylist (<code>disallowedTools</code>)</td></tr><tr><td>Autonomy</td><td>Single response</td><td>Multi-turn loop</td></tr><tr><td>Activation</td><td>Auto-triggers on context</td><td>Called as sub-agent</td></tr><tr><td>Iteration</td><td>No <code>maxTurns</code></td><td><code>maxTurns</code> controls loop</td></tr><tr><td>Effort</td><td>No effort control</td><td><code>effort</code> sets reasoning depth</td></tr><tr><td>File location</td><td><code>skills/name/SKILL.md</code></td><td><code>agents/name.md</code></td></tr></tbody></table>
+<h2 id="next-steps">Next Steps</h2>
+<p>Once your agent is working:</p>
+<ol>
+<li>Add it to a plugin alongside commands and skills (see <a href="/docs/guides/build-a-plugin">How to Build a Claude Code Plugin</a>)</li>
+<li>Write clear documentation in your README about when and how to use the agent</li>
+<li>Validate and <a href="/docs/guides/publish-to-marketplace">publish to the marketplace</a></li>
+</ol>
+<p>Agents compose well with skills and commands. A plugin might have a <code>/security-scan</code> command that invokes the <code>security-scanner</code> agent, plus a <code>security-review</code> skill that auto-activates during code review to surface common vulnerabilities. Design your plugin’s components to work together as a cohesive toolkit.</p>
+
+        </article>
+
+        <!-- Official Links Callout -->
+        <aside class="official-links" data-astro-cid-ya4srytn>
+            <h3 class="official-links-title" data-astro-cid-ya4srytn>Official Anthropic Documentation</h3>
+            <ul class="official-links-list" data-astro-cid-ya4srytn>
+              <li data-astro-cid-ya4srytn>
+                  <a href="https://docs.anthropic.com/en/docs/claude-code/" target="_blank" rel="noopener noreferrer" data-astro-cid-ya4srytn>
+                    Anthropic Claude Code Documentation
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-left:4px;vertical-align:middle;" data-astro-cid-ya4srytn><path d="M3.5 1.5H10.5V8.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-ya4srytn></path><path d="M10.5 1.5L1.5 10.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-ya4srytn></path></svg>
+                  </a>
+                </li><li data-astro-cid-ya4srytn>
+                  <a href="https://docs.anthropic.com/en/docs/claude-code/agents" target="_blank" rel="noopener noreferrer" data-astro-cid-ya4srytn>
+                    Anthropic Agents Reference
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-left:4px;vertical-align:middle;" data-astro-cid-ya4srytn><path d="M3.5 1.5H10.5V8.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-ya4srytn></path><path d="M10.5 1.5L1.5 10.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-ya4srytn></path></svg>
+                  </a>
+                </li>
+            </ul>
+          </aside>
+
+        <!-- Related Docs -->
+        <aside class="related-docs" data-astro-cid-ya4srytn>
+            <h3 class="related-title" data-astro-cid-ya4srytn>Related Documentation</h3>
+            <div class="related-grid" data-astro-cid-ya4srytn>
+              <a href="/docs/concepts/agents" class="related-card" data-astro-cid-ya4srytn>
+                  <span class="related-section" data-astro-cid-ya4srytn>Concepts</span>
+                  <span class="related-name" data-astro-cid-ya4srytn>Claude Code Agents and Subagents</span>
+                </a><a href="/docs/reference/skill-frontmatter" class="related-card" data-astro-cid-ya4srytn>
+                  <span class="related-section" data-astro-cid-ya4srytn>Reference</span>
+                  <span class="related-name" data-astro-cid-ya4srytn>SKILL.md Frontmatter Reference</span>
+                </a>
+            </div>
+          </aside>
+
+        <!-- Prev/Next Navigation -->
+        <nav class="docs-nav-footer" data-astro-cid-ya4srytn>
+          <a href="/docs/guides/build-a-plugin" class="nav-link nav-prev" data-astro-cid-ya4srytn>
+              <span class="nav-label" data-astro-cid-ya4srytn>Previous</span>
+              <span class="nav-title" data-astro-cid-ya4srytn>How to Build a Claude Code Plugin</span>
+            </a>
+          <a href="/docs/guides/saas-skill-packs" class="nav-link nav-next" data-astro-cid-ya4srytn>
+              <span class="nav-label" data-astro-cid-ya4srytn>Next</span>
+              <span class="nav-title" data-astro-cid-ya4srytn>SaaS Skill Packs: Platform Integrations</span>
+            </a>
+        </nav>
+      </div>
+    </div>
+  </div>
+
+  
+
+  
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

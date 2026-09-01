@@ -1,0 +1,1201 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How to Build a Claude Code Plugin | Docs</title>
+    <meta name="description" content="Complete guide to building a Claude Code plugin from scratch. Covers plugin.json configuration, commands, skills, agents, directory structure, validation, and testing with full code examples.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://tonsofskills.com/tons-of-skills-marketplace/docs/guides/build-a-plugin/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/docs/guides/build-a-plugin/">
+    <meta property="og:title" content="How to Build a Claude Code Plugin | Docs">
+    <meta property="og:description" content="Complete guide to building a Claude Code plugin from scratch. Covers plugin.json configuration, commands, skills, agents, directory structure, validation, and testing with full code examples.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="How to Build a Claude Code Plugin | Docs">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/docs/guides/build-a-plugin/">
+    <meta name="twitter:title" content="How to Build a Claude Code Plugin | Docs">
+    <meta name="twitter:description" content="Complete guide to building a Claude Code plugin from scratch. Covers plugin.json configuration, commands, skills, agents, directory structure, validation, and testing with full code examples.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"How to Build a Claude Code Plugin","description":"Complete guide to building a Claude Code plugin from scratch. Covers plugin.json configuration, commands, skills, agents, directory structure, validation, and testing with full code examples.","author":{"@type":"Organization","name":"Intent Solutions","url":"https://intentsolutions.io"},"publisher":{"@type":"Organization","name":"Tons of Skills","url":"https://tonsofskills.com"},"url":"https://tonsofskills.com/docs/guides/build-a-plugin","keywords":"plugin, plugin.json, commands, agents, skills, Claude Code plugin, plugin development, build plugin","mainEntityOfPage":{"@type":"WebPage","@id":"https://tonsofskills.com/docs/guides/build-a-plugin"}}</script>
+  
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/_..B9N6JsV8.css"></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  <div class="docs-page" data-astro-cid-ya4srytn>
+    <div class="docs-container" data-astro-cid-ya4srytn>
+      <aside class="docs-sidebar" id="docs-sidebar" data-astro-cid-qrwn6rcr>
+  <div class="sidebar-sticky" data-astro-cid-qrwn6rcr>
+    <a href="/docs" class="sidebar-home" data-astro-cid-qrwn6rcr>Documentation</a>
+    <nav class="sidebar-nav" data-astro-cid-qrwn6rcr>
+      <div class="sidebar-section" data-astro-cid-qrwn6rcr>
+          <h3 class="sidebar-section-title" data-astro-cid-qrwn6rcr>Getting Started</h3>
+          <ul class="sidebar-list" data-astro-cid-qrwn6rcr>
+            <li data-astro-cid-qrwn6rcr>
+                <a href="/docs/getting-started/installation" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Install Claude Code Plugins
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/getting-started/first-plugin" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Install Your First Plugin
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/getting-started/first-skill" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Your First Agent Skill
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/getting-started/cli-reference" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  ccpi CLI Quick Reference
+                </a>
+              </li>
+          </ul>
+        </div><div class="sidebar-section" data-astro-cid-qrwn6rcr>
+          <h3 class="sidebar-section-title" data-astro-cid-qrwn6rcr>Concepts</h3>
+          <ul class="sidebar-list" data-astro-cid-qrwn6rcr>
+            <li data-astro-cid-qrwn6rcr>
+                <a href="/docs/concepts/plugins" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  What Are Claude Code Plugins?
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/concepts/skills" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Understanding Agent Skills (SKILL.md)
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/concepts/agents" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Claude Code Agents and Subagents
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/concepts/commands-and-hooks" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Slash Commands and Hooks
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/concepts/mcp-servers" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  MCP Servers in Claude Code Plugins
+                </a>
+              </li>
+          </ul>
+        </div><div class="sidebar-section" data-astro-cid-qrwn6rcr>
+          <h3 class="sidebar-section-title" data-astro-cid-qrwn6rcr>Guides</h3>
+          <ul class="sidebar-list" data-astro-cid-qrwn6rcr>
+            <li data-astro-cid-qrwn6rcr>
+                <a href="/docs/guides/write-a-skill" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  How to Write a Claude Code Skill
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/guides/build-a-plugin" class="sidebar-link active" data-astro-cid-qrwn6rcr>
+                  How to Build a Claude Code Plugin
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/guides/create-an-agent" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  How to Create a Claude Code Agent
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/guides/saas-skill-packs" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  SaaS Skill Packs: Platform Integrations
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/guides/mcp-server-plugin" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Building an MCP Server Plugin
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/guides/publish-to-marketplace" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Publish a Plugin to the Marketplace
+                </a>
+              </li>
+          </ul>
+        </div><div class="sidebar-section" data-astro-cid-qrwn6rcr>
+          <h3 class="sidebar-section-title" data-astro-cid-qrwn6rcr>Reference</h3>
+          <ul class="sidebar-list" data-astro-cid-qrwn6rcr>
+            <li data-astro-cid-qrwn6rcr>
+                <a href="/docs/reference/skill-frontmatter" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  SKILL.md Frontmatter Reference
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/reference/plugin-json-schema" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  plugin.json Schema Reference
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/reference/plugin-categories" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Plugin Categories and Tags
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/reference/allowed-tools" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Allowed Tools Reference
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/reference/cli-commands" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  ccpi CLI Command Reference
+                </a>
+              </li>
+          </ul>
+        </div><div class="sidebar-section" data-astro-cid-qrwn6rcr>
+          <h3 class="sidebar-section-title" data-astro-cid-qrwn6rcr>Ecosystem</h3>
+          <ul class="sidebar-list" data-astro-cid-qrwn6rcr>
+            <li data-astro-cid-qrwn6rcr>
+                <a href="/docs/ecosystem/marketplace-overview" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Tons of Skills Marketplace Guide
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/ecosystem/official-anthropic-docs" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Official Anthropic Documentation Links
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/ecosystem/community-resources" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Claude Code Community and Resources
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/ecosystem/faq" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Claude Code Plugins FAQ
+                </a>
+              </li>
+          </ul>
+        </div>
+    </nav>
+  </div>
+</aside>
+
+      <div class="docs-main" data-astro-cid-ya4srytn>
+        <!-- Breadcrumbs -->
+        <nav class="docs-breadcrumbs" aria-label="Breadcrumb" data-astro-cid-ya4srytn>
+          <a href="/" data-astro-cid-ya4srytn>Home</a>
+          <span class="sep" data-astro-cid-ya4srytn>/</span>
+          <a href="/docs" data-astro-cid-ya4srytn>Docs</a>
+          <span class="sep" data-astro-cid-ya4srytn>/</span>
+          <a href="/docs#guides" data-astro-cid-ya4srytn>Guides</a>
+          <span class="sep" data-astro-cid-ya4srytn>/</span>
+          <span class="current" data-astro-cid-ya4srytn>How to Build a Claude Code Plugin</span>
+        </nav>
+
+        <!-- Header -->
+        <header class="docs-header" data-astro-cid-ya4srytn>
+          <h1 class="docs-title" data-astro-cid-ya4srytn>How to Build a Claude Code Plugin</h1>
+          <p class="docs-description" data-astro-cid-ya4srytn>Complete guide to building a Claude Code plugin from scratch. Covers plugin.json configuration, commands, skills, agents, directory structure, validation, and testing with full code examples.</p>
+        </header>
+
+        <!-- Content -->
+        <article class="docs-content" id="docs-content" data-astro-cid-ya4srytn>
+          
+  <h2 id="what-is-a-claude-code-plugin">What Is a Claude Code Plugin?</h2>
+<p>A Claude Code plugin is a directory containing AI instruction files that extend Claude Code’s capabilities. Plugins can include slash commands, auto-activating skills, and autonomous agents — all defined as Markdown files with YAML frontmatter. No compiled code is required. The entire plugin is plain text.</p>
+<p>Plugins are installed with a single command:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">claude</span><span style="color:#9ECBFF"> /plugin</span><span style="color:#9ECBFF"> add</span><span style="color:#9ECBFF"> username/repo-name</span></span></code></pre>
+<p>Once installed, Claude Code reads the plugin’s manifest, discovers its commands, skills, and agents, and makes them available in the session. This guide walks through building a complete plugin from an empty directory to a validated, installable package.</p>
+<h2 id="step-1-plan-your-plugin">Step 1: Plan Your Plugin</h2>
+<p>A plugin is a coherent collection of capabilities around a single domain. Good plugin boundaries:</p>
+<ul>
+<li><strong>One technology:</strong> A plugin for Docker, Terraform, or Kubernetes</li>
+<li><strong>One workflow:</strong> A plugin for code review, release engineering, or CI/CD</li>
+<li><strong>One integration:</strong> A plugin for Stripe, GitHub, or Slack</li>
+</ul>
+<p>Avoid “mega plugins” that try to cover everything. Instead, create focused plugins that compose well together.</p>
+<h3 id="decide-what-to-include">Decide What to Include</h3>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Component</th><th>Use When</th></tr></thead><tbody><tr><td><strong>Commands</strong> (<code>commands/*.md</code>)</td><td>User explicitly invokes with <code>/command-name</code></td></tr><tr><td><strong>Skills</strong> (<code>skills/name/SKILL.md</code>)</td><td>Auto-activates based on context</td></tr><tr><td><strong>Agents</strong> (<code>agents/*.md</code>)</td><td>Runs as autonomous sub-agent with its own tool permissions</td></tr></tbody></table>
+<p>A plugin can contain any combination of these. A minimal plugin might have one skill. A full plugin might have several commands, multiple skills, and a couple of agents.</p>
+<h2 id="step-2-create-the-directory-structure">Step 2: Create the Directory Structure</h2>
+<p>Every plugin follows this layout:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>my-plugin/</span></span>
+<span class="line"><span>├── .claude-plugin/</span></span>
+<span class="line"><span>│   └── plugin.json        # Required: plugin manifest</span></span>
+<span class="line"><span>├── README.md              # Required: documentation</span></span>
+<span class="line"><span>├── LICENSE                # Recommended: license file</span></span>
+<span class="line"><span>├── CHANGELOG.md           # Recommended: version history</span></span>
+<span class="line"><span>├── commands/              # Optional: slash commands</span></span>
+<span class="line"><span>│   ├── deploy.md</span></span>
+<span class="line"><span>│   └── rollback.md</span></span>
+<span class="line"><span>├── skills/                # Optional: auto-activating skills</span></span>
+<span class="line"><span>│   └── docker-compose/</span></span>
+<span class="line"><span>│       ├── SKILL.md</span></span>
+<span class="line"><span>│       └── reference.md</span></span>
+<span class="line"><span>└── agents/                # Optional: autonomous agents</span></span>
+<span class="line"><span>    └── security-scanner.md</span></span></code></pre>
+<p>Create the scaffolding:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">mkdir</span><span style="color:#79B8FF"> -p</span><span style="color:#9ECBFF"> my-plugin/.claude-plugin</span></span>
+<span class="line"><span style="color:#B392F0">mkdir</span><span style="color:#79B8FF"> -p</span><span style="color:#9ECBFF"> my-plugin/commands</span></span>
+<span class="line"><span style="color:#B392F0">mkdir</span><span style="color:#79B8FF"> -p</span><span style="color:#9ECBFF"> my-plugin/skills</span></span>
+<span class="line"><span style="color:#B392F0">mkdir</span><span style="color:#79B8FF"> -p</span><span style="color:#9ECBFF"> my-plugin/agents</span></span>
+<span class="line"><span style="color:#B392F0">touch</span><span style="color:#9ECBFF"> my-plugin/.claude-plugin/plugin.json</span></span>
+<span class="line"><span style="color:#B392F0">touch</span><span style="color:#9ECBFF"> my-plugin/README.md</span></span></code></pre>
+<p>You can also start from one of the <a href="https://github.com/jeremylongshore/claude-code-plugins/tree/main/templates">templates</a> included in the Tons of Skills repository:</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Template</th><th>Includes</th></tr></thead><tbody><tr><td><code>minimal-plugin</code></td><td>plugin.json and README only</td></tr><tr><td><code>command-plugin</code></td><td>One slash command</td></tr><tr><td><code>skill-plugin</code></td><td>One auto-activating skill</td></tr><tr><td><code>agent-plugin</code></td><td>One autonomous agent</td></tr><tr><td><code>full-plugin</code></td><td>Commands, skills, and agents</td></tr></tbody></table>
+<h2 id="step-3-configure-pluginjson">Step 3: Configure plugin.json</h2>
+<p>The <code>plugin.json</code> file is the plugin’s manifest. It tells Claude Code what the plugin is, who wrote it, and where to find it. Only these fields are allowed:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="json"><code><span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#79B8FF">  "name"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"docker-workflow"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">  "version"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"1.0.0"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">  "description"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"Docker development workflow automation: compose management, image optimization, multi-stage builds, and container debugging"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">  "author"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"Your Name &#x3C;you@example.com>"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">  "repository"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"https://github.com/username/docker-workflow"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">  "homepage"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"https://tonsofskills.com/plugins/devops/docker-workflow"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">  "license"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"MIT"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">  "keywords"</span><span style="color:#E1E4E8">: [</span><span style="color:#9ECBFF">"docker"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"containers"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"devops"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"compose"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"deployment"</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<h3 id="field-reference">Field Reference</h3>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Field</th><th>Required</th><th>Rules</th></tr></thead><tbody><tr><td><code>name</code></td><td>Yes</td><td>Lowercase kebab-case. Must be unique across the marketplace.</td></tr><tr><td><code>version</code></td><td>Yes</td><td>Semantic versioning (e.g., <code>1.0.0</code>, <code>1.2.3</code>).</td></tr><tr><td><code>description</code></td><td>Yes</td><td>One to two sentences. Describe what the plugin does, not how.</td></tr><tr><td><code>author</code></td><td>Yes</td><td>Name and optional email in angle brackets.</td></tr><tr><td><code>repository</code></td><td>No</td><td>Full URL to the source repository.</td></tr><tr><td><code>homepage</code></td><td>No</td><td>Full URL to the plugin’s page or documentation.</td></tr><tr><td><code>license</code></td><td>No</td><td>SPDX identifier (e.g., <code>MIT</code>, <code>Apache-2.0</code>).</td></tr><tr><td><code>keywords</code></td><td>No</td><td>Array of strings for search and categorization.</td></tr></tbody></table>
+<p><strong>Important:</strong> CI validation rejects any fields not in this list. Do not add <code>dependencies</code>, <code>scripts</code>, <code>main</code>, or any other fields. The <code>plugin.json</code> schema is intentionally minimal.</p>
+<h3 id="choosing-a-name">Choosing a Name</h3>
+<ul>
+<li>Use kebab-case: <code>docker-workflow</code>, not <code>DockerWorkflow</code> or <code>docker_workflow</code></li>
+<li>Be specific: <code>react-test-writer</code> is better than <code>test-helper</code></li>
+<li>Avoid generic prefixes: skip <code>claude-</code>, <code>ai-</code>, or <code>plugin-</code> in the name</li>
+<li>Check the <a href="/explore">marketplace</a> for name conflicts</li>
+</ul>
+<h2 id="step-4-write-the-readme">Step 4: Write the README</h2>
+<p>The README is both documentation for users and content for the marketplace listing. Structure it clearly:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="markdown"><code><span class="line"><span style="color:#79B8FF;font-weight:bold"># Docker Workflow</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">Docker development workflow automation for Claude Code. Manages compose</span></span>
+<span class="line"><span style="color:#E1E4E8">files, optimizes images, builds multi-stage Dockerfiles, and debugs</span></span>
+<span class="line"><span style="color:#E1E4E8">running containers.</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79B8FF;font-weight:bold">## Features</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FFAB70">-</span><span style="color:#E1E4E8"> Generate and validate docker-compose.yml files</span></span>
+<span class="line"><span style="color:#FFAB70">-</span><span style="color:#E1E4E8"> Optimize Dockerfiles with multi-stage build patterns</span></span>
+<span class="line"><span style="color:#FFAB70">-</span><span style="color:#E1E4E8"> Debug containers with log analysis and exec commands</span></span>
+<span class="line"><span style="color:#FFAB70">-</span><span style="color:#E1E4E8"> Manage environment-specific compose overrides</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79B8FF;font-weight:bold">## Installation</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79B8FF">\`</span><span style="color:#E1E4E8">``bash</span></span>
+<span class="line"><span style="color:#E1E4E8">claude /plugin add username/docker-workflow</span></span>
+<span class="line"><span style="color:#79B8FF">\`</span><span style="color:#E1E4E8">``</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79B8FF;font-weight:bold">## Commands</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">| Command | Description |</span></span>
+<span class="line"><span style="color:#E1E4E8">|---------|-------------|</span></span>
+<span class="line"><span style="color:#E1E4E8">| </span><span style="color:#79B8FF">`/docker-build`</span><span style="color:#E1E4E8"> | Generate an optimized Dockerfile |</span></span>
+<span class="line"><span style="color:#E1E4E8">| </span><span style="color:#79B8FF">`/docker-debug`</span><span style="color:#E1E4E8"> | Debug a running container |</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79B8FF;font-weight:bold">## Skills</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FFAB70">-</span><span style="color:#E1E4E8;font-weight:bold"> **docker-compose**</span><span style="color:#E1E4E8"> - Auto-activates when working with compose files</span></span>
+<span class="line"><span style="color:#FFAB70">-</span><span style="color:#E1E4E8;font-weight:bold"> **dockerfile-optimizer**</span><span style="color:#E1E4E8"> - Activates when editing Dockerfiles</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79B8FF;font-weight:bold">## Requirements</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FFAB70">-</span><span style="color:#E1E4E8"> Docker installed and running</span></span>
+<span class="line"><span style="color:#FFAB70">-</span><span style="color:#E1E4E8"> docker-compose v2+</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79B8FF;font-weight:bold">## License</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">MIT</span></span></code></pre>
+<h2 id="step-5-add-commands">Step 5: Add Commands</h2>
+<p>Commands are user-invoked actions triggered with <code>/command-name</code> in Claude Code. Each command is a Markdown file in the <code>commands/</code> directory.</p>
+<h3 id="command-file-structure">Command File Structure</h3>
+<p>Create <code>commands/docker-build.md</code>:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#B392F0">---</span></span>
+<span class="line"><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">docker-build</span></span>
+<span class="line"><span style="color:#85E89D">description</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"Generate an optimized multi-stage Dockerfile for the current project"</span></span>
+<span class="line"><span style="color:#85E89D">argument-hint</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"&#x3C;project-type>"</span></span>
+<span class="line"><span style="color:#B392F0">---</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Docker Build</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#9ECBFF">Generate a production-ready, multi-stage Dockerfile optimized for the</span></span>
+<span class="line"><span style="color:#9ECBFF">current project.</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">## Instructions</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#9ECBFF">1. Detect the project type by reading package.json, requirements.txt,</span></span>
+<span class="line"><span style="color:#9ECBFF">   go.mod, or Cargo.toml</span></span>
+<span class="line"><span style="color:#9ECBFF">2. Choose the appropriate base image (slim variants preferred)</span></span>
+<span class="line"><span style="color:#85E89D">3. Implement a multi-stage build</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">   - </span><span style="color:#85E89D">Stage 1</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Install dependencies</span></span>
+<span class="line"><span style="color:#E1E4E8">   - </span><span style="color:#85E89D">Stage 2</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Build/compile</span></span>
+<span class="line"><span style="color:#E1E4E8">   - </span><span style="color:#85E89D">Stage 3</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Production runtime (minimal image)</span></span>
+<span class="line"><span style="color:#9ECBFF">4. Add health checks, non-root user, and proper signal handling</span></span>
+<span class="line"><span style="color:#9ECBFF">5. Write the Dockerfile to the project root</span></span>
+<span class="line"><span style="color:#9ECBFF">6. Validate with `docker build --check .` if available</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">## Output</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">Write a `Dockerfile` with</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">- </span><span style="color:#9ECBFF">Multi-stage build reducing final image size</span></span>
+<span class="line"><span style="color:#E1E4E8">- </span><span style="color:#9ECBFF">Layer caching optimized for dependency changes</span></span>
+<span class="line"><span style="color:#E1E4E8">- </span><span style="color:#9ECBFF">Non-root USER directive</span></span>
+<span class="line"><span style="color:#E1E4E8">- </span><span style="color:#9ECBFF">HEALTHCHECK instruction</span></span>
+<span class="line"><span style="color:#E1E4E8">- </span><span style="color:#9ECBFF">Descriptive comments on each stage</span></span></code></pre>
+<h3 id="command-frontmatter-fields">Command Frontmatter Fields</h3>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Field</th><th>Required</th><th>Purpose</th></tr></thead><tbody><tr><td><code>name</code></td><td>Yes</td><td>The slash command name (users type <code>/name</code>)</td></tr><tr><td><code>description</code></td><td>Yes</td><td>Short description shown in the command menu</td></tr><tr><td><code>argument-hint</code></td><td>No</td><td>Placeholder text for autocomplete</td></tr><tr><td><code>user-invocable</code></td><td>No</td><td>Set to <code>false</code> to hide from the menu (default <code>true</code>)</td></tr><tr><td><code>model</code></td><td>No</td><td>Override the LLM model (<code>sonnet</code>, <code>haiku</code>, <code>opus</code>)</td></tr><tr><td><code>context</code></td><td>No</td><td>Set to <code>fork</code> to run in a sub-agent</td></tr></tbody></table>
+<h2 id="step-6-add-skills">Step 6: Add Skills</h2>
+<p>Skills auto-activate based on context. See the full guide at <a href="/docs/guides/write-a-skill">How to Write a Claude Code Skill</a>. Here is a quick example.</p>
+<p>Create <code>skills/docker-compose/SKILL.md</code>:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#B392F0">---</span></span>
+<span class="line"><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">docker-compose</span></span>
+<span class="line"><span style="color:#85E89D">description</span><span style="color:#E1E4E8">: </span><span style="color:#F97583">|</span></span>
+<span class="line"><span style="color:#9ECBFF">  Manage Docker Compose configurations. Auto-activates when creating,</span></span>
+<span class="line"><span style="color:#9ECBFF">  editing, or debugging docker-compose.yml files. Handles service</span></span>
+<span class="line"><span style="color:#9ECBFF">  definitions, networking, volumes, and environment variables. Trigger</span></span>
+<span class="line"><span style="color:#9ECBFF">  phrases: "create a compose file", "add a service to compose",</span></span>
+<span class="line"><span style="color:#9ECBFF">  "fix my docker-compose", "debug compose networking".</span></span>
+<span class="line"><span style="color:#85E89D">allowed-tools</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Read, Write, Edit, Bash(docker:*), Glob, Grep</span></span>
+<span class="line"><span style="color:#85E89D">version</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">1.0.0</span></span>
+<span class="line"><span style="color:#85E89D">author</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Your Name &#x3C;you@example.com></span></span>
+<span class="line"><span style="color:#85E89D">license</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">MIT</span></span>
+<span class="line"><span style="color:#85E89D">compatible-with</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">claude-code</span></span>
+<span class="line"><span style="color:#85E89D">tags</span><span style="color:#E1E4E8">: [</span><span style="color:#9ECBFF">docker</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">compose</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">containers</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">devops</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"><span style="color:#B392F0">---</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Docker Compose Manager</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#9ECBFF">Create, modify, and debug Docker Compose configurations.</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">## Overview</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">Manages docker-compose.yml files with best practices</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">proper service</span></span>
+<span class="line"><span style="color:#9ECBFF">ordering, health checks, named volumes, custom networks, and</span></span>
+<span class="line"><span style="color:#9ECBFF">environment variable management.</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">## Instructions</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#9ECBFF">1. Read the existing docker-compose.yml if present</span></span>
+<span class="line"><span style="color:#9ECBFF">2. Identify all services, networks, and volumes</span></span>
+<span class="line"><span style="color:#9ECBFF">3. Apply the requested changes</span></span>
+<span class="line"><span style="color:#9ECBFF">4. Validate the compose file with `docker compose config`</span></span>
+<span class="line"><span style="color:#9ECBFF">5. Report any warnings or errors</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">## Error Handling</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">- </span><span style="color:#9ECBFF">If docker compose is not installed, suggest installation steps</span></span>
+<span class="line"><span style="color:#E1E4E8">- </span><span style="color:#9ECBFF">If the compose file has syntax errors, show the specific line and fix</span></span>
+<span class="line"><span style="color:#E1E4E8">- </span><span style="color:#9ECBFF">If a referenced image does not exist, suggest alternatives</span></span></code></pre>
+<h3 id="adding-supporting-files">Adding Supporting Files</h3>
+<p>Skills can reference additional documentation files. Create <code>skills/docker-compose/reference.md</code> with compose file patterns, and link to it from the SKILL.md body:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="markdown"><code><span class="line"><span style="color:#E1E4E8">For advanced networking patterns, see Reference.</span></span></code></pre>
+<p>Claude Code follows these relative links using the Read tool when the information is needed.</p>
+<h2 id="step-7-add-agents">Step 7: Add Agents</h2>
+<p>Agents are autonomous sub-agents with their own capabilities and constraints. They differ from skills in two important ways:</p>
+<ol>
+<li>Agents use <code>disallowedTools</code> (a denylist) instead of <code>allowed-tools</code> (an allowlist)</li>
+<li>Agents can iterate autonomously up to <code>maxTurns</code> iterations</li>
+</ol>
+<p>Create <code>agents/security-scanner.md</code>:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#B392F0">---</span></span>
+<span class="line"><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">security-scanner</span></span>
+<span class="line"><span style="color:#85E89D">description</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"Scans the codebase for security vulnerabilities, secrets, and misconfigurations"</span></span>
+<span class="line"><span style="color:#85E89D">capabilities</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">  - </span><span style="color:#9ECBFF">"Dependency vulnerability scanning"</span></span>
+<span class="line"><span style="color:#E1E4E8">  - </span><span style="color:#9ECBFF">"Secret detection in source code"</span></span>
+<span class="line"><span style="color:#E1E4E8">  - </span><span style="color:#9ECBFF">"Docker security configuration review"</span></span>
+<span class="line"><span style="color:#E1E4E8">  - </span><span style="color:#9ECBFF">"Environment variable exposure analysis"</span></span>
+<span class="line"><span style="color:#85E89D">model</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">sonnet</span></span>
+<span class="line"><span style="color:#85E89D">maxTurns</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">15</span></span>
+<span class="line"><span style="color:#85E89D">expertise_level</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">advanced</span></span>
+<span class="line"><span style="color:#85E89D">activation_priority</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">medium</span></span>
+<span class="line"><span style="color:#B392F0">---</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Security Scanner Agent</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#9ECBFF">You are a security-focused agent that scans codebases for vulnerabilities,</span></span>
+<span class="line"><span style="color:#9ECBFF">exposed secrets, and security misconfigurations.</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">## Your Expertise</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">- </span><span style="color:#9ECBFF">OWASP Top 10 vulnerabilities</span></span>
+<span class="line"><span style="color:#E1E4E8">- </span><span style="color:#9ECBFF">Secret detection (API keys, tokens, passwords in source)</span></span>
+<span class="line"><span style="color:#E1E4E8">- </span><span style="color:#9ECBFF">Dependency vulnerability analysis (CVEs)</span></span>
+<span class="line"><span style="color:#E1E4E8">- </span><span style="color:#9ECBFF">Docker and container security</span></span>
+<span class="line"><span style="color:#E1E4E8">- </span><span style="color:#9ECBFF">Environment variable exposure</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">## Scanning Process</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#9ECBFF">1. Scan for hardcoded secrets using pattern matching</span></span>
+<span class="line"><span style="color:#9ECBFF">2. Check dependency manifests for known vulnerabilities</span></span>
+<span class="line"><span style="color:#9ECBFF">3. Review Dockerfile security (root user, exposed ports, secrets in layers)</span></span>
+<span class="line"><span style="color:#9ECBFF">4. Analyze environment variable handling</span></span>
+<span class="line"><span style="color:#9ECBFF">5. Check for sensitive files committed to git (.env, credentials, keys)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">## Output Format</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">Present findings as a security report</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">*</span><span style="color:#E1E4E8">*Critical:** </span><span style="color:#9ECBFF">Issues requiring immediate attention</span></span>
+<span class="line"><span style="color:#F97583">*</span><span style="color:#E1E4E8">*High:** </span><span style="color:#9ECBFF">Significant vulnerabilities</span></span>
+<span class="line"><span style="color:#F97583">*</span><span style="color:#E1E4E8">*Medium:** </span><span style="color:#9ECBFF">Best practice violations</span></span>
+<span class="line"><span style="color:#F97583">*</span><span style="color:#E1E4E8">*Low:** </span><span style="color:#9ECBFF">Informational findings</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">For each finding, include</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">- </span><span style="color:#9ECBFF">File and line number</span></span>
+<span class="line"><span style="color:#E1E4E8">- </span><span style="color:#9ECBFF">Description of the issue</span></span>
+<span class="line"><span style="color:#E1E4E8">- </span><span style="color:#9ECBFF">Recommended fix with code example</span></span></code></pre>
+<h3 id="agent-frontmatter-fields">Agent Frontmatter Fields</h3>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Field</th><th>Required</th><th>Purpose</th></tr></thead><tbody><tr><td><code>name</code></td><td>Yes</td><td>Unique identifier</td></tr><tr><td><code>description</code></td><td>Yes</td><td>20-200 characters describing the agent’s specialty</td></tr><tr><td><code>capabilities</code></td><td>No</td><td>Array of capability descriptions</td></tr><tr><td><code>model</code></td><td>No</td><td>LLM model override</td></tr><tr><td><code>effort</code></td><td>No</td><td>Reasoning effort: <code>low</code>, <code>medium</code>, <code>high</code></td></tr><tr><td><code>maxTurns</code></td><td>No</td><td>Maximum autonomous iterations</td></tr><tr><td><code>disallowedTools</code></td><td>No</td><td>Tools the agent cannot use (denylist)</td></tr><tr><td><code>expertise_level</code></td><td>No</td><td><code>intermediate</code>, <code>advanced</code>, <code>expert</code></td></tr><tr><td><code>activation_priority</code></td><td>No</td><td><code>low</code>, <code>medium</code>, <code>high</code>, <code>critical</code></td></tr><tr><td><code>permissionMode</code></td><td>No</td><td>Permission behavior override</td></tr></tbody></table>
+<p>For a deeper dive, see <a href="/docs/guides/create-an-agent">How to Create a Claude Code Agent</a>.</p>
+<h2 id="step-8-validate-your-plugin">Step 8: Validate Your Plugin</h2>
+<p>Run the universal validator to check your plugin against both the Anthropic spec and the enterprise quality rubric.</p>
+<h3 id="structural-validation">Structural Validation</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#6A737D"># Validate plugin.json fields, file references, permissions</span></span>
+<span class="line"><span style="color:#B392F0">./scripts/validate-all-plugins.sh</span><span style="color:#9ECBFF"> plugins/devops/docker-workflow/</span></span></code></pre>
+<p>This checks:</p>
+<ul>
+<li><code>plugin.json</code> contains only allowed fields</li>
+<li>All referenced files exist</li>
+<li>Script files have execute permissions</li>
+<li>No secrets or dangerous patterns</li>
+</ul>
+<h3 id="content-validation">Content Validation</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#6A737D"># Standard tier: Anthropic minimum requirements</span></span>
+<span class="line"><span style="color:#B392F0">python3</span><span style="color:#9ECBFF"> scripts/validate-skills-schema.py</span><span style="color:#79B8FF"> --verbose</span><span style="color:#9ECBFF"> plugins/devops/docker-workflow/</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Enterprise tier: 100-point rubric for marketplace quality</span></span>
+<span class="line"><span style="color:#B392F0">python3</span><span style="color:#9ECBFF"> scripts/validate-skills-schema.py</span><span style="color:#79B8FF"> --enterprise</span><span style="color:#79B8FF"> --verbose</span><span style="color:#9ECBFF"> plugins/devops/docker-workflow/</span></span></code></pre>
+<p>The enterprise validator grades each SKILL.md on a 100-point rubric:</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Grade</th><th>Score</th><th>Meaning</th></tr></thead><tbody><tr><td>A</td><td>90-100</td><td>Excellent: production-ready, well-documented</td></tr><tr><td>B</td><td>70-89</td><td>Good: functional with minor improvements needed</td></tr><tr><td>C</td><td>50-69</td><td>Adequate: works but needs more documentation</td></tr><tr><td>D</td><td>30-49</td><td>Poor: significant gaps in structure or content</td></tr><tr><td>F</td><td>0-29</td><td>Failing: stub or placeholder content</td></tr></tbody></table>
+<p>Target a B grade (70+) minimum for marketplace submission. A grade (90+) plugins are featured on the <a href="/explore">Explore</a> page.</p>
+<h3 id="quick-test-script">Quick Test Script</h3>
+<p>For rapid iteration during development, use the quick test:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">pnpm</span><span style="color:#9ECBFF"> run</span><span style="color:#9ECBFF"> sync-marketplace</span><span style="color:#E1E4E8"> &#x26;&#x26; </span><span style="color:#B392F0">./scripts/quick-test.sh</span></span></code></pre>
+<p>This runs the build, lint, and validation pipeline in about 30 seconds.</p>
+<h2 id="full-example-building-a-complete-plugin">Full Example: Building a Complete Plugin</h2>
+<p>Here is the complete file tree for a production-ready Docker workflow plugin:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>docker-workflow/</span></span>
+<span class="line"><span>├── .claude-plugin/</span></span>
+<span class="line"><span>│   └── plugin.json</span></span>
+<span class="line"><span>├── README.md</span></span>
+<span class="line"><span>├── LICENSE</span></span>
+<span class="line"><span>├── commands/</span></span>
+<span class="line"><span>│   ├── docker-build.md</span></span>
+<span class="line"><span>│   └── docker-debug.md</span></span>
+<span class="line"><span>├── skills/</span></span>
+<span class="line"><span>│   ├── docker-compose/</span></span>
+<span class="line"><span>│   │   ├── SKILL.md</span></span>
+<span class="line"><span>│   │   └── reference.md</span></span>
+<span class="line"><span>│   └── dockerfile-optimizer/</span></span>
+<span class="line"><span>│       ├── SKILL.md</span></span>
+<span class="line"><span>│       └── patterns.md</span></span>
+<span class="line"><span>└── agents/</span></span>
+<span class="line"><span>    └── security-scanner.md</span></span></code></pre>
+<p>Each file follows the patterns shown in the steps above. The plugin provides:</p>
+<ul>
+<li>Two commands users can invoke explicitly (<code>/docker-build</code>, <code>/docker-debug</code>)</li>
+<li>Two skills that activate automatically when working with Docker files</li>
+<li>One agent that can run autonomous security scans</li>
+</ul>
+<h2 id="testing-your-plugin">Testing Your Plugin</h2>
+<h3 id="local-installation">Local Installation</h3>
+<p>Install the plugin from a local path:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">claude</span><span style="color:#9ECBFF"> /plugin</span><span style="color:#9ECBFF"> add</span><span style="color:#9ECBFF"> /path/to/docker-workflow</span></span></code></pre>
+<h3 id="verify-discovery">Verify Discovery</h3>
+<p>Check that Claude Code finds your commands, skills, and agents:</p>
+<ol>
+<li>Type <code>/docker-</code> and verify autocomplete shows your commands</li>
+<li>Say “create a docker-compose file” and verify the skill activates</li>
+<li>Ask Claude to “run a security scan” and verify the agent responds</li>
+</ol>
+<h3 id="iterate">Iterate</h3>
+<p>Edit your Markdown files, re-run validation, and test again. No build step is required for instruction plugins — Claude Code reads the Markdown directly.</p>
+<h2 id="next-steps">Next Steps</h2>
+<p>Once your plugin passes validation:</p>
+<ol>
+<li>Push to a GitHub repository</li>
+<li><a href="/docs/guides/publish-to-marketplace">Publish to the Tons of Skills marketplace</a></li>
+<li>Share with the community at <a href="https://tonsofskills.com">tonsofskills.com</a></li>
+</ol>
+<p>For platform-specific integrations, consider building a <a href="/docs/guides/saas-skill-packs">SaaS Skill Pack</a>. For tools that need runtime capabilities beyond Markdown instructions, see <a href="/docs/guides/mcp-server-plugin">Building an MCP Server Plugin</a>.</p>
+
+        </article>
+
+        <!-- Official Links Callout -->
+        <aside class="official-links" data-astro-cid-ya4srytn>
+            <h3 class="official-links-title" data-astro-cid-ya4srytn>Official Anthropic Documentation</h3>
+            <ul class="official-links-list" data-astro-cid-ya4srytn>
+              <li data-astro-cid-ya4srytn>
+                  <a href="https://docs.anthropic.com/en/docs/claude-code/" target="_blank" rel="noopener noreferrer" data-astro-cid-ya4srytn>
+                    Anthropic Claude Code Documentation
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-left:4px;vertical-align:middle;" data-astro-cid-ya4srytn><path d="M3.5 1.5H10.5V8.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-ya4srytn></path><path d="M10.5 1.5L1.5 10.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-ya4srytn></path></svg>
+                  </a>
+                </li><li data-astro-cid-ya4srytn>
+                  <a href="https://docs.anthropic.com/en/docs/claude-code/plugins" target="_blank" rel="noopener noreferrer" data-astro-cid-ya4srytn>
+                    Anthropic Plugins Reference
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-left:4px;vertical-align:middle;" data-astro-cid-ya4srytn><path d="M3.5 1.5H10.5V8.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-ya4srytn></path><path d="M10.5 1.5L1.5 10.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-ya4srytn></path></svg>
+                  </a>
+                </li>
+            </ul>
+          </aside>
+
+        <!-- Related Docs -->
+        <aside class="related-docs" data-astro-cid-ya4srytn>
+            <h3 class="related-title" data-astro-cid-ya4srytn>Related Documentation</h3>
+            <div class="related-grid" data-astro-cid-ya4srytn>
+              <a href="/docs/concepts/plugins" class="related-card" data-astro-cid-ya4srytn>
+                  <span class="related-section" data-astro-cid-ya4srytn>Concepts</span>
+                  <span class="related-name" data-astro-cid-ya4srytn>What Are Claude Code Plugins?</span>
+                </a><a href="/docs/reference/plugin-json-schema" class="related-card" data-astro-cid-ya4srytn>
+                  <span class="related-section" data-astro-cid-ya4srytn>Reference</span>
+                  <span class="related-name" data-astro-cid-ya4srytn>plugin.json Schema Reference</span>
+                </a><a href="/docs/guides/publish-to-marketplace" class="related-card" data-astro-cid-ya4srytn>
+                  <span class="related-section" data-astro-cid-ya4srytn>Guides</span>
+                  <span class="related-name" data-astro-cid-ya4srytn>Publish a Plugin to the Marketplace</span>
+                </a>
+            </div>
+          </aside>
+
+        <!-- Prev/Next Navigation -->
+        <nav class="docs-nav-footer" data-astro-cid-ya4srytn>
+          <a href="/docs/guides/write-a-skill" class="nav-link nav-prev" data-astro-cid-ya4srytn>
+              <span class="nav-label" data-astro-cid-ya4srytn>Previous</span>
+              <span class="nav-title" data-astro-cid-ya4srytn>How to Write a Claude Code Skill</span>
+            </a>
+          <a href="/docs/guides/create-an-agent" class="nav-link nav-next" data-astro-cid-ya4srytn>
+              <span class="nav-label" data-astro-cid-ya4srytn>Next</span>
+              <span class="nav-title" data-astro-cid-ya4srytn>How to Create a Claude Code Agent</span>
+            </a>
+        </nav>
+      </div>
+    </div>
+  </div>
+
+  
+
+  
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
