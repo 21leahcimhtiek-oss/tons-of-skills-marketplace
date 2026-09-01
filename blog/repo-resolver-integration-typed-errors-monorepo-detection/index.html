@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Repo-Resolver: Typed Errors and Monorepo Detection — Tons of Skills Work Diary</title>
+    <meta name="description" content="A shared repo-resolver package shipped into claude-runtime — ADR to integration in seven PRs, with typed error classes and transparent fallback that avoided a flag day.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://startaitools.com/posts/repo-resolver-integration-typed-errors-monorepo-detection/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/repo-resolver-integration-typed-errors-monorepo-detection/">
+    <meta property="og:title" content="Repo-Resolver: Typed Errors and Monorepo Detection — Tons of Skills Work Diary">
+    <meta property="og:description" content="A shared repo-resolver package shipped into claude-runtime — ADR to integration in seven PRs, with typed error classes and transparent fallback that avoided a flag day.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="Repo-Resolver: Typed Errors and Monorepo Detection — Tons of Skills Work Diary">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/repo-resolver-integration-typed-errors-monorepo-detection/">
+    <meta name="twitter:title" content="Repo-Resolver: Typed Errors and Monorepo Detection — Tons of Skills Work Diary">
+    <meta name="twitter:description" content="A shared repo-resolver package shipped into claude-runtime — ADR to integration in seven PRs, with typed error classes and transparent fallback that avoided a flag day.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"Repo-Resolver: Typed Errors and Monorepo Detection","description":"A shared repo-resolver package shipped into claude-runtime — ADR to integration in seven PRs, with typed error classes and transparent fallback that avoided a flag day.","datePublished":"2026-04-14","url":"https://tonsofskills.com/blog/undefined","author":{"@type":"Person","name":"Jeremy Longshore"},"publisher":{"@type":"Organization","name":"Tons of Skills","url":"https://tonsofskills.com"}}</script>
+  
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.post-header[data-astro-cid-7jjqptxk]{background:var(--panel);padding:4rem 1.5rem 3rem;border-bottom:1px solid var(--border)}.post-header-inner[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto}.back-link[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3);text-decoration:none;display:inline-block;margin-bottom:1.5rem;transition:color .2s}.back-link[data-astro-cid-7jjqptxk]:hover{color:var(--primary)}.post-meta[data-astro-cid-7jjqptxk]{display:flex;align-items:center;gap:.75rem;margin-bottom:1rem}time[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3)}.featured-badge[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.2rem .6rem;background:#ce114126;color:var(--red);border-radius:0;font-weight:600;text-transform:uppercase;letter-spacing:.05em}.post-header[data-astro-cid-7jjqptxk] h1[data-astro-cid-7jjqptxk]{font-family:var(--font-body);font-size:clamp(1.5rem,4vw,2.2rem);font-weight:700;color:var(--text);line-height:1.25;margin-bottom:.75rem;letter-spacing:0}.post-desc[data-astro-cid-7jjqptxk]{color:var(--text-2);font-size:1.05rem;line-height:1.6;margin-bottom:1rem}.post-tags[data-astro-cid-7jjqptxk]{display:flex;gap:.4rem;flex-wrap:wrap}.tag[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.15rem .5rem;background:var(--surface-3);color:var(--text-3);border-radius:0}.post-body[data-astro-cid-7jjqptxk]{padding:3rem 1.5rem 4rem}.prose[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto;color:var(--text-2);line-height:1.8;font-size:1rem}.prose[data-astro-cid-7jjqptxk] h2{font-family:var(--font-body);font-size:1.5rem;font-weight:700;color:var(--text);margin:2.5rem 0 1rem;letter-spacing:0}.prose[data-astro-cid-7jjqptxk] h3{font-size:1.2rem;font-weight:600;color:var(--text);margin:2rem 0 .75rem}.prose[data-astro-cid-7jjqptxk] p{margin-bottom:1rem}.prose[data-astro-cid-7jjqptxk] ul,.prose[data-astro-cid-7jjqptxk] ol{margin:.5rem 0 1rem 1.5rem}.prose[data-astro-cid-7jjqptxk] li{margin-bottom:.35rem}.prose[data-astro-cid-7jjqptxk] strong{color:var(--text);font-weight:600}.prose[data-astro-cid-7jjqptxk] code{font-family:var(--font-mono);font-size:.88em;background:var(--surface-3);padding:.15em .35em;border-radius:0;color:var(--primary)}.prose[data-astro-cid-7jjqptxk] a{color:var(--primary);text-decoration:none}.prose[data-astro-cid-7jjqptxk] a:hover{text-decoration:underline}@media(max-width:768px){.post-header[data-astro-cid-7jjqptxk]{padding:3rem 1rem 2rem}.post-body[data-astro-cid-7jjqptxk]{padding:2rem 1rem 3rem}}
+</style></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  <article class="post" data-astro-cid-7jjqptxk>
+    <header class="post-header" data-astro-cid-7jjqptxk>
+      <div class="post-header-inner" data-astro-cid-7jjqptxk>
+        <a href="/blog" class="back-link" data-astro-cid-7jjqptxk>Back to Work Diary</a>
+        <div class="post-meta" data-astro-cid-7jjqptxk>
+          <time datetime="2026-04-14" data-astro-cid-7jjqptxk>April 13, 2026</time>
+          
+        </div>
+        <h1 data-astro-cid-7jjqptxk>Repo-Resolver: Typed Errors and Monorepo Detection</h1>
+        <p class="post-desc" data-astro-cid-7jjqptxk>A shared repo-resolver package shipped into claude-runtime — ADR to integration in seven PRs, with typed error classes and transparent fallback that avoided a flag day.</p>
+        <div class="post-tags" data-astro-cid-7jjqptxk>
+          <span class="tag" data-astro-cid-7jjqptxk>typescript</span><span class="tag" data-astro-cid-7jjqptxk>architecture</span><span class="tag" data-astro-cid-7jjqptxk>monorepo</span><span class="tag" data-astro-cid-7jjqptxk>claude-code</span><span class="tag" data-astro-cid-7jjqptxk>ai-agents</span><span class="tag" data-astro-cid-7jjqptxk>automation</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="post-body" data-astro-cid-7jjqptxk>
+      <div class="prose" data-astro-cid-7jjqptxk>
+        <p>Three different services in the qmd-team-intent-kb stack all need to answer the same question: “what repo is this?” The edge-daemon needs it at spool time to tag captured memory candidates. The MCP server needs it at query time to scope retrieval. The ingestion pipeline needs it at index time to build canonical tenant partitions. Before April 14, each of them had its own half-answer — <code>resolveGitContext()</code> variants with different edge-case handling, different caching strategies, and a long tail of bugs around SSH vs HTTPS remotes and monorepo roots.</p>
+<p>Today the work of consolidating that into a proper shared package landed. <code>@qmd-team-intent-kb/repo-resolver</code> went from an ADR (PR #33) to full runtime integration in <code>claude-runtime</code> (PR #43) in seven merged PRs, all on the same day. The design-rationale call I want to unpack is the one that enabled shipping #43 without a flag day: typed error classes plus a transparent fallback to the legacy resolver. The runtime never had to pick a side.</p>
+<h2 id="the-repo-resolver-arc">The Repo-Resolver Arc</h2>
+<p>Six PRs, in order of merge:</p>
+<ul>
+<li><strong>#33 — ADR.</strong> Why a new package exists, what it owns, and what it explicitly does not own (no network I/O, no commit-graph traversal, no LFS awareness).</li>
+<li><strong>#35 — Core <code>resolveRepoContext()</code> entry point.</strong> One function, one return shape, no overloads. The rest of the package is supporting detail.</li>
+<li><strong>#36 — Tenant ID derivation + remote URL normalization.</strong> 295 insertions across 3 files. Test file alone was 178 lines because the normalization matrix is wide: SSH, HTTPS, bare-git, self-hosted instances all have to collapse to the same canonical tenant ID.</li>
+<li><strong>#37 — Monorepo detection.</strong> pnpm, npm workspaces, Nx, Turborepo, Lerna. 125 lines of detection logic, 178 lines of tests across 6 fixture repos.</li>
+<li><strong>#38 — Process-local TTL cache.</strong> Deliberately not Redis.</li>
+<li><strong>#40 — Gemini review feedback on #35.</strong> Addressing automated code review comments before integration.</li>
+<li><strong>#43 — Runtime integration.</strong> <code>claude-runtime</code>’s <code>DefaultContextProvider</code> swaps in <code>resolveRepoContext()</code>. 227 insertions across 8 files, with 159 new lines in <code>context-provider.test.ts</code> and 39 more in <code>candidate-builder.test.ts</code>.</li>
+</ul>
+<p>The order matters. The ADR came first for a reason that I’ll get to. The runtime integration came last because everything else had to exist before it could land cleanly.</p>
+<p>Two adjacent PRs shipped the same day and are worth naming: <strong>#34</strong> (brought the repo into the shared <code>wild-ecosystem</code> GCP project so CI had the right service accounts) and <strong>#42</strong> (edge-daemon CLI subcommand dispatcher — <code>start</code>/<code>stop</code>/<code>status</code>/<code>run-once</code> replacing monolithic argv flag checking in <code>main.ts</code>, with 126 lines of dispatcher and 185 lines of tests).</p>
+<h2 id="why-a-separate-package">Why a Separate Package</h2>
+<p>The three consumers problem forced the hand. If <code>resolveRepoContext()</code> lives inside edge-daemon, then the MCP server has to reach across module boundaries to get it — or worse, reimplement it. If it lives inside a “common” utility module that already pulls in unrelated things, then every consumer pays the transitive dependency tax.</p>
+<p>The cost of guessing wrong on the contract mid-implementation is the thing the ADR was optimizing against. Three integrations, each a week of work to unwind if the shape changes. Cheap to think hard for an afternoon before PR #35; expensive to re-shape after three consumers depend on it.</p>
+<p>So: separate package, minimal surface, explicit non-goals. The ADR enumerated what repo-resolver does not do — no git fetch, no remote introspection, no credential handling. That list of non-goals is what keeps the package small enough to be worth depending on.</p>
+<h2 id="why-not-just-read-the-git-remote">Why Not Just Read the Git Remote?</h2>
+<p>The obvious approach is: <code>git config --get remote.origin.url</code>, parse it, done. This does not work, and here is why not.</p>
+<p>First, the same logical repo has many valid remote URLs. <code>git@github.com:org/repo.git</code>, <code>https://github.com/org/repo</code>, <code>https://github.com/org/repo.git</code>, <code>ssh://git@github.com:22/org/repo.git</code> — all the same tenant. If you treat the raw URL as the identifier, every contributor who cloned over a different protocol gets a different tenant ID and their captured memory candidates scatter across what should be one partition.</p>
+<p>Second, <code>origin</code> is not guaranteed. Forks have <code>upstream</code>. Some workflows push to <code>deploy</code>. A freshly-initialized repo with no remote set at all still needs a stable identifier while the developer is iterating locally.</p>
+<p>Third, monorepos break the one-repo-one-tenant assumption from a different direction. If the developer is working inside <code>packages/foo/</code> of a pnpm workspace, the interesting unit for scoping memory might be the workspace root, or the package, or both — but you cannot figure that out from the remote URL alone.</p>
+<p>So repo-resolver derives the tenant ID from a normalized form of the remote (PR #36), falls back to a content-hash of the initial commit when no remote exists, and separately records the monorepo root and the package subpath when detected (PR #37). Three outputs from one entry point, each with defined fallbacks.</p>
+<h2 id="monorepo-detection-without-guessing">Monorepo Detection Without Guessing</h2>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#F97583">function</span><span style="color:#B392F0"> detectMonorepo</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">root</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> string</span><span style="color:#E1E4E8">)</span><span style="color:#F97583">:</span><span style="color:#B392F0"> MonorepoKind</span><span style="color:#F97583"> |</span><span style="color:#79B8FF"> null</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">  if</span><span style="color:#E1E4E8"> (</span><span style="color:#B392F0">hasPnpmWorkspaceFile</span><span style="color:#E1E4E8">(root)) </span><span style="color:#F97583">return</span><span style="color:#9ECBFF"> 'pnpm'</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">  if</span><span style="color:#E1E4E8"> (</span><span style="color:#B392F0">hasNpmWorkspacesField</span><span style="color:#E1E4E8">(root)) </span><span style="color:#F97583">return</span><span style="color:#9ECBFF"> 'npm'</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">  if</span><span style="color:#E1E4E8"> (</span><span style="color:#B392F0">hasNxJson</span><span style="color:#E1E4E8">(root) </span><span style="color:#F97583">&#x26;&#x26;</span><span style="color:#B392F0"> hasWorkspacesConfig</span><span style="color:#E1E4E8">(root)) </span><span style="color:#F97583">return</span><span style="color:#9ECBFF"> 'nx'</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">  if</span><span style="color:#E1E4E8"> (</span><span style="color:#B392F0">hasTurboJson</span><span style="color:#E1E4E8">(root)) </span><span style="color:#F97583">return</span><span style="color:#9ECBFF"> 'turbo'</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">  if</span><span style="color:#E1E4E8"> (</span><span style="color:#B392F0">hasLernaJson</span><span style="color:#E1E4E8">(root)) </span><span style="color:#F97583">return</span><span style="color:#9ECBFF"> 'lerna'</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">  return</span><span style="color:#79B8FF"> null</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>The order is not alphabetical — it reflects specificity. pnpm’s <code>pnpm-workspace.yaml</code> is unambiguous; it exists exactly when the repo is a pnpm workspace. npm’s <code>"workspaces"</code> field inside <code>package.json</code> is the second-most specific. Nx comes third and requires both <code>nx.json</code> and a workspace configuration, because Nx also supports non-workspace single-app projects. Turborepo and Lerna come last because their presence is weaker evidence.</p>
+<p>Three edge cases the fixture tests encode:</p>
+<ol>
+<li><strong>Turbo without a monorepo.</strong> A single-app project using <code>turbo.json</code> for incremental build caching. Running with this config alone means “not actually a monorepo” — so Turbo detection only triggers when <code>turbo.json</code> is present and no stronger signal above it fires.</li>
+<li><strong>Nx without workspaces.</strong> A standalone Nx project with <code>nx.json</code> but no <code>workspaces</code> field. The <code>&#x26;&#x26; hasWorkspacesConfig(root)</code> in the third check exists for exactly this.</li>
+<li><strong>Nested monorepos.</strong> A repo with a subdirectory that also has its own <code>pnpm-workspace.yaml</code>. The resolver walks upward and takes the outermost workspace root as definitive. The nested config is a mistake we do not try to second-guess, but we also do not let it shadow the real root.</li>
+</ol>
+<p>No heuristic is perfect. But <code>detectMonorepo</code> returning <code>null</code> is an acceptable answer — consumers treat it as “single-package repo” and move on. The cost of a wrong classification is higher than the cost of an honest unknown.</p>
+<h2 id="tenant-id-derivation-is-not-url-parsing">Tenant ID Derivation Is Not URL Parsing</h2>
+<p>PR #36 is the one I expected to be small and was not. 295 insertions, 178 lines of tests, because every remote URL shape is its own wrinkle:</p>
+<ul>
+<li><code>git@github.com:org/repo.git</code> — SSH scp-style, no <code>ssh://</code> prefix, colon-delimited path</li>
+<li><code>ssh://git@github.com/org/repo.git</code> — real ssh:// URL</li>
+<li><code>https://github.com/org/repo.git</code> — HTTPS with <code>.git</code></li>
+<li><code>https://github.com/org/repo</code> — HTTPS without <code>.git</code></li>
+<li><code>https://user@github.com/org/repo</code> — HTTPS with username in userinfo</li>
+<li><code>git://github.com/org/repo.git</code> — legacy git protocol</li>
+<li><code>https://gitlab.self-hosted.corp/group/subgroup/repo.git</code> — self-hosted with nested groups</li>
+<li>` — local file remotes (yes, people do this)</li>
+</ul>
+<p>Normalization collapses all of these to a form like <code>host/path</code>, lowercase, trailing <code>.git</code> stripped, query and fragment discarded, userinfo discarded. The tenant ID is a hash of that canonical string. Same logical repo, same tenant, regardless of how the contributor happened to clone.</p>
+<p>The alternative — storing the raw remote URL and trying to canonicalize at query time — was considered and rejected. Canonicalization is lossy by definition; doing it once at capture and hashing the result means every downstream consumer agrees by construction, not by convention.</p>
+<h2 id="the-cache-is-process-local-on-purpose">The Cache Is Process-Local on Purpose</h2>
+<p>PR #38 added a TTL cache. The obvious reach is Redis. The deliberate choice was process-local.</p>
+<p>Why: repo context changes on events that already restart the daemon. A new <code>git commit</code> does not invalidate the tenant ID or the monorepo structure. A <code>git remote set-url</code> does — and the developer will bounce the daemon, because changing a remote URL is not a silent background event. The only real drift between cache and truth is during active development of the resolver itself, which is a bounded scenario.</p>
+<p>A shared Redis cache would buy approximately zero hit-rate improvement in the realistic access pattern (one daemon per developer machine) and add a whole class of staleness bugs. Process-local with a conservative TTL is correct for the actual workload.</p>
+<h2 id="integration-without-surprises">Integration Without Surprises</h2>
+<p>PR #43 is the payoff. <code>DefaultContextProvider</code> in <code>claude-runtime</code> previously had a stub pass-through that called the legacy <code>resolveGitContext()</code>. The new code tries <code>resolveRepoContext()</code> first and falls back transparently:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#F97583">try</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> resolved</span><span style="color:#F97583"> =</span><span style="color:#F97583"> await</span><span style="color:#B392F0"> resolveRepoContext</span><span style="color:#E1E4E8">(cwd);</span></span>
+<span class="line"><span style="color:#F97583">  return</span><span style="color:#B392F0"> enrichGitContext</span><span style="color:#E1E4E8">(resolved);</span></span>
+<span class="line"><span style="color:#E1E4E8">} </span><span style="color:#F97583">catch</span><span style="color:#E1E4E8"> (err) {</span></span>
+<span class="line"><span style="color:#F97583">  if</span><span style="color:#E1E4E8"> (</span></span>
+<span class="line"><span style="color:#E1E4E8">    err </span><span style="color:#F97583">instanceof</span><span style="color:#B392F0"> NotAGitRepo</span><span style="color:#F97583"> ||</span></span>
+<span class="line"><span style="color:#E1E4E8">    err </span><span style="color:#F97583">instanceof</span><span style="color:#B392F0"> GitUnavailable</span><span style="color:#F97583"> ||</span></span>
+<span class="line"><span style="color:#E1E4E8">    err </span><span style="color:#F97583">instanceof</span><span style="color:#B392F0"> NoCommits</span><span style="color:#F97583"> ||</span></span>
+<span class="line"><span style="color:#E1E4E8">    err </span><span style="color:#F97583">instanceof</span><span style="color:#B392F0"> BareRepo</span><span style="color:#F97583"> ||</span></span>
+<span class="line"><span style="color:#E1E4E8">    err </span><span style="color:#F97583">instanceof</span><span style="color:#B392F0"> Io</span></span>
+<span class="line"><span style="color:#E1E4E8">  ) {</span></span>
+<span class="line"><span style="color:#F97583">    return</span><span style="color:#B392F0"> resolveGitContext</span><span style="color:#E1E4E8">(cwd); </span><span style="color:#6A737D">// legacy path</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#F97583">  throw</span><span style="color:#E1E4E8"> err;</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>Five typed error classes — <code>NotAGitRepo</code>, <code>GitUnavailable</code>, <code>NoCommits</code>, <code>BareRepo</code>, <code>Io</code> — each carry a specific failure mode. The integration code catches exactly those and falls back. Any other error is a programming bug and rethrows.</p>
+<p>This is the “without a flag day” part. No feature flag, no env var, no staged rollout. If the resolver works, you get the enriched context (<code>repoName</code>, <code>commitSha</code>, canonical tenant). If it fails for any known reason, you get the old behavior. The typed errors make the fallback predicate legible — there is no <code>catch (e) { return fallback(); }</code> that silently swallows real bugs.</p>
+<p>Test-footprint-to-behavior-change ratio: 227 insertions, 198 of them in test files. <code>context-provider.test.ts</code> got 159 new lines covering every error class and the enrichment path. <code>candidate-builder.test.ts</code> got 39 lines for the <code>projectContext</code> default-to-canonical-name behavior. The ratio of tests to production code was not an accident — integration points into the runtime are exactly where stealth regressions hide.</p>
+<h2 id="also-shipped">Also Shipped</h2>
+<p><strong>claude-code-plugins</strong> cut v4.25.0. The headline was Shopify Skill Pack v2.0 — 38 skills now with references-extraction, which was the gap that had kept Shopify out of the top tier. Marketplace is at 430 plugins and 2,838 skills. Cowork plugin got a fix: it was referencing a <code>stripe-pack</code> that did not exist, which has been swapped for <code>clerk-pack</code>. SaaS packs now render as individual marketplace cards rather than collapsing into a category group.</p>
+<p><strong>xireactor</strong> tagged v0.2.1 and picked up the “Brilliant” rebrand. The immediate bug fix was <code>demo_e2e.sh</code> which had drifted off the current API contract. RLS-denied writes now return 403 instead of 500 — the old behavior made permission errors look like server faults. Upstream sync brought in 4-tier governance, entry-links write path, permissions v2, comments, and render. The <code>main</code>/<code>dev</code> branching convention got documented because the repo had quietly switched to a two-branch model without telling anyone.</p>
+<p><strong>braves</strong> (the broadcast dashboard) shipped two small quality-of-life fixes that mattered more than the size suggests. Player surname suffix strip now handles Jr./Sr./II/III so the lineup card displays “Acuña” not “Acuña Jr.” in the space-constrained slots. Pregame storylines now persist to SQLite, which means the dashboard survives a restart during broadcast — previously a kernel upgrade or power blip wiped the show’s prep. CLAUDE.md got rewritten from the old cloud-deployment assumptions to the local-first deployment model the project actually uses now.</p>
+<h2 id="the-shape-of-the-day">The Shape of the Day</h2>
+<p>Nine merged PRs across four repos, all converging on the same theme: make the contract explicit, then integrate. The repo-resolver arc in qmd-team-intent-kb is the clearest example — ADR first, core implementation second, normalization and detection third, integration last, with typed errors absorbing the risk of the integration step. But the pattern repeats. The xireactor branching model got documented after the fact because the implicit convention was causing drift. The braves CLAUDE.md got rewritten because the documented deployment model was a lie. Shopify Skill Pack v2.0 added references-extraction because the implicit “skills have references” assumption was only explicit for some packs.</p>
+<p>Every one of these is the same move: take something that was working by convention and make it work by contract. The repo-resolver just happened to be the one that earned its own package.</p>
+<h2 id="related-posts">Related Posts</h2>
+<ul>
+<li><a href="/blog/twelve-prs-security-sprint-pregame-overhaul/">Twelve PRs, a Security Sprint, and a Pregame Overhaul</a></li>
+<li><a href="/blog/zero-to-ci-full-stack-dashboard-one-session/">Zero to CI: Full-Stack Dashboard, One Session</a></li>
+<li><a href="https://startaitools.com/posts/wild-deep-dive-3-observability/">Wild Deep Dive #3: Observability</a></li>
+</ul>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "Repo-Resolver: Typed Errors and Monorepo Detection",
+  "description": "A shared repo-resolver package shipped into claude-runtime — ADR to integration in seven PRs, with typed error classes and transparent fallback that avoided a flag day.",
+  "datePublished": "2026-04-14T10:00:00-05:00",
+  "dateModified": "2026-04-14T10:00:00-05:00",
+  "author": {"@type": "Person", "name": "Jeremy Longshore", "url": "https://startaitools.com/about/"},
+  "publisher": {"@type": "Organization", "name": "Intent Solutions", "url": "https://startaitools.com"},
+  "mainEntityOfPage": {"@type": "WebPage", "@id": "https://startaitools.com/posts/repo-resolver-integration-typed-errors-monorepo-detection/"},
+  "keywords": "typescript, architecture, monorepo, claude-code, ai-agents, automation, repo-resolver"
+}
+</script>
+      </div>
+    </div>
+  </article>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

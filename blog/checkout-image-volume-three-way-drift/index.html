@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Third State: When Your Checkout, Image, and Docker Volume All Disagree — Tons of Skills Work Diary</title>
+    <meta name="description" content="A rebuild succeeded and nothing changed. How Docker named volumes shadow your image, and how to write a deploy smoke check that asserts on the served bytes.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://startaitools.com/posts/checkout-image-volume-three-way-drift/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/checkout-image-volume-three-way-drift/">
+    <meta property="og:title" content="The Third State: When Your Checkout, Image, and Docker Volume All Disagree — Tons of Skills Work Diary">
+    <meta property="og:description" content="A rebuild succeeded and nothing changed. How Docker named volumes shadow your image, and how to write a deploy smoke check that asserts on the served bytes.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="The Third State: When Your Checkout, Image, and Docker Volume All Disagree — Tons of Skills Work Diary">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/checkout-image-volume-three-way-drift/">
+    <meta name="twitter:title" content="The Third State: When Your Checkout, Image, and Docker Volume All Disagree — Tons of Skills Work Diary">
+    <meta name="twitter:description" content="A rebuild succeeded and nothing changed. How Docker named volumes shadow your image, and how to write a deploy smoke check that asserts on the served bytes.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"The Third State: When Your Checkout, Image, and Docker Volume All Disagree","description":"A rebuild succeeded and nothing changed. How Docker named volumes shadow your image, and how to write a deploy smoke check that asserts on the served bytes.","datePublished":"2026-07-26","url":"https://tonsofskills.com/blog/undefined","author":{"@type":"Person","name":"Jeremy Longshore"},"publisher":{"@type":"Organization","name":"Tons of Skills","url":"https://tonsofskills.com"}}</script>
+  
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.post-header[data-astro-cid-7jjqptxk]{background:var(--panel);padding:4rem 1.5rem 3rem;border-bottom:1px solid var(--border)}.post-header-inner[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto}.back-link[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3);text-decoration:none;display:inline-block;margin-bottom:1.5rem;transition:color .2s}.back-link[data-astro-cid-7jjqptxk]:hover{color:var(--primary)}.post-meta[data-astro-cid-7jjqptxk]{display:flex;align-items:center;gap:.75rem;margin-bottom:1rem}time[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3)}.featured-badge[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.2rem .6rem;background:#ce114126;color:var(--red);border-radius:0;font-weight:600;text-transform:uppercase;letter-spacing:.05em}.post-header[data-astro-cid-7jjqptxk] h1[data-astro-cid-7jjqptxk]{font-family:var(--font-body);font-size:clamp(1.5rem,4vw,2.2rem);font-weight:700;color:var(--text);line-height:1.25;margin-bottom:.75rem;letter-spacing:0}.post-desc[data-astro-cid-7jjqptxk]{color:var(--text-2);font-size:1.05rem;line-height:1.6;margin-bottom:1rem}.post-tags[data-astro-cid-7jjqptxk]{display:flex;gap:.4rem;flex-wrap:wrap}.tag[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.15rem .5rem;background:var(--surface-3);color:var(--text-3);border-radius:0}.post-body[data-astro-cid-7jjqptxk]{padding:3rem 1.5rem 4rem}.prose[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto;color:var(--text-2);line-height:1.8;font-size:1rem}.prose[data-astro-cid-7jjqptxk] h2{font-family:var(--font-body);font-size:1.5rem;font-weight:700;color:var(--text);margin:2.5rem 0 1rem;letter-spacing:0}.prose[data-astro-cid-7jjqptxk] h3{font-size:1.2rem;font-weight:600;color:var(--text);margin:2rem 0 .75rem}.prose[data-astro-cid-7jjqptxk] p{margin-bottom:1rem}.prose[data-astro-cid-7jjqptxk] ul,.prose[data-astro-cid-7jjqptxk] ol{margin:.5rem 0 1rem 1.5rem}.prose[data-astro-cid-7jjqptxk] li{margin-bottom:.35rem}.prose[data-astro-cid-7jjqptxk] strong{color:var(--text);font-weight:600}.prose[data-astro-cid-7jjqptxk] code{font-family:var(--font-mono);font-size:.88em;background:var(--surface-3);padding:.15em .35em;border-radius:0;color:var(--primary)}.prose[data-astro-cid-7jjqptxk] a{color:var(--primary);text-decoration:none}.prose[data-astro-cid-7jjqptxk] a:hover{text-decoration:underline}@media(max-width:768px){.post-header[data-astro-cid-7jjqptxk]{padding:3rem 1rem 2rem}.post-body[data-astro-cid-7jjqptxk]{padding:2rem 1rem 3rem}}
+</style></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  <article class="post" data-astro-cid-7jjqptxk>
+    <header class="post-header" data-astro-cid-7jjqptxk>
+      <div class="post-header-inner" data-astro-cid-7jjqptxk>
+        <a href="/blog" class="back-link" data-astro-cid-7jjqptxk>Back to Work Diary</a>
+        <div class="post-meta" data-astro-cid-7jjqptxk>
+          <time datetime="2026-07-26" data-astro-cid-7jjqptxk>July 25, 2026</time>
+          
+        </div>
+        <h1 data-astro-cid-7jjqptxk>The Third State: When Your Checkout, Image, and Docker Volume All Disagree</h1>
+        <p class="post-desc" data-astro-cid-7jjqptxk>A rebuild succeeded and nothing changed. How Docker named volumes shadow your image, and how to write a deploy smoke check that asserts on the served bytes.</p>
+        <div class="post-tags" data-astro-cid-7jjqptxk>
+          <span class="tag" data-astro-cid-7jjqptxk>deployment</span><span class="tag" data-astro-cid-7jjqptxk>docker</span><span class="tag" data-astro-cid-7jjqptxk>ci</span><span class="tag" data-astro-cid-7jjqptxk>devops</span><span class="tag" data-astro-cid-7jjqptxk>named-volumes</span><span class="tag" data-astro-cid-7jjqptxk>smoke-testing</span><span class="tag" data-astro-cid-7jjqptxk>verification</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="post-body" data-astro-cid-7jjqptxk>
+      <div class="prose" data-astro-cid-7jjqptxk>
+        <p>A rebuild succeeded. Docker reported healthy. The site served the same bytes it had been serving for weeks.</p>
+<p>That was July on <code>now-lms</code>, a fork of an open source Flask learning management system that Intent Solutions runs in production at <code>learn.intentsolutions.io</code> (Contabo VPS, Docker Compose, PostgreSQL 16, Caddy in front). Fork issue #14 recorded the actual problem: nobody could answer “what is deployed?” without shelling into the running container and hashing files by hand. Three artifacts each claimed a different answer.</p>
+<p>The git checkout on the server said one commit. The Docker image had been built from a second. The theme actually being served came from a third state that someone had hand copied into the Docker volumes at some earlier point, and which no commit anywhere described.</p>
+<p>36 commits landed on 2026-07-26 aimed at closing that gap. This is what the failure was, what the measurement said, and what is still unproven.</p>
+<h2 id="why-the-rebuild-changed-nothing">Why the rebuild changed nothing</h2>
+<p>A Docker named volume shadows the image’s copy of the files it holds, so the rebuilt image updates while the container keeps serving stale bytes out of the volume that outlived the rebuild.</p>
+<p>Two environment variables carry more weight than they look like they do.</p>
+<p><code>NOW_LMS_THEMES_DIR</code> (<code>/app/themes</code>) is not a themes folder. It is Flask’s entire template root. <code>NOW_LMS_DATA_DIR</code> (<code>/app/data</code>) serves every static asset. Both are Docker named volumes.</p>
+<p>Upstream’s code populates those directories only when they are empty. It is effectively a <code>copytree(dirs_exist_ok=True)</code> gated on an emptiness check. That guard is reasonable on first boot and actively harmful on every boot after it. Once the volumes have content, a rebuild picks up your new templates, bakes them into the image, starts the container, and the container reads templates from the volume instead. The image updates. The served bytes do not.</p>
+<p>Nothing errors. <code>docker compose up -d --build</code> exits zero. The health check passes, because the app is genuinely healthy: it is serving old files correctly.</p>
+<p>This is the shape of the bug worth generalizing. The stateful layer is where the identity chain breaks, because it is the only layer that survives the thing you replaced.</p>
+<h2 id="fix-one-the-image-knows-its-own-commit">Fix one: the image knows its own commit</h2>
+<p>Commit <code>ecb2388</code> closed three P0 beads. The first one gives every image a name it cannot lie about.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="dockerfile"><code><span class="line"><span style="color:#F97583">ARG</span><span style="color:#E1E4E8"> BUILD_SHA</span></span>
+<span class="line"><span style="color:#F97583">RUN</span><span style="color:#E1E4E8"> test -n </span><span style="color:#9ECBFF">"${BUILD_SHA}"</span><span style="color:#E1E4E8"> &#x26;&#x26; echo </span><span style="color:#9ECBFF">"${BUILD_SHA}"</span><span style="color:#E1E4E8"> > /app/BUILD_SHA</span></span>
+<span class="line"><span style="color:#F97583">LABEL</span><span style="color:#E1E4E8"> io.intentsolutions.commit=</span><span style="color:#9ECBFF">"${BUILD_SHA}"</span></span></code></pre>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">build</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  context</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">.</span></span>
+<span class="line"><span style="color:#85E89D">  args</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    BUILD_SHA</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">${BUILD_SHA:?run the deploy via scripts/deploy-vps.sh, which sets BUILD_SHA}</span></span></code></pre>
+<p>There is no default value, on purpose. A build that forgets <code>BUILD_SHA</code> fails instead of minting one more unidentifiable image. That was verified in both directions: <code>docker compose config</code> succeeds with the variable set, and fails with that exact guard message without it.</p>
+<p>Two read paths, because they answer different questions. The file is readable at runtime by the app or by an operator who is already inside the container. The label is queryable by Docker without starting anything, which is what you want when you are triaging a stopped container.</p>
+<h2 id="fix-two-an-explicit-refresh-not-a-delete">Fix two: an explicit refresh, not a delete</h2>
+<p>The volume trap needs a step that runs every deploy, not a guard that runs once. In <code>scripts/deploy-vps.sh</code>, after the build and after the container reports healthy:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">docker</span><span style="color:#9ECBFF"> compose</span><span style="color:#9ECBFF"> exec</span><span style="color:#79B8FF"> -T</span><span style="color:#9ECBFF"> app</span><span style="color:#9ECBFF"> sh</span><span style="color:#79B8FF"> -c</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#9ECBFF">  'cp -a /app/now_lms/templates/. /app/themes/ &#x26;&#x26; cp -a /app/now_lms/static/. /app/data/'</span></span></code></pre>
+<p>The trailing <code>/.</code> matters. <code>cp -a src/. dest/</code> has merge semantics: files present in the image overwrite their stale copies in the volume, and anything that exists only in the volume (user uploads living under <code>/app/data</code>) is left alone. The script then restarts the app so Jinja drops its compiled template caches.</p>
+<p>The alternative was deleting the volume copies to force the empty only guard to repopulate them. That was rejected for two reasons. Deletion destroys anything that exists only in the volume, which includes real user data. And it makes correctness depend on the empty only guard firing at exactly the right moment in the boot sequence, which is a timing argument rather than a guarantee. The sync is deterministic and idempotent. Run it twice and nothing changes.</p>
+<p>The same script refuses to deploy a dirty checkout: <code>git diff --quiet</code> against both the worktree and the index, exit 1 with <code>git status --short</code> printed if either is dirty. If the checkout is not a commit, the deploy cannot claim to be one.</p>
+<h2 id="the-mailto-link-that-no-mail-client-would-send">The mailto link that no mail client would send</h2>
+<p>While assembling the response body assertions that fix three’s smoke check would need, one of them caught a live bug that had been shipping to users.</p>
+<p>The theme built its access request link like this:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="jinja"><code><span class="line"><span style="color:#E1E4E8">href="</span><span style="color:#FFAB70">{{ </span><span style="color:#9ECBFF">'mailto:'</span><span style="color:#FFAB70"> ~ (</span><span style="color:#E1E4E8">contact_email</span><span style="color:#FFAB70"> | </span><span style="color:#E1E4E8">urlencode</span><span style="color:#FFAB70">) }}</span><span style="color:#E1E4E8">"</span></span></code></pre>
+<p>Jinja’s <code>urlencode</code> is <code>quote(value, safe="/")</code>. The <code>@</code> is not in the safe set, so it came out as <code>mailto:hello%40intentsolutions.io</code>. RFC 6068 section 2 defines the text between <code>mailto:</code> and any <code>?</code> as an addr-spec, which carries a literal <code>@</code>. Mail clients parse the percent encoded version as a local part with no domain and refuse to send it. Every “request access” click on the live site opened a compose window that could not be sent.</p>
+<p>The fix was dropping <code>| urlencode</code> from the address while keeping it on the subject, where percent encoding is correct.</p>
+<h2 id="fix-three-the-smoke-check-refuses-to-lie">Fix three: the smoke check refuses to lie</h2>
+<p><code>scripts/deploy-smoke.sh</code> is the artifact from this day most worth stealing. It fails the deploy unless all of the following hold.</p>
+<p>First, identity. <code>docker compose exec -T app cat /app/BUILD_SHA</code> must equal <code>git rev-parse HEAD</code> on the checkout. If the file is absent at all, it fails with “image predates the provable deploy work” rather than skipping the check.</p>
+<p>Second, liveness. The container health status must be <code>healthy</code>. That check is necessary and nowhere near sufficient, for <a href="/blog/liveness-without-health-is-theater/">the reason a health endpoint is not a correctness signal</a>: this container was healthy the entire time it served the wrong files.</p>
+<p>Third, and this is the one that changes how the whole thing behaves: the served page must carry markers that only the current commit can produce. It is fetched through the same loopback and header path that Caddy uses, so the assertion runs against the real request path:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">curl</span><span style="color:#79B8FF"> -fsS</span><span style="color:#79B8FF"> -H</span><span style="color:#9ECBFF"> 'X-Forwarded-Proto: https'</span><span style="color:#9ECBFF"> http://127.0.0.1:8080/</span></span></code></pre>
+<p>Four assertions on that response body:</p>
+<ol>
+<li>The front door actually renders (<code>isl-hero-copy</code> is present).</li>
+<li>The mailto address contains a literal <code>@</code> and not <code>%40</code>.</li>
+<li>The Credly badge iframe marker <code>embedded_badge</code> is present. This one specifically proves the volume refresh landed, because the stale volume copy predates the badge entirely.</li>
+<li>Neither <code>unpkg.com</code> nor <code>cdn.jsdelivr.net</code> appears anywhere in the response.</li>
+</ol>
+<p>The first two checks, identity and liveness, are about the container. This third check, the four assertions above, is about the bytes on the wire. A deploy check that only asks the orchestrator whether it is happy cannot detect a volume shadowing an image, because from the orchestrator’s point of view nothing is wrong. You have to assert on what the user receives, and the assertion has to name a marker that only the new commit can produce. “The page returned 200” would have passed happily for the entire period the site was stale. A check that runs is not the same thing as a check that <a href="/blog/passing-is-not-validating/">validates something</a>.</p>
+<h2 id="the-gate-that-failed-its-own-first-run">The gate that failed its own first run</h2>
+<p>Commit <code>fb8b5b9</code> added a CI test gate for the deploy line. Its first run, on PR #18, failed with <code>no such table: ad_sense</code> across a large slice of the suite.</p>
+<p>The root cause was not the new code. <code>tests/conftest.py</code> falls back to <code>sqlite:///:memory:</code> when <code>DATABASE_URL</code> is unset. Each in memory SQLite database lives only for the connection that opened it. SQLAlchemy’s default pool for <code>sqlite:///:memory:</code> keeps one connection alive per thread specifically to paper over that, but the fork’s rewritten conftest still ends up handing <code>initial_setup()</code> and the tests that follow different connections, so the schema <code>initial_setup()</code> creates is invisible to the connection the test actually runs against. Upstream’s conftest survives this arrangement. The fork’s rewritten one does not. The same failure reproduced locally, which is what proved it was the fork’s conftest and not the CI runner.</p>
+<p>The fix (commit <code>9e19ee3</code>) was to run the gate against real PostgreSQL 16, mirroring the existing <code>release.yml</code> recipe verbatim: the runner’s built in postgresql service, the same role and database grants, the same pg8000 driver. A file backed SQLite workaround was measured first and rejected, because it trades the missing table errors for roughly 100 UNIQUE constraint collisions between fixtures. Production runs Postgres 16, so the honest gate tests the engine that is actually deployed.</p>
+<p>Fixing <code>conftest.py</code> itself was ruled out of scope. It is shared test infrastructure that the pending v2.0.0 upstream sync replaces wholesale, so patching it now buys a merge conflict and nothing lasting. An interim commit (<code>b7264a0</code>) makes the Postgres test step advisory until that sync repairs the suite. The gate is real but not yet blocking, and saying otherwise would be the same category of lie the smoke check exists to prevent.</p>
+<h2 id="measuring-the-fork-sync-instead-of-estimating-it">Measuring the fork sync instead of estimating it</h2>
+<p>The same deploy discipline applies here: trust the artifact, not the claim about it, whether the artifact is a running container or a merge plan. The same day, the v2.0.0 upstream sync got mapped with measured data rather than the previous plan’s estimates. Divergence: 41 ahead, 100 behind, with 35 of the 41 non merge.</p>
+<p>A test merge, run with <code>git merge-tree --write-tree --name-only</code>, produces 61 conflicted files. The earlier plan assumed 84. More useful than the correction: 60 of those 61 are files touched by four retired i18n commits, a fork local Spanish to English translation layer that upstream’s own i18n work has since superseded. The only non i18n conflict is the Dockerfile, from a commit already fixed upstream.</p>
+<p>So the conflict count for the work actually worth keeping is zero.</p>
+<p>“Merge, then revert the dead commits” was tried and does not work. Three of the four conflict on revert, because later fork commits build on them. That route leaves 56 files to hand resolve.</p>
+<p>The chosen strategy is to branch from <code>upstream/main</code> and cherry pick only the must survive set. The dead i18n commits are never replayed, so their 60 conflicts cannot occur by construction. That is a categorically different guarantee than resolving them 60 times by hand, where every manual resolution is one more chance to reinstate a Spanish string or silently drop an upstream fix.</p>
+<p>Two corrections surfaced during the mapping, both of which would have caused production regressions:</p>
+<ul>
+<li>One commit was on the “dies in the sync” list and must survive. Upstream v2.0.0 still hardcodes Spanish in <code>now_lms/auth.py</code> and <code>now_lms/static/js/paypal.js</code> with no gettext wrapper, and a catalog cannot translate an unwrapped string. Dropping that commit reverts production to Spanish.</li>
+<li>A fresh PostgreSQL bootstrap fix. Upstream PR #179 reports <code>merged=true</code>, and its commits did land in <code>upstream/main</code>. A later, unrelated squash merge for a different feature was cut from an older snapshot of the same file, and it silently reverted the fix on the way back in. <code>alembic.stamp()</code> appears nowhere in upstream’s current tree, and the test file that #179 added is absent upstream. The fix was merged, then overwritten by a later merge. Dropping this commit from the fork would reintroduce a bootstrap failure that originally crash looped the deployment.</li>
+</ul>
+<p>The second one is the transferable lesson, and it is sharper than it first looks. “The PR says merged” is not the same claim as “the code is in main today”. Ancestry is not enough either: those commits really are ancestors, and the code is still gone, because a squash merge cut from a stale snapshot can revert a landed fix without a single conflict and without anything in the PR’s status changing. The only claim worth trusting is the current tree. Grep for the symbol.</p>
+<p>Migration risk was read rather than assumed. The live production database is stamped at a revision inside upstream’s chain, so six migrations will run. Production was built by <code>create_all()</code> from models and then stamped behind several of those migrations, which is normally the exact setup where <code>alembic.upgrade()</code> dies on “already exists”. All six were read line by line: each one inspects the schema and returns early when its change is already present, so a clean upgrade is expected. A snapshot gate stays mandatory regardless, because one migration moves a live <code>csrf_seed</code> value and a bad rename there invalidates every session. Idempotence against a <code>create_all()</code> schema is a property to demonstrate, not one to assume.</p>
+<h2 id="the-same-failure-class-a-different-repo">The same failure class, a different repo</h2>
+<p>The identity chain breaks the same way in any system that reports a verdict without checking whether its own inputs resolved. Here is that same shape of failure, one repo over. <code>claude-code-plugins</code> has a version coupling drift watch at <code>scripts/kernel-vendor-hash.mjs</code>. It was printing a green check for a check that never ran.</p>
+<p>Three faults, found together (commit <code>713955a3d</code>). <code>KERNEL_REPO_PKG</code> resolved two directories up instead of one, to a path that does not exist, so the kernel identity never resolved locally and two of the check’s legs were silently skipped. With that input unresolved and no violations recorded, the CLI printed a checkmark and “ordering + staleness OK (or skipped where inputs absent)”: absence of a violation rendered identically to a pass, and a real 17 day staleness breach read as clean on every local run. The report footer was a string literal asserting that the kernel pin tracked the latest published version, which went false the moment the next version shipped.</p>
+<p>Fixes: a candidate path list instead of one guessed path; skipped legs now report “INCONCLUSIVE … This is NOT a pass” and name which input failed to resolve; the footer is derived from live values each run.</p>
+<p>The decision that matters most moved the verdict out of the printer into an exported pure function, <code>verdictFor()</code>. A verdict that lives only in the presentation layer is untestable, which is precisely how the original fail open survived for as long as it did. Tests went from 20 to 25, and the fix was mutation verified: reintroducing the fail open by changing <code>if (missing.length > 0)</code> to <code>if (false)</code> flips exactly 2 of the 5 new tests.</p>
+<p>A follow up the same day (<code>ddec6a195</code>), prompted by an automated reviewer note, closed a worse hole in the fix itself. <code>verdictFor</code> read <code>report.identities.V_vendored.version</code> directly, so a report carrying no <code>identities</code> key would throw a TypeError in the middle of printing. A guard that crashes is not a guard, and it is a strictly worse failure mode than the fail open it replaced. Optional chaining lets a malformed report degrade to a named missing leg. Tests 25 to 26.</p>
+<h2 id="what-is-still-open">What is still open</h2>
+<ul>
+<li>The deploy work has not been proven end to end. Its real proof is the first production deploy, which runs the smoke check as its final step. Local verification so far is <code>bash -n</code> plus shellcheck clean on both scripts, and <code>docker compose config</code> validated with and without <code>BUILD_SHA</code>.</li>
+<li>The Postgres CI step is advisory, not blocking, until the v2.0.0 sync repairs the test suite.</li>
+<li>The v2.0.0 sync is planning only. Nothing in the migration map has been executed.</li>
+</ul>
+<h2 id="the-rule">The rule</h2>
+<p>Every layer in your deploy must be able to state which commit it is, out loud, without you hashing anything: the checkout, the image, and above all the stateful layer that outlives both. Then verify by asking the layer that cannot be faked. Fetch the page a user would get, and assert on a marker that only the commit you just shipped could have produced. An orchestrator reporting healthy is a claim about the container. The bytes on the wire are the only claim about the deploy.</p>
+      </div>
+    </div>
+  </article>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
