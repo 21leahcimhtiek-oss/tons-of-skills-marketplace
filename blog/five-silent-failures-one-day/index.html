@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Five Silent Failures in One Day — Tons of Skills Work Diary</title>
+    <meta name="description" content="Five tools said PASS without doing the work — pr-prescreen, .gitignore, prettier, SSH deploy, and a regex. Each silent failure and the guard that catches it.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://startaitools.com/posts/five-silent-failures-one-day/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/five-silent-failures-one-day/">
+    <meta property="og:title" content="Five Silent Failures in One Day — Tons of Skills Work Diary">
+    <meta property="og:description" content="Five tools said PASS without doing the work — pr-prescreen, .gitignore, prettier, SSH deploy, and a regex. Each silent failure and the guard that catches it.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="Five Silent Failures in One Day — Tons of Skills Work Diary">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/five-silent-failures-one-day/">
+    <meta name="twitter:title" content="Five Silent Failures in One Day — Tons of Skills Work Diary">
+    <meta name="twitter:description" content="Five tools said PASS without doing the work — pr-prescreen, .gitignore, prettier, SSH deploy, and a regex. Each silent failure and the guard that catches it.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"Five Silent Failures in One Day","description":"Five tools said PASS without doing the work — pr-prescreen, .gitignore, prettier, SSH deploy, and a regex. Each silent failure and the guard that catches it.","datePublished":"2026-05-16","url":"https://tonsofskills.com/blog/undefined","author":{"@type":"Person","name":"Jeremy Longshore"},"publisher":{"@type":"Organization","name":"Tons of Skills","url":"https://tonsofskills.com"}}</script>
+  
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.post-header[data-astro-cid-7jjqptxk]{background:var(--panel);padding:4rem 1.5rem 3rem;border-bottom:1px solid var(--border)}.post-header-inner[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto}.back-link[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3);text-decoration:none;display:inline-block;margin-bottom:1.5rem;transition:color .2s}.back-link[data-astro-cid-7jjqptxk]:hover{color:var(--primary)}.post-meta[data-astro-cid-7jjqptxk]{display:flex;align-items:center;gap:.75rem;margin-bottom:1rem}time[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3)}.featured-badge[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.2rem .6rem;background:#ce114126;color:var(--red);border-radius:0;font-weight:600;text-transform:uppercase;letter-spacing:.05em}.post-header[data-astro-cid-7jjqptxk] h1[data-astro-cid-7jjqptxk]{font-family:var(--font-body);font-size:clamp(1.5rem,4vw,2.2rem);font-weight:700;color:var(--text);line-height:1.25;margin-bottom:.75rem;letter-spacing:0}.post-desc[data-astro-cid-7jjqptxk]{color:var(--text-2);font-size:1.05rem;line-height:1.6;margin-bottom:1rem}.post-tags[data-astro-cid-7jjqptxk]{display:flex;gap:.4rem;flex-wrap:wrap}.tag[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.15rem .5rem;background:var(--surface-3);color:var(--text-3);border-radius:0}.post-body[data-astro-cid-7jjqptxk]{padding:3rem 1.5rem 4rem}.prose[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto;color:var(--text-2);line-height:1.8;font-size:1rem}.prose[data-astro-cid-7jjqptxk] h2{font-family:var(--font-body);font-size:1.5rem;font-weight:700;color:var(--text);margin:2.5rem 0 1rem;letter-spacing:0}.prose[data-astro-cid-7jjqptxk] h3{font-size:1.2rem;font-weight:600;color:var(--text);margin:2rem 0 .75rem}.prose[data-astro-cid-7jjqptxk] p{margin-bottom:1rem}.prose[data-astro-cid-7jjqptxk] ul,.prose[data-astro-cid-7jjqptxk] ol{margin:.5rem 0 1rem 1.5rem}.prose[data-astro-cid-7jjqptxk] li{margin-bottom:.35rem}.prose[data-astro-cid-7jjqptxk] strong{color:var(--text);font-weight:600}.prose[data-astro-cid-7jjqptxk] code{font-family:var(--font-mono);font-size:.88em;background:var(--surface-3);padding:.15em .35em;border-radius:0;color:var(--primary)}.prose[data-astro-cid-7jjqptxk] a{color:var(--primary);text-decoration:none}.prose[data-astro-cid-7jjqptxk] a:hover{text-decoration:underline}@media(max-width:768px){.post-header[data-astro-cid-7jjqptxk]{padding:3rem 1rem 2rem}.post-body[data-astro-cid-7jjqptxk]{padding:2rem 1rem 3rem}}
+</style></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  <article class="post" data-astro-cid-7jjqptxk>
+    <header class="post-header" data-astro-cid-7jjqptxk>
+      <div class="post-header-inner" data-astro-cid-7jjqptxk>
+        <a href="/blog" class="back-link" data-astro-cid-7jjqptxk>Back to Work Diary</a>
+        <div class="post-meta" data-astro-cid-7jjqptxk>
+          <time datetime="2026-05-16" data-astro-cid-7jjqptxk>May 15, 2026</time>
+          
+        </div>
+        <h1 data-astro-cid-7jjqptxk>Five Silent Failures in One Day</h1>
+        <p class="post-desc" data-astro-cid-7jjqptxk>Five tools said PASS without doing the work — pr-prescreen, .gitignore, prettier, SSH deploy, and a regex. Each silent failure and the guard that catches it.</p>
+        <div class="post-tags" data-astro-cid-7jjqptxk>
+          <span class="tag" data-astro-cid-7jjqptxk>ci-cd</span><span class="tag" data-astro-cid-7jjqptxk>debugging</span><span class="tag" data-astro-cid-7jjqptxk>devops</span><span class="tag" data-astro-cid-7jjqptxk>claude-code</span><span class="tag" data-astro-cid-7jjqptxk>release-engineering</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="post-body" data-astro-cid-7jjqptxk>
+      <div class="prose" data-astro-cid-7jjqptxk>
+        <p><strong>A silent failure is when a tool reports PASS without doing the work it was supposed to do — the legitimate empty-set case and the broken-but-silent case produce identical output, and nothing downstream can tell them apart.</strong></p>
+<p>A green check is not evidence of work. It is evidence that whatever ran did not raise an error. Those are different claims, and on 2026-05-16 the difference surfaced five times in five unrelated systems before lunch.</p>
+<p>The pattern is the same in all five: a tool reported PASS without doing the work it was supposed to do. Not a wrong answer — no answer, dressed up as a correct one. The legitimate empty-set case and the broken-but-silent case produced identical output. CI was green. Reviewers saw nothing to push back on. The signal that something was wrong came from downstream consumers noticing the work was missing.</p>
+<p>The five instances, in the order they were found:</p>
+<ol>
+<li>A CI prescreen that ran on zero plugins and called itself green</li>
+<li>A <code>.gitignore</code> rule that silently dropped plugin configs from every commit</li>
+<li>Prettier that reformatted an 11,000-line catalog and exited 0</li>
+<li>An SSH deploy that succeeded by doing nothing</li>
+<li>A regex that quietly skipped matches because the <code>/g</code> flag left state behind</li>
+</ol>
+<p>Each one shipped past code review. Each one was caught by a downstream user, not by the gate that was supposed to catch it. Each one has now been re-armed with a guard whose job is to assert the work actually happened — not to assert that the command exited zero.</p>
+<h2 id="1-the-prescreen-that-ran-on-zero-plugins">1. The prescreen that ran on zero plugins</h2>
+<p>Repo: <code>claude-code-plugins</code>, PR #730.</p>
+<p>The <code>pr-prescreen.yml</code> workflow’s “Compute changed plugin paths” step combined <code>gh api --paginate</code> with <code>--jq</code> in a single pipe:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#E1E4E8">- </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Compute changed plugin paths</span></span>
+<span class="line"><span style="color:#85E89D">  run</span><span style="color:#E1E4E8">: </span><span style="color:#F97583">|</span></span>
+<span class="line"><span style="color:#9ECBFF">    gh api --paginate \</span></span>
+<span class="line"><span style="color:#9ECBFF">      "/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" \</span></span>
+<span class="line"><span style="color:#9ECBFF">      --jq '.[].filename' \</span></span>
+<span class="line"><span style="color:#9ECBFF">      | grep -E '^plugins/[^/]+/' \</span></span>
+<span class="line"><span style="color:#9ECBFF">      | cut -d/ -f1-2 \</span></span>
+<span class="line"><span style="color:#9ECBFF">      | sort -u > changed-plugins.txt || true</span></span></code></pre>
+<p>This works on every local shell. On the GitHub Actions runner, the <code>--paginate</code> + <code>--jq</code> combination silently produced empty stdout. No error. No exit code. Just nothing on the pipe. The downstream <code>grep | cut | sort -u</code> happily processed zero lines and wrote an empty file. The trailing <code>|| true</code> swallowed any failure that might have escaped the pipeline.</p>
+<p>The classifier then read <code>changed-plugins.txt</code>, saw zero entries, and emitted <code>PASS: no plugin paths matched the PR diff</code>. Two external PRs — #726 and #728, the first contributions through the new pipeline — both landed false PASS verdicts on PRs that obviously added new plugin directories.</p>
+<p>The fix is two changes and a guard:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#E1E4E8">- </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Fetch changed files</span></span>
+<span class="line"><span style="color:#85E89D">  run</span><span style="color:#E1E4E8">: </span><span style="color:#F97583">|</span></span>
+<span class="line"><span style="color:#9ECBFF">    gh api --paginate \</span></span>
+<span class="line"><span style="color:#9ECBFF">      "/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" \</span></span>
+<span class="line"><span style="color:#9ECBFF">      > pr-files.json</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">- </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Extract plugin paths</span></span>
+<span class="line"><span style="color:#85E89D">  run</span><span style="color:#E1E4E8">: </span><span style="color:#F97583">|</span></span>
+<span class="line"><span style="color:#9ECBFF">    jq -r '.[].filename' pr-files.json \</span></span>
+<span class="line"><span style="color:#9ECBFF">      | grep -E '^plugins/[^/]+/' \</span></span>
+<span class="line"><span style="color:#9ECBFF">      | cut -d/ -f1-2 \</span></span>
+<span class="line"><span style="color:#9ECBFF">      | sort -u > changed-plugins.txt</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">- </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Sanity guard</span></span>
+<span class="line"><span style="color:#85E89D">  run</span><span style="color:#E1E4E8">: </span><span style="color:#F97583">|</span></span>
+<span class="line"><span style="color:#9ECBFF">    if jq -r '.[].filename' pr-files.json | grep -qE '^plugins/'; then</span></span>
+<span class="line"><span style="color:#9ECBFF">      if [ ! -s changed-plugins.txt ]; then</span></span>
+<span class="line"><span style="color:#9ECBFF">        echo "HARD_BLOCK: PR touches plugins/ but extraction produced zero dirs"</span></span>
+<span class="line"><span style="color:#9ECBFF">        exit 1</span></span>
+<span class="line"><span style="color:#9ECBFF">      fi</span></span>
+<span class="line"><span style="color:#9ECBFF">    fi</span></span></code></pre>
+<p>Splitting <code>gh api --paginate</code> from <code>jq</code> removes the pipe-buffering interaction that ate stdout. Dropping the blanket <code>|| true</code> lets real errors propagate. The third step is the actual fix: it asserts that <em>if</em> the PR diff touched any plugin path, the extraction must have produced at least one row. “I found nothing” becomes “I would have found something — fail loud.”</p>
+<h2 id="2-the-gitignore-that-ate-plugin-configs">2. The gitignore that ate plugin configs</h2>
+<p>Repo: <code>claude-code-plugins</code>, PR #733.</p>
+<p>The root <code>.gitignore</code> contained one line that was never meant to apply globally:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="text"><code><span class="line"><span>.mcp.json</span></span></code></pre>
+<p>The original intent was dev-local — devs sometimes drop a <code>.mcp.json</code> at the repo root for personal MCP servers. The pattern matched everywhere. Three plugins — <code>slack-channel</code>, <code>pr-to-spec</code>, <code>x-bug-triage</code> — had a <code>.mcp.json</code> on disk because the mirror sync wrote them, and git silently never tracked any of the three. The mirror produced the file. The working tree showed the file. <code>git status</code> showed it as ignored. Nothing red anywhere.</p>
+<p>Plugins without their <code>.mcp.json</code> fail the MCP handshake at install time. Claude Code can’t determine how to spawn the server. The plugin loads, registers nothing, and the user sees commands that do nothing.</p>
+<p>A second silent failure lived in the same PR. The mirror’s <code>sources.yaml</code> listed source files explicitly:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">plugins/x-bug-triage</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  sources</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#9ECBFF">server.ts</span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#9ECBFF">lib.ts</span></span></code></pre>
+<p><code>server.ts</code> imports <code>journal.ts</code>, <code>manifest.ts</code>, <code>policy.ts</code>, <code>supervisor.ts</code> — none of which were in the allow-list. The mirror shipped a non-functional server, not because anything errored, but because the include list silently skipped the missing files. No “file not in sources” warning. No diff check. Just a partial build that compiled because the imports themselves were valid module references at type-check time but missing at runtime.</p>
+<p>The fix:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="text"><code><span class="line"><span># .gitignore</span></span>
+<span class="line"><span>.mcp.json</span></span>
+<span class="line"><span>!plugins/**/.mcp.json</span></span></code></pre>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">plugins/x-bug-triage</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  sources</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    include</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"*.ts"</span></span>
+<span class="line"><span style="color:#85E89D">    exclude</span><span style="color:#E1E4E8">: [</span><span style="color:#9ECBFF">"*.test.ts"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"*.spec.ts"</span><span style="color:#E1E4E8">]</span></span></code></pre>
+<p>The negation rule re-tracks plugin configs. The glob-with-exclude replaces named-file allow-lists with a pattern that can’t silently miss a new file. The three affected <code>.mcp.json</code> files were force-added in the same commit.</p>
+<h2 id="3-prettier-that-reformatted-11000-lines-and-exited-0">3. Prettier that reformatted 11,000 lines and exited 0</h2>
+<p>Repo: <code>claude-code-plugins</code>, PR #730 (same PR as the prescreen failure).</p>
+<p><code>.claude-plugin/marketplace.extended.json</code> is the canonical plugin catalog — eleven thousand lines, hand-formatted with deliberate multi-line <code>keywords</code> arrays for git-diff hygiene:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="json"><code><span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#79B8FF">  "name"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"example-plugin"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">  "keywords"</span><span style="color:#E1E4E8">: [</span></span>
+<span class="line"><span style="color:#9ECBFF">    "ci"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">    "validation"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">    "marketplace"</span></span>
+<span class="line"><span style="color:#E1E4E8">  ]</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>A contributor’s format-on-save action ran prettier across the catalog. Prettier collapsed every keyword array to a single line:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="json"><code><span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#79B8FF">  "name"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"example-plugin"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">  "keywords"</span><span style="color:#E1E4E8">: [</span><span style="color:#9ECBFF">"ci"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"validation"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"marketplace"</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>The JSON was still valid. Prettier exited 0. The <code>validate-plugins.yml</code> workflow loaded the catalog, parsed it, ran every entry through the schema — all green. The actual diff was +1 plugin entry, -1,200 lines of reformatted catalog. Every other in-flight PR’s merge base was now unrecoverable without rebase-and-reformat.</p>
+<p>The fix has two parts. First, <code>.prettierignore</code>:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="text"><code><span class="line"><span>.claude-plugin/marketplace.extended.json</span></span></code></pre>
+<p>Second, an active line-budget guard at <code>scripts/check-catalog-format.py</code>:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#F97583">def</span><span style="color:#B392F0"> expected_line_delta</span><span style="color:#E1E4E8">(base_catalog, head_catalog):</span></span>
+<span class="line"><span style="color:#F97583">    with</span><span style="color:#79B8FF"> open</span><span style="color:#E1E4E8">(base_catalog) </span><span style="color:#F97583">as</span><span style="color:#E1E4E8"> f:</span></span>
+<span class="line"><span style="color:#E1E4E8">        base </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> json.load(f)</span></span>
+<span class="line"><span style="color:#F97583">    with</span><span style="color:#79B8FF"> open</span><span style="color:#E1E4E8">(head_catalog) </span><span style="color:#F97583">as</span><span style="color:#E1E4E8"> f:</span></span>
+<span class="line"><span style="color:#E1E4E8">        head </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> json.load(f)</span></span>
+<span class="line"><span style="color:#E1E4E8">    base_by_name </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> {p[</span><span style="color:#9ECBFF">"name"</span><span style="color:#E1E4E8">]: p </span><span style="color:#F97583">for</span><span style="color:#E1E4E8"> p </span><span style="color:#F97583">in</span><span style="color:#E1E4E8"> base[</span><span style="color:#9ECBFF">"plugins"</span><span style="color:#E1E4E8">]}</span></span>
+<span class="line"><span style="color:#E1E4E8">    head_by_name </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> {p[</span><span style="color:#9ECBFF">"name"</span><span style="color:#E1E4E8">]: p </span><span style="color:#F97583">for</span><span style="color:#E1E4E8"> p </span><span style="color:#F97583">in</span><span style="color:#E1E4E8"> head[</span><span style="color:#9ECBFF">"plugins"</span><span style="color:#E1E4E8">]}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">    added </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> set</span><span style="color:#E1E4E8">(head_by_name) </span><span style="color:#F97583">-</span><span style="color:#79B8FF"> set</span><span style="color:#E1E4E8">(base_by_name)</span></span>
+<span class="line"><span style="color:#E1E4E8">    removed </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> set</span><span style="color:#E1E4E8">(base_by_name) </span><span style="color:#F97583">-</span><span style="color:#79B8FF"> set</span><span style="color:#E1E4E8">(head_by_name)</span></span>
+<span class="line"><span style="color:#E1E4E8">    modified </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> {n </span><span style="color:#F97583">for</span><span style="color:#E1E4E8"> n </span><span style="color:#F97583">in</span><span style="color:#E1E4E8"> head_by_name </span><span style="color:#F97583">&#x26;</span><span style="color:#E1E4E8"> base_by_name</span></span>
+<span class="line"><span style="color:#F97583">                if</span><span style="color:#E1E4E8"> head_by_name[n] </span><span style="color:#F97583">!=</span><span style="color:#E1E4E8"> base_by_name[n]}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">    # Average plugin block is ~30 lines.</span></span>
+<span class="line"><span style="color:#F97583">    return</span><span style="color:#E1E4E8"> (</span><span style="color:#79B8FF">len</span><span style="color:#E1E4E8">(added) </span><span style="color:#F97583">+</span><span style="color:#79B8FF"> len</span><span style="color:#E1E4E8">(removed) </span><span style="color:#F97583">+</span><span style="color:#79B8FF"> len</span><span style="color:#E1E4E8">(modified)) </span><span style="color:#F97583">*</span><span style="color:#79B8FF"> 30</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">actual_delta </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> abs</span><span style="color:#E1E4E8">(file_line_count(head) </span><span style="color:#F97583">-</span><span style="color:#E1E4E8"> file_line_count(base))</span></span>
+<span class="line"><span style="color:#E1E4E8">expected </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> expected_line_delta(base, head)</span></span>
+<span class="line"><span style="color:#E1E4E8">budget </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> expected </span><span style="color:#F97583">+</span><span style="color:#79B8FF"> 300</span><span style="color:#6A737D">  # slack for inline edits</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">if</span><span style="color:#E1E4E8"> actual_delta </span><span style="color:#F97583">></span><span style="color:#E1E4E8"> budget:</span></span>
+<span class="line"><span style="color:#E1E4E8">    sys.exit(</span><span style="color:#F97583">f</span><span style="color:#9ECBFF">"FAIL: catalog diff </span><span style="color:#79B8FF">{</span><span style="color:#E1E4E8">actual_delta</span><span style="color:#79B8FF">}</span><span style="color:#9ECBFF"> lines, budget </span><span style="color:#79B8FF">{</span><span style="color:#E1E4E8">budget</span><span style="color:#79B8FF">}</span><span style="color:#9ECBFF">"</span><span style="color:#E1E4E8">)</span></span></code></pre>
+<p>The guard parses both catalogs structurally, computes the expected line delta from the actual content changes, and rejects PRs where the file delta exceeds that by more than 300 lines. “The file is still valid” becomes “the diff is the size we expected from the work that was claimed.”</p>
+<h2 id="4-the-ssh-deploy-that-succeeded-by-doing-nothing">4. The SSH deploy that succeeded by doing nothing</h2>
+<p>Repo: <code>hustle</code>, PR #40. Documented in the <code>intentsolutions-vps-runbook</code> AAR for Phase 2.5 of the VPS migration.</p>
+<p>The new Hustle VPS deploy workflow merged green. The first auto-deploy reported success. The container on the VPS was untouched.</p>
+<p>The canonical reusable VPS deploy workflow is one SSH call:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#E1E4E8">- </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Deploy</span></span>
+<span class="line"><span style="color:#85E89D">  run</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">ssh ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}</span></span></code></pre>
+<p>There is no command argument. The whole architecture relies on a <code>command="..."</code> force-command directive in <code>authorized_keys</code> to bind the deploy key to a specific script. Connect with the key, the forced command runs, deploy happens, connection closes.</p>
+<p>The <code>hustle-deploy</code> user’s <code>authorized_keys</code> had no force-command. Plain <code>ssh user@host</code> with no command and no force-command opens an interactive session. The runner has no TTY. The session sits idle for a moment, the server times out the silent connection, exit 0. From the runner’s perspective: SSH connected, SSH closed cleanly, deploy step SUCCESS. From the VPS’s perspective: a key authenticated, nothing happened, the session ended.</p>
+<p>The fix is a deploy script and a force-command lock:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#6A737D"># /usr/local/sbin/deploy-hustle</span></span>
+<span class="line"><span style="color:#6A737D">#!/bin/bash</span></span>
+<span class="line"><span style="color:#79B8FF">set</span><span style="color:#79B8FF"> -euo</span><span style="color:#9ECBFF"> pipefail</span></span>
+<span class="line"><span style="color:#79B8FF">cd</span><span style="color:#9ECBFF"> /srv/hustle</span></span>
+<span class="line"><span style="color:#B392F0">git</span><span style="color:#9ECBFF"> fetch</span><span style="color:#9ECBFF"> origin</span></span>
+<span class="line"><span style="color:#B392F0">git</span><span style="color:#9ECBFF"> reset</span><span style="color:#79B8FF"> --hard</span><span style="color:#9ECBFF"> origin/main</span></span>
+<span class="line"><span style="color:#B392F0">docker</span><span style="color:#9ECBFF"> compose</span><span style="color:#9ECBFF"> pull</span></span>
+<span class="line"><span style="color:#B392F0">docker</span><span style="color:#9ECBFF"> compose</span><span style="color:#9ECBFF"> up</span><span style="color:#79B8FF"> -d</span><span style="color:#79B8FF"> --remove-orphans</span></span>
+<span class="line"><span style="color:#B392F0">docker</span><span style="color:#9ECBFF"> compose</span><span style="color:#9ECBFF"> ps</span></span></code></pre>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="text"><code><span class="line"><span># /home/hustle-deploy/.ssh/authorized_keys</span></span>
+<span class="line"><span>command="/usr/local/sbin/deploy-hustle",no-port-forwarding,no-X11-forwarding,no-pty ssh-ed25519 AAAA... deploy@github</span></span></code></pre>
+<p>Now there is no path where the SSH channel can do nothing. The forced command runs or the key fails to authenticate. The second deploy ran the script end-to-end, recreated the container, and produced visible log output the runner could grep.</p>
+<p>The generalization matters more than the fix. Every Docker-variant deploy in the fleet that depends on a force-command and doesn’t have one is silently broken in the same way. <code>lilly-75-holy</code> and <code>braves-booth</code> are flagged for audit; <code>partner-portals</code> and <code>claude-code-plugins-plus-skills</code> are safe — both have the force-command directive in place. The fleet sweep is tracked as a follow-up bead off the P7 Stage C epic, not folded into this post.</p>
+<h2 id="5-the-regex-that-skipped-matches-because-g-left-state-behind">5. The regex that skipped matches because <code>/g</code> left state behind</h2>
+<p>Repo: <code>intentional-cognition-os</code>, PR #67 (a Gemini review followup on E10-B03).</p>
+<p>Two module-level constants:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> SOURCE_RE</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> /</span><span style="color:#85E89D;font-weight:bold">\[\^</span><span style="color:#DBEDFF">src:(</span><span style="color:#79B8FF">[</span><span style="color:#F97583">^</span><span style="color:#85E89D;font-weight:bold">\]</span><span style="color:#79B8FF">]</span><span style="color:#F97583">+</span><span style="color:#DBEDFF">)</span><span style="color:#85E89D;font-weight:bold">\]</span><span style="color:#9ECBFF">/</span><span style="color:#F97583">g</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> WIKILINK_RE</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> /</span><span style="color:#85E89D;font-weight:bold">\[\[</span><span style="color:#DBEDFF">(</span><span style="color:#79B8FF">[</span><span style="color:#F97583">^</span><span style="color:#85E89D;font-weight:bold">\]</span><span style="color:#79B8FF">]</span><span style="color:#F97583">+</span><span style="color:#DBEDFF">)</span><span style="color:#85E89D;font-weight:bold">\]\]</span><span style="color:#9ECBFF">/</span><span style="color:#F97583">g</span><span style="color:#E1E4E8">;</span></span></code></pre>
+<p>Used in two back-to-back <code>RegExp.exec</code> loops to iterate citation markers in a body of text:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#F97583">export</span><span style="color:#F97583"> function</span><span style="color:#B392F0"> extractCitations</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">body</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> string</span><span style="color:#E1E4E8">)</span><span style="color:#F97583">:</span><span style="color:#B392F0"> Citation</span><span style="color:#E1E4E8">[] {</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> out</span><span style="color:#F97583">:</span><span style="color:#B392F0"> Citation</span><span style="color:#E1E4E8">[] </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> [];</span></span>
+<span class="line"><span style="color:#F97583">  let</span><span style="color:#E1E4E8"> m;</span></span>
+<span class="line"><span style="color:#F97583">  while</span><span style="color:#E1E4E8"> ((m </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> SOURCE_RE</span><span style="color:#E1E4E8">.</span><span style="color:#B392F0">exec</span><span style="color:#E1E4E8">(body)) </span><span style="color:#F97583">!==</span><span style="color:#79B8FF"> null</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#E1E4E8">    out.</span><span style="color:#B392F0">push</span><span style="color:#E1E4E8">({ kind: </span><span style="color:#9ECBFF">"source"</span><span style="color:#E1E4E8">, id: m[</span><span style="color:#79B8FF">1</span><span style="color:#E1E4E8">] });</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#F97583">  while</span><span style="color:#E1E4E8"> ((m </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> WIKILINK_RE</span><span style="color:#E1E4E8">.</span><span style="color:#B392F0">exec</span><span style="color:#E1E4E8">(body)) </span><span style="color:#F97583">!==</span><span style="color:#79B8FF"> null</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#E1E4E8">    out.</span><span style="color:#B392F0">push</span><span style="color:#E1E4E8">({ kind: </span><span style="color:#9ECBFF">"wikilink"</span><span style="color:#E1E4E8">, id: m[</span><span style="color:#79B8FF">1</span><span style="color:#E1E4E8">] });</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#F97583">  return</span><span style="color:#E1E4E8"> out;</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p><code>RegExp</code> instances with the <code>/g</code> flag carry a mutable <code>lastIndex</code> between calls. The <code>exec</code> loop is supposed to walk it to the end and let the final non-match reset it to 0 — but any code path that exits the loop early, throws mid-iteration, or runs concurrently on the same regex object leaves <code>lastIndex</code> mid-string. The next call to <code>extractCitations</code> starts searching from wherever the last one stopped.</p>
+<p>The citation handler kept reporting “verified” because the missed citations were not checked at all — not flagged as missing, not flagged as wrong. They were invisible. Whichever entries fell before the carried-over <code>lastIndex</code> were skipped silently, every time.</p>
+<p>The fix:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#F97583">export</span><span style="color:#F97583"> function</span><span style="color:#B392F0"> extractCitations</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">body</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> string</span><span style="color:#E1E4E8">)</span><span style="color:#F97583">:</span><span style="color:#B392F0"> Citation</span><span style="color:#E1E4E8">[] {</span></span>
+<span class="line"><span style="color:#6A737D">  // Required: SOURCE_RE and WIKILINK_RE are module-level /g regexes.</span></span>
+<span class="line"><span style="color:#6A737D">  // Reset lastIndex on entry so prior loop state cannot cause this call</span></span>
+<span class="line"><span style="color:#6A737D">  // to start mid-string and silently skip matches.</span></span>
+<span class="line"><span style="color:#79B8FF">  SOURCE_RE</span><span style="color:#E1E4E8">.lastIndex </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> 0</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#79B8FF">  WIKILINK_RE</span><span style="color:#E1E4E8">.lastIndex </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> 0</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> out</span><span style="color:#F97583">:</span><span style="color:#B392F0"> Citation</span><span style="color:#E1E4E8">[] </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> [];</span></span>
+<span class="line"><span style="color:#F97583">  let</span><span style="color:#E1E4E8"> m;</span></span>
+<span class="line"><span style="color:#F97583">  while</span><span style="color:#E1E4E8"> ((m </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> SOURCE_RE</span><span style="color:#E1E4E8">.</span><span style="color:#B392F0">exec</span><span style="color:#E1E4E8">(body)) </span><span style="color:#F97583">!==</span><span style="color:#79B8FF"> null</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#E1E4E8">    out.</span><span style="color:#B392F0">push</span><span style="color:#E1E4E8">({ kind: </span><span style="color:#9ECBFF">"source"</span><span style="color:#E1E4E8">, id: m[</span><span style="color:#79B8FF">1</span><span style="color:#E1E4E8">] });</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#F97583">  while</span><span style="color:#E1E4E8"> ((m </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> WIKILINK_RE</span><span style="color:#E1E4E8">.</span><span style="color:#B392F0">exec</span><span style="color:#E1E4E8">(body)) </span><span style="color:#F97583">!==</span><span style="color:#79B8FF"> null</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#E1E4E8">    out.</span><span style="color:#B392F0">push</span><span style="color:#E1E4E8">({ kind: </span><span style="color:#9ECBFF">"wikilink"</span><span style="color:#E1E4E8">, id: m[</span><span style="color:#79B8FF">1</span><span style="color:#E1E4E8">] });</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#F97583">  return</span><span style="color:#E1E4E8"> out;</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>The comment is load-bearing. Without it, the next refactor pulls the resets out as “redundant” and the silent skip comes back. Six regression tests pin the invariant: prebuilt-index honored, batch aggregation correct, 100 sequential calls return identical output, two interleaved bodies (one long, one short) stay independent of each other.</p>
+<h2 id="the-shape-of-a-silent-failure">The shape of a silent failure</h2>
+<p>All five share the same anatomy. There exists a legitimate no-op outcome — no plugin paths matched, no files to include, no formatting changes needed, no command to run, no remaining matches in the string. The error path produces an observable state identical to the legitimate no-op. The downstream consumer cannot tell which one it got.</p>
+<p>The fixes are not better error handling. The fixes are active assertions about the work that was claimed:</p>
+<ul>
+<li><strong>prescreen:</strong> if files matched the trigger, the extraction must have produced rows</li>
+<li><strong>gitignore + allow-list:</strong> plugin configs must reach the tree, not just the working directory — and source allow-lists must fail on missing imports, not silently ship a partial build</li>
+<li><strong>prettier:</strong> the diff size must match the structural work</li>
+<li><strong>SSH deploy:</strong> bind the command to the key — make it impossible for the channel to do nothing</li>
+<li><strong>regex:</strong> reset state to a known precondition before every call, and pin that contract with a test</li>
+</ul>
+<p>The common verb in every fix is <em>assert</em>, not <em>handle</em>. The bug was not that errors weren’t caught. The bug was that there was no point in the pipeline where the system stated, in code, what counted as the work actually being done.</p>
+<p>The hardest silent failures to catch are the ones where the tool’s success state and its silent-failure state are observationally identical. That is the category. Once auditing for it begins, more keep surfacing — most CI pipelines have at least one step that exits 0 whether or not it did anything, and most of them are downstream of a step that <em>can</em> legitimately produce empty output.</p>
+<p>Silent failures don’t get worse over time. They get more confident. Each green check trains the audit instinct to skip them, and the audit instinct is the only thing standing between the build status and the truth.</p>
+<h2 id="related-posts">Related Posts</h2>
+<ul>
+<li><a href="https://startaitools.com/posts/deterministic-first-llm-advisory-ci/">Deterministic-first, LLM-advisory CI</a> — the broader argument for keeping reject/accept decisions in code that can be reasoned about, with model output as advisory signal</li>
+<li><a href="https://startaitools.com/posts/three-guards-against-shipping-slop/">Three guards against shipping slop</a> — earlier examples of the same assert-the-work pattern in plugin merges</li>
+<li><a href="/blog/two-false-positive-fixes-same-root-cause/">Two false-positive fixes, same root cause</a> — when two unrelated bugs share an underlying shape</li>
+</ul>
+      </div>
+    </div>
+  </article>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

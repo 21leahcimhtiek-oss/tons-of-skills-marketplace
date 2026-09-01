@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>podium-contact-dedup - Agent Skill</title>
+    <meta name="description" content="Deduplicate Podium contacts in production and survive the data-quality failures — phone-format inconsistency producing four contacts for one phone, merge-api ordering that silently discards the richer record, opt-out flags lost on merge re-enabling marketing on an opted-out person, soft-delete confusion, cross-location duplicate blind spots, and simultaneous-merge race conditions. Use when you build a Podium dedup pipeline, scan and detect duplicate clusters, normalize phones to e164 form across an entire contact corpus, preserve opt-out state through merges, or validate cross-location duplicate resolution. Trigger with &quot;podium contact dedup&quot;, &quot;podium phone normalization&quot;, &quot;podium e164&quot;, &quot;podium duplicate contacts&quot;, &quot;podium merge contacts&quot;, &quot;podium opt-out preservation&quot;, &quot;podium cross-location dedup&quot;.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://tonsofskills.com/tons-of-skills-marketplace/skills/podium-contact-dedup/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/podium-contact-dedup/">
+    <meta property="og:title" content="podium-contact-dedup - Agent Skill">
+    <meta property="og:description" content="Deduplicate Podium contacts in production and survive the data-quality failures — phone-format inconsistency producing four contacts for one phone, merge-api ordering that silently discards the richer record, opt-out flags lost on merge re-enabling marketing on an opted-out person, soft-delete confusion, cross-location duplicate blind spots, and simultaneous-merge race conditions. Use when you build a Podium dedup pipeline, scan and detect duplicate clusters, normalize phones to e164 form across an entire contact corpus, preserve opt-out state through merges, or validate cross-location duplicate resolution. Trigger with &quot;podium contact dedup&quot;, &quot;podium phone normalization&quot;, &quot;podium e164&quot;, &quot;podium duplicate contacts&quot;, &quot;podium merge contacts&quot;, &quot;podium opt-out preservation&quot;, &quot;podium cross-location dedup&quot;.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="podium-contact-dedup - Agent Skill">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/podium-contact-dedup/">
+    <meta name="twitter:title" content="podium-contact-dedup - Agent Skill">
+    <meta name="twitter:description" content="Deduplicate Podium contacts in production and survive the data-quality failures — phone-format inconsistency producing four contacts for one phone, merge-api ordering that silently discards the richer record, opt-out flags lost on merge re-enabling marketing on an opted-out person, soft-delete confusion, cross-location duplicate blind spots, and simultaneous-merge race conditions. Use when you build a Podium dedup pipeline, scan and detect duplicate clusters, normalize phones to e164 form across an entire contact corpus, preserve opt-out state through merges, or validate cross-location duplicate resolution. Trigger with &quot;podium contact dedup&quot;, &quot;podium phone normalization&quot;, &quot;podium e164&quot;, &quot;podium duplicate contacts&quot;, &quot;podium merge contacts&quot;, &quot;podium opt-out preservation&quot;, &quot;podium cross-location dedup&quot;.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"podium-contact-dedup","description":"Deduplicate Podium contacts in production and survive the data-quality failures — phone-format inconsistency producing four contacts for one phone, merge-api ordering that silently discards the richer record, opt-out flags lost on merge re-enabling marketing on an opted-out person, soft-delete confusion, cross-location duplicate blind spots, and simultaneous-merge race conditions. Use when you build a Podium dedup pipeline, scan and detect duplicate clusters, normalize phones to e164 form across an entire contact corpus, preserve opt-out state through merges, or validate cross-location duplicate resolution. Trigger with \"podium contact dedup\", \"podium phone normalization\", \"podium e164\", \"podium duplicate contacts\", \"podium merge contacts\", \"podium opt-out preservation\", \"podium cross-location dedup\".","version":"2.9.0","author":{"@type":"Person","name":"Jeremy Longshore"},"license":"MIT","programmingLanguage":"Claude Code Agent Skill","isPartOf":{"@type":"SoftwareApplication","name":"podium-pack","applicationCategory":"unknown"}}</script>
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.breadcrumbs[data-astro-cid-ilhxcym7]{margin-bottom:var(--space-5)}.breadcrumbs__list[data-astro-cid-ilhxcym7]{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;list-style:none;padding:0;margin:0;font-family:var(--font-mono);font-size:var(--text-sm, .8rem)}.breadcrumbs__item[data-astro-cid-ilhxcym7]{display:flex;align-items:center;gap:.375rem}.breadcrumbs__link[data-astro-cid-ilhxcym7]{color:var(--text-3);text-decoration:none;transition:color var(--duration-fast, .2s) var(--ease-out)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:hover{color:var(--primary)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:0}.breadcrumbs__sep[data-astro-cid-ilhxcym7]{color:var(--text-3);user-select:none;font-size:.7em;line-height:1}.breadcrumbs__current[data-astro-cid-ilhxcym7]{color:var(--text-2)}.detail-cta[data-astro-cid-qcigfm7x]{background:var(--surface-3, var(--brand-light-gray));border-top:1px solid var(--border, var(--brand-light-gray));border-radius:var(--radius-lg);padding:2rem 1.5rem;margin-top:2rem;text-align:center}.detail-cta__headline[data-astro-cid-qcigfm7x]{font-family:var(--font-display);font-weight:700;font-size:1.35rem;color:var(--text, var(--brand-dark));margin-bottom:1.25rem}.detail-cta__actions[data-astro-cid-qcigfm7x]{display:flex;justify-content:center;gap:.75rem;flex-wrap:wrap}.detail-cta__primary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:var(--primary);color:#0a0a0c;border:none;border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;cursor:pointer;transition:background var(--duration-fast) var(--ease-out),transform var(--duration-fast) var(--ease-out)}.detail-cta__primary[data-astro-cid-qcigfm7x]:hover{background:var(--primary-dark, var(--primary-dark));transform:translateY(-1px)}.detail-cta__primary[data-astro-cid-qcigfm7x].copied{background:var(--positive, var(--brand-green))}.detail-cta__secondary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:transparent;color:var(--text, var(--brand-dark));border:1px solid var(--border, var(--brand-mid-gray));border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;text-decoration:none;transition:border-color var(--duration-fast) var(--ease-out),color var(--duration-fast) var(--ease-out)}.detail-cta__secondary[data-astro-cid-qcigfm7x]:hover{border-color:var(--primary);color:var(--primary)}@media(max-width:480px){.detail-cta__actions[data-astro-cid-qcigfm7x]{flex-direction:column;align-items:stretch}.detail-cta__primary[data-astro-cid-qcigfm7x],.detail-cta__secondary[data-astro-cid-qcigfm7x]{justify-content:center}}
+</style>
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/_slug_@_@astro.wF9emvVq.css"></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  
+  
+
+  <div class="skill-detail" data-astro-cid-jrlgpo3w>
+    <!-- 1. Breadcrumbs -->
+    <nav aria-label="Breadcrumb" class="breadcrumbs" data-astro-cid-ilhxcym7>
+  <ol class="breadcrumbs__list" itemscope itemtype="https://schema.org/BreadcrumbList" data-astro-cid-ilhxcym7>
+    <li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Home</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="1">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/skills/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Skills</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="2">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          <span class="breadcrumbs__current" aria-current="page" itemprop="name" data-astro-cid-ilhxcym7>
+              podium-contact-dedup
+            </span>
+          <meta itemprop="position" content="3">
+        </li>
+  </ol>
+</nav>
+
+    <!-- 2. Header (enhanced) -->
+    <header class="skill-header" data-astro-cid-jrlgpo3w>
+      <h1 data-astro-cid-jrlgpo3w>podium-contact-dedup</h1>
+      <p class="skill-description" data-astro-cid-jrlgpo3w>Deduplicate Podium contacts in production and survive the data-quality failures — phone-format inconsistency producing four contacts for one phone, merge-api ordering that silently discards the richer record, opt-out flags lost on merge re-enabling marketing on an opted-out person, soft-delete confusion, cross-location duplicate blind spots, and simultaneous-merge race conditions. Use when you build a Podium dedup pipeline, scan and detect duplicate clusters, normalize phones to e164 form across an entire contact corpus, preserve opt-out state through merges, or validate cross-location duplicate resolution. Trigger with &quot;podium contact dedup&quot;, &quot;podium phone normalization&quot;, &quot;podium e164&quot;, &quot;podium duplicate contacts&quot;, &quot;podium merge contacts&quot;, &quot;podium opt-out preservation&quot;, &quot;podium cross-location dedup&quot;.</p>
+
+      <div class="skill-metadata" data-astro-cid-jrlgpo3w>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>v2.9.0</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>Jeremy Longshore</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>MIT</span>
+        </div>
+      </div>
+
+      
+    </header>
+
+    <!-- 4. Allowed Tools -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Allowed Tools</h2>
+      <div class="tools-grid" data-astro-cid-jrlgpo3w>
+        <span class="tool-badge" data-astro-cid-jrlgpo3w>Read</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Write</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Edit</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(curl:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(jq:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(python3:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(sqlite3:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Grep</span>
+      </div>
+      
+    </section>
+
+    <!-- 5. Provided by Plugin -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Provided by Plugin</h2>
+      <div class="plugin-info" data-astro-cid-jrlgpo3w>
+        <div class="plugin-details" data-astro-cid-jrlgpo3w>
+          <h3 data-astro-cid-jrlgpo3w>
+            <a href="/plugins/podium-pack/" data-astro-cid-jrlgpo3w>podium-pack</a>
+          </h3>
+          <p data-astro-cid-jrlgpo3w>Claude Code skill pack for Podium (10 production-engineer skills)</p>
+          <div class="plugin-meta" data-astro-cid-jrlgpo3w>
+            <span data-astro-cid-jrlgpo3w>unknown</span>
+            <span data-astro-cid-jrlgpo3w>v2.9.0</span>
+          </div>
+        </div>
+        <a href="/plugins/podium-pack/" class="btn-primary" data-astro-cid-jrlgpo3w>View Plugin</a>
+      </div>
+    </section>
+
+    <!-- 6. Installation -->
+    <section class="section-box dark" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Installation</h2>
+      <p class="install-note" style="color: var(--brand-light-gray); margin-bottom: 0.75rem;" data-astro-cid-jrlgpo3w>This skill is included in the podium-pack plugin:</p>
+      <pre class="install-command" data-copy="/plugin install podium-pack@claude-code-plugins-plus" data-astro-cid-jrlgpo3w><code data-astro-cid-jrlgpo3w>/plugin install podium-pack@claude-code-plugins-plus</code></pre>
+      <p class="install-note" data-astro-cid-jrlgpo3w>Click to copy</p>
+    </section>
+
+    <!-- 7. Skill Content (Markdown) -->
+    <section class="skill-content-section" data-astro-cid-jrlgpo3w>
+      <h2 data-astro-cid-jrlgpo3w>Instructions</h2>
+      <div class="skill-content" data-astro-cid-jrlgpo3w>
+        <div data-astro-cid-jrlgpo3w><h1>Podium Contact Dedup</h1>
+<h2>Overview</h2>
+<p>Deduplicate Podium contacts in production and operate the dedup pipeline at scale. This is not a one-shot cleanup script — it is the data-quality layer your integration runs continuously to keep the contact corpus sane while messages, calls, webchats, and reviews keep mutating it. Run it once and Sydney&#39;s &quot;0412 345 678&quot; walk-in stops creating a fifth contact next to the four that already exist as <code>+61 412 345 678</code>, <code>(04) 1234-5678</code>, <code>+61412345678</code>, and <code>0412345678</code>.</p>
+<p>The six production failures this skill prevents:</p>
+<ol>
+<li><strong>Phone format inconsistency</strong> — <code>+61 412 345 678</code>, <code>0412 345 678</code>, <code>(04) 1234-5678</code>, <code>+61412345678</code> are all the same phone but produce four contacts. Operators paste numbers from a CRM, a phone screen, a written form, and a stored fragment; Podium dedups on exact string match, so all four survive and the next caller appears as a fifth.</li>
+<li><strong>Merge API ordering loses fields</strong> — Podium&#39;s merge endpoint takes a <code>primary</code> and a <code>duplicate</code>; whichever you pick as <code>primary</code> keeps its own fields, the other&#39;s fields are discarded. Pick the wrong record (newer but emptier) as primary and the older, richer record&#39;s name, tags, and conversation links vanish silently.</li>
+<li><strong>Opt-out flag lost on merge</strong> — duplicate had <code>marketing_opt_out=true</code>, primary had <code>marketing_opt_out=false</code>; naive merge keeps primary&#39;s flag and re-enables marketing on a person who explicitly opted out. This is a compliance incident (TCPA, GDPR Article 21, ACMA Spam Act) and a trust incident — the customer opted out, you marketed at them anyway.</li>
+<li><strong>Soft-delete vs hard-delete semantic confusion</strong> — Podium&#39;s <code>DELETE /contacts/{uid}</code> is reversible; the record is hidden, not destroyed. Treat it as terminal and you ship a &quot;contact reappeared after we deleted them&quot; support ticket every time an admin restores a contact via the UI. Hard-delete (purge) is a separate, irreversible endpoint with different scopes.</li>
+<li><strong>Duplicate detection across locations</strong> — same phone calls Sydney AND Burleigh Heads, two contacts created (one per location), per-location dedup misses it entirely. Cross-location dedup needs a separate routine keyed by <code>phone_natural_key</code> across the union of contacts in every location_uid, not just within one.</li>
+<li><strong>Merge conflicts on simultaneous edits</strong> — two operators (or one operator + one automated job) merge overlapping clusters at the same time; the second merge&#39;s <code>primary</code> may have already been merged into another record, the API silently merges into a now-stale target, and one operator&#39;s intent is dropped without surfacing the conflict.</li>
+</ol>
+<h2>Prerequisites</h2>
+<ul>
+<li>Python 3.10+ with the <code>phonenumbers</code> library (<code>pip install phonenumbers</code>)</li>
+<li>A working <code>podium-auth</code> integration (this skill calls Podium with an authenticated client)</li>
+<li>Read scope: <code>contacts.read</code>. Write scope: <code>contacts.write</code>. (<code>contacts.delete</code> only if hard-purge is in scope.)</li>
+<li>A local SQLite database for the natural-key index and merge state file (default <code>./podium-dedup.sqlite</code>)</li>
+<li>A default region for E.164 parsing (<code>AU</code> for Australian deployments, <code>US</code> for US — set per-tenant)</li>
+</ul>
+<h2>Instructions</h2>
+<p>Build in this order. Each section neutralizes one production failure mode.</p>
+<h3>1. E.164 normalization with natural-key emission (neutralizes phone-format inconsistency)</h3>
+<p>Every contact&#39;s phone is parsed by the <code>phonenumbers</code> library into E.164 form, then hashed into a stable &quot;natural key&quot; suitable for an index lookup. Same human-readable phone → same key, regardless of formatting input.</p>
+<pre data-lang="python"><code>
+import phonenumbers
+from phonenumbers import NumberParseException
+
+def normalize_phone(raw: str, default_region: str = &quot;AU&quot;) -&gt; dict:
+    &quot;&quot;&quot;Return {e164, national, country, natural_key, valid} for any input format.&quot;&quot;&quot;
+    try:
+        parsed = phonenumbers.parse(raw, default_region)
+    except NumberParseException as e:
+        return {&quot;valid&quot;: False, &quot;reason&quot;: f&quot;parse_failed: {e}&quot;}
+    if not phonenumbers.is_valid_number(parsed):
+        return {&quot;valid&quot;: False, &quot;reason&quot;: &quot;not_a_valid_number&quot;}
+    e164 = phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.E164)
+    national = phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.NATIONAL)
+    return {
+        &quot;valid&quot;: True,
+        &quot;e164&quot;: e164,                         # +61412345678
+        &quot;national&quot;: national,                 # 0412 345 678
+        &quot;country&quot;: phonenumbers.region_code_for_number(parsed),
+        &quot;natural_key&quot;: e164,                  # the E.164 IS the natural key — no further hashing needed
+    }
+</code></pre>
+<p>The natural key is the E.164 string itself. Hashing it adds nothing — E.164 is already canonical and bounded in length. Use the E.164 directly as the SQLite primary key on the natural-key index.</p>
+<h3>2. SQLite-backed natural-key index (neutralizes O(N²) duplicate scans)</h3>
+<p>A naive dedup scans every pair of contacts — O(N²) on a 50k-contact corpus is hours. Instead, build a <code>(natural_key → [contact_uid, ...])</code> index in SQLite once, then duplicate detection is O(N) over the index.</p>
+<pre data-lang="sql"><code>
+CREATE TABLE IF NOT EXISTS contact_index (
+    contact_uid    TEXT PRIMARY KEY,
+    location_uid   TEXT NOT NULL,
+    natural_key    TEXT NOT NULL,   -- E.164
+    raw_phone      TEXT,
+    name           TEXT,
+    field_count    INTEGER NOT NULL DEFAULT 0,
+    marketing_opt_out  INTEGER NOT NULL DEFAULT 0,
+    sms_opt_out        INTEGER NOT NULL DEFAULT 0,
+    email_opt_out      INTEGER NOT NULL DEFAULT 0,
+    deleted_at_podium  TEXT,        -- ISO8601, NULL if live
+    updated_at_podium  TEXT NOT NULL,
+    indexed_at         TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_natural_key ON contact_index(natural_key);
+CREATE INDEX IF NOT EXISTS idx_natural_key_per_location ON contact_index(natural_key, location_uid);
+</code></pre>
+<p>The <code>field_count</code> column is precomputed at index time so the merge orchestrator picks the richer record as <code>primary</code> without re-fetching every record.</p>
+<h3>3. Duplicate detection with confidence scoring (neutralizes blind merges)</h3>
+<p>A cluster is a set of contacts sharing the same <code>natural_key</code>. Within a cluster, each pair gets a confidence score in <code>[0.0, 1.0]</code>:</p>
+<table><thead><tr>
+<th>Factor</th>
+<th>Weight</th>
+</tr></thead><tbody>
+<tr>
+<td>Same E.164 (always true within a cluster)</td>
+<td>0.60 — required floor</td>
+</tr>
+<tr>
+<td>Same name (case-insensitive, normalized)</td>
+<td>+0.20</td>
+</tr>
+<tr>
+<td>Same email</td>
+<td>+0.15</td>
+</tr>
+<tr>
+<td>Overlapping tags</td>
+<td>+0.05</td>
+</tr>
+</tbody></table>
+<p>Only clusters with all pairwise scores <code>&gt;= 0.80</code> auto-merge by default. Lower-scored clusters surface for human review.</p>
+<pre data-lang="python"><code>
+def cluster_confidence(a: dict, b: dict) -&gt; float:
+    score = 0.60   # same natural_key by construction
+    if a.get(&quot;name&quot;) and a[&quot;name&quot;].strip().lower() == (b.get(&quot;name&quot;) or &quot;&quot;).strip().lower():
+        score += 0.20
+    if a.get(&quot;email&quot;) and a[&quot;email&quot;].strip().lower() == (b.get(&quot;email&quot;) or &quot;&quot;).strip().lower():
+        score += 0.15
+    a_tags, b_tags = set(a.get(&quot;tags&quot;) or []), set(b.get(&quot;tags&quot;) or [])
+    if a_tags &amp; b_tags:
+        score += 0.05
+    return round(min(score, 1.0), 4)
+</code></pre>
+<h3>4. Merge orchestrator with primary selection (neutralizes lost richer record)</h3>
+<p>For each auto-mergeable cluster, pick the <code>primary</code> by this deterministic rule, in order:</p>
+<ol>
+<li><strong>Most fields populated</strong> (highest <code>field_count</code>) — the richer record wins.</li>
+<li><strong>Most recently updated</strong> (<code>updated_at_podium</code>) — break ties toward fresher state.</li>
+<li><strong>Lowest contact_uid</strong> (lexical) — final, deterministic, reproducible tiebreak.</li>
+</ol>
+<p>Every other contact in the cluster is a <code>duplicate</code> to be merged INTO the primary. Never trust caller-supplied ordering — always compute primary inside the orchestrator.</p>
+<pre data-lang="python"><code>
+def select_primary(cluster: list[dict]) -&gt; dict:
+    return max(
+        cluster,
+        key=lambda c: (c[&quot;field_count&quot;], c[&quot;updated_at_podium&quot;], -ord_key(c[&quot;contact_uid&quot;]))
+    )
+
+def ord_key(uid: str) -&gt; int:
+    # Stable, deterministic tiebreak — lower uid sorts first
+    return sum(ord(c) for c in uid)
+</code></pre>
+<h3>5. Opt-out preservation by union (neutralizes compliance re-enable)</h3>
+<p>The strongest setting wins, always. If any record in the cluster has <code>marketing_opt_out=true</code>, the merged record has <code>marketing_opt_out=true</code>. Same for <code>sms_opt_out</code> and <code>email_opt_out</code>. This rule is non-negotiable and is the reason every cluster&#39;s opt-out state is computed BEFORE the merge API call, then forced via <code>PATCH /contacts/{primary_uid}</code> immediately after the merge completes.</p>
+<pre data-lang="python"><code>
+def union_opt_outs(cluster: list[dict]) -&gt; dict:
+    return {
+        &quot;marketing_opt_out&quot;: any(c.get(&quot;marketing_opt_out&quot;) for c in cluster),
+        &quot;sms_opt_out&quot;:       any(c.get(&quot;sms_opt_out&quot;) for c in cluster),
+        &quot;email_opt_out&quot;:     any(c.get(&quot;email_opt_out&quot;) for c in cluster),
+    }
+</code></pre>
+<p>The merge-then-patch sequence:</p>
+<ol>
+<li>Compute <code>opt_outs = union_opt_outs(cluster)</code> BEFORE any API call.</li>
+<li>Call Podium merge API: <code>POST /contacts/{primary_uid}/merge</code> with <code>{&quot;duplicate_uids&quot;: [...]}</code>.</li>
+<li>Immediately <code>PATCH /contacts/{primary_uid}</code> with <code>opt_outs</code> to overwrite whatever Podium&#39;s merge left there.</li>
+</ol>
+<p>Do not rely on Podium&#39;s merge to preserve opt-outs. The PATCH is the canonical source of truth for the final state.</p>
+<h3>6. Soft-delete vs hard-delete handling (neutralizes &quot;contact reappeared&quot;)</h3>
+<p>Podium&#39;s <code>DELETE /contacts/{uid}</code> is <strong>soft delete</strong> — the record sets <code>deleted_at</code> and disappears from default list endpoints but remains restorable via the Podium UI. Treat it as a state change, not a destruction.</p>
+<p>The dedup pipeline never hard-deletes. It always:</p>
+<ol>
+<li>Calls <code>POST /contacts/{primary_uid}/merge</code> — Podium soft-deletes the duplicates and links their conversation history to the primary.</li>
+<li>Records the operation in the local audit log with <code>operation=merge, soft_delete=true, restorable=true</code>.</li>
+<li>If a human admin restores a soft-deleted duplicate via the Podium UI, the next dedup run sees it again and re-merges it. This is by design — the audit log surfaces the loop so a human can decide whether the restore was intentional.</li>
+</ol>
+<p>Hard-delete (<code>/contacts/{uid}?hard=true</code> — separate scope, separate endpoint) is reserved for compliance erasure requests (GDPR right-to-be-forgotten, CCPA delete request) and runs through a different skill, not this one.</p>
+<h3>7. Cross-location dedup (neutralizes the Sydney + Burleigh Heads case)</h3>
+<p>Per-location dedup misses the case where the same phone exists as two separate contacts in two different locations. The cross-location scan runs after per-location dedup completes:</p>
+<pre data-lang="python"><code>
+def cross_location_clusters(db) -&gt; list[list[dict]]:
+    &quot;&quot;&quot;Return clusters of contacts sharing a natural_key across DIFFERENT location_uids.&quot;&quot;&quot;
+    rows = db.execute(&quot;&quot;&quot;
+        SELECT natural_key, contact_uid, location_uid, field_count, updated_at_podium
+        FROM contact_index
+        WHERE deleted_at_podium IS NULL
+        GROUP BY natural_key
+        HAVING COUNT(DISTINCT location_uid) &gt; 1
+    &quot;&quot;&quot;).fetchall()
+    # ... assemble per-key cluster
+</code></pre>
+<p>Cross-location merges have a different policy: by default they DO NOT auto-merge, because a person may legitimately be a customer of two separate franchises. They surface for human review with both location names attached. The auto-merge threshold can be raised per-deployment when the operator confirms locations represent the same business entity (e.g., two co-located retail floors).</p>
+<h3>8. Idempotent merge with state file (neutralizes mid-run crash)</h3>
+<p>Every cluster operation is recorded in <code>merge_state</code> BEFORE the API call and confirmed AFTER. A crash mid-merge leaves a <code>pending</code> row; the next run sees it, queries Podium for the current state of the primary, and either confirms <code>done</code> or retries.</p>
+<pre data-lang="sql"><code>
+CREATE TABLE IF NOT EXISTS merge_state (
+    cluster_id        TEXT PRIMARY KEY,    -- hash of sorted contact_uids
+    natural_key       TEXT NOT NULL,
+    primary_uid       TEXT NOT NULL,
+    duplicate_uids    TEXT NOT NULL,       -- JSON array
+    status            TEXT NOT NULL,       -- pending | merging | merged | patched | failed
+    attempts          INTEGER NOT NULL DEFAULT 0,
+    last_error        TEXT,
+    started_at        TEXT NOT NULL,
+    completed_at      TEXT
+);
+</code></pre>
+<p>State transitions: <code>pending → merging → merged → patched</code>. Only <code>patched</code> is terminal-success. A run resumes from any non-terminal state by re-checking the primary in Podium.</p>
+<h3>9. Conflict detection on simultaneous edits (neutralizes the race)</h3>
+<p>Before each merge API call, the orchestrator re-fetches each duplicate and verifies <code>updated_at_podium</code> matches the indexed value. If a duplicate has been updated since the index was built (another operator merged it into a different record, an admin edited it, an inbound message arrived), the orchestrator:</p>
+<ol>
+<li>Aborts the merge for this cluster.</li>
+<li>Logs <code>conflict_detected</code> to the audit log with the stale <code>indexed_updated_at</code> vs the current <code>live_updated_at</code>.</li>
+<li>Marks the cluster <code>re_index_required</code> — the next run rebuilds the index for this <code>natural_key</code> and re-evaluates.</li>
+</ol>
+<p>This is fail-stop, not fail-silent. A simultaneous-merge race surfaces in the audit log, not in the customer&#39;s marketing inbox.</p>
+<h2>Error Handling</h2>
+<p>Troubleshoot failures using the table below — each row maps a wire-level symptom to the root cause and the action. For deeper debug, the <code>audit-log.jsonl</code> records every cluster&#39;s pre- and post-merge state, and the <code>merge_state</code> SQLite table is the resumable source of truth for any in-flight operation.</p>
+<table><thead><tr>
+<th>HTTP Status</th>
+<th>Podium Error</th>
+<th>Root Cause</th>
+<th>Action</th>
+</tr></thead><tbody>
+<tr>
+<td><code>400 Bad Request</code></td>
+<td><code>invalid_duplicate_uid</code></td>
+<td>A duplicate_uid does not exist or already soft-deleted</td>
+<td>Re-fetch and re-evaluate cluster — duplicate may have been merged elsewhere</td>
+</tr>
+<tr>
+<td><code>404 Not Found</code></td>
+<td><code>contact_not_found</code></td>
+<td>Primary uid no longer exists (hard-deleted between index and merge)</td>
+<td>Skip cluster; the data is gone, no recovery needed</td>
+</tr>
+<tr>
+<td><code>409 Conflict</code></td>
+<td><code>merge_in_progress</code></td>
+<td>Another merge is already operating on one of these contacts</td>
+<td>Wait with exponential backoff; another orchestrator instance is mid-merge</td>
+</tr>
+<tr>
+<td><code>422 Unprocessable</code></td>
+<td><code>cross_location_merge_blocked</code></td>
+<td>Primary and duplicate are in different location_uids and tenant policy forbids</td>
+<td>Surface to human review queue; do not retry</td>
+</tr>
+<tr>
+<td><code>429 Too Many Requests</code></td>
+<td><code>rate_limited</code></td>
+<td>Burst merge load tripped Podium&#39;s per-tenant limit</td>
+<td>Honor <code>Retry-After</code>; downstream skill is <code>podium-rate-limit-survival</code></td>
+</tr>
+<tr>
+<td><code>500/502/503</code></td>
+<td><code>server_error</code></td>
+<td>Podium-side transient</td>
+<td>Exponential backoff with jitter, max 4 attempts; keep cluster <code>pending</code></td>
+</tr>
+</tbody></table>
+<h2>Examples</h2>
+<h3>Normalize a single phone number from CLI</h3>
+<pre data-lang="bash"><code>
+python3 scripts/phone_normalize.py --phone &quot;0412 345 678&quot; --region AU --output json
+</code></pre>
+<p>Output:</p>
+<pre data-lang="json"><code>
+{
+  &quot;valid&quot;: true,
+  &quot;e164&quot;: &quot;+61412345678&quot;,
+  &quot;national&quot;: &quot;0412 345 678&quot;,
+  &quot;country&quot;: &quot;AU&quot;,
+  &quot;natural_key&quot;: &quot;+61412345678&quot;
+}
+</code></pre>
+<h3>Build the natural-key index and find duplicate clusters</h3>
+<pre data-lang="bash"><code>
+# 1. Pull all contacts from a location and populate the SQLite index
+python3 scripts/find_duplicates.py \
+  --location-uid loc_abc123 \
+  --db ./podium-dedup.sqlite \
+  --token-env PODIUM_ACCESS_TOKEN \
+  --output json
+
+# Output: clusters of length &gt;= 2, each with confidence score and suggested primary
+</code></pre>
+<h3>Dry-run a merge of one cluster</h3>
+<pre data-lang="bash"><code>
+python3 scripts/merge_contacts.py \
+  --cluster-id cl_7f3a... \
+  --db ./podium-dedup.sqlite \
+  --token-env PODIUM_ACCESS_TOKEN \
+  --dry-run
+</code></pre>
+<p>Dry-run prints the planned operation — <code>primary_uid</code>, <code>duplicate_uids</code>, <code>opt_out_union</code>, and the exact API calls that would fire — without contacting Podium.</p>
+<h3>Execute the merge for real</h3>
+<pre data-lang="bash"><code>
+python3 scripts/merge_contacts.py \
+  --cluster-id cl_7f3a... \
+  --db ./podium-dedup.sqlite \
+  --token-env PODIUM_ACCESS_TOKEN
+</code></pre>
+<h3>Scan for cross-location duplicates after per-location runs complete</h3>
+<pre data-lang="bash"><code>
+python3 scripts/cross_location_dedup.py \
+  --db ./podium-dedup.sqlite \
+  --output review-queue.json
+</code></pre>
+<p>The output is a human-review queue, not an auto-merge plan — cross-location merges require operator confirmation by default.</p>
+<h2>Output</h2>
+<ul>
+<li>E.164 normalization function with natural-key emission, validated by the <code>phonenumbers</code> library</li>
+<li>SQLite-backed natural-key index keyed on <code>natural_key</code> and <code>(natural_key, location_uid)</code></li>
+<li>Duplicate detection emitting clusters with confidence scores (0.60 floor, 0.80 auto-merge threshold)</li>
+<li>Merge orchestrator with deterministic primary selection (field_count &gt; updated_at &gt; uid)</li>
+<li>Opt-out preservation via union-then-PATCH after every merge</li>
+<li>Cross-location duplicate scanner producing a human-review queue</li>
+<li>Idempotent merge state file (resumable after crash)</li>
+<li>Conflict detection via <code>updated_at_podium</code> re-check before each merge</li>
+</ul>
+<h2>Resources</h2>
+<ul>
+<li><a href="https://docs.podium.com/reference/contacts">Podium API docs — Contacts</a></li>
+<li><a href="https://docs.podium.com/reference/contact-merge">Podium API docs — Contact merge</a></li>
+<li><a href="https://github.com/daviddrysdale/python-phonenumbers">phonenumbers library (Google libphonenumber port)</a></li>
+<li><a href="https://www.itu.int/rec/T-REC-E.164">E.164 spec (ITU-T Recommendation E.164)</a></li>
+<li><a href="config/settings.yaml">config/settings.yaml</a> — region defaults, confidence thresholds, opt-out policy</li>
+<li><a href="references/errors.md">references/errors.md</a> — ERR_DEDUP_* codes with cause + solution</li>
+<li><a href="references/examples.md">references/examples.md</a> — 10 worked examples (single phone, cluster, cross-location, resume)</li>
+<li><a href="references/implementation.md">references/implementation.md</a> — Node port, libphonenumber wiring, audit log schema</li>
+<li><a href="scripts/phone_normalize.py">scripts/phone_normalize.py</a> — CLI: normalize a phone to E.164 + natural-key</li>
+<li><a href="scripts/find_duplicates.py">scripts/find_duplicates.py</a> — CLI: scan and emit cluster proposals with scores</li>
+<li><a href="scripts/merge_contacts.py">scripts/merge_contacts.py</a> — CLI: merge a cluster (primary + dupes) with <code>--dry-run</code></li>
+<li><a href="scripts/cross_location_dedup.py">scripts/cross_location_dedup.py</a> — CLI: cross-location scan for human review</li>
+</ul></div>
+      </div>
+    </section>
+
+    <!-- 8. Bottom CTA -->
+    <section class="detail-cta" data-astro-cid-qcigfm7x>
+  <h2 class="detail-cta__headline" data-astro-cid-qcigfm7x>Ready to use podium-pack?</h2>
+  <div class="detail-cta__actions" data-astro-cid-qcigfm7x>
+    <button class="detail-cta__primary" data-copy-install="/plugin install podium-pack@claude-code-plugins-plus" data-astro-cid-qcigfm7x>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" data-astro-cid-qcigfm7x>
+        <rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" stroke-width="1.5" data-astro-cid-qcigfm7x></rect>
+        <path d="M3 11V3a1 1 0 011-1h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" data-astro-cid-qcigfm7x></path>
+      </svg>
+      <span class="detail-cta__btn-text" data-astro-cid-qcigfm7x>Copy Install Command</span>
+    </button>
+    
+  </div>
+</section>
+
+<script type="module">document.querySelectorAll("[data-copy-install]").forEach(t=>{t.addEventListener("click",async()=>{const a=t.dataset.copyInstall||"";await navigator.clipboard.writeText(a);const e=t.querySelector(".detail-cta__btn-text");if(e){const o=e.textContent;e.textContent="Copied!",t.classList.add("copied"),window.trackEvent&&window.trackEvent("install_copied",{plugin_name:a.split(" ").pop()||"",source:"detail_cta"}),setTimeout(()=>{e.textContent=o,t.classList.remove("copied")},2e3)}})});</script>
+
+    <!-- 9. Related Skills (6, with tool pills) -->
+    <section class="related-skills-section" data-astro-cid-jrlgpo3w>
+        <h2 class="related-skills-heading" data-astro-cid-jrlgpo3w>Related Skills</h2>
+        <div class="related-skills-grid" data-astro-cid-jrlgpo3w>
+          <a href="/skills/abridge-ci-integration/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-ci-integration</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Configure CI/CD pipeline for Abridge clinical AI integrations with GitHub Actions.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-common-errors/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-common-errors</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Diagnose and fix common Abridge clinical AI integration errors.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-a/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-a</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge ambient clinical documentation capture-to-note pipeline.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-b/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-b</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge patient-facing documentation and after-visit summary generation.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-cost-tuning/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-cost-tuning</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Optimize Abridge clinical AI costs through tier selection, session management, and usage monitoring for healthcare organizations.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-debug-bundle/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-debug-bundle</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Collect Abridge debug evidence for support tickets and troubleshooting.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a>
+        </div>
+      </section>
+
+  </div>
+
+  
+  <script>
+    document.querySelectorAll('.install-command').forEach(el => {
+      el.addEventListener('click', function() {
+        const text = this.dataset.copy || this.textContent;
+        navigator.clipboard.writeText(text).then(() => {
+          const originalText = this.textContent;
+          this.textContent = 'Copied to clipboard!';
+          this.style.color = 'var(--brand-green)';
+          setTimeout(() => {
+            this.textContent = originalText;
+            this.style.color = '';
+          }, 2000);
+        });
+      });
+    });
+  </script>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

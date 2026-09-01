@@ -1,0 +1,993 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>langchain-debug-bundle - Agent Skill</title>
+    <meta name="description" content="Produce a reproducible, sanitized diagnostic bundle for a LangChain / LangGraph incident — environment snapshot, version manifest, filtered astream_events(v2) transcript, propagating callback stack, LangSmith trace URL — so a debug colleague can reproduce the failure without a live terminal. Use when triaging a production incident, filing a Discord or GitHub bug report, asking for help on the LangChain forum, or archiving a post-mortem artifact. Trigger with &quot;langchain debug bundle&quot;, &quot;langgraph debug dump&quot;, &quot;langchain diagnostic export&quot;, &quot;langsmith trace export&quot;, &quot;astream_events dump&quot;, &quot;langchain incident bundle&quot;.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://tonsofskills.com/tons-of-skills-marketplace/skills/langchain-debug-bundle/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/langchain-debug-bundle/">
+    <meta property="og:title" content="langchain-debug-bundle - Agent Skill">
+    <meta property="og:description" content="Produce a reproducible, sanitized diagnostic bundle for a LangChain / LangGraph incident — environment snapshot, version manifest, filtered astream_events(v2) transcript, propagating callback stack, LangSmith trace URL — so a debug colleague can reproduce the failure without a live terminal. Use when triaging a production incident, filing a Discord or GitHub bug report, asking for help on the LangChain forum, or archiving a post-mortem artifact. Trigger with &quot;langchain debug bundle&quot;, &quot;langgraph debug dump&quot;, &quot;langchain diagnostic export&quot;, &quot;langsmith trace export&quot;, &quot;astream_events dump&quot;, &quot;langchain incident bundle&quot;.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="langchain-debug-bundle - Agent Skill">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/langchain-debug-bundle/">
+    <meta name="twitter:title" content="langchain-debug-bundle - Agent Skill">
+    <meta name="twitter:description" content="Produce a reproducible, sanitized diagnostic bundle for a LangChain / LangGraph incident — environment snapshot, version manifest, filtered astream_events(v2) transcript, propagating callback stack, LangSmith trace URL — so a debug colleague can reproduce the failure without a live terminal. Use when triaging a production incident, filing a Discord or GitHub bug report, asking for help on the LangChain forum, or archiving a post-mortem artifact. Trigger with &quot;langchain debug bundle&quot;, &quot;langgraph debug dump&quot;, &quot;langchain diagnostic export&quot;, &quot;langsmith trace export&quot;, &quot;astream_events dump&quot;, &quot;langchain incident bundle&quot;.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"langchain-debug-bundle","description":"Produce a reproducible, sanitized diagnostic bundle for a LangChain / LangGraph incident — environment snapshot, version manifest, filtered astream_events(v2) transcript, propagating callback stack, LangSmith trace URL — so a debug colleague can reproduce the failure without a live terminal. Use when triaging a production incident, filing a Discord or GitHub bug report, asking for help on the LangChain forum, or archiving a post-mortem artifact. Trigger with \"langchain debug bundle\", \"langgraph debug dump\", \"langchain diagnostic export\", \"langsmith trace export\", \"astream_events dump\", \"langchain incident bundle\".","version":"2.5.0","author":{"@type":"Person","name":"Jeremy Longshore"},"license":"MIT","programmingLanguage":"Claude Code Agent Skill","isPartOf":{"@type":"SoftwareApplication","name":"langchain-py-pack","applicationCategory":"unknown"}}</script>
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.breadcrumbs[data-astro-cid-ilhxcym7]{margin-bottom:var(--space-5)}.breadcrumbs__list[data-astro-cid-ilhxcym7]{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;list-style:none;padding:0;margin:0;font-family:var(--font-mono);font-size:var(--text-sm, .8rem)}.breadcrumbs__item[data-astro-cid-ilhxcym7]{display:flex;align-items:center;gap:.375rem}.breadcrumbs__link[data-astro-cid-ilhxcym7]{color:var(--text-3);text-decoration:none;transition:color var(--duration-fast, .2s) var(--ease-out)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:hover{color:var(--primary)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:0}.breadcrumbs__sep[data-astro-cid-ilhxcym7]{color:var(--text-3);user-select:none;font-size:.7em;line-height:1}.breadcrumbs__current[data-astro-cid-ilhxcym7]{color:var(--text-2)}.detail-cta[data-astro-cid-qcigfm7x]{background:var(--surface-3, var(--brand-light-gray));border-top:1px solid var(--border, var(--brand-light-gray));border-radius:var(--radius-lg);padding:2rem 1.5rem;margin-top:2rem;text-align:center}.detail-cta__headline[data-astro-cid-qcigfm7x]{font-family:var(--font-display);font-weight:700;font-size:1.35rem;color:var(--text, var(--brand-dark));margin-bottom:1.25rem}.detail-cta__actions[data-astro-cid-qcigfm7x]{display:flex;justify-content:center;gap:.75rem;flex-wrap:wrap}.detail-cta__primary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:var(--primary);color:#0a0a0c;border:none;border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;cursor:pointer;transition:background var(--duration-fast) var(--ease-out),transform var(--duration-fast) var(--ease-out)}.detail-cta__primary[data-astro-cid-qcigfm7x]:hover{background:var(--primary-dark, var(--primary-dark));transform:translateY(-1px)}.detail-cta__primary[data-astro-cid-qcigfm7x].copied{background:var(--positive, var(--brand-green))}.detail-cta__secondary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:transparent;color:var(--text, var(--brand-dark));border:1px solid var(--border, var(--brand-mid-gray));border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;text-decoration:none;transition:border-color var(--duration-fast) var(--ease-out),color var(--duration-fast) var(--ease-out)}.detail-cta__secondary[data-astro-cid-qcigfm7x]:hover{border-color:var(--primary);color:var(--primary)}@media(max-width:480px){.detail-cta__actions[data-astro-cid-qcigfm7x]{flex-direction:column;align-items:stretch}.detail-cta__primary[data-astro-cid-qcigfm7x],.detail-cta__secondary[data-astro-cid-qcigfm7x]{justify-content:center}}
+</style>
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/_slug_@_@astro.wF9emvVq.css"></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  
+  
+
+  <div class="skill-detail" data-astro-cid-jrlgpo3w>
+    <!-- 1. Breadcrumbs -->
+    <nav aria-label="Breadcrumb" class="breadcrumbs" data-astro-cid-ilhxcym7>
+  <ol class="breadcrumbs__list" itemscope itemtype="https://schema.org/BreadcrumbList" data-astro-cid-ilhxcym7>
+    <li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Home</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="1">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/skills/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Skills</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="2">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          <span class="breadcrumbs__current" aria-current="page" itemprop="name" data-astro-cid-ilhxcym7>
+              langchain-debug-bundle
+            </span>
+          <meta itemprop="position" content="3">
+        </li>
+  </ol>
+</nav>
+
+    <!-- 2. Header (enhanced) -->
+    <header class="skill-header" data-astro-cid-jrlgpo3w>
+      <h1 data-astro-cid-jrlgpo3w>langchain-debug-bundle</h1>
+      <p class="skill-description" data-astro-cid-jrlgpo3w>Produce a reproducible, sanitized diagnostic bundle for a LangChain / LangGraph incident — environment snapshot, version manifest, filtered astream_events(v2) transcript, propagating callback stack, LangSmith trace URL — so a debug colleague can reproduce the failure without a live terminal. Use when triaging a production incident, filing a Discord or GitHub bug report, asking for help on the LangChain forum, or archiving a post-mortem artifact. Trigger with &quot;langchain debug bundle&quot;, &quot;langgraph debug dump&quot;, &quot;langchain diagnostic export&quot;, &quot;langsmith trace export&quot;, &quot;astream_events dump&quot;, &quot;langchain incident bundle&quot;.</p>
+
+      <div class="skill-metadata" data-astro-cid-jrlgpo3w>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>v2.5.0</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>Jeremy Longshore</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>MIT</span>
+        </div>
+      </div>
+
+      
+    </header>
+
+    <!-- 4. Allowed Tools -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Allowed Tools</h2>
+      <div class="tools-grid" data-astro-cid-jrlgpo3w>
+        <span class="tool-badge" data-astro-cid-jrlgpo3w>Read</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Write</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Edit</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(python:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(pip:*)</span>
+      </div>
+      
+    </section>
+
+    <!-- 5. Provided by Plugin -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Provided by Plugin</h2>
+      <div class="plugin-info" data-astro-cid-jrlgpo3w>
+        <div class="plugin-details" data-astro-cid-jrlgpo3w>
+          <h3 data-astro-cid-jrlgpo3w>
+            <a href="/plugins/langchain-py-pack/" data-astro-cid-jrlgpo3w>langchain-py-pack</a>
+          </h3>
+          <p data-astro-cid-jrlgpo3w>Claude Code skill pack for LangChain 1.0 + LangGraph 1.0 (Python) - 34 skills covering chains, agents, RAG, middleware, checkpointing, HITL, streaming, and production patterns</p>
+          <div class="plugin-meta" data-astro-cid-jrlgpo3w>
+            <span data-astro-cid-jrlgpo3w>unknown</span>
+            <span data-astro-cid-jrlgpo3w>v2.5.0</span>
+          </div>
+        </div>
+        <a href="/plugins/langchain-py-pack/" class="btn-primary" data-astro-cid-jrlgpo3w>View Plugin</a>
+      </div>
+    </section>
+
+    <!-- 6. Installation -->
+    <section class="section-box dark" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Installation</h2>
+      <p class="install-note" style="color: var(--brand-light-gray); margin-bottom: 0.75rem;" data-astro-cid-jrlgpo3w>This skill is included in the langchain-py-pack plugin:</p>
+      <pre class="install-command" data-copy="/plugin install langchain-py-pack@claude-code-plugins-plus" data-astro-cid-jrlgpo3w><code data-astro-cid-jrlgpo3w>/plugin install langchain-py-pack@claude-code-plugins-plus</code></pre>
+      <p class="install-note" data-astro-cid-jrlgpo3w>Click to copy</p>
+    </section>
+
+    <!-- 7. Skill Content (Markdown) -->
+    <section class="skill-content-section" data-astro-cid-jrlgpo3w>
+      <h2 data-astro-cid-jrlgpo3w>Instructions</h2>
+      <div class="skill-content" data-astro-cid-jrlgpo3w>
+        <div data-astro-cid-jrlgpo3w><h1>LangChain Debug Bundle (Python)</h1>
+<h2>Overview</h2>
+<p>An on-call engineer pages you at 2am: the production agent loops, <code>ToolMessage</code> outputs are empty strings, the user sees &quot;I could not find the answer.&quot; Someone asks the right question — <em>what state was the graph in when it gave up?</em> — and there is no answer, because the terminal that caught the failure is already gone, the Kubernetes pod has restarted, and the LangSmith URL was never recorded.</p>
+<p>This skill produces one artifact: a single <code>bundle-&lt;incident_id&gt;.tar.gz</code> (typically 1-10 MB) containing everything a second engineer needs to reproduce the failure without a live terminal — environment and version manifest, filtered <code>astream_events(version=&quot;v2&quot;)</code> JSONL, a propagating callback stack, the LangSmith trace URL, and a post-write sanitization pass.</p>
+<p>Four pitfalls make naive bundles useless:</p>
+<ul>
+<li><strong>P01</strong> — <code>ChatAnthropic.stream()</code> reports <code>token_usage</code> only on stream close; token math read from <code>on_llm_end</code> lags by stream duration, so cost context in the bundle is wrong.</li>
+<li><strong>P28</strong> — <code>BaseCallbackHandler.with_config(callbacks=[...])</code> does NOT propagate into subgraphs or inner <code>create_react_agent</code> loops. A debug callback bound that way silently captures zero events from the place the incident actually happened.</li>
+<li><strong>P47</strong> — <code>astream_events(version=&quot;v2&quot;)</code> emits 2,000+ events per invocation. A raw dump is 50 MB and unreadable; an SSE viewer crashes on it.</li>
+<li><strong>P67</strong> — <code>astream_log()</code> is soft-deprecated in 1.0. Diagnostic tooling built on it breaks on the next minor version.</li>
+</ul>
+<p>The skill&#39;s answer: assemble the manifest, capture v2 events with a whitelist (drop lifecycle noise, keep <code>on_chat_model_stream</code> / <code>on_tool_*</code> / any <code>*_error</code> event), attach <code>DebugCallbackHandler</code> via <code>config[&quot;callbacks&quot;]</code> at invoke time, pull the LangSmith URL from the active <code>RunTree</code>, run the sanitization pass, tar it up. Pinned: <code>langchain-core 1.0.x</code>, <code>langgraph 1.0.x</code>, <code>langsmith 0.1.x</code>. Pain-catalog anchors: P01, P28, P47, P67.</p>
+<h2>Prerequisites</h2>
+<ul>
+<li>Python 3.10+</li>
+<li><code>langchain-core &gt;= 1.0, &lt; 2.0</code>, <code>langgraph &gt;= 1.0, &lt; 2.0</code></li>
+<li><code>langsmith &gt;= 0.1.40</code> for <code>RunTree</code> access</li>
+<li>Active LangSmith project (<code>LANGSMITH_TRACING=true</code>, <code>LANGSMITH_API_KEY=...</code>, <code>LANGSMITH_PROJECT=...</code>) — canonical 1.0 env-var names, not the legacy <code>LANGCHAIN_TRACING_V2</code> (see P26).</li>
+<li>Write access to a staging directory outside the repo tree.</li>
+</ul>
+<h2>Instructions</h2>
+<h3>Step 1 — Assemble the environment manifest</h3>
+<p>Record the runtime snapshot that lets a colleague reproduce on a different host. See <a href="references/env-manifest-template.md">env-manifest-template.md</a> for the exact YAML shape.</p>
+<pre data-lang="python"><code>
+import platform, sys, os, subprocess, datetime
+
+RELEVANT = [
+    &quot;langchain-core&quot;, &quot;langchain&quot;, &quot;langgraph&quot;,
+    &quot;langchain-anthropic&quot;, &quot;langchain-openai&quot;,
+    &quot;langsmith&quot;, &quot;anthropic&quot;, &quot;openai&quot;, &quot;pydantic&quot;,
+]
+
+def pip_show(name: str) -&gt; str | None:
+    try:
+        out = subprocess.check_output(
+            [sys.executable, &quot;-m&quot;, &quot;pip&quot;, &quot;show&quot;, name],
+            stderr=subprocess.DEVNULL, text=True,
+        )
+        for line in out.splitlines():
+            if line.startswith(&quot;Version:&quot;):
+                return line.split(&quot;:&quot;, 1)[1].strip()
+    except subprocess.CalledProcessError:
+        return None
+
+def build_manifest(incident_id: str, invoke_meta: dict) -&gt; dict:
+    return {
+        &quot;bundle_spec_version&quot;: &quot;1.0&quot;,
+        &quot;generated_at&quot;: datetime.datetime.utcnow().isoformat() + &quot;Z&quot;,
+        &quot;incident_id&quot;: incident_id,
+        &quot;runtime&quot;: {
+            &quot;python&quot;: sys.version.split()[0],
+            &quot;platform&quot;: platform.platform(),
+            &quot;cpu_count&quot;: os.cpu_count(),
+        },
+        &quot;packages&quot;: [
+            {&quot;name&quot;: n, &quot;version&quot;: pip_show(n)}
+            for n in RELEVANT if pip_show(n) is not None
+        ],
+        # NAMES only — never values. Sanitized by design (P27 posture).
+        &quot;env_var_names_present&quot;: sorted(
+            k for k in os.environ
+            if k.startswith((&quot;LANGSMITH_&quot;, &quot;LANGCHAIN_&quot;, &quot;ANTHROPIC_&quot;, &quot;OPENAI_&quot;, &quot;GOOGLE_&quot;))
+        ),
+        &quot;invocation&quot;: invoke_meta,
+    }
+</code></pre>
+<p>Record env-var <em>names</em>, not values. Values go through the sanitization pass in Step 5, but the safest design is never to capture them.</p>
+<h3>Step 2 — Capture <code>astream_events(version=&quot;v2&quot;)</code> with a filter</h3>
+<p>Raw v2 events flood 2,000+ per invocation (P47). A server-side filter drops lifecycle noise (<code>on_chain_start</code>/<code>on_chain_end</code>) and keeps model, tool, and error events — yielding 50-200 events per invocation and a ~500 KB JSONL.</p>
+<pre data-lang="python"><code>
+import json, itertools
+from pathlib import Path
+
+KEEP = {
+    &quot;on_chat_model_start&quot;, &quot;on_chat_model_end&quot;,
+    &quot;on_tool_start&quot;, &quot;on_tool_end&quot;, &quot;on_tool_error&quot;,
+    &quot;on_retriever_start&quot;, &quot;on_retriever_end&quot;,
+    &quot;on_custom_event&quot;,
+}
+# Additionally: any event whose name ends in &quot;_error&quot;
+# Additionally: 1-in-10 sampled on_chat_model_stream (for response reconstruction)
+
+async def capture_events(graph, inputs, config, out_path: Path) -&gt; int:
+    sample = itertools.count()
+    written = 0
+    with out_path.open(&quot;w&quot;) as f:
+        async for evt in graph.astream_events(inputs, config=config, version=&quot;v2&quot;):
+            name = evt[&quot;event&quot;]
+            if name == &quot;on_chat_model_stream&quot; and next(sample) % 10 != 0:
+                continue
+            if name not in KEEP and not name.endswith(&quot;_error&quot;):
+                continue
+            f.write(json.dumps({
+                &quot;event&quot;: name,
+                &quot;name&quot;: evt.get(&quot;name&quot;),
+                &quot;run_id&quot;: str(evt.get(&quot;run_id&quot;)),
+                &quot;tags&quot;: evt.get(&quot;tags&quot;),
+                &quot;metadata&quot;: evt.get(&quot;metadata&quot;),
+                &quot;data&quot;: _json_safe(evt.get(&quot;data&quot;, {})),
+            }, default=str) + &quot;\n&quot;)
+            written += 1
+    return written
+</code></pre>
+<p>Never use <code>astream_log()</code> (P67). The full event taxonomy and <code>_json_safe</code> helper live in <a href="references/astream-events-capture.md">astream-events-capture.md</a>.</p>
+<h3>Step 3 — Attach callbacks that propagate into subgraphs (P28)</h3>
+<p>Callbacks bound via <code>Runnable.with_config(callbacks=[...])</code> fire on the outer chain only. They go silent the moment the graph crosses into a subgraph or an inner <code>create_react_agent</code> loop — exactly where incidents happen. Pass them via <code>config[&quot;callbacks&quot;]</code> at invoke time instead.</p>
+<pre data-lang="python"><code>
+from langchain_core.callbacks import BaseCallbackHandler
+
+class DebugCallbackHandler(BaseCallbackHandler):
+    def __init__(self): self.records: list[dict] = []
+    def on_tool_start(self, serialized, input_str, *, run_id, parent_run_id=None, **kw):
+        self.records.append({
+            &quot;kind&quot;: &quot;tool_start&quot;, &quot;run_id&quot;: str(run_id),
+            &quot;parent_run_id&quot;: str(parent_run_id) if parent_run_id else None,
+            &quot;tool&quot;: serialized.get(&quot;name&quot;), &quot;input&quot;: input_str[:500],
+        })
+    def on_tool_error(self, error, *, run_id, **kw):
+        self.records.append({
+            &quot;kind&quot;: &quot;tool_error&quot;, &quot;run_id&quot;: str(run_id),
+            &quot;error_type&quot;: type(error).__name__, &quot;error_message&quot;: str(error)[:1000],
+        })
+
+debug = DebugCallbackHandler()
+
+result = await agent.ainvoke(
+    {&quot;messages&quot;: [(&quot;user&quot;, reproducer_prompt)]},
+    config={
+        &quot;configurable&quot;: {&quot;thread_id&quot;: thread_id},
+        &quot;callbacks&quot;: [debug],                      # propagates into subgraphs
+        &quot;tags&quot;: [&quot;debug-bundle&quot;, incident_id],
+        &quot;metadata&quot;: {&quot;incident_id&quot;: incident_id},
+    },
+)
+</code></pre>
+<p>The full handler (LLM + retriever + tool lifecycle) and a propagation smoke test live in <a href="references/callback-propagation.md">callback-propagation.md</a>.</p>
+<h3>Step 4 — Record the LangSmith trace URL</h3>
+<p>A trace URL is cheaper than any local artifact — one click and the colleague sees the full run with latency, token counts, and input/output per node. Pull it from the active <code>RunTree</code> if you have a live handle; otherwise construct it from the invoke&#39;s <code>run_id</code>:</p>
+<pre data-lang="python"><code>
+from langsmith.run_helpers import get_current_run_tree
+
+def capture_langsmith_url() -&gt; str | None:
+    rt = get_current_run_tree()
+    if rt is None:
+        return None  # tracing not enabled or run already closed
+    return rt.get_url()  # https://smith.langchain.com/o/.../r/&lt;run_id&gt;
+
+# Write to langsmith.url in the bundle:
+url = capture_langsmith_url()
+(staging / &quot;langsmith.url&quot;).write_text(url or &quot;(no trace URL available)&quot;)
+</code></pre>
+<p>The URL requires the colleague to have access to the LangSmith project. For public sharing, use <code>RunTree.share()</code> to generate a public snapshot URL. Never paste a non-shared URL into a public Discord thread — the page redirects to a login and leaks the project name.</p>
+<h3>Step 5 — Sanitize before packaging</h3>
+<p>Every file in the staging dir passes through the redaction pass <strong>before</strong> the tar.gz is written. This is the last-mile guard; upstream redaction middleware should already have caught credential material, but the bundle cannot assume that.</p>
+<pre data-lang="python"><code>
+import re
+
+PATTERNS = [
+    (&quot;openai_key&quot;,    r&quot;sk-proj-[A-Za-z0-9_-]{16,}|sk-[A-Za-z0-9_-]{32,}&quot;),
+    (&quot;anthropic_key&quot;, r&quot;sk-ant-[A-Za-z0-9_-]{16,}&quot;),
+    (&quot;google_key&quot;,    r&quot;AIza[A-Za-z0-9_-]{35}&quot;),
+    (&quot;langsmith_key&quot;, r&quot;lsv2_(?:pt|sk)_[A-Za-z0-9]{32,}&quot;),
+    (&quot;bearer&quot;,        r&quot;(?i)bearer\s+[A-Za-z0-9._~+/=-]{20,}&quot;),
+    (&quot;db_uri&quot;,        r&quot;[a-z]+://[^:/\s]+:[^@\s]+@[^/\s]+&quot;),
+    (&quot;private_key&quot;,   r&quot;-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----&quot;),
+]
+
+def sanitize_file(path, patterns=PATTERNS) -&gt; dict[str, int]:
+    text, counts = path.read_text(), {}
+    for name, pat in patterns:
+        new, n = re.subn(pat, f&quot;[REDACTED:{name}]&quot;, text)
+        if n: counts[name] = n; text = new
+    path.write_text(text)
+    return counts
+</code></pre>
+<p>The full pattern catalog (credentials, session tokens, PII, internal URLs) and the pre-upload <code>tar -xzf ... &amp;&amp; grep</code> scan live in <a href="references/sanitization-checklist.md">sanitization-checklist.md</a>. For the production-grade upstream redaction middleware, use the forthcoming <code>langchain-security-basics</code> skill.</p>
+<h3>Step 6 — Bundle with an index</h3>
+<p>Write a top-level <code>MANIFEST.yaml</code> that describes every file and records the sanitization summary. Then tar.gz the staging dir.</p>
+<pre data-lang="python"><code>
+import tarfile, yaml
+from pathlib import Path
+
+def write_bundle(staging: Path, manifest: dict, sanitize_report: dict,
+                 out: Path, events_count: int, callback_count: int) -&gt; Path:
+    index = {
+        &quot;bundle_spec_version&quot;: &quot;1.0&quot;,
+        &quot;incident_id&quot;: manifest[&quot;incident_id&quot;],
+        &quot;generated_at&quot;: manifest[&quot;generated_at&quot;],
+        &quot;files&quot;: [
+            {&quot;name&quot;: &quot;manifest.yaml&quot;,  &quot;purpose&quot;: &quot;env + version snapshot&quot;},
+            {&quot;name&quot;: &quot;events.jsonl&quot;,   &quot;purpose&quot;: f&quot;filtered astream_events(v2), {events_count} events&quot;},
+            {&quot;name&quot;: &quot;callbacks.txt&quot;,  &quot;purpose&quot;: f&quot;DebugCallbackHandler records, {callback_count} entries&quot;},
+            {&quot;name&quot;: &quot;langsmith.url&quot;,  &quot;purpose&quot;: &quot;trace URL (shared) or (none)&quot;},
+            {&quot;name&quot;: &quot;notes.txt&quot;,      &quot;purpose&quot;: &quot;free-form engineer notes, sanitized&quot;},
+        ],
+        &quot;sanitization&quot;: sanitize_report,
+    }
+    (staging / &quot;MANIFEST.yaml&quot;).write_text(yaml.safe_dump(index, sort_keys=False))
+    with tarfile.open(out, &quot;w:gz&quot;) as tar:
+        tar.add(staging, arcname=out.stem)
+    return out
+
+bundle = write_bundle(
+    staging=Path(&quot;/tmp/bundle-INC-2026-0421-A&quot;),
+    manifest=m, sanitize_report=report,
+    out=Path(&quot;/tmp/bundle-INC-2026-0421-A.tar.gz&quot;),
+    events_count=n_events, callback_count=len(debug.records),
+)
+</code></pre>
+<h2>Output</h2>
+<table><thead><tr>
+<th>File in bundle</th>
+<th>Purpose</th>
+<th>Source</th>
+<th>Sanitization step</th>
+</tr></thead><tbody>
+<tr>
+<td><code>MANIFEST.yaml</code></td>
+<td>Index + file descriptions + redaction counts</td>
+<td>Step 6</td>
+<td>N/A (authored)</td>
+</tr>
+<tr>
+<td><code>manifest.yaml</code></td>
+<td>Python/OS/package/env-var-name snapshot</td>
+<td>Step 1</td>
+<td>Run pass; env-var <em>names</em> only by design</td>
+</tr>
+<tr>
+<td><code>events.jsonl</code></td>
+<td>Filtered <code>astream_events(v2)</code> — model, tool, error events</td>
+<td>Step 2</td>
+<td>Per-line regex redaction</td>
+</tr>
+<tr>
+<td><code>callbacks.txt</code></td>
+<td><code>DebugCallbackHandler</code> records (JSONL)</td>
+<td>Step 3</td>
+<td>Per-line regex redaction</td>
+</tr>
+<tr>
+<td><code>langsmith.url</code></td>
+<td><code>RunTree.get_url()</code> (shared if public)</td>
+<td>Step 4</td>
+<td>Verify no embedded API key param</td>
+</tr>
+<tr>
+<td><code>notes.txt</code></td>
+<td>Engineer&#39;s free-form observations</td>
+<td>Manual</td>
+<td>Per-line regex redaction</td>
+</tr>
+</tbody></table>
+<p>Typical size: <strong>1-10 MB</strong> compressed. Typical event count after filter: <strong>50-200</strong> per invocation (down from 2,000+ raw). Bundle is self-contained — no external dependencies beyond <code>tar -xzf</code> and a text editor.</p>
+<h2>Error Handling</h2>
+<table><thead><tr>
+<th>Error</th>
+<th>Cause</th>
+<th>Fix</th>
+</tr></thead><tbody>
+<tr>
+<td><code>events.jsonl</code> has no subgraph events</td>
+<td>Callbacks bound via <code>Runnable.with_config(callbacks=[...])</code> instead of <code>config[&quot;callbacks&quot;]</code> (P28)</td>
+<td>Move callbacks to invoke-time config; see <a href="references/callback-propagation.md">callback-propagation.md</a></td>
+</tr>
+<tr>
+<td><code>events.jsonl</code> is 50 MB+</td>
+<td>Filter not applied or <code>on_chain_*</code> events not excluded (P47)</td>
+<td>Enforce <code>KEEP</code> whitelist and 1:10 streaming sample; Step 2</td>
+</tr>
+<tr>
+<td><code>DeprecationWarning: astream_log is deprecated</code></td>
+<td>Captured via <code>astream_log()</code> instead of <code>astream_events(v2)</code> (P67)</td>
+<td>Migrate to <code>graph.astream_events(..., version=&quot;v2&quot;)</code></td>
+</tr>
+<tr>
+<td><code>response_metadata[&quot;token_usage&quot;]</code> empty in <code>on_chat_model_end</code> records</td>
+<td>Read before stream closed (P01)</td>
+<td>Aggregate from <code>on_chat_model_stream</code> chunks with <code>usage_metadata</code>; see model-inference skill</td>
+</tr>
+<tr>
+<td><code>langsmith.url</code> is empty</td>
+<td>Tracing not enabled or <code>get_current_run_tree()</code> returned <code>None</code></td>
+<td>Set <code>LANGSMITH_TRACING=true</code>, <code>LANGSMITH_API_KEY=...</code>, <code>LANGSMITH_PROJECT=...</code> (P26)</td>
+</tr>
+<tr>
+<td><code>TypeError: Object of type X is not JSON serializable</code> in events capture</td>
+<td>Tool returned a custom class with no <code>.model_dump()</code></td>
+<td>Extend <code>_json_safe</code> in <a href="references/astream-events-capture.md">astream-events-capture.md</a></td>
+</tr>
+<tr>
+<td>Pre-upload scan finds <code>sk-...</code> pattern</td>
+<td>Upstream middleware missed a key, or regex too lax</td>
+<td>Add specific pattern to <code>PATTERNS</code>, re-run Step 5, re-archive</td>
+</tr>
+</tbody></table>
+<h2>Examples</h2>
+<h3>Triage decision tree — &quot;which file in the bundle do I read first?&quot;</h3>
+<p>Give a colleague this table with the bundle so they know where to start:</p>
+<table><thead><tr>
+<th>Symptom in the ticket</th>
+<th>Start with</th>
+<th>Then</th>
+</tr></thead><tbody>
+<tr>
+<td>&quot;Agent looped forever&quot; / <code>GraphRecursionError</code></td>
+<td><code>events.jsonl</code> (filter <code>on_tool_start</code>)</td>
+<td><code>callbacks.txt</code> for tool→tool timing</td>
+</tr>
+<tr>
+<td>&quot;Tool returned empty&quot; / &quot;Could not find the answer&quot; (P09)</td>
+<td><code>events.jsonl</code> (grep <code>on_tool_error</code>)</td>
+<td><code>callbacks.txt</code> for the parent <code>run_id</code></td>
+</tr>
+<tr>
+<td>&quot;Wrong answer, correct tool called&quot;</td>
+<td><code>events.jsonl</code> (grep <code>on_chat_model_start</code> + last <code>on_tool_end</code>)</td>
+<td>LangSmith trace URL for full context</td>
+</tr>
+<tr>
+<td>&quot;Token count wrong in dashboard&quot; (P01, P25)</td>
+<td><code>events.jsonl</code> <code>on_chat_model_stream</code> chunks</td>
+<td><code>manifest.yaml</code> for retry middleware presence</td>
+</tr>
+<tr>
+<td>&quot;Works locally, fails in prod&quot;</td>
+<td><code>manifest.yaml</code> diff against local</td>
+<td><code>events.jsonl</code> for env-specific branches</td>
+</tr>
+<tr>
+<td>&quot;Memory resets between turns&quot; (P16)</td>
+<td><code>manifest.yaml</code> → <code>langgraph.thread_id</code> present?</td>
+<td><code>events.jsonl</code> → checkpointer restore events</td>
+</tr>
+</tbody></table>
+<h3>Incident-driven capture — reproducing and bundling in one script</h3>
+<p>See <a href="references/callback-propagation.md">callback-propagation.md</a> for the full invoke-time config pattern. The skeleton:</p>
+<pre data-lang="python"><code>
+async def reproduce_and_bundle(agent, reproducer, incident_id: str) -&gt; Path:
+    debug = DebugCallbackHandler()
+    staging = Path(f&quot;/tmp/bundle-{incident_id}&quot;); staging.mkdir(exist_ok=True)
+
+    try:
+        result = await agent.ainvoke(
+            reproducer,
+            config={&quot;configurable&quot;: {&quot;thread_id&quot;: f&quot;debug-{incident_id}&quot;},
+                    &quot;callbacks&quot;: [debug], &quot;tags&quot;: [&quot;debug-bundle&quot;, incident_id]},
+        )
+        invoke_meta = {&quot;status&quot;: &quot;success&quot;}
+    except Exception as e:
+        invoke_meta = {&quot;status&quot;: &quot;error&quot;,
+                       &quot;error_class&quot;: type(e).__name__, &quot;error_message&quot;: str(e)[:500]}
+
+    # Step 2 — capture events (separate invocation with same inputs OR replay
+    # from RunTree if already in LangSmith)
+    n_events = await capture_events(agent, reproducer, {...}, staging / &quot;events.jsonl&quot;)
+
+    # Step 1 — manifest, Step 3 — callbacks, Step 4 — LangSmith URL, Step 5 — sanitize
+    # Step 6 — bundle
+    return write_bundle(staging, build_manifest(incident_id, invoke_meta), ..., ...)
+</code></pre>
+<h3>Discord / forum bug report checklist</h3>
+<p>Before posting to the LangChain Discord or GitHub Issues:</p>
+<ol>
+<li>Run the pre-upload <code>tar -xzf &amp;&amp; grep</code> scan (<a href="references/sanitization-checklist.md">sanitization-checklist.md</a>)</li>
+<li>Confirm <code>langsmith.url</code> is a <em>shared</em> URL (public), not a project-internal one</li>
+<li>Strip the <code>incident_id</code> if it maps to internal ticket numbers you cannot disclose</li>
+<li>Include in the post: bundle attachment, a 3-sentence symptom description, the exact reproducer prompt, the first line of <code>MANIFEST.yaml</code> (spec version and versions of <code>langchain-core</code> + <code>langgraph</code>)</li>
+</ol>
+<h2>Resources</h2>
+<ul>
+<li><a href="https://python.langchain.com/docs/concepts/callbacks/">LangChain callbacks concept</a></li>
+<li><a href="https://python.langchain.com/docs/how_to/streaming/#using-stream-events"><code>astream_events</code> v2</a></li>
+<li><a href="https://docs.smith.langchain.com/observability">LangSmith observability</a></li>
+<li><a href="https://docs.smith.langchain.com/reference/python/run_helpers">LangSmith <code>RunTree</code> API</a></li>
+<li><a href="https://langchain-ai.github.io/langgraph/how-tos/streaming/">LangGraph streaming modes</a></li>
+<li><a href="https://blog.langchain.com/langchain-langgraph-1dot0/">LangChain 1.0 release notes</a></li>
+<li>Pack pain catalog: <code>docs/pain-catalog.md</code> (entries P01, P26, P28, P47, P67)</li>
+<li>Companion skills: <code>langchain-observability</code>, <code>langchain-security-basics</code> (upstream redaction middleware), <code>langchain-model-inference</code> (token accounting)</li>
+</ul></div>
+      </div>
+    </section>
+
+    <!-- 8. Bottom CTA -->
+    <section class="detail-cta" data-astro-cid-qcigfm7x>
+  <h2 class="detail-cta__headline" data-astro-cid-qcigfm7x>Ready to use langchain-py-pack?</h2>
+  <div class="detail-cta__actions" data-astro-cid-qcigfm7x>
+    <button class="detail-cta__primary" data-copy-install="/plugin install langchain-py-pack@claude-code-plugins-plus" data-astro-cid-qcigfm7x>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" data-astro-cid-qcigfm7x>
+        <rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" stroke-width="1.5" data-astro-cid-qcigfm7x></rect>
+        <path d="M3 11V3a1 1 0 011-1h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" data-astro-cid-qcigfm7x></path>
+      </svg>
+      <span class="detail-cta__btn-text" data-astro-cid-qcigfm7x>Copy Install Command</span>
+    </button>
+    
+  </div>
+</section>
+
+<script type="module">document.querySelectorAll("[data-copy-install]").forEach(t=>{t.addEventListener("click",async()=>{const a=t.dataset.copyInstall||"";await navigator.clipboard.writeText(a);const e=t.querySelector(".detail-cta__btn-text");if(e){const o=e.textContent;e.textContent="Copied!",t.classList.add("copied"),window.trackEvent&&window.trackEvent("install_copied",{plugin_name:a.split(" ").pop()||"",source:"detail_cta"}),setTimeout(()=>{e.textContent=o,t.classList.remove("copied")},2e3)}})});</script>
+
+    <!-- 9. Related Skills (6, with tool pills) -->
+    <section class="related-skills-section" data-astro-cid-jrlgpo3w>
+        <h2 class="related-skills-heading" data-astro-cid-jrlgpo3w>Related Skills</h2>
+        <div class="related-skills-grid" data-astro-cid-jrlgpo3w>
+          <a href="/skills/abridge-ci-integration/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-ci-integration</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Configure CI/CD pipeline for Abridge clinical AI integrations with GitHub Actions.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-common-errors/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-common-errors</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Diagnose and fix common Abridge clinical AI integration errors.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-a/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-a</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge ambient clinical documentation capture-to-note pipeline.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-b/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-b</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge patient-facing documentation and after-visit summary generation.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-cost-tuning/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-cost-tuning</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Optimize Abridge clinical AI costs through tier selection, session management, and usage monitoring for healthcare organizations.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-debug-bundle/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-debug-bundle</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Collect Abridge debug evidence for support tickets and troubleshooting.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a>
+        </div>
+      </section>
+
+  </div>
+
+  
+  <script>
+    document.querySelectorAll('.install-command').forEach(el => {
+      el.addEventListener('click', function() {
+        const text = this.dataset.copy || this.textContent;
+        navigator.clipboard.writeText(text).then(() => {
+          const originalText = this.textContent;
+          this.textContent = 'Copied to clipboard!';
+          this.style.color = 'var(--brand-green)';
+          setTimeout(() => {
+            this.textContent = originalText;
+            this.style.color = '';
+          }, 2000);
+        });
+      });
+    });
+  </script>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

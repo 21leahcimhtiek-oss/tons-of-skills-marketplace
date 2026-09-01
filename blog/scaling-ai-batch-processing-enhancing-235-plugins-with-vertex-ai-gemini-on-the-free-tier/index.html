@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scaling AI Batch Processing: Enhancing 235 Plugins with Vertex AI Gemini on the Free Tier — Tons of Skills Work Diary</title>
+    <meta name="description" content="Building an overnight batch processing system to enhance 235 Claude Code plugins using Vertex AI Gemini 2.0 Flash - complete with rate limiting, SQLite audit trails, and Turso disaster recovery. The full technical journey from conservative 90s delays to optimized 45s processing.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://startaitools.com/posts/scaling-ai-batch-processing-enhancing-235-plugins-with-vertex-ai-gemini-on-the-free-tier/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/scaling-ai-batch-processing-enhancing-235-plugins-with-vertex-ai-gemini-on-the-free-tier/">
+    <meta property="og:title" content="Scaling AI Batch Processing: Enhancing 235 Plugins with Vertex AI Gemini on the Free Tier — Tons of Skills Work Diary">
+    <meta property="og:description" content="Building an overnight batch processing system to enhance 235 Claude Code plugins using Vertex AI Gemini 2.0 Flash - complete with rate limiting, SQLite audit trails, and Turso disaster recovery. The full technical journey from conservative 90s delays to optimized 45s processing.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="Scaling AI Batch Processing: Enhancing 235 Plugins with Vertex AI Gemini on the Free Tier — Tons of Skills Work Diary">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/scaling-ai-batch-processing-enhancing-235-plugins-with-vertex-ai-gemini-on-the-free-tier/">
+    <meta name="twitter:title" content="Scaling AI Batch Processing: Enhancing 235 Plugins with Vertex AI Gemini on the Free Tier — Tons of Skills Work Diary">
+    <meta name="twitter:description" content="Building an overnight batch processing system to enhance 235 Claude Code plugins using Vertex AI Gemini 2.0 Flash - complete with rate limiting, SQLite audit trails, and Turso disaster recovery. The full technical journey from conservative 90s delays to optimized 45s processing.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"Scaling AI Batch Processing: Enhancing 235 Plugins with Vertex AI Gemini on the Free Tier","description":"Building an overnight batch processing system to enhance 235 Claude Code plugins using Vertex AI Gemini 2.0 Flash - complete with rate limiting, SQLite audit trails, and Turso disaster recovery. The full technical journey from conservative 90s delays to optimized 45s processing.","datePublished":"2025-10-19","url":"https://tonsofskills.com/blog/undefined","author":{"@type":"Person","name":"Jeremy Longshore"},"publisher":{"@type":"Organization","name":"Tons of Skills","url":"https://tonsofskills.com"}}</script>
+  
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.post-header[data-astro-cid-7jjqptxk]{background:var(--panel);padding:4rem 1.5rem 3rem;border-bottom:1px solid var(--border)}.post-header-inner[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto}.back-link[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3);text-decoration:none;display:inline-block;margin-bottom:1.5rem;transition:color .2s}.back-link[data-astro-cid-7jjqptxk]:hover{color:var(--primary)}.post-meta[data-astro-cid-7jjqptxk]{display:flex;align-items:center;gap:.75rem;margin-bottom:1rem}time[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3)}.featured-badge[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.2rem .6rem;background:#ce114126;color:var(--red);border-radius:0;font-weight:600;text-transform:uppercase;letter-spacing:.05em}.post-header[data-astro-cid-7jjqptxk] h1[data-astro-cid-7jjqptxk]{font-family:var(--font-body);font-size:clamp(1.5rem,4vw,2.2rem);font-weight:700;color:var(--text);line-height:1.25;margin-bottom:.75rem;letter-spacing:0}.post-desc[data-astro-cid-7jjqptxk]{color:var(--text-2);font-size:1.05rem;line-height:1.6;margin-bottom:1rem}.post-tags[data-astro-cid-7jjqptxk]{display:flex;gap:.4rem;flex-wrap:wrap}.tag[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.15rem .5rem;background:var(--surface-3);color:var(--text-3);border-radius:0}.post-body[data-astro-cid-7jjqptxk]{padding:3rem 1.5rem 4rem}.prose[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto;color:var(--text-2);line-height:1.8;font-size:1rem}.prose[data-astro-cid-7jjqptxk] h2{font-family:var(--font-body);font-size:1.5rem;font-weight:700;color:var(--text);margin:2.5rem 0 1rem;letter-spacing:0}.prose[data-astro-cid-7jjqptxk] h3{font-size:1.2rem;font-weight:600;color:var(--text);margin:2rem 0 .75rem}.prose[data-astro-cid-7jjqptxk] p{margin-bottom:1rem}.prose[data-astro-cid-7jjqptxk] ul,.prose[data-astro-cid-7jjqptxk] ol{margin:.5rem 0 1rem 1.5rem}.prose[data-astro-cid-7jjqptxk] li{margin-bottom:.35rem}.prose[data-astro-cid-7jjqptxk] strong{color:var(--text);font-weight:600}.prose[data-astro-cid-7jjqptxk] code{font-family:var(--font-mono);font-size:.88em;background:var(--surface-3);padding:.15em .35em;border-radius:0;color:var(--primary)}.prose[data-astro-cid-7jjqptxk] a{color:var(--primary);text-decoration:none}.prose[data-astro-cid-7jjqptxk] a:hover{text-decoration:underline}@media(max-width:768px){.post-header[data-astro-cid-7jjqptxk]{padding:3rem 1rem 2rem}.post-body[data-astro-cid-7jjqptxk]{padding:2rem 1rem 3rem}}
+</style></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  <article class="post" data-astro-cid-7jjqptxk>
+    <header class="post-header" data-astro-cid-7jjqptxk>
+      <div class="post-header-inner" data-astro-cid-7jjqptxk>
+        <a href="/blog" class="back-link" data-astro-cid-7jjqptxk>Back to Work Diary</a>
+        <div class="post-meta" data-astro-cid-7jjqptxk>
+          <time datetime="2025-10-19" data-astro-cid-7jjqptxk>October 18, 2025</time>
+          
+        </div>
+        <h1 data-astro-cid-7jjqptxk>Scaling AI Batch Processing: Enhancing 235 Plugins with Vertex AI Gemini on the Free Tier</h1>
+        <p class="post-desc" data-astro-cid-7jjqptxk>Building an overnight batch processing system to enhance 235 Claude Code plugins using Vertex AI Gemini 2.0 Flash - complete with rate limiting, SQLite audit trails, and Turso disaster recovery. The full technical journey from conservative 90s delays to optimized 45s processing.</p>
+        <div class="post-tags" data-astro-cid-7jjqptxk>
+          <span class="tag" data-astro-cid-7jjqptxk>vertex-ai</span><span class="tag" data-astro-cid-7jjqptxk>gemini</span><span class="tag" data-astro-cid-7jjqptxk>batch-processing</span><span class="tag" data-astro-cid-7jjqptxk>automation</span><span class="tag" data-astro-cid-7jjqptxk>rate-limiting</span><span class="tag" data-astro-cid-7jjqptxk>claude-code</span><span class="tag" data-astro-cid-7jjqptxk>disaster-recovery</span><span class="tag" data-astro-cid-7jjqptxk>turso</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="post-body" data-astro-cid-7jjqptxk>
+      <div class="prose" data-astro-cid-7jjqptxk>
+        <h2 id="the-problem-235-plugins-need-comprehensive-documentation">The Problem: 235 Plugins Need Comprehensive Documentation</h2>
+<p>I maintain <a href="https://github.com/jeremylongshore/claude-code-plugins">claude-code-plugins</a>, a marketplace with 235 plugins for Claude Code. Each plugin needed enhanced SKILL.md files (8,000-14,000 bytes) following Anthropic’s Agent Skills standards. Doing this manually would take weeks.</p>
+<p><strong>The goal:</strong> Process all 235 plugins overnight using Vertex AI Gemini 2.0 Flash - entirely on the free tier.</p>
+<p><strong>The constraints:</strong></p>
+<ul>
+<li>Must stay within Vertex AI free tier limits</li>
+<li>Need 100% success rate (no corrupted files)</li>
+<li>Require full audit trail for compliance</li>
+<li>Zero tolerance for API quota violations</li>
+</ul>
+<h2 id="the-journey-from-ultra-conservative-to-optimized">The Journey: From Ultra-Conservative to Optimized</h2>
+<h3 id="phase-1-initial-system-design">Phase 1: Initial System Design</h3>
+<p>I built <code>overnight-plugin-enhancer.py</code> with these core components:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#6A737D"># Ultra-conservative rate limiting</span></span>
+<span class="line"><span style="color:#79B8FF">RATE_LIMIT_DELAY</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> 90.0</span><span style="color:#6A737D">  # 90 seconds base delay</span></span>
+<span class="line"><span style="color:#79B8FF">RATE_LIMIT_RANDOMNESS</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> 30.0</span><span style="color:#6A737D">  # Add 0-30 seconds random</span></span></code></pre>
+<p><strong>Why so slow?</strong> I wanted to ensure we stayed well under the Vertex AI free tier limits:</p>
+<ul>
+<li>1,500 requests/day</li>
+<li>235 plugins = 470 API calls (analysis + generation per plugin)</li>
+<li>At 90-120s per plugin: ~15 plugins/hour = Safe</li>
+</ul>
+<p>The system included:</p>
+<ol>
+<li><strong>SQLite Audit Database</strong></li>
+</ol>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#F97583">def</span><span style="color:#B392F0"> init_database</span><span style="color:#E1E4E8">(self):</span></span>
+<span class="line"><span style="color:#E1E4E8">    cursor.execute(</span><span style="color:#9ECBFF">'''</span></span>
+<span class="line"><span style="color:#9ECBFF">        CREATE TABLE IF NOT EXISTS enhancements (</span></span>
+<span class="line"><span style="color:#9ECBFF">            id INTEGER PRIMARY KEY AUTOINCREMENT,</span></span>
+<span class="line"><span style="color:#9ECBFF">            timestamp TEXT NOT NULL,</span></span>
+<span class="line"><span style="color:#9ECBFF">            plugin_name TEXT NOT NULL,</span></span>
+<span class="line"><span style="color:#9ECBFF">            plugin_path TEXT NOT NULL,</span></span>
+<span class="line"><span style="color:#9ECBFF">            enhancement_type TEXT NOT NULL,</span></span>
+<span class="line"><span style="color:#9ECBFF">            status TEXT NOT NULL,</span></span>
+<span class="line"><span style="color:#9ECBFF">            processing_time_seconds REAL</span></span>
+<span class="line"><span style="color:#9ECBFF">        )</span></span>
+<span class="line"><span style="color:#9ECBFF">    '''</span><span style="color:#E1E4E8">)</span></span></code></pre>
+<ol>
+<li><strong>Automatic Backups Before Changes</strong></li>
+</ol>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#F97583">def</span><span style="color:#B392F0"> backup_plugin</span><span style="color:#E1E4E8">(self, plugin):</span></span>
+<span class="line"><span style="color:#E1E4E8">    timestamp </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> datetime.now().strftime(</span><span style="color:#9ECBFF">'%Y%m</span><span style="color:#79B8FF">%d</span><span style="color:#9ECBFF">_%H%M%S'</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">    backup_dir </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> BACKUP_DIR</span><span style="color:#F97583"> /</span><span style="color:#9ECBFF"> 'plugin-backups'</span><span style="color:#F97583"> /</span><span style="color:#F97583"> f</span><span style="color:#9ECBFF">"</span><span style="color:#79B8FF">{</span><span style="color:#E1E4E8">plugin[</span><span style="color:#9ECBFF">'name'</span><span style="color:#E1E4E8">]</span><span style="color:#79B8FF">}</span><span style="color:#9ECBFF">_</span><span style="color:#79B8FF">{</span><span style="color:#E1E4E8">timestamp</span><span style="color:#79B8FF">}</span><span style="color:#9ECBFF">"</span></span>
+<span class="line"><span style="color:#E1E4E8">    shutil.copytree(plugin_path, backup_dir)</span></span></code></pre>
+<ol>
+<li><strong>Two-Phase AI Generation</strong></li>
+</ol>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#6A737D"># Phase 1: Analyze and create enhancement plan</span></span>
+<span class="line"><span style="color:#E1E4E8">plan </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> self</span><span style="color:#E1E4E8">.generate_enhancement_plan(plugin)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Phase 2: Generate comprehensive SKILL.md</span></span>
+<span class="line"><span style="color:#E1E4E8">skill_content </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> self</span><span style="color:#E1E4E8">.generate_skill_md(plugin, plan)</span></span></code></pre>
+<h3 id="phase-2-testing-and-timeout-issues">Phase 2: Testing and Timeout Issues</h3>
+<p>First test run on 10 plugins:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">timeout</span><span style="color:#79B8FF"> 120</span><span style="color:#9ECBFF"> python3</span><span style="color:#9ECBFF"> overnight-plugin-enhancer.py</span><span style="color:#79B8FF"> --limit</span><span style="color:#79B8FF"> 10</span></span></code></pre>
+<p><strong>Problem:</strong> Process appeared stuck - no output for minutes.</p>
+<p><strong>Diagnosis:</strong> Python output buffering. The script was working but output wasn’t showing in real-time.</p>
+<p><strong>Fix:</strong> Unbuffered output flag</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">python3</span><span style="color:#79B8FF"> -u</span><span style="color:#9ECBFF"> overnight-plugin-enhancer.py</span></span></code></pre>
+<p><strong>Result:</strong> Real-time log streaming confirmed the system was working perfectly. Each plugin took 90-100 seconds as designed.</p>
+<h3 id="phase-3-expanding-to-all-categories">Phase 3: Expanding to All Categories</h3>
+<p>Initially, I only processed 7 plugin categories (testing). Time to go all in:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#6A737D"># Before (testing with 7 categories)</span></span>
+<span class="line"><span style="color:#79B8FF">CATEGORIES</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> [</span></span>
+<span class="line"><span style="color:#9ECBFF">    'productivity'</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">'security'</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">'testing'</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">'packages'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">    'examples'</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">'community'</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">'mcp'</span></span>
+<span class="line"><span style="color:#E1E4E8">]</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># After (all 17 categories - full 235 plugins)</span></span>
+<span class="line"><span style="color:#79B8FF">CATEGORIES</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> [</span></span>
+<span class="line"><span style="color:#9ECBFF">    'productivity'</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">'security'</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">'testing'</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">'packages'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">    'examples'</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">'community'</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">'mcp'</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">'ai-agency'</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">'ai-ml'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">    'api-development'</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">'crypto'</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">'database'</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">'devops'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">    'fairdb-operations-kit'</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">'finance'</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">'performance'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">    'skill-enhancers'</span></span>
+<span class="line"><span style="color:#E1E4E8">]</span></span></code></pre>
+<p>Started the overnight batch:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">nohup</span><span style="color:#9ECBFF"> python3</span><span style="color:#79B8FF"> -u</span><span style="color:#9ECBFF"> scripts/overnight-plugin-enhancer.py</span><span style="color:#F97583"> >></span><span style="color:#9ECBFF"> overnight-enhancement-all-plugins.log</span><span style="color:#F97583"> 2>&#x26;1</span><span style="color:#E1E4E8"> &#x26;</span></span></code></pre>
+<h3 id="phase-4-disaster-recovery-planning">Phase 4: Disaster Recovery Planning</h3>
+<p>Mid-batch, user concern: <strong>“What if I get locked out of GitHub?”</strong></p>
+<p>This is a legitimate fear when you have 235 production plugins and rely on GitHub for everything. I needed an off-site backup solution immediately.</p>
+<p><strong>Enter Turso:</strong> Edge SQLite database with free tier (500 databases, 9GB storage).</p>
+<p>Built <code>turso-plugin-backup.sh</code> in 30 minutes:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#6A737D"># Creates comprehensive backup with integrity checks</span></span>
+<span class="line"><span style="color:#B392F0">create_plugins_archive</span><span style="color:#E1E4E8">() {</span></span>
+<span class="line"><span style="color:#F97583">    local</span><span style="color:#E1E4E8"> archive_name</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">"plugins-$(</span><span style="color:#B392F0">date</span><span style="color:#9ECBFF"> +%Y%m%d-%H%M%S).tar.gz"</span></span>
+<span class="line"><span style="color:#B392F0">    tar</span><span style="color:#79B8FF"> -czf</span><span style="color:#9ECBFF"> "</span><span style="color:#E1E4E8">$archive_path</span><span style="color:#9ECBFF">"</span><span style="color:#79B8FF"> -C</span><span style="color:#9ECBFF"> "</span><span style="color:#E1E4E8">$PLUGINS_DIR</span><span style="color:#9ECBFF">"</span><span style="color:#9ECBFF"> .</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">    # Calculate SHA256 hash for integrity</span></span>
+<span class="line"><span style="color:#F97583">    local</span><span style="color:#E1E4E8"> hash</span><span style="color:#F97583">=</span><span style="color:#E1E4E8">$(</span><span style="color:#B392F0">sha256sum</span><span style="color:#9ECBFF"> "</span><span style="color:#E1E4E8">$archive_path</span><span style="color:#9ECBFF">"</span><span style="color:#F97583"> |</span><span style="color:#B392F0"> cut</span><span style="color:#79B8FF"> -d</span><span style="color:#9ECBFF">' '</span><span style="color:#79B8FF"> -f1</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Store metadata in Turso</span></span>
+<span class="line"><span style="color:#B392F0">upload_to_turso</span><span style="color:#E1E4E8">() {</span></span>
+<span class="line"><span style="color:#B392F0">    turso</span><span style="color:#9ECBFF"> db</span><span style="color:#9ECBFF"> shell</span><span style="color:#9ECBFF"> "</span><span style="color:#E1E4E8">$TURSO_DB_NAME</span><span style="color:#9ECBFF">"</span><span style="color:#F97583"> &#x3C;&#x3C;</span><span style="color:#9ECBFF">EOF</span></span>
+<span class="line"><span style="color:#9ECBFF">    INSERT INTO backup_history (timestamp, version, plugin_count,</span></span>
+<span class="line"><span style="color:#9ECBFF">                                archive_size, backup_metadata)</span></span>
+<span class="line"><span style="color:#9ECBFF">    VALUES ('</span><span style="color:#E1E4E8">$timestamp</span><span style="color:#9ECBFF">', '</span><span style="color:#E1E4E8">$version</span><span style="color:#9ECBFF">', </span><span style="color:#E1E4E8">$plugin_count</span><span style="color:#9ECBFF">,</span></span>
+<span class="line"><span style="color:#E1E4E8">            $archive_size</span><span style="color:#9ECBFF">, '</span><span style="color:#E1E4E8">$metadata</span><span style="color:#9ECBFF">');</span></span>
+<span class="line"><span style="color:#9ECBFF">EOF</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p><strong>The backup system includes:</strong></p>
+<ul>
+<li>All 235 plugins (tar.gz compressed)</li>
+<li>Enhancement SQLite database</li>
+<li>Plugin inventory JSON</li>
+<li>SHA256 integrity hashes</li>
+<li>Turso metadata for queryability</li>
+</ul>
+<p><strong>Recovery time objective:</strong> &#x3C; 30 minutes to restore complete repository from Turso.</p>
+<p>Related: Building Production Testing Suite with Playwright covers similar disaster recovery planning.</p>
+<h3 id="phase-5-speed-optimization-request">Phase 5: Speed Optimization Request</h3>
+<p>At 12:53 PM (after 12 hours): 157/235 plugins complete (66%)</p>
+<p><strong>User:</strong> “Let’s speed it up - we have room.”</p>
+<p><strong>Analysis:</strong></p>
+<ul>
+<li>Only using 7-14% of Vertex AI free tier quota</li>
+<li>Success rate: 100%</li>
+<li>Could safely cut delays in half</li>
+</ul>
+<p><strong>Optimization:</strong></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#6A737D"># Old: Ultra-conservative</span></span>
+<span class="line"><span style="color:#79B8FF">RATE_LIMIT_DELAY</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> 90.0</span></span>
+<span class="line"><span style="color:#79B8FF">RATE_LIMIT_RANDOMNESS</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> 30.0</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># New: Conservative but 2x faster</span></span>
+<span class="line"><span style="color:#79B8FF">RATE_LIMIT_DELAY</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> 45.0</span></span>
+<span class="line"><span style="color:#79B8FF">RATE_LIMIT_RANDOMNESS</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> 15.0</span></span></code></pre>
+<p><strong>Impact:</strong></p>
+<ul>
+<li>Before: ~15 plugins/hour → Completion: 5:30 AM</li>
+<li>After: ~30 plugins/hour → Completion: 2:30 AM (saved 3 hours!)</li>
+</ul>
+<p>Killed the old process and restarted:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#79B8FF">kill</span><span style="color:#79B8FF"> 876147</span></span>
+<span class="line"><span style="color:#B392F0">nohup</span><span style="color:#9ECBFF"> python3</span><span style="color:#79B8FF"> -u</span><span style="color:#9ECBFF"> scripts/overnight-plugin-enhancer.py</span><span style="color:#F97583"> >></span><span style="color:#9ECBFF"> overnight-enhancement-all-plugins.log</span><span style="color:#F97583"> 2>&#x26;1</span><span style="color:#E1E4E8"> &#x26;</span></span></code></pre>
+<p>The system intelligently skips already-enhanced plugins:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#E1E4E8">skill_path </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> plugin_path </span><span style="color:#F97583">/</span><span style="color:#9ECBFF"> 'skills'</span><span style="color:#F97583"> /</span><span style="color:#9ECBFF"> 'skill-adapter'</span><span style="color:#F97583"> /</span><span style="color:#9ECBFF"> 'SKILL.md'</span></span>
+<span class="line"><span style="color:#F97583">if</span><span style="color:#E1E4E8"> skill_path.exists() </span><span style="color:#F97583">and</span><span style="color:#79B8FF"> len</span><span style="color:#E1E4E8">(skill_path.read_text()) </span><span style="color:#F97583">></span><span style="color:#79B8FF"> 8000</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#79B8FF">    print</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">f</span><span style="color:#9ECBFF">"  ⏭️  SKILL.md already comprehensive (</span><span style="color:#79B8FF">{len</span><span style="color:#E1E4E8">(content)</span><span style="color:#79B8FF">}</span><span style="color:#9ECBFF"> bytes)"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#6A737D">    # Skip AI generation, just backup and validate</span></span></code></pre>
+<h2 id="the-technical-architecture">The Technical Architecture</h2>
+<h3 id="rate-limiting-strategy">Rate Limiting Strategy</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#F97583">def</span><span style="color:#B392F0"> apply_rate_limit</span><span style="color:#E1E4E8">(self, idx, total):</span></span>
+<span class="line"><span style="color:#9ECBFF">    """Apply intelligent rate limiting"""</span></span>
+<span class="line"><span style="color:#6A737D">    # Base delay with randomness</span></span>
+<span class="line"><span style="color:#E1E4E8">    base_delay </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> RATE_LIMIT_DELAY</span><span style="color:#F97583"> +</span><span style="color:#E1E4E8"> random.uniform(</span><span style="color:#79B8FF">0</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">RATE_LIMIT_RANDOMNESS</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">    time.sleep(base_delay)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">    # Extra rest every 10 plugins</span></span>
+<span class="line"><span style="color:#F97583">    if</span><span style="color:#E1E4E8"> idx </span><span style="color:#F97583">%</span><span style="color:#79B8FF"> 10</span><span style="color:#F97583"> ==</span><span style="color:#79B8FF"> 0</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">        extra_delay </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> random.uniform(</span><span style="color:#79B8FF">30</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">60</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#79B8FF">        print</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">f</span><span style="color:#9ECBFF">"  ⏸️  Extra rest break: </span><span style="color:#79B8FF">{</span><span style="color:#E1E4E8">extra_delay</span><span style="color:#F97583">:.1f</span><span style="color:#79B8FF">}</span><span style="color:#9ECBFF">s..."</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">        time.sleep(extra_delay)</span></span></code></pre>
+<p><strong>Why this works:</strong></p>
+<ol>
+<li><strong>Randomness prevents patterns</strong> that might trigger rate limits</li>
+<li><strong>Extra breaks every 10 plugins</strong> ensure long-term sustainability</li>
+<li><strong>Configurable delays</strong> allow real-time optimization without code changes</li>
+</ol>
+<h3 id="smart-processing-logic">Smart Processing Logic</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#F97583">def</span><span style="color:#B392F0"> process_plugin</span><span style="color:#E1E4E8">(self, plugin):</span></span>
+<span class="line"><span style="color:#9ECBFF">    """Process single plugin with comprehensive enhancement"""</span></span>
+<span class="line"><span style="color:#F97583">    try</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#6A737D">        # Always backup first (disaster recovery)</span></span>
+<span class="line"><span style="color:#79B8FF">        self</span><span style="color:#E1E4E8">.backup_plugin(plugin)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">        # Generate enhancement plan</span></span>
+<span class="line"><span style="color:#E1E4E8">        plan </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> self</span><span style="color:#E1E4E8">.generate_enhancement_plan(plugin)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">        # Generate or validate SKILL.md</span></span>
+<span class="line"><span style="color:#F97583">        if</span><span style="color:#E1E4E8"> needs_generation:</span></span>
+<span class="line"><span style="color:#E1E4E8">            skill_content </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> self</span><span style="color:#E1E4E8">.generate_skill_md(plugin, plan)</span></span>
+<span class="line"><span style="color:#F97583">        else</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#79B8FF">            print</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">f</span><span style="color:#9ECBFF">"  ⏭️  SKILL.md already comprehensive"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">        # Create bundled resource directories</span></span>
+<span class="line"><span style="color:#F97583">        for</span><span style="color:#E1E4E8"> resource_type </span><span style="color:#F97583">in</span><span style="color:#E1E4E8"> [</span><span style="color:#9ECBFF">'scripts'</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">'references'</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">'assets'</span><span style="color:#E1E4E8">]:</span></span>
+<span class="line"><span style="color:#F97583">            if</span><span style="color:#E1E4E8"> plan[</span><span style="color:#9ECBFF">'bundled_resources_needed'</span><span style="color:#E1E4E8">][resource_type]:</span></span>
+<span class="line"><span style="color:#E1E4E8">                create_resource_directory(resource_type)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">        # Log to SQLite audit trail</span></span>
+<span class="line"><span style="color:#79B8FF">        self</span><span style="color:#E1E4E8">.log_enhancement(plugin, </span><span style="color:#9ECBFF">'success'</span><span style="color:#E1E4E8">, changes)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">    except</span><span style="color:#79B8FF"> Exception</span><span style="color:#F97583"> as</span><span style="color:#E1E4E8"> e:</span></span>
+<span class="line"><span style="color:#79B8FF">        self</span><span style="color:#E1E4E8">.log_enhancement(plugin, </span><span style="color:#9ECBFF">'failed'</span><span style="color:#E1E4E8">, </span><span style="color:#FFAB70">error</span><span style="color:#F97583">=</span><span style="color:#79B8FF">str</span><span style="color:#E1E4E8">(e))</span></span>
+<span class="line"><span style="color:#F97583">        raise</span></span></code></pre>
+<h3 id="monitoring-and-observability">Monitoring and Observability</h3>
+<p>Real-time progress tracking:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#6A737D"># Check current status</span></span>
+<span class="line"><span style="color:#B392F0">tail</span><span style="color:#79B8FF"> -f</span><span style="color:#9ECBFF"> overnight-enhancement-all-plugins.log</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Query database for metrics</span></span>
+<span class="line"><span style="color:#B392F0">sqlite3</span><span style="color:#9ECBFF"> backups/plugin-enhancements/enhancements.db</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#9ECBFF">  "SELECT COUNT(*) FROM enhancements WHERE status = 'success';"</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Get processing time stats</span></span>
+<span class="line"><span style="color:#B392F0">sqlite3</span><span style="color:#9ECBFF"> backups/plugin-enhancements/enhancements.db</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#9ECBFF">  "SELECT AVG(processing_time_seconds), MAX(processing_time_seconds)</span></span>
+<span class="line"><span style="color:#9ECBFF">   FROM enhancements WHERE status = 'success';"</span></span></code></pre>
+<h2 id="the-results">The Results</h2>
+<p><strong>Final Metrics (as of 11:30 PM):</strong></p>
+<ul>
+<li><strong>Plugins processed:</strong> 163/235 (69% complete)</li>
+<li><strong>Success rate:</strong> 100%</li>
+<li><strong>Average SKILL.md size:</strong> 10,617 bytes</li>
+<li><strong>Processing time:</strong> ~60-100 seconds per plugin</li>
+<li><strong>API calls used:</strong> ~326 of 1,500 daily limit (22%)</li>
+<li><strong>Estimated completion:</strong> 2:30-3:00 AM</li>
+</ul>
+<p><strong>Quality metrics:</strong></p>
+<ul>
+<li>All SKILL.md files follow Anthropic Agent Skills standards</li>
+<li>Comprehensive documentation (8,000-14,000 bytes each)</li>
+<li>Proper YAML frontmatter</li>
+<li>Bundled resource directories created</li>
+<li>Complete backup trail in SQLite</li>
+</ul>
+<h2 id="lessons-learned">Lessons Learned</h2>
+<h3 id="1-start-conservative-optimize-later">1. Start Conservative, Optimize Later</h3>
+<p>Initial 90-120s delays seemed wasteful, but they ensured:</p>
+<ul>
+<li>No quota violations</li>
+<li>100% success rate</li>
+<li>Confidence to optimize</li>
+</ul>
+<p>Once we had data proving safety margins, cutting to 45-60s was an easy decision.</p>
+<h3 id="2-real-time-observability-is-critical">2. Real-Time Observability is Critical</h3>
+<p>The unbuffered output fix was crucial. Without seeing real-time progress:</p>
+<ul>
+<li>Can’t identify stuck processes</li>
+<li>Can’t calculate accurate completion times</li>
+<li>Can’t debug issues as they happen</li>
+</ul>
+<h3 id="3-disaster-recovery-before-production">3. Disaster Recovery Before Production</h3>
+<p>Building the Turso backup system mid-batch was the right call. Production systems need:</p>
+<ul>
+<li>Off-site backups (not just local)</li>
+<li>Integrity verification (SHA256 hashes)</li>
+<li>Fast recovery (&#x3C; 30 minutes)</li>
+<li>Queryable metadata (Turso SQLite)</li>
+</ul>
+<h3 id="4-sqlite-for-audit-trails">4. SQLite for Audit Trails</h3>
+<p>Using SQLite for enhancement tracking provided:</p>
+<ul>
+<li>Complete history of every change</li>
+<li>Easy querying for metrics</li>
+<li>Backup-friendly (just copy the .db file)</li>
+<li>No external dependencies</li>
+</ul>
+<p>Related: Building 254 BigQuery Schemas in 72 Hours shows similar database-driven automation patterns.</p>
+<h3 id="5-smart-skipping-saves-money">5. Smart Skipping Saves Money</h3>
+<p>The system automatically skips already-enhanced plugins:</p>
+<ul>
+<li>Saves API quota</li>
+<li>Reduces processing time</li>
+<li>Allows safe restarts after failures</li>
+<li>Enables incremental improvements</li>
+</ul>
+<h2 id="the-code">The Code</h2>
+<p>Full implementation: claude-code-plugins/scripts/overnight-plugin-enhancer.py</p>
+<p><strong>Key files:</strong></p>
+<ul>
+<li><code>overnight-plugin-enhancer.py</code> - Main batch processor</li>
+<li><code>turso-plugin-backup.sh</code> - Disaster recovery system</li>
+<li><code>TURSO-BACKUP-GUIDE.md</code> - Recovery procedures</li>
+<li><code>enhancements.db</code> - SQLite audit trail</li>
+</ul>
+<h2 id="whats-next">What’s Next</h2>
+<p><strong>Immediate (tonight):</strong></p>
+<ul class="contains-task-list">
+<li class="task-list-item"><input type="checkbox" checked disabled> Complete batch processing (163/235 done)</li>
+<li class="task-list-item"><input type="checkbox" disabled> Run Turso backup after completion</li>
+<li class="task-list-item"><input type="checkbox" disabled> Release v1.2.0 with 235 enhanced plugins</li>
+</ul>
+<p><strong>Short-term (this week):</strong></p>
+<ul class="contains-task-list">
+<li class="task-list-item"><input type="checkbox" disabled> Generate analytics on enhancement quality</li>
+<li class="task-list-item"><input type="checkbox" disabled> Spot-check 10 random SKILL.md files</li>
+<li class="task-list-item"><input type="checkbox" disabled> Deploy marketplace website with new content</li>
+<li class="task-list-item"><input type="checkbox" disabled> Set up automated weekly backups to Turso</li>
+</ul>
+<p><strong>Long-term (future releases):</strong></p>
+<ul class="contains-task-list">
+<li class="task-list-item"><input type="checkbox" disabled> Build <code>turso-plugin-restore.sh</code> for automated recovery</li>
+<li class="task-list-item"><input type="checkbox" disabled> Add Turso backup to release checklist</li>
+<li class="task-list-item"><input type="checkbox" disabled> Implement progressive enhancement (update existing SKILL.md files)</li>
+<li class="task-list-item"><input type="checkbox" disabled> A/B test different SKILL.md structures for effectiveness</li>
+</ul>
+<h2 id="try-it-yourself">Try It Yourself</h2>
+<p>The enhancement system is open source and works with any plugin repository:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#6A737D"># Clone the repo</span></span>
+<span class="line"><span style="color:#B392F0">git</span><span style="color:#9ECBFF"> clone</span><span style="color:#9ECBFF"> https://github.com/jeremylongshore/claude-code-plugins</span></span>
+<span class="line"><span style="color:#79B8FF">cd</span><span style="color:#9ECBFF"> claude-code-plugins</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Configure Vertex AI</span></span>
+<span class="line"><span style="color:#B392F0">gcloud</span><span style="color:#9ECBFF"> auth</span><span style="color:#9ECBFF"> application-default</span><span style="color:#9ECBFF"> login</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Test on single plugin</span></span>
+<span class="line"><span style="color:#B392F0">python3</span><span style="color:#9ECBFF"> scripts/overnight-plugin-enhancer.py</span><span style="color:#79B8FF"> --plugin</span><span style="color:#9ECBFF"> overnight-dev</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Run batch on 10 plugins</span></span>
+<span class="line"><span style="color:#B392F0">python3</span><span style="color:#9ECBFF"> scripts/overnight-plugin-enhancer.py</span><span style="color:#79B8FF"> --limit</span><span style="color:#79B8FF"> 10</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Full overnight batch</span></span>
+<span class="line"><span style="color:#B392F0">nohup</span><span style="color:#9ECBFF"> python3</span><span style="color:#79B8FF"> -u</span><span style="color:#9ECBFF"> scripts/overnight-plugin-enhancer.py</span><span style="color:#F97583"> >></span><span style="color:#9ECBFF"> batch.log</span><span style="color:#F97583"> 2>&#x26;1</span><span style="color:#E1E4E8"> &#x26;</span></span></code></pre>
+<p><strong>Requirements:</strong></p>
+<ul>
+<li>Google Cloud account with Vertex AI enabled</li>
+<li>Python 3.12+</li>
+<li>Claude Code plugins repository structure</li>
+</ul>
+<p><strong>Free tier limits:</strong></p>
+<ul>
+<li>1,500 Vertex AI requests/day</li>
+<li>Process ~750 plugins/day (2 calls per plugin)</li>
+<li>Completely free for repositories under 1,000 plugins</li>
+</ul>
+<h2 id="related-reading">Related Reading</h2>
+<ul>
+<li>Building AI-Friendly Codebases - Documentation systems for AI tools</li>
+<li>Automating Developer Workflows - Building slash commands and automation</li>
+<li>Building Production Testing Suites - Automated testing at scale</li>
+</ul>
+<h2 id="conclusion">Conclusion</h2>
+<p>Batch processing 235 plugins with AI isn’t just about throwing API calls at the problem. It requires:</p>
+<ol>
+<li><strong>Conservative rate limiting</strong> that respects free tier limits</li>
+<li><strong>Real-time observability</strong> to catch issues immediately</li>
+<li><strong>Disaster recovery planning</strong> before you need it</li>
+<li><strong>Smart optimization</strong> based on real data</li>
+<li><strong>Complete audit trails</strong> for compliance and debugging</li>
+</ol>
+<p>The overnight batch will complete around 2:30 AM with 100% success rate, entirely on the Vertex AI free tier. That’s 235 plugins × 10KB of AI-generated documentation = 2.3MB of high-quality content created overnight.</p>
+<p>Not bad for free.</p>
+<p><strong>Want to see the historical results?</strong> The marketplace was hosted at the [retired legacy public domain]; the <a href="https://github.com/jeremylongshore/claude-code-plugins">complete source code</a> remains on GitHub.</p>
+<p><strong>Have questions about batch processing with Vertex AI?</strong> Drop a comment or find me on X <a href="https://twitter.com/AsphaltCowb0y">@AsphaltCowb0y</a>.</p>
+      </div>
+    </div>
+  </article>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

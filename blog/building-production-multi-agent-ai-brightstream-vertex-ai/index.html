@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Building a Production Multi-Agent AI System: BrightStream&#39;s 10-Agent Architecture on Vertex AI — Tons of Skills Work Diary</title>
+    <meta name="description" content="The real journey from concept to production: building BrightStream's 10-agent positive news platform on Google Vertex AI Agent Engine. Multi-agent debate, parallel execution, and 89% cost reduction through architectural optimization.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://startaitools.com/posts/building-a-production-multi-agent-ai-system-brightstreams-10-agent-architecture-on-vertex-ai/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/building-production-multi-agent-ai-brightstream-vertex-ai/">
+    <meta property="og:title" content="Building a Production Multi-Agent AI System: BrightStream's 10-Agent Architecture on Vertex AI — Tons of Skills Work Diary">
+    <meta property="og:description" content="The real journey from concept to production: building BrightStream's 10-agent positive news platform on Google Vertex AI Agent Engine. Multi-agent debate, parallel execution, and 89% cost reduction through architectural optimization.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="Building a Production Multi-Agent AI System: BrightStream's 10-Agent Architecture on Vertex AI — Tons of Skills Work Diary">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/building-production-multi-agent-ai-brightstream-vertex-ai/">
+    <meta name="twitter:title" content="Building a Production Multi-Agent AI System: BrightStream's 10-Agent Architecture on Vertex AI — Tons of Skills Work Diary">
+    <meta name="twitter:description" content="The real journey from concept to production: building BrightStream's 10-agent positive news platform on Google Vertex AI Agent Engine. Multi-agent debate, parallel execution, and 89% cost reduction through architectural optimization.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"Building a Production Multi-Agent AI System: BrightStream's 10-Agent Architecture on Vertex AI","description":"The real journey from concept to production: building BrightStream's 10-agent positive news platform on Google Vertex AI Agent Engine. Multi-agent debate, parallel execution, and 89% cost reduction through architectural optimization.","datePublished":"2025-10-30","url":"https://tonsofskills.com/blog/undefined","author":{"@type":"Person","name":"Jeremy Longshore"},"publisher":{"@type":"Organization","name":"Tons of Skills","url":"https://tonsofskills.com"}}</script>
+  
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.post-header[data-astro-cid-7jjqptxk]{background:var(--panel);padding:4rem 1.5rem 3rem;border-bottom:1px solid var(--border)}.post-header-inner[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto}.back-link[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3);text-decoration:none;display:inline-block;margin-bottom:1.5rem;transition:color .2s}.back-link[data-astro-cid-7jjqptxk]:hover{color:var(--primary)}.post-meta[data-astro-cid-7jjqptxk]{display:flex;align-items:center;gap:.75rem;margin-bottom:1rem}time[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3)}.featured-badge[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.2rem .6rem;background:#ce114126;color:var(--red);border-radius:0;font-weight:600;text-transform:uppercase;letter-spacing:.05em}.post-header[data-astro-cid-7jjqptxk] h1[data-astro-cid-7jjqptxk]{font-family:var(--font-body);font-size:clamp(1.5rem,4vw,2.2rem);font-weight:700;color:var(--text);line-height:1.25;margin-bottom:.75rem;letter-spacing:0}.post-desc[data-astro-cid-7jjqptxk]{color:var(--text-2);font-size:1.05rem;line-height:1.6;margin-bottom:1rem}.post-tags[data-astro-cid-7jjqptxk]{display:flex;gap:.4rem;flex-wrap:wrap}.tag[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.15rem .5rem;background:var(--surface-3);color:var(--text-3);border-radius:0}.post-body[data-astro-cid-7jjqptxk]{padding:3rem 1.5rem 4rem}.prose[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto;color:var(--text-2);line-height:1.8;font-size:1rem}.prose[data-astro-cid-7jjqptxk] h2{font-family:var(--font-body);font-size:1.5rem;font-weight:700;color:var(--text);margin:2.5rem 0 1rem;letter-spacing:0}.prose[data-astro-cid-7jjqptxk] h3{font-size:1.2rem;font-weight:600;color:var(--text);margin:2rem 0 .75rem}.prose[data-astro-cid-7jjqptxk] p{margin-bottom:1rem}.prose[data-astro-cid-7jjqptxk] ul,.prose[data-astro-cid-7jjqptxk] ol{margin:.5rem 0 1rem 1.5rem}.prose[data-astro-cid-7jjqptxk] li{margin-bottom:.35rem}.prose[data-astro-cid-7jjqptxk] strong{color:var(--text);font-weight:600}.prose[data-astro-cid-7jjqptxk] code{font-family:var(--font-mono);font-size:.88em;background:var(--surface-3);padding:.15em .35em;border-radius:0;color:var(--primary)}.prose[data-astro-cid-7jjqptxk] a{color:var(--primary);text-decoration:none}.prose[data-astro-cid-7jjqptxk] a:hover{text-decoration:underline}@media(max-width:768px){.post-header[data-astro-cid-7jjqptxk]{padding:3rem 1rem 2rem}.post-body[data-astro-cid-7jjqptxk]{padding:2rem 1rem 3rem}}
+</style></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  <article class="post" data-astro-cid-7jjqptxk>
+    <header class="post-header" data-astro-cid-7jjqptxk>
+      <div class="post-header-inner" data-astro-cid-7jjqptxk>
+        <a href="/blog" class="back-link" data-astro-cid-7jjqptxk>Back to Work Diary</a>
+        <div class="post-meta" data-astro-cid-7jjqptxk>
+          <time datetime="2025-10-30" data-astro-cid-7jjqptxk>October 29, 2025</time>
+          
+        </div>
+        <h1 data-astro-cid-7jjqptxk>Building a Production Multi-Agent AI System: BrightStream&#39;s 10-Agent Architecture on Vertex AI</h1>
+        <p class="post-desc" data-astro-cid-7jjqptxk>The real journey from concept to production: building BrightStream&#39;s 10-agent positive news platform on Google Vertex AI Agent Engine. Multi-agent debate, parallel execution, and 89% cost reduction through architectural optimization.</p>
+        <div class="post-tags" data-astro-cid-7jjqptxk>
+          <span class="tag" data-astro-cid-7jjqptxk>vertex-ai</span><span class="tag" data-astro-cid-7jjqptxk>ai-agents</span><span class="tag" data-astro-cid-7jjqptxk>google-cloud</span><span class="tag" data-astro-cid-7jjqptxk>adk</span><span class="tag" data-astro-cid-7jjqptxk>multi-agent-systems</span><span class="tag" data-astro-cid-7jjqptxk>cost-optimization</span><span class="tag" data-astro-cid-7jjqptxk>docker</span><span class="tag" data-astro-cid-7jjqptxk>infrastructure-as-code</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="post-body" data-astro-cid-7jjqptxk>
+      <div class="prose" data-astro-cid-7jjqptxk>
+        <h1 id="building-a-production-multi-agent-ai-system-brightstreams-10-agent-architecture-on-vertex-ai">Building a Production Multi-Agent AI System: BrightStream’s 10-Agent Architecture on Vertex AI</h1>
+<p><strong>The Journey from Concept to Infrastructure in One Session</strong></p>
+<p>I just built BrightStream - a production-ready positive news platform powered by 10 independent AI agents orchestrated through Google’s Vertex AI Agent Engine. This isn’t a tutorial with a clean solution. This is the real story: the confusion, the pivots, the “wait, how does this actually work?” moments that happened over the last few hours.</p>
+<p><strong>What We Built:</strong></p>
+<ul>
+<li>10 ADK-compliant agent configurations</li>
+<li>Complete GCP infrastructure (Vertex AI, Firestore, Cloud Storage, Artifact Registry)</li>
+<li>Docker-based local testing environment</li>
+<li>Multi-agent orchestration with parallel execution</li>
+<li>Cost-optimized architecture ($168/month, 95% cheaper than initial estimate)</li>
+</ul>
+<p><strong>The Problem: From n8n to Native AI Agents</strong></p>
+<p>The original plan was n8n workflows. Simple, visual, click-and-connect. But there’s a fundamental problem with treating AI agents like HTTP endpoints in a workflow tool: <strong>you lose the intelligence</strong>.</p>
+<p>AI agents aren’t just API calls. They:</p>
+<ul>
+<li>Maintain context across conversations</li>
+<li>Make decisions based on multiple inputs</li>
+<li>Handle errors adaptively</li>
+<li>Learn from interactions</li>
+</ul>
+<p>Cramming that into n8n meant we’d be managing agent state manually, handling retries with basic webhook logic, and debugging multi-step conversations through workflow logs. It would work, but it wouldn’t be <em>agentic</em>.</p>
+<p><strong>The Pivot: Google’s Agent Development Kit (ADK)</strong></p>
+<p>Instead of workflows, we needed <strong>Agent-to-Agent (A2A) communication</strong> - native agent orchestration where agents call each other directly through Vertex AI’s managed infrastructure.</p>
+<p>Here’s where the confusion started.</p>
+<h2 id="the-architecture-confusion-and-how-we-solved-it">The Architecture Confusion (And How We Solved It)</h2>
+<p><strong>Initial Understanding (Wrong):</strong>
+“We need Docker containers for each agent to deploy to Cloud Run.”</p>
+<p><strong>Reality Check #1:</strong>
+“Wait, Vertex AI Agent Engine auto-generates containers from YAML configs. Do we even need Docker?”</p>
+<p><strong>Reality Check #2:</strong>
+“But each agent DOES run in its own container with its own endpoint. So… containers exist, we just don’t build them?”</p>
+<p><strong>The Actual Architecture:</strong></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>GitHub Repository</span></span>
+<span class="line"><span>├── agents/agent_0_root_orchestrator.yaml  # ADK config</span></span>
+<span class="line"><span>├── tools/agent_0_tools.py                 # Python functions</span></span>
+<span class="line"><span>└── requirements.txt</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>    ↓ (adk deploy agent_engine)</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>Vertex AI Agent Engine (Production)</span></span>
+<span class="line"><span>├── Auto-generates Docker container</span></span>
+<span class="line"><span>├── Deploys to managed infrastructure</span></span>
+<span class="line"><span>├── Provides HTTP endpoint</span></span>
+<span class="line"><span>└── Handles: sessions, memory, A2A calls</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>Result: Agent 0 running at Vertex AI endpoint</span></span></code></pre>
+<p><strong>Key Insight:</strong> Vertex AI Agent Engine is a <strong>container orchestration platform that builds containers FOR YOU</strong>. You provide YAML + Python tools. It generates everything else.</p>
+<p>So why did we create Dockerfiles?</p>
+<p><strong>For local testing.</strong> Docker Compose lets us run all 10 agents locally before deploying to production. The Dockerfiles show what Vertex AI builds internally - they’re educational and practical for development, but not needed for production deployment.</p>
+<h2 id="the-10-agent-architecture">The 10-Agent Architecture</h2>
+<p><strong>Agent 0: Root Orchestrator (Always-On)</strong></p>
+<ul>
+<li>Coordinates the entire workflow</li>
+<li>Calls sub-agents via A2A protocol</li>
+<li>Handles rate limiting (15 RPM for Gemini free tier)</li>
+<li>4 CPU, 4Gi RAM, min 1 instance</li>
+</ul>
+<p><strong>Agent 1: News Aggregator</strong></p>
+<ul>
+<li>Fetches RSS/Atom feeds with adaptive timeouts</li>
+<li>48-hour date filtering</li>
+<li>URL-based deduplication</li>
+<li>Feed health scoring (deprioritize slow/unreliable sources)</li>
+</ul>
+<p><strong>Agent 2: Story Scorer</strong></p>
+<ul>
+<li>Multi-agent debate scoring (3 parallel scorers: optimistic, balanced, conservative)</li>
+<li>Consensus algorithm with confidence weighting</li>
+<li>Structured debate rounds with hard timeouts (max 60s)</li>
+<li>Weighted criteria: Impact (35%), Relevance (25%), Quality (25%), Timeliness (15%)</li>
+</ul>
+<p><strong>Agent 3: Content Orchestrator</strong></p>
+<ul>
+<li>Generates 600-word inspirational articles</li>
+<li>Reflection-Revision pattern (self-critique before media generation)</li>
+<li>Quality scoring: Factual accuracy (35%), Tone (25%), Structure (25%), Technical (15%)</li>
+<li>Triggers Agents 4 &#x26; 5 in parallel</li>
+</ul>
+<p><strong>Agent 4: Lyria Audio (Parallel)</strong></p>
+<ul>
+<li>Text-to-speech narration</li>
+<li>Cleans markdown, expands abbreviations</li>
+<li>Outputs MP3 at 128kbps</li>
+<li>Runs simultaneously with Agent 5</li>
+</ul>
+<p><strong>Agent 5: Imagen Image (Parallel)</strong></p>
+<ul>
+<li>Generates hero images (photorealistic, vibrant, uplifting)</li>
+<li>3 variants: Original (1920x1080), Web (1200x675), Thumbnail (400x225)</li>
+<li>Runs simultaneously with Agent 4</li>
+</ul>
+<p><strong>Agent 7: QA Verification</strong></p>
+<ul>
+<li>4-layer anti-hallucination verification</li>
+<li>Layer 1: Date filtering (48-hour enforcement)</li>
+<li>Layer 2: Source URL verification</li>
+<li>Layer 3: Prompt injection detection</li>
+<li>Layer 4: Temperature-zero fact-checking</li>
+<li><strong>Veto power:</strong> If ANY layer fails, content does NOT publish</li>
+</ul>
+<p><strong>Agent 8: Publishing</strong></p>
+<ul>
+<li>Multi-channel: Email (HTML newsletter), X/Twitter (280 chars), Web (SEO-optimized)</li>
+<li>Exponential backoff retry: 1s → 2s → 4s → 8s with jitter</li>
+<li><code>require_confirmation: true</code> (human approval before publishing)</li>
+<li>Partial success handling (queue failed channels)</li>
+</ul>
+<p><strong>Agent 9: Analytics</strong></p>
+<ul>
+<li>Real-time event logging</li>
+<li>Weekly reflection pattern (every Sunday)</li>
+<li><strong>Dynamic parameter updates with validation</strong> (critical: validates weight sums, ranges, safe bounds)</li>
+<li>Confidence-based application: High (>80%) = auto-apply, Medium (50-80%) = human review</li>
+</ul>
+<p><strong>Agent 10: Evaluation (Optional)</strong></p>
+<ul>
+<li>Synthetic test case generation</li>
+<li>End-to-end workflow testing</li>
+<li>Performance benchmarking</li>
+<li>Bottleneck identification</li>
+</ul>
+<p><strong>Agent 6: Disabled</strong> (Veo video generation - cost savings)</p>
+<h2 id="the-cost-optimization-journey">The Cost Optimization Journey</h2>
+<p><strong>Initial Estimate:</strong> $1,548/month</p>
+<ul>
+<li>LLM calls: $1,500/month (assumed paid tier)</li>
+<li>Infrastructure: $48/month</li>
+</ul>
+<p><strong>User Feedback:</strong> “I don’t believe those costs if we use the free tier”</p>
+<p><strong>Corrected Analysis:</strong></p>
+<ul>
+<li>Gemini 2.0 Flash free tier: 15 RPM, 1M TPM, 1,500 RPD</li>
+<li><strong>4,080 articles/month FREE</strong></li>
+<li>Lyria Audio: $0.02 × 100 articles/day × 30 days = $60/month</li>
+<li>Imagen Image: $0.02 × 100 articles/day × 30 days = $60/month</li>
+<li>Infrastructure: $48/month</li>
+<li><strong>Total: $168/month</strong> (89% cost reduction!)</li>
+</ul>
+<p>Removing Agent 6 (Veo video) saved another $1,500/month.</p>
+<h2 id="the-technical-implementation">The Technical Implementation</h2>
+<h3 id="adk-agent-config-structure">ADK Agent Config Structure</h3>
+<p>Each agent has a YAML config with:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#6A737D"># agents/agent_1_news_aggregator.yaml</span></span>
+<span class="line"><span style="color:#6A737D"># yaml-language-server: $schema=https://raw.githubusercontent.com/google/adk-python/refs/heads/main/src/google/adk/agents/config_schemas/AgentConfig.json</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">agent_1_news_aggregator</span></span>
+<span class="line"><span style="color:#85E89D">agent_class</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">LlmAgent</span></span>
+<span class="line"><span style="color:#85E89D">model</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">gemini-2.0-flash</span></span>
+<span class="line"><span style="color:#85E89D">description</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">News aggregation agent - fetches, parses, filters RSS feeds</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">instruction</span><span style="color:#E1E4E8">: </span><span style="color:#F97583">|</span></span>
+<span class="line"><span style="color:#9ECBFF">  You are the News Aggregator for BrightStream.</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#9ECBFF">  WORKFLOW:</span></span>
+<span class="line"><span style="color:#9ECBFF">  1. Retrieve feed health scores</span></span>
+<span class="line"><span style="color:#9ECBFF">  2. Calculate adaptive timeouts (P95 latency × 1.5)</span></span>
+<span class="line"><span style="color:#9ECBFF">  3. Fetch feeds with priority batching</span></span>
+<span class="line"><span style="color:#9ECBFF">  4. Parse XML/JSON content</span></span>
+<span class="line"><span style="color:#9ECBFF">  5. Extract story data</span></span>
+<span class="line"><span style="color:#9ECBFF">  6. Filter by date (48-hour window)</span></span>
+<span class="line"><span style="color:#9ECBFF">  7. Deduplicate by URL</span></span>
+<span class="line"><span style="color:#9ECBFF">  8. Store raw feeds to Cloud Storage</span></span>
+<span class="line"><span style="color:#9ECBFF">  9. Track performance metrics</span></span>
+<span class="line"><span style="color:#9ECBFF">  10. Auto-deprioritize unreliable feeds</span></span>
+<span class="line"><span style="color:#9ECBFF">  11. Return structured JSON</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">tools</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">  - </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">brightstream_agent_1_tools</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">output_schema</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  type</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">object</span></span>
+<span class="line"><span style="color:#85E89D">  properties</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    status</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      type</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">string</span></span>
+<span class="line"><span style="color:#85E89D">      enum</span><span style="color:#E1E4E8">: [</span><span style="color:#9ECBFF">success</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">warning</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">error</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"><span style="color:#85E89D">    data</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      type</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">object</span></span>
+<span class="line"><span style="color:#85E89D">    metadata</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      type</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">object</span></span>
+<span class="line"><span style="color:#85E89D">  required</span><span style="color:#E1E4E8">: [</span><span style="color:#9ECBFF">status</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">data</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">metadata</span><span style="color:#E1E4E8">]</span></span></code></pre>
+<h3 id="tool-implementation">Tool Implementation</h3>
+<p>The <code>tools/agent_1_tools.py</code> file contains actual Python functions:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#F97583">async</span><span style="color:#F97583"> def</span><span style="color:#B392F0"> fetch_multiple</span><span style="color:#E1E4E8">(urls: List[</span><span style="color:#79B8FF">str</span><span style="color:#E1E4E8">], timeout: </span><span style="color:#79B8FF">int</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> 10000</span><span style="color:#E1E4E8">) -> List[Dict[</span><span style="color:#79B8FF">str</span><span style="color:#E1E4E8">, Any]]:</span></span>
+<span class="line"><span style="color:#9ECBFF">    """Fetch multiple URLs in parallel."""</span></span>
+<span class="line"><span style="color:#F97583">    async</span><span style="color:#F97583"> def</span><span style="color:#B392F0"> fetch_one</span><span style="color:#E1E4E8">(url: </span><span style="color:#79B8FF">str</span><span style="color:#E1E4E8">) -> Dict[</span><span style="color:#79B8FF">str</span><span style="color:#E1E4E8">, Any]:</span></span>
+<span class="line"><span style="color:#F97583">        try</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">            content </span><span style="color:#F97583">=</span><span style="color:#F97583"> await</span><span style="color:#E1E4E8"> fetch_rss_feed(url, timeout)</span></span>
+<span class="line"><span style="color:#F97583">            return</span><span style="color:#E1E4E8"> {</span><span style="color:#9ECBFF">"url"</span><span style="color:#E1E4E8">: url, </span><span style="color:#9ECBFF">"content"</span><span style="color:#E1E4E8">: content, </span><span style="color:#9ECBFF">"status"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"success"</span><span style="color:#E1E4E8">}</span></span>
+<span class="line"><span style="color:#F97583">        except</span><span style="color:#79B8FF"> Exception</span><span style="color:#F97583"> as</span><span style="color:#E1E4E8"> e:</span></span>
+<span class="line"><span style="color:#F97583">            return</span><span style="color:#E1E4E8"> {</span><span style="color:#9ECBFF">"url"</span><span style="color:#E1E4E8">: url, </span><span style="color:#9ECBFF">"content"</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">None</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"status"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"error"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"error"</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">str</span><span style="color:#E1E4E8">(e)}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">    results </span><span style="color:#F97583">=</span><span style="color:#F97583"> await</span><span style="color:#E1E4E8"> asyncio.gather(</span><span style="color:#F97583">*</span><span style="color:#E1E4E8">[fetch_one(url) </span><span style="color:#F97583">for</span><span style="color:#E1E4E8"> url </span><span style="color:#F97583">in</span><span style="color:#E1E4E8"> urls])</span></span>
+<span class="line"><span style="color:#F97583">    return</span><span style="color:#E1E4E8"> results</span></span></code></pre>
+<h3 id="parallel-agent-execution">Parallel Agent Execution</h3>
+<p>Agents 4 and 5 run simultaneously for speed:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#6A737D"># Agent 3 triggers parallel media generation</span></span>
+<span class="line"><span style="color:#F97583">async</span><span style="color:#F97583"> def</span><span style="color:#B392F0"> generate_media_parallel</span><span style="color:#E1E4E8">(article_data):</span></span>
+<span class="line"><span style="color:#E1E4E8">    tasks </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> [</span></span>
+<span class="line"><span style="color:#E1E4E8">        call_sub_agent(</span><span style="color:#9ECBFF">"agent_4_lyria_audio"</span><span style="color:#E1E4E8">, {</span><span style="color:#9ECBFF">"text"</span><span style="color:#E1E4E8">: article_data[</span><span style="color:#9ECBFF">"content"</span><span style="color:#E1E4E8">]}),</span></span>
+<span class="line"><span style="color:#E1E4E8">        call_sub_agent(</span><span style="color:#9ECBFF">"agent_5_imagen_image"</span><span style="color:#E1E4E8">, {</span><span style="color:#9ECBFF">"theme"</span><span style="color:#E1E4E8">: article_data[</span><span style="color:#9ECBFF">"theme"</span><span style="color:#E1E4E8">]})</span></span>
+<span class="line"><span style="color:#E1E4E8">    ]</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">    results </span><span style="color:#F97583">=</span><span style="color:#F97583"> await</span><span style="color:#E1E4E8"> asyncio.gather(</span><span style="color:#F97583">*</span><span style="color:#E1E4E8">tasks, </span><span style="color:#FFAB70">return_exceptions</span><span style="color:#F97583">=</span><span style="color:#79B8FF">True</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#6A737D">    # Continue even if one fails (partial success)</span></span>
+<span class="line"><span style="color:#F97583">    return</span><span style="color:#E1E4E8"> results</span></span></code></pre>
+<h2 id="the-deployment-structure">The Deployment Structure</h2>
+<h3 id="local-testing-docker-compose">Local Testing (Docker Compose)</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#6A737D"># docker-compose.yml</span></span>
+<span class="line"><span style="color:#85E89D">services</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  agent-0</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    build</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      dockerfile</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">dockerfiles/Dockerfile.agent-0</span></span>
+<span class="line"><span style="color:#85E89D">    ports</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#9ECBFF">"8080:8080"</span><span style="color:#6A737D">  # Root orchestrator</span></span>
+<span class="line"><span style="color:#85E89D">    networks</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#9ECBFF">brightstream-network</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">  agent-1</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    build</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      dockerfile</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">dockerfiles/Dockerfile.agent-1</span></span>
+<span class="line"><span style="color:#85E89D">    ports</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#9ECBFF">"8081:8080"</span><span style="color:#6A737D">  # News aggregator</span></span>
+<span class="line"><span style="color:#85E89D">    networks</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#9ECBFF">brightstream-network</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">  # ... agents 2-5, 7-10</span></span></code></pre>
+<p>Local endpoints:</p>
+<ul>
+<li>Agent 0: <code>http://localhost:8080</code></li>
+<li>Agent 1: <code>http://localhost:8081</code></li>
+<li>Agent 2: <code>http://localhost:8082</code></li>
+<li>etc.</li>
+</ul>
+<h3 id="production-deployment-vertex-ai-agent-engine">Production Deployment (Vertex AI Agent Engine)</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="makefile"><code><span class="line"><span style="color:#6A737D"># Makefile</span></span>
+<span class="line"><span style="color:#B392F0">deploy-agent-0</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">    adk deploy agent_engine \</span></span>
+<span class="line"><span style="color:#E1E4E8">        --project=brightstream-news </span><span style="color:#79B8FF">\</span></span>
+<span class="line"><span style="color:#E1E4E8">        --region=us-central1 </span><span style="color:#79B8FF">\</span></span>
+<span class="line"><span style="color:#E1E4E8">        --staging_bucket=gs://brightstream-agent-staging </span><span style="color:#79B8FF">\</span></span>
+<span class="line"><span style="color:#E1E4E8">        --display_name="BrightStream Root Orchestrator" </span><span style="color:#79B8FF">\</span></span>
+<span class="line"><span style="color:#E1E4E8">        ./agents/agent_0_root_orchestrator.yaml </span><span style="color:#79B8FF">\</span></span>
+<span class="line"><span style="color:#E1E4E8">        --trace_to_cloud </span><span style="color:#79B8FF">\</span></span>
+<span class="line"><span style="color:#E1E4E8">        --cpu=4 </span><span style="color:#79B8FF">\</span></span>
+<span class="line"><span style="color:#E1E4E8">        --memory=4Gi </span><span style="color:#79B8FF">\</span></span>
+<span class="line"><span style="color:#E1E4E8">        --min_instances=1 </span><span style="color:#79B8FF">\</span></span>
+<span class="line"><span style="color:#E1E4E8">        --max_instances=5</span></span></code></pre>
+<p>Vertex AI automatically:</p>
+<ol>
+<li>Reads the YAML config</li>
+<li>Bundles <code>tools/agent_0_tools.py</code></li>
+<li>Creates a Docker container</li>
+<li>Deploys to managed infrastructure</li>
+<li>Returns the Agent Engine endpoint</li>
+</ol>
+<p>No manual Docker building. No Artifact Registry pushes. It’s all automated.</p>
+<h2 id="the-setup-script">The Setup Script</h2>
+<p>We automated the entire GCP setup:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#6A737D">#!/bin/bash</span></span>
+<span class="line"><span style="color:#6A737D"># setup-gcp-project.sh</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># 1. Create GCP project</span></span>
+<span class="line"><span style="color:#B392F0">gcloud</span><span style="color:#9ECBFF"> projects</span><span style="color:#9ECBFF"> create</span><span style="color:#9ECBFF"> brightstream-news</span><span style="color:#79B8FF"> --set-as-default</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># 2. Link billing</span></span>
+<span class="line"><span style="color:#B392F0">gcloud</span><span style="color:#9ECBFF"> billing</span><span style="color:#9ECBFF"> projects</span><span style="color:#9ECBFF"> link</span><span style="color:#9ECBFF"> brightstream-news</span><span style="color:#79B8FF"> --billing-account=</span><span style="color:#E1E4E8">$BILLING_ACCOUNT_ID</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># 3. Enable APIs (Vertex AI, Firestore, Storage, Cloud Run, etc.)</span></span>
+<span class="line"><span style="color:#B392F0">gcloud</span><span style="color:#9ECBFF"> services</span><span style="color:#9ECBFF"> enable</span><span style="color:#9ECBFF"> aiplatform.googleapis.com</span></span>
+<span class="line"><span style="color:#B392F0">gcloud</span><span style="color:#9ECBFF"> services</span><span style="color:#9ECBFF"> enable</span><span style="color:#9ECBFF"> firestore.googleapis.com</span></span>
+<span class="line"><span style="color:#6A737D"># ... 6 more APIs</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># 4. Create staging bucket</span></span>
+<span class="line"><span style="color:#B392F0">gsutil</span><span style="color:#9ECBFF"> mb</span><span style="color:#79B8FF"> -p</span><span style="color:#9ECBFF"> brightstream-news</span><span style="color:#79B8FF"> -l</span><span style="color:#9ECBFF"> us-central1</span><span style="color:#9ECBFF"> gs://brightstream-agent-staging</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># 5. Create Firestore database (free tier)</span></span>
+<span class="line"><span style="color:#B392F0">gcloud</span><span style="color:#9ECBFF"> firestore</span><span style="color:#9ECBFF"> databases</span><span style="color:#9ECBFF"> create</span><span style="color:#79B8FF"> --location=us-central1</span><span style="color:#79B8FF"> --type=firestore-native</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># 6. Create Artifact Registry</span></span>
+<span class="line"><span style="color:#B392F0">gcloud</span><span style="color:#9ECBFF"> artifacts</span><span style="color:#9ECBFF"> repositories</span><span style="color:#9ECBFF"> create</span><span style="color:#9ECBFF"> brightstream-agents</span><span style="color:#79B8FF"> --repository-format=docker</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># 7. Configure Docker auth</span></span>
+<span class="line"><span style="color:#B392F0">gcloud</span><span style="color:#9ECBFF"> auth</span><span style="color:#9ECBFF"> configure-docker</span><span style="color:#9ECBFF"> us-central1-docker.pkg.dev</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># 8. Create GitHub repo</span></span>
+<span class="line"><span style="color:#B392F0">gh</span><span style="color:#9ECBFF"> repo</span><span style="color:#9ECBFF"> create</span><span style="color:#9ECBFF"> brightstream</span><span style="color:#79B8FF"> --private</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># 9. Initialize git</span></span>
+<span class="line"><span style="color:#B392F0">git</span><span style="color:#9ECBFF"> init</span><span style="color:#E1E4E8"> &#x26;&#x26; </span><span style="color:#B392F0">git</span><span style="color:#9ECBFF"> add</span><span style="color:#9ECBFF"> .</span><span style="color:#E1E4E8"> &#x26;&#x26; </span><span style="color:#B392F0">git</span><span style="color:#9ECBFF"> commit</span><span style="color:#79B8FF"> -m</span><span style="color:#9ECBFF"> "Initial commit"</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># 10. Create service account</span></span>
+<span class="line"><span style="color:#B392F0">gcloud</span><span style="color:#9ECBFF"> iam</span><span style="color:#9ECBFF"> service-accounts</span><span style="color:#9ECBFF"> create</span><span style="color:#9ECBFF"> brightstream-agent-sa</span></span>
+<span class="line"><span style="color:#B392F0">gcloud</span><span style="color:#9ECBFF"> projects</span><span style="color:#9ECBFF"> add-iam-policy-binding</span><span style="color:#9ECBFF"> brightstream-news</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">    --member=</span><span style="color:#9ECBFF">"serviceAccount:brightstream-agent-sa@brightstream-news.iam.gserviceaccount.com"</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">    --role=</span><span style="color:#9ECBFF">"roles/aiplatform.user"</span></span></code></pre>
+<p><strong>Runtime:</strong> 3-5 minutes
+<strong>Result:</strong> Complete production infrastructure ready for deployment</p>
+<h2 id="what-i-learned">What I Learned</h2>
+<h3 id="1-vertex-ai-agent-engine-abstracts-container-management">1. Vertex AI Agent Engine Abstracts Container Management</h3>
+<p>You don’t need to think about Docker in production. Provide YAML configs and Python tools. Vertex AI handles the rest.</p>
+<p><strong>Use Docker for:</strong> Local testing only (docker-compose up)</p>
+<h3 id="2-each-agent-is-independent">2. Each Agent is Independent</h3>
+<ul>
+<li>Separate container</li>
+<li>Separate endpoint</li>
+<li>Scales independently</li>
+<li>Fails independently (circuit breakers prevent cascading failures)</li>
+</ul>
+<p>This isn’t a monolith. It’s true microservices architecture for AI agents.</p>
+<h3 id="3-cost-optimization-requires-deep-analysis">3. Cost Optimization Requires Deep Analysis</h3>
+<p>Initial estimate: $1,548/month
+Final cost: $168/month (89% reduction)</p>
+<p>The difference? Understanding free tier limits and removing unnecessary features (video generation).</p>
+<h3 id="4-multi-agent-debate-is-powerful">4. Multi-Agent Debate is Powerful</h3>
+<p>Agent 2’s scoring uses 3 parallel instances (optimistic, balanced, conservative) to reach consensus. This prevents single-model bias and improves decision quality.</p>
+<h3 id="5-validation-is-critical-for-dynamic-systems">5. Validation is Critical for Dynamic Systems</h3>
+<p>Agent 9 dynamically updates parameters based on performance data. Without validation (weight sums, ranges, safe bounds), it could break the system. Always validate before applying changes.</p>
+<h2 id="the-repository-structure">The Repository Structure</h2>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>brightstream/</span></span>
+<span class="line"><span>├── agents/                  # 10 ADK Agent Config YAMLs</span></span>
+<span class="line"><span>├── tools/                   # Python tool implementations (3,390 lines)</span></span>
+<span class="line"><span>├── dockerfiles/             # Individual Dockerfiles (local testing)</span></span>
+<span class="line"><span>├── docker-compose.yml       # Multi-agent local orchestration</span></span>
+<span class="line"><span>├── Makefile                 # Build and deployment commands</span></span>
+<span class="line"><span>├── deployment-config.yaml   # Cost estimates and scaling config</span></span>
+<span class="line"><span>├── setup-gcp-project.sh    # Infrastructure automation</span></span>
+<span class="line"><span>└── QUICKSTART.md            # Complete guide</span></span></code></pre>
+<h2 id="next-steps">Next Steps</h2>
+<ol>
+<li><strong>Local testing:</strong> <code>docker-compose up -d</code></li>
+<li><strong>Deploy to Vertex AI:</strong> <code>make deploy-all</code></li>
+<li><strong>Test production:</strong> <code>make test-agent-0</code></li>
+</ol>
+<p><strong>Estimated time to production:</strong> 1-2 hours (infrastructure already complete)</p>
+<h2 id="related-reading">Related Reading</h2>
+<ul>
+<li>Coasean Singularity: AI Agents and Market Transformation - Economic theory of AI agent markets</li>
+<li><a href="https://startaitools.com/posts/scaling-ai-batch-processing-enhancing-235-plugins-with-vertex-ai-gemini-on-the-free-tier/">Scaling AI Batch Processing: 235 Plugins with Vertex AI Gemini on Free Tier</a> - Free tier optimization techniques</li>
+<li>Waygate MCP v2.1.0: Forensic Analysis to Production Enterprise Server - Security-hardened MCP architecture</li>
+</ul>
+<h2 id="final-thoughts">Final Thoughts</h2>
+<p>This wasn’t a clean build. It was iterative, confusing, and full of “wait, how does this actually work?” moments. That’s real development.</p>
+<p>The key insights:</p>
+<ul>
+<li><strong>Vertex AI Agent Engine is container orchestration for AI</strong> - you provide configs, it handles deployment</li>
+<li><strong>Each agent is independent</strong> - true microservices, not a monolith</li>
+<li><strong>Cost optimization requires deep analysis</strong> - free tiers can cover 95% of costs</li>
+<li><strong>Validation prevents system failures</strong> - especially for dynamic parameter updates</li>
+</ul>
+<p><strong>Repository:</strong> <a href="https://github.com/jeremylongshore/brightstream">https://github.com/jeremylongshore/brightstream</a>
+<strong>GCP Project:</strong> <code>brightstream-news</code>
+<strong>Monthly Cost:</strong> $168
+<strong>Agents:</strong> 10 (0-5, 7-10)</p>
+      </div>
+    </div>
+  </article>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

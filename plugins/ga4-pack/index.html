@@ -1,0 +1,1044 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ga4-pack | Claude Code Plugins</title>
+    <meta name="description" content="Claude Code skill pack for Google Analytics 4 — 5 starter skills covering auth (OAuth + service account), Data API v1 queries (runReport, filters, sampling), Realtime API, canonical reports (DAU/MAU/retention/top pages/funnel), and BigQuery export with event-level SQL recipes.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://tonsofskills.com/tons-of-skills-marketplace/plugins/ga4-pack/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/plugins/ga4-pack/">
+    <meta property="og:title" content="ga4-pack | Claude Code Plugins">
+    <meta property="og:description" content="Claude Code skill pack for Google Analytics 4 — 5 starter skills covering auth (OAuth + service account), Data API v1 queries (runReport, filters, sampling), Realtime API, canonical reports (DAU/MAU/retention/top pages/funnel), and BigQuery export with event-level SQL recipes.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="ga4-pack | Claude Code Plugins">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/plugins/ga4-pack/">
+    <meta name="twitter:title" content="ga4-pack | Claude Code Plugins">
+    <meta name="twitter:description" content="Claude Code skill pack for Google Analytics 4 — 5 starter skills covering auth (OAuth + service account), Data API v1 queries (runReport, filters, sampling), Realtime API, canonical reports (DAU/MAU/retention/top pages/funnel), and BigQuery export with event-level SQL recipes.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"ga4-pack","description":"Claude Code skill pack for Google Analytics 4 — 5 starter skills covering auth (OAuth + service account), Data API v1 queries (runReport, filters, sampling), Realtime API, canonical reports (DAU/MAU/retention/top pages/funnel), and BigQuery export with event-level SQL recipes.","applicationCategory":"DeveloperApplication","operatingSystem":"Cross-platform","author":{"@type":"Organization","name":"Jeremy Longshore"},"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}</script>
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.breadcrumbs[data-astro-cid-ilhxcym7]{margin-bottom:var(--space-5)}.breadcrumbs__list[data-astro-cid-ilhxcym7]{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;list-style:none;padding:0;margin:0;font-family:var(--font-mono);font-size:var(--text-sm, .8rem)}.breadcrumbs__item[data-astro-cid-ilhxcym7]{display:flex;align-items:center;gap:.375rem}.breadcrumbs__link[data-astro-cid-ilhxcym7]{color:var(--text-3);text-decoration:none;transition:color var(--duration-fast, .2s) var(--ease-out)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:hover{color:var(--primary)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:0}.breadcrumbs__sep[data-astro-cid-ilhxcym7]{color:var(--text-3);user-select:none;font-size:.7em;line-height:1}.breadcrumbs__current[data-astro-cid-ilhxcym7]{color:var(--text-2)}.detail-cta[data-astro-cid-qcigfm7x]{background:var(--surface-3, var(--brand-light-gray));border-top:1px solid var(--border, var(--brand-light-gray));border-radius:var(--radius-lg);padding:2rem 1.5rem;margin-top:2rem;text-align:center}.detail-cta__headline[data-astro-cid-qcigfm7x]{font-family:var(--font-display);font-weight:700;font-size:1.35rem;color:var(--text, var(--brand-dark));margin-bottom:1.25rem}.detail-cta__actions[data-astro-cid-qcigfm7x]{display:flex;justify-content:center;gap:.75rem;flex-wrap:wrap}.detail-cta__primary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:var(--primary);color:#0a0a0c;border:none;border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;cursor:pointer;transition:background var(--duration-fast) var(--ease-out),transform var(--duration-fast) var(--ease-out)}.detail-cta__primary[data-astro-cid-qcigfm7x]:hover{background:var(--primary-dark, var(--primary-dark));transform:translateY(-1px)}.detail-cta__primary[data-astro-cid-qcigfm7x].copied{background:var(--positive, var(--brand-green))}.detail-cta__secondary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:transparent;color:var(--text, var(--brand-dark));border:1px solid var(--border, var(--brand-mid-gray));border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;text-decoration:none;transition:border-color var(--duration-fast) var(--ease-out),color var(--duration-fast) var(--ease-out)}.detail-cta__secondary[data-astro-cid-qcigfm7x]:hover{border-color:var(--primary);color:var(--primary)}@media(max-width:480px){.detail-cta__actions[data-astro-cid-qcigfm7x]{flex-direction:column;align-items:stretch}.detail-cta__primary[data-astro-cid-qcigfm7x],.detail-cta__secondary[data-astro-cid-qcigfm7x]{justify-content:center}}
+</style>
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/_name_@_@astro.DkhX4uPa.css">
+<style>.pcard{display:block;padding:var(--space-5);border-bottom:1px solid var(--rule);color:inherit;text-decoration:none;transition:var(--card-transition);min-width:0;max-width:100%}.pcard:hover{background:var(--panel-2)}.pcard:focus-visible{outline:2px solid var(--signal);outline-offset:-2px}.pcard h3{font-family:var(--font-display);font-size:var(--text-lg);font-weight:600;line-height:1.3;color:var(--ink);margin:0 0 var(--space-2);overflow-wrap:anywhere}.pcard p{font-family:var(--font-sans);font-size:var(--text-sm);font-weight:400;line-height:1.5;color:var(--ink-2);margin:0 0 var(--space-3);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.pcard code{display:block;font-family:var(--font-mono);font-size:var(--text-sm);font-weight:400;line-height:1.4;color:var(--ink);background:var(--panel-2);padding:var(--space-2) var(--space-3);border-radius:0;word-break:break-all;margin:0 0 var(--space-3)}.pcard small{font-family:var(--font-sans);font-size:var(--text-xs);line-height:1.4;color:var(--ink-3)}@media(min-width:768px){.pcard{border:1px solid var(--rule);border-radius:0}}
+</style></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+  <div class="plugin-page" data-astro-cid-vaomz7ca>
+    <div class="container" data-astro-cid-vaomz7ca>
+      <!-- 1. Breadcrumbs (3-level) -->
+      <nav aria-label="Breadcrumb" class="breadcrumbs" data-astro-cid-ilhxcym7>
+  <ol class="breadcrumbs__list" itemscope itemtype="https://schema.org/BreadcrumbList" data-astro-cid-ilhxcym7>
+    <li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Home</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="1">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/explore?category=saas-packs" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Saas Packs</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="2">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          <span class="breadcrumbs__current" aria-current="page" itemprop="name" data-astro-cid-ilhxcym7>
+              ga4-pack
+            </span>
+          <meta itemprop="position" content="3">
+        </li>
+  </ol>
+</nav>
+
+      <!-- 2. Header -->
+      <div class="header" data-astro-cid-vaomz7ca>
+        <h1 data-astro-cid-vaomz7ca>
+          ga4-pack
+        </h1>
+        
+        <div class="meta" data-astro-cid-vaomz7ca>
+          
+          <span class="meta-item" data-astro-cid-vaomz7ca>v1.3.0</span>
+          <span class="meta-item" data-astro-cid-vaomz7ca>by Jeremy Longshore</span>
+        </div>
+      </div>
+
+      <!-- 3. Description -->
+      <p class="description" data-astro-cid-vaomz7ca>Claude Code skill pack for Google Analytics 4 — 5 starter skills covering auth (OAuth + service account), Data API v1 queries (runReport, filters, sampling), Realtime API, canonical reports (DAU/MAU/retention/top pages/funnel), and BigQuery export with event-level SQL recipes.</p>
+
+      <!-- 4. Stats Bar -->
+      <div class="stats-bar" data-astro-cid-vaomz7ca>
+          <div class="stat-item" data-astro-cid-vaomz7ca>
+              <span class="stat-value" data-count-provenance="plugin-local" data-astro-cid-vaomz7ca>5</span>
+              <span class="stat-label" data-astro-cid-vaomz7ca>plugin-local skills</span>
+            </div>
+          <span class="stats-divider" aria-hidden="true" data-astro-cid-vaomz7ca></span><div class="stat-item" data-astro-cid-vaomz7ca>
+                <span class="stat-value" data-astro-cid-vaomz7ca>MIT</span>
+                <span class="stat-label" data-astro-cid-vaomz7ca>License</span>
+              </div>
+            <span class="stats-divider" aria-hidden="true" data-astro-cid-vaomz7ca></span><div class="stat-item" data-astro-cid-vaomz7ca>
+                <span class="stat-value" data-astro-cid-vaomz7ca>Claude Code</span>
+                <span class="stat-label" data-astro-cid-vaomz7ca>Adapters (declared)</span>
+              </div>
+            
+        </div>
+
+      <!-- 5. Installation -->
+      <div class="section" data-astro-cid-vaomz7ca>
+        <h2 data-astro-cid-vaomz7ca>Installation</h2>
+        <p class="section-hint" data-astro-cid-vaomz7ca>Open Claude Code and run this command:</p>
+        <div class="install-box" data-astro-cid-vaomz7ca>
+          <code class="install-command" data-astro-cid-vaomz7ca>/plugin install ga4-pack@claude-code-plugins-plus</code>
+          <button class="copy-btn" id="copy-btn" data-astro-cid-vaomz7ca>Copy</button>
+        </div>
+        <p class="tip" data-astro-cid-vaomz7ca>
+          Use <code data-astro-cid-vaomz7ca>--global</code> to install for all projects, or <code data-astro-cid-vaomz7ca>--project</code> for current project only.
+        </p>
+      </div>
+
+      <!-- 6. Overview / What It Does (from README) -->
+      
+
+      <!-- 7. Features (from README) -->
+      
+
+      <!-- 8. Skills -->
+      <div class="section skills-section" data-astro-cid-vaomz7ca>
+          <div class="skills-header" data-astro-cid-vaomz7ca>
+            <h2 data-astro-cid-vaomz7ca>Skills (5) <small data-count-provenance="plugin-local" data-astro-cid-vaomz7ca>plugin-local skills</small></h2>
+            <button class="expand-all-btn" id="expand-all-btn" data-astro-cid-vaomz7ca>Expand All</button>
+          </div>
+          <div class="gist-list" data-astro-cid-vaomz7ca>
+            <div class="gist-card" data-skill-slug="ga4-auth-setup" data-astro-cid-vaomz7ca>
+                <div class="gist-header" data-astro-cid-vaomz7ca>
+                  <button class="gist-toggle" aria-label="Toggle skill content" data-astro-cid-vaomz7ca>
+                    <svg class="toggle-icon" width="12" height="12" viewBox="0 0 12 12" data-astro-cid-vaomz7ca>
+                      <path d="M4 2 L10 6 L4 10 Z" fill="currentColor" data-astro-cid-vaomz7ca></path>
+                    </svg>
+                  </button>
+                  <span class="gist-filename" data-astro-cid-vaomz7ca>ga4-auth-setup</span>
+                  <a href="/skills/ga4-auth-setup/" class="gist-view-link" data-astro-cid-vaomz7ca>View full skill &rarr;</a>
+                </div>
+                <div class="gist-body" data-astro-cid-vaomz7ca>
+                  <p class="gist-description" data-astro-cid-vaomz7ca>Configure auth for the GA4 Data API — OAuth user credentials for interactive use, or a service account for automation / CI.</p>
+                  <div class="gist-tools" data-astro-cid-vaomz7ca>
+                      <span class="tool-pill" data-astro-cid-vaomz7ca>Bash(gcloud:*)</span><span class="tool-pill" data-astro-cid-vaomz7ca>Bash(curl:*)</span><span class="tool-pill" data-astro-cid-vaomz7ca>Bash(jq:*)</span><span class="tool-pill" data-astro-cid-vaomz7ca>Bash(python3:*)</span><span class="tool-pill" data-astro-cid-vaomz7ca>Bash(ls:*)</span>
+                    </div>
+                </div>
+                <div class="gist-content" style="display: none;" data-astro-cid-vaomz7ca>
+                  <div class="gist-content-inner" data-astro-cid-vaomz7ca><h1>GA4 Auth Setup</h1>
+<h2>Overview</h2>
+<p>GA4 has two production-grade auth paths. Pick before you start; mixing them mid-flight is the most common failure mode.</p>
+<table><thead><tr>
+<th>Path</th>
+<th>When</th>
+<th>Credential file</th>
+</tr></thead><tbody>
+<tr>
+<td><strong>Service account</strong></td>
+<td>Automation, CI, server-side scripts. Token is long-lived, scoped, revocable.</td>
+<td><code>~/.config/gcloud/sa-ga4.json</code> (or any path you choose)</td>
+</tr>
+<tr>
+<td><strong>OAuth user creds</strong></td>
+<td>Interactive use, multiple GA4 properties, ad-hoc analyst work. Token refreshes from a <code>~/.config/gcloud/application_default_credentials.json</code> file.</td>
+<td>ADC</td>
+</tr>
+</tbody></table>
+<p><strong>Recommendation:</strong> service account for any pipeline / report-runner / agent use. OAuth for a human poking around. Don&#39;t share OAuth user creds across machines — that&#39;s an audit-trail mess.</p>
+<h2>Prerequisites</h2>
+<ul>
+<li>A Google Cloud project where you can create a service account and enable APIs, or a Google account with access to the target GA4 property.</li>
+<li>The GA4 property ID (digits only, not the <code>G-...</code> measurement ID).</li>
+<li><code>gcloud</code> authenticated to the GCP project; the Python verification also needs the Google Analytics Data API client library installed.</li>
+</ul>
+<h2>Instructions</h2>
+<h2>Examples</h2>
+<h2>Path A — Service account (recommended for automation)</h2>
+<h3>1. Create the SA in GCP</h3>
+<pre data-lang="bash"><code>
+PROJECT=your-gcp-project          # the project that will own the SA
+SA_NAME=ga4-reader
+SA_EMAIL=&quot;${SA_NAME}@${PROJECT}.iam.gserviceaccount.com&quot;
+
+gcloud iam service-accounts create &quot;$SA_NAME&quot; \
+  --display-name=&quot;GA4 read-only API access&quot; \
+  --project=&quot;$PROJECT&quot;
+
+# Generate a key (file lands locally)
+gcloud iam service-accounts keys create ~/.config/gcloud/sa-ga4.json \
+  --iam-account=&quot;$SA_EMAIL&quot;
+</code></pre>
+<h3>2. Grant the SA access to your GA4 property</h3>
+<p>This is the step everyone forgets. GA4 has <strong>property-level</strong> access control that lives in the Google Analytics web UI, NOT in GCP IAM. The service account email needs to be added there.</p>
+<ol>
+<li>Open &lt;https://analytics.google.com/&gt;</li>
+<li>Admin (bottom-left gear) → Property column → <strong>Property Access Management</strong></li>
+<li>Add user: paste <code>$SA_EMAIL</code> (e.g. <code>ga4-reader@your-project.iam.gserviceaccount.com</code>)</li>
+<li>Role: <strong>Viewer</strong> (read-only — anything more is over-privilege)</li>
+<li>Save</li>
+</ol>
+<h3>3. Enable the Data API in the SA&#39;s project</h3>
+<pre data-lang="bash"><code>
+gcloud services enable analyticsdata.googleapis.com --project=&quot;$PROJECT&quot;
+</code></pre>
+<h3>4. Test the auth round-trip</h3>
+<pre data-lang="bash"><code>
+GOOGLE_APPLICATION_CREDENTIALS=~/.config/gcloud/sa-ga4.json \
+PROPERTY_ID=123456789 \
+python3 -c &quot</div>
+                </div>
+              </div><div class="gist-card" data-skill-slug="ga4-bigquery-export" data-astro-cid-vaomz7ca>
+                <div class="gist-header" data-astro-cid-vaomz7ca>
+                  <button class="gist-toggle" aria-label="Toggle skill content" data-astro-cid-vaomz7ca>
+                    <svg class="toggle-icon" width="12" height="12" viewBox="0 0 12 12" data-astro-cid-vaomz7ca>
+                      <path d="M4 2 L10 6 L4 10 Z" fill="currentColor" data-astro-cid-vaomz7ca></path>
+                    </svg>
+                  </button>
+                  <span class="gist-filename" data-astro-cid-vaomz7ca>ga4-bigquery-export</span>
+                  <a href="/skills/ga4-bigquery-export/" class="gist-view-link" data-astro-cid-vaomz7ca>View full skill &rarr;</a>
+                </div>
+                <div class="gist-body" data-astro-cid-vaomz7ca>
+                  <p class="gist-description" data-astro-cid-vaomz7ca>Wire GA4 → BigQuery for unsampled, queryable event-level data.</p>
+                  <div class="gist-tools" data-astro-cid-vaomz7ca>
+                      <span class="tool-pill" data-astro-cid-vaomz7ca>Bash(bq:*)</span><span class="tool-pill" data-astro-cid-vaomz7ca>Bash(gcloud:*)</span>
+                    </div>
+                </div>
+                <div class="gist-content" style="display: none;" data-astro-cid-vaomz7ca>
+                  <div class="gist-content-inner" data-astro-cid-vaomz7ca><h1>GA4 → BigQuery Export</h1>
+<h2>Overview</h2>
+<p>The Data API is good but bounded — sampled past a threshold, capped at ~150 dimensions, no cohort joins. BigQuery export gives you the raw event stream as SQL-queryable tables, <strong>free</strong> at the standard GA4 tier (up to 1M events/day), with no sampling and full event payloads.</p>
+<p>This skill: one-time setup, then the SQL recipes for what the Data API can&#39;t do well.</p>
+<h2>Prerequisites</h2>
+<ul>
+<li>A GA4 property for which you can create a BigQuery link.</li>
+<li>A Google Cloud project with BigQuery enabled and permission to grant project IAM roles.</li>
+<li>The <code>bq</code> and <code>gcloud</code> CLIs authenticated to that project; use the service account created by <code>ga4-auth-setup</code> for unattended queries.</li>
+</ul>
+<h2>Instructions</h2>
+<h2>Setup — one time</h2>
+<h3>1. Link your GA4 property to a GCP project</h3>
+<p>In &lt;https://analytics.google.com/&gt;:</p>
+<ol>
+<li>Admin → Property column → <strong>BigQuery Links</strong></li>
+<li>Create a link → pick your GCP project</li>
+<li>Data location: pick the BQ region for the export tables (US multi-region is fine for most cases; EU if you need data residency)</li>
+<li><strong>Export type:</strong></li>
+</ol>
+<ul>
+<li><strong>Daily</strong> — single <code>events_YYYYMMDD</code> table per day, written ~24h after midnight. Fine for most reporting.</li>
+<li><strong>Streaming</strong> — <code>events_intraday_YYYYMMDD</code> table written ~near-real-time. Costs more, useful for hot ops dashboards.</li>
+<li>Most setups: enable both. Streaming for &quot;today&quot;, daily for everything else.</li>
+</ul>
+<ol>
+<li><strong>Include advertising identifiers</strong> — uncheck unless you specifically need device-graph data (most don&#39;t)</li>
+<li>Save</li>
+</ol>
+<p>The first daily table lands within 24h. The first streaming table is near-immediate. After that you have a new <code>events_YYYYMMDD</code> every day forever, no maintenance needed.</p>
+<h3>2. Verify the export is working</h3>
+<pre data-lang="bash"><code>
+PROJECT=your-gcp-project
+DATASET=analytics_123456789       # auto-named after the property ID
+
+bq ls &quot;$PROJECT:$DATASET&quot; 2&gt;&amp;1 | head -10
+# Expect: events_YYYYMMDD tables + events_intraday_YYYYMMDD if streaming enabled
+</code></pre>
+<p>If you see no dataset, the link is configured but the first export hasn&#39;t fired yet — wait 24h.</p>
+<h3>3. Authorize a service account for querying</h3>
+<p>The SA from <code>ga4-auth-setup</code> only has Data API access. For BQ queries, grant the same SA:</p>
+<pre data-lang="bash"><code>
+SA_EMAIL=ga4-reader@your-project.iam.gserviceaccount.com
+gcloud projects add-iam-policy-binding &quot;$PROJECT&quot; \
+  --member=&quot;serviceAccount:$SA_EMAIL&quot; \
+  --role=&quot;roles/bigquery.dataViewer&quot;
+gcloud projects add-iam-policy-binding &quot;$PROJECT&quot; \
+  --member=&quot;serviceAccount:$SA_EMAIL&quot; \
+  --role=&quot;roles/bigquery.jobUser&q</div>
+                </div>
+              </div><div class="gist-card" data-skill-slug="ga4-common-reports" data-astro-cid-vaomz7ca>
+                <div class="gist-header" data-astro-cid-vaomz7ca>
+                  <button class="gist-toggle" aria-label="Toggle skill content" data-astro-cid-vaomz7ca>
+                    <svg class="toggle-icon" width="12" height="12" viewBox="0 0 12 12" data-astro-cid-vaomz7ca>
+                      <path d="M4 2 L10 6 L4 10 Z" fill="currentColor" data-astro-cid-vaomz7ca></path>
+                    </svg>
+                  </button>
+                  <span class="gist-filename" data-astro-cid-vaomz7ca>ga4-common-reports</span>
+                  <a href="/skills/ga4-common-reports/" class="gist-view-link" data-astro-cid-vaomz7ca>View full skill &rarr;</a>
+                </div>
+                <div class="gist-body" data-astro-cid-vaomz7ca>
+                  <p class="gist-description" data-astro-cid-vaomz7ca>Copy-paste recipes for the 6-7 reports every site owner actually wants: DAU/MAU/WAU, retention cohort, top pages by source, channel attribution, conversion funnel, geo breakdown, device split.</p>
+                  <div class="gist-tools" data-astro-cid-vaomz7ca>
+                      <span class="tool-pill" data-astro-cid-vaomz7ca>Bash(python3:*)</span>
+                    </div>
+                </div>
+                <div class="gist-content" style="display: none;" data-astro-cid-vaomz7ca>
+                  <div class="gist-content-inner" data-astro-cid-vaomz7ca><h1>GA4 Common Reports</h1>
+<h2>Overview</h2>
+<p>Recipes for the reports that get asked for ~95% of the time. Each one is a complete <code>runReport</code> you can paste, change <code>PROPERTY_ID</code>, and run. Prerequisite: <code>ga4-auth-setup</code> done.</p>
+<h2>Prerequisites</h2>
+<ul>
+<li>A GA4 Data API credential configured by <code>ga4-auth-setup</code> and granted Viewer access to the target property.</li>
+<li>Python with <code>google-analytics-data</code> installed and <code>GA4_PROPERTY_ID</code> set to the numeric property ID.</li>
+<li>A clear reporting window; use completed days for stable comparisons.</li>
+</ul>
+<h2>Instructions</h2>
+<p>The setup block (same for every recipe):</p>
+<pre data-lang="python"><code>
+import os
+from google.analytics.data_v1beta import BetaAnalyticsDataClient
+from google.analytics.data_v1beta.types import (
+    RunReportRequest, DateRange, Metric, Dimension,
+    FilterExpression, Filter, OrderBy,
+)
+
+PROPERTY = f&quot;properties/{os.environ[&#39;GA4_PROPERTY_ID&#39;]}&quot;
+client = BetaAnalyticsDataClient()
+</code></pre>
+<h2>Examples</h2>
+<h2>1. Daily Active Users (DAU) — 30-day rolling</h2>
+<pre data-lang="python"><code>
+req = RunReportRequest(
+    property=PROPERTY,
+    date_ranges=[DateRange(start_date=&quot;30daysAgo&quot;, end_date=&quot;yesterday&quot;)],
+    metrics=[Metric(name=&quot;activeUsers&quot;)],
+    dimensions=[Dimension(name=&quot;date&quot;)],
+    order_bys=[OrderBy(dimension=OrderBy.DimensionOrderBy(dimension_name=&quot;date&quot;))],
+)
+resp = client.run_report(req)
+for r in resp.rows:
+    print(f&quot;{r.dimension_values[0].value} {r.metric_values[0].value}&quot;)
+</code></pre>
+<p><strong>Why <code>yesterday</code>, not <code>today</code>:</strong> today&#39;s number is incomplete and will keep climbing through the day. For a clean rolling DAU, end the window at <code>yesterday</code>.</p>
+<h2>2. MAU / WAU — rolling unique users</h2>
+<p>GA4 doesn&#39;t expose MAU as a single metric — you compute it from the same <code>activeUsers</code> rolled up over a wider date range. The trick: a single-row report with no date dimension returns the unique count over the entire window (de-duplicated across days).</p>
+<pre data-lang="python"><code>
+# MAU (last 30 days)
+mau = client.run_report(RunReportRequest(
+    property=PROPERTY,
+    date_ranges=[DateRange(start_date=&quot;29daysAgo&quot;, end_date=&quot;yesterday&quot;)],
+    metrics=[Metric(name=&quot;activeUsers&quot;)],
+))
+mau_count = int(mau.rows[0].metric_values[0].value) if mau.rows else 0
+
+# WAU (last 7 days)
+wau = client.run_report(RunReportRequest(
+    property=PROPERTY,
+    date_ranges=[DateRange(start_date=&quot;6daysAgo&quot;, end_date=&quot;yesterday&quot;)],
+    metrics=[Metric(name=&quot;activeUsers&quot;)],
+))
+wau_count = int(wau.rows[0].metric_values[0].value) if wau.rows else 0
+
+print(f&quot;MAU: {mau_count:,}   WAU: {wau_count:,}   Ratio (engagement): {wau_count/mau_count:.2%}&quot;)
+</code><</div>
+                </div>
+              </div><div class="gist-card" data-skill-slug="ga4-data-api-query" data-astro-cid-vaomz7ca>
+                <div class="gist-header" data-astro-cid-vaomz7ca>
+                  <button class="gist-toggle" aria-label="Toggle skill content" data-astro-cid-vaomz7ca>
+                    <svg class="toggle-icon" width="12" height="12" viewBox="0 0 12 12" data-astro-cid-vaomz7ca>
+                      <path d="M4 2 L10 6 L4 10 Z" fill="currentColor" data-astro-cid-vaomz7ca></path>
+                    </svg>
+                  </button>
+                  <span class="gist-filename" data-astro-cid-vaomz7ca>ga4-data-api-query</span>
+                  <a href="/skills/ga4-data-api-query/" class="gist-view-link" data-astro-cid-vaomz7ca>View full skill &rarr;</a>
+                </div>
+                <div class="gist-body" data-astro-cid-vaomz7ca>
+                  <p class="gist-description" data-astro-cid-vaomz7ca>Build a runReport request against the GA4 Data API v1 — pick valid metric/dimension combinations, set date ranges that respect data-freshness limits, apply filters, paginate large result sets, handle sampling thresholds.</p>
+                  <div class="gist-tools" data-astro-cid-vaomz7ca>
+                      <span class="tool-pill" data-astro-cid-vaomz7ca>Bash(python3:*)</span><span class="tool-pill" data-astro-cid-vaomz7ca>Bash(curl:*)</span>
+                    </div>
+                </div>
+                <div class="gist-content" style="display: none;" data-astro-cid-vaomz7ca>
+                  <div class="gist-content-inner" data-astro-cid-vaomz7ca><h1>GA4 Data API v1 — runReport</h1>
+<h2>Overview</h2>
+<p>The Data API v1 is the canonical read path for GA4. One endpoint (<code>runReport</code>) covers most use cases. Two paths matter for picking the right query: <strong>dimensions</strong> describe rows (date, page, source), <strong>metrics</strong> describe values (sessions, users, events). Not every combination is valid — see &quot;Compatibility&quot; below.</p>
+<p>Prerequisite: auth working (see <code>ga4-auth-setup</code>).</p>
+<h2>Prerequisites</h2>
+<ul>
+<li>An authenticated GA4 Data API client with access to the target property; follow <code>ga4-auth-setup</code> first.</li>
+<li>Python and the <code>google-analytics-data</code> package.</li>
+<li>A numeric GA4 property ID and a bounded date range appropriate to the metric&#39;s freshness.</li>
+</ul>
+<h2>Instructions</h2>
+<h2>Examples</h2>
+<h2>The minimum viable query</h2>
+<pre data-lang="python"><code>
+from google.analytics.data_v1beta import BetaAnalyticsDataClient
+from google.analytics.data_v1beta.types import (
+    RunReportRequest, DateRange, Metric, Dimension,
+)
+
+client = BetaAnalyticsDataClient()
+
+req = RunReportRequest(
+    property=&quot;properties/123456789&quot;,     # YOUR property ID (digits only)
+    date_ranges=[
+        DateRange(start_date=&quot;30daysAgo&quot;, end_date=&quot;today&quot;),
+    ],
+    metrics=[Metric(name=&quot;activeUsers&quot;)],
+    dimensions=[Dimension(name=&quot;date&quot;)],
+)
+resp = client.run_report(req)
+
+for row in resp.rows:
+    date = row.dimension_values[0].value     # YYYYMMDD string
+    users = row.metric_values[0].value       # numeric string
+    print(f&quot;{date}: {users}&quot;)
+</code></pre>
+<p>That&#39;s the full skeleton. Everything below extends this shape.</p>
+<h2>The 12 metrics worth knowing</h2>
+<table><thead><tr>
+<th>Metric</th>
+<th>What it counts</th>
+<th>Notes</th>
+</tr></thead><tbody>
+<tr>
+<td><code>activeUsers</code></td>
+<td>Unique users with engagement in the window</td>
+<td>The &quot;users&quot; people mean by default</td>
+</tr>
+<tr>
+<td><code>newUsers</code></td>
+<td>First-seen users in the window</td>
+<td></td>
+</tr>
+<tr>
+<td><code>totalUsers</code></td>
+<td>All users (engaged or not) — superset of <code>activeUsers</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>sessions</code></td>
+<td>Sessions started in the window</td>
+<td>Re-engages after 30min inactivity</td>
+</tr>
+<tr>
+<td><code>engagedSessions</code></td>
+<td>Sessions ≥10s OR ≥2 pageviews OR ≥1 conversion</td>
+<td>The &quot;good&quot; sessions</td>
+</tr>
+<tr>
+<td><code>screenPageViews</code></td>
+<td>Pageviews + app screenviews combined</td>
+<td>What people mean by &quot;pageviews&quot;</td>
+</tr>
+<tr>
+<td><code>eventCount</code></td>
+<td>Total event count (every event, not just <code>page_view</code>)</td>
+<td>Often misleadingly large</td>
+</tr>
+<tr>
+<td><code>bounceRate</code></td>
+<td><code>(sessions - engagedSessions) / sessions</code></td>
+<td>Lower is better</td>
+</tr>
+<tr>
+<td><code>avera</div>
+                </div>
+              </div><div class="gist-card" data-skill-slug="ga4-realtime-api" data-astro-cid-vaomz7ca>
+                <div class="gist-header" data-astro-cid-vaomz7ca>
+                  <button class="gist-toggle" aria-label="Toggle skill content" data-astro-cid-vaomz7ca>
+                    <svg class="toggle-icon" width="12" height="12" viewBox="0 0 12 12" data-astro-cid-vaomz7ca>
+                      <path d="M4 2 L10 6 L4 10 Z" fill="currentColor" data-astro-cid-vaomz7ca></path>
+                    </svg>
+                  </button>
+                  <span class="gist-filename" data-astro-cid-vaomz7ca>ga4-realtime-api</span>
+                  <a href="/skills/ga4-realtime-api/" class="gist-view-link" data-astro-cid-vaomz7ca>View full skill &rarr;</a>
+                </div>
+                <div class="gist-body" data-astro-cid-vaomz7ca>
+                  <p class="gist-description" data-astro-cid-vaomz7ca>Pull current-session / active-user data from the GA4 Realtime endpoint — a separate API surface from runReport with different metrics, dimensions, and freshness guarantees (~30 min rolling window instead of T-48h).</p>
+                  <div class="gist-tools" data-astro-cid-vaomz7ca>
+                      <span class="tool-pill" data-astro-cid-vaomz7ca>Bash(python3:*)</span><span class="tool-pill" data-astro-cid-vaomz7ca>Bash(curl:*)</span>
+                    </div>
+                </div>
+                <div class="gist-content" style="display: none;" data-astro-cid-vaomz7ca>
+                  <div class="gist-content-inner" data-astro-cid-vaomz7ca><h1>GA4 Realtime API</h1>
+<h2>Overview</h2>
+<p>The Realtime API is GA4&#39;s &quot;what&#39;s happening right now&quot; endpoint. Different from <code>runReport</code>:</p>
+<table><thead><tr>
+<th></th>
+<th><code>runReport</code> (Data API)</th>
+<th><code>runRealtimeReport</code> (Realtime)</th>
+</tr></thead><tbody>
+<tr>
+<td>Freshness</td>
+<td>~24-48h lag, stable</td>
+<td>Last ~30 min, rolling</td>
+</tr>
+<tr>
+<td>Window</td>
+<td>Any date range</td>
+<td>Implicit — last 30 min</td>
+</tr>
+<tr>
+<td>Metrics</td>
+<td>~50 supported</td>
+<td>~10 supported (subset)</td>
+</tr>
+<tr>
+<td>Dimensions</td>
+<td>~150 supported</td>
+<td>~15 supported (subset)</td>
+</tr>
+<tr>
+<td>Quota</td>
+<td>Per-property daily</td>
+<td>Separate Realtime quota</td>
+</tr>
+<tr>
+<td>Use case</td>
+<td>Reports, dashboards, trend analysis</td>
+<td>Live dashboards, monitoring, &quot;are we down?&quot;</td>
+</tr>
+</tbody></table>
+<p>Don&#39;t try to use <code>runReport</code> for now-data — its freshest data point is yesterday. Use <code>runRealtimeReport</code>.</p>
+<h2>Prerequisites</h2>
+<ul>
+<li>A GA4 Data API credential with access to the target property, configured through <code>ga4-auth-setup</code>.</li>
+<li>Python with <code>google-analytics-data</code> installed.</li>
+<li>A numeric property ID; realtime data is inherently a rolling, roughly 30-minute view and is not a replacement for historical reporting.</li>
+</ul>
+<h2>Instructions</h2>
+<h2>Examples</h2>
+<h2>Minimum viable call</h2>
+<pre data-lang="python"><code>
+from google.analytics.data_v1beta import BetaAnalyticsDataClient
+from google.analytics.data_v1beta.types import (
+    RunRealtimeReportRequest, Metric, Dimension,
+)
+
+client = BetaAnalyticsDataClient()
+resp = client.run_realtime_report(RunRealtimeReportRequest(
+    property=&quot;properties/123456789&quot;,
+    metrics=[Metric(name=&quot;activeUsers&quot;)],
+))
+
+# Single-row response when there are no dimensions
+total = int(resp.rows[0].metric_values[0].value) if resp.rows else 0
+print(f&quot;Active users right now: {total}&quot;)
+</code></pre>
+<p>No <code>date_ranges</code> block — the implicit window is the last 30 min. Adding one will error.</p>
+<h2>Realtime metrics (the full list)</h2>
+<table><thead><tr>
+<th>Metric</th>
+<th>What it counts</th>
+</tr></thead><tbody>
+<tr>
+<td><code>activeUsers</code></td>
+<td>Unique users in the last 30 min</td>
+</tr>
+<tr>
+<td><code>screenPageViews</code></td>
+<td>Pageviews + screenviews in the last 30 min</td>
+</tr>
+<tr>
+<td><code>eventCount</code></td>
+<td>Total events in the last 30 min</td>
+</tr>
+<tr>
+<td><code>conversions</code></td>
+<td>Conversion events in the last 30 min</td>
+</tr>
+<tr>
+<td><code>keyEvents</code></td>
+<td>Key events (post-2024 rename of conversions)</td>
+</tr>
+</tbody></table>
+<p>Custom-event aggregates (e.g. <code>purchase_revenue</code>) are NOT in the Realtime API. If you need realtime revenue, derive it from <code>eventCount</code> filtered to <code>eventName==&quot;purchase&quot;</code> plus y</div>
+                </div>
+              </div>
+          </div>
+        </div>
+
+      <!-- 9. Usage / How It Works (from README) -->
+      
+
+      <!-- 10. Use Cases (from README) -->
+      
+
+      <!-- 11. FAQ (from README troubleshooting) -->
+      
+
+      <!-- 12. Bottom CTA -->
+      <section class="detail-cta" data-astro-cid-qcigfm7x>
+  <h2 class="detail-cta__headline" data-astro-cid-qcigfm7x>Ready to use ga4-pack?</h2>
+  <div class="detail-cta__actions" data-astro-cid-qcigfm7x>
+    <button class="detail-cta__primary" data-copy-install="/plugin install ga4-pack@claude-code-plugins-plus" data-astro-cid-qcigfm7x>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" data-astro-cid-qcigfm7x>
+        <rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" stroke-width="1.5" data-astro-cid-qcigfm7x></rect>
+        <path d="M3 11V3a1 1 0 011-1h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" data-astro-cid-qcigfm7x></path>
+      </svg>
+      <span class="detail-cta__btn-text" data-astro-cid-qcigfm7x>Copy Install Command</span>
+    </button>
+    
+  </div>
+</section>
+
+<script type="module">document.querySelectorAll("[data-copy-install]").forEach(t=>{t.addEventListener("click",async()=>{const a=t.dataset.copyInstall||"";await navigator.clipboard.writeText(a);const e=t.querySelector(".detail-cta__btn-text");if(e){const o=e.textContent;e.textContent="Copied!",t.classList.add("copied"),window.trackEvent&&window.trackEvent("install_copied",{plugin_name:a.split(" ").pop()||"",source:"detail_cta"}),setTimeout(()=>{e.textContent=o,t.classList.remove("copied")},2e3)}})});</script>
+
+      <!-- 13. Related Plugins -->
+      <div class="section" data-astro-cid-vaomz7ca>
+          <h2 data-astro-cid-vaomz7ca>Related Plugins</h2>
+          <div class="related-plugins" data-astro-cid-vaomz7ca>
+            <a class="pcard" href="/plugins/supabase-pack">
+  <h3>supabase-pack</h3>
+  <p>Complete Supabase integration skill pack with 30 skills covering authentication, database, storage, realtime, edge functions, and production operations. Flagship+ tier vendor pack.</p>
+  <code>/plugin install supabase-pack@claude-code-plugins-plus</code>
+  
+</a><a class="pcard" href="/plugins/vercel-pack">
+  <h3>vercel-pack</h3>
+  <p>Complete Vercel integration skill pack with 30 skills covering deployments, edge functions, preview environments, performance optimization, and production operations. Flagship+ tier vendor pack.</p>
+  <code>/plugin install vercel-pack@claude-code-plugins-plus</code>
+  
+</a><a class="pcard" href="/plugins/clay-pack">
+  <h3>clay-pack</h3>
+  <p>Complete Clay integration skill pack with 30 skills covering data enrichment, waterfall workflows, AI agents, and GTM automation. Flagship+ tier vendor pack.</p>
+  <code>/plugin install clay-pack@claude-code-plugins-plus</code>
+  
+</a><a class="pcard" href="/plugins/cursor-pack">
+  <h3>cursor-pack</h3>
+  <p>Complete Cursor integration skill pack with 30 skills covering AI code editing, composer workflows, codebase indexing, and productivity features. Flagship+ tier vendor pack.</p>
+  <code>/plugin install cursor-pack@claude-code-plugins-plus</code>
+  
+</a><a class="pcard" href="/plugins/exa-pack">
+  <h3>exa-pack</h3>
+  <p>Complete Exa integration skill pack with 30 skills covering neural search, semantic retrieval, web search API, and AI-powered discovery. Flagship+ tier vendor pack.</p>
+  <code>/plugin install exa-pack@claude-code-plugins-plus</code>
+  
+</a><a class="pcard" href="/plugins/firecrawl-pack">
+  <h3>firecrawl-pack</h3>
+  <p>Complete Firecrawl integration skill pack with 30 skills covering web scraping, crawling, markdown conversion, and LLM-ready data extraction. Flagship+ tier vendor pack.</p>
+  <code>/plugin install firecrawl-pack@claude-code-plugins-plus</code>
+  
+</a>
+          </div>
+        </div>
+
+      <!-- 14. Tags Footer -->
+      <div class="tags-footer" data-astro-cid-vaomz7ca>
+          <span class="tags-label" data-astro-cid-vaomz7ca>Tags</span>
+          <div class="tags-list" data-astro-cid-vaomz7ca>
+            <span class="tag" data-astro-cid-vaomz7ca>google-analytics</span><span class="tag" data-astro-cid-vaomz7ca>ga4</span><span class="tag" data-astro-cid-vaomz7ca>analytics</span><span class="tag" data-astro-cid-vaomz7ca>data-api</span><span class="tag" data-astro-cid-vaomz7ca>bigquery</span><span class="tag" data-astro-cid-vaomz7ca>reporting</span><span class="tag" data-astro-cid-vaomz7ca>dau-mau</span><span class="tag" data-astro-cid-vaomz7ca>cohort-retention</span>
+          </div>
+        </div>
+    </div>
+  </div>
+
+  <script type="module">const c=document.getElementById("copy-btn"),a=document.querySelector(".install-command");c&&a&&c.addEventListener("click",async()=>{const t=a.textContent||"";await navigator.clipboard.writeText(t),c.textContent="Copied!",c.classList.add("copied"),window.trackEvent&&window.trackEvent("install_copied",{plugin_name:t.split(" ").pop()||"",source:"plugin_detail"}),setTimeout(()=>{c.textContent="Copy",c.classList.remove("copied")},2e3)});document.querySelectorAll(".gist-toggle").forEach(t=>{t.addEventListener("click",()=>{const e=t.closest(".gist-card");if(!e)return;const n=e.querySelector(".gist-content"),o=t.querySelector(".toggle-icon");if(!n||!o)return;const l=n.style.display!=="none";n.style.display=l?"none":"block",o.style.transform=l?"":"rotate(90deg)",e.classList.toggle("expanded",!l)})});document.querySelectorAll(".gist-header").forEach(t=>{t.addEventListener("click",e=>{const n=e.target;if(n.closest("a")||n.closest(".gist-toggle"))return;const o=t.querySelector(".gist-toggle");o&&o.click()})});const s=document.getElementById("expand-all-btn");if(s){let t=!1;s.addEventListener("click",()=>{t=!t,s.textContent=t?"Collapse All":"Expand All",document.querySelectorAll(".gist-card").forEach(e=>{const n=e.querySelector(".gist-content"),o=e.querySelector(".toggle-icon");!n||!o||(n.style.display=t?"block":"none",o.style.transform=t?"rotate(90deg)":"",e.classList.toggle("expanded",t))})})}document.querySelectorAll("[data-expandable]").forEach(t=>{const e=t.querySelector(".readme-content");if(!e||e.scrollHeight<=400)return;e.classList.add("truncated");const n=document.createElement("button");n.className="show-more-btn",n.textContent="Show more",n.addEventListener("click",()=>{const o=e.classList.contains("truncated");e.classList.toggle("truncated",!o),n.textContent=o?"Show less":"Show more"}),e.insertAdjacentElement("afterend",n)});</script>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Rubric Sits On Top Of The Spec: A Schema Validator Postmortem — Tons of Skills Work Diary</title>
+    <meta name="description" content="Postmortem on a schema validator debacle: when a stricter enterprise rubric is built on top of a permissive open spec, the rubric must be additive, never the spec's floor.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://startaitools.com/posts/schema-debacle-rubric-on-spec-postmortem/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/schema-debacle-rubric-on-spec-postmortem/">
+    <meta property="og:title" content="The Rubric Sits On Top Of The Spec: A Schema Validator Postmortem — Tons of Skills Work Diary">
+    <meta property="og:description" content="Postmortem on a schema validator debacle: when a stricter enterprise rubric is built on top of a permissive open spec, the rubric must be additive, never the spec's floor.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="The Rubric Sits On Top Of The Spec: A Schema Validator Postmortem — Tons of Skills Work Diary">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/schema-debacle-rubric-on-spec-postmortem/">
+    <meta name="twitter:title" content="The Rubric Sits On Top Of The Spec: A Schema Validator Postmortem — Tons of Skills Work Diary">
+    <meta name="twitter:description" content="Postmortem on a schema validator debacle: when a stricter enterprise rubric is built on top of a permissive open spec, the rubric must be additive, never the spec's floor.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"The Rubric Sits On Top Of The Spec: A Schema Validator Postmortem","description":"Postmortem on a schema validator debacle: when a stricter enterprise rubric is built on top of a permissive open spec, the rubric must be additive, never the spec's floor.","datePublished":"2026-04-28","url":"https://tonsofskills.com/blog/undefined","author":{"@type":"Person","name":"Jeremy Longshore"},"publisher":{"@type":"Organization","name":"Tons of Skills","url":"https://tonsofskills.com"}}</script>
+  
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.post-header[data-astro-cid-7jjqptxk]{background:var(--panel);padding:4rem 1.5rem 3rem;border-bottom:1px solid var(--border)}.post-header-inner[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto}.back-link[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3);text-decoration:none;display:inline-block;margin-bottom:1.5rem;transition:color .2s}.back-link[data-astro-cid-7jjqptxk]:hover{color:var(--primary)}.post-meta[data-astro-cid-7jjqptxk]{display:flex;align-items:center;gap:.75rem;margin-bottom:1rem}time[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3)}.featured-badge[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.2rem .6rem;background:#ce114126;color:var(--red);border-radius:0;font-weight:600;text-transform:uppercase;letter-spacing:.05em}.post-header[data-astro-cid-7jjqptxk] h1[data-astro-cid-7jjqptxk]{font-family:var(--font-body);font-size:clamp(1.5rem,4vw,2.2rem);font-weight:700;color:var(--text);line-height:1.25;margin-bottom:.75rem;letter-spacing:0}.post-desc[data-astro-cid-7jjqptxk]{color:var(--text-2);font-size:1.05rem;line-height:1.6;margin-bottom:1rem}.post-tags[data-astro-cid-7jjqptxk]{display:flex;gap:.4rem;flex-wrap:wrap}.tag[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.15rem .5rem;background:var(--surface-3);color:var(--text-3);border-radius:0}.post-body[data-astro-cid-7jjqptxk]{padding:3rem 1.5rem 4rem}.prose[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto;color:var(--text-2);line-height:1.8;font-size:1rem}.prose[data-astro-cid-7jjqptxk] h2{font-family:var(--font-body);font-size:1.5rem;font-weight:700;color:var(--text);margin:2.5rem 0 1rem;letter-spacing:0}.prose[data-astro-cid-7jjqptxk] h3{font-size:1.2rem;font-weight:600;color:var(--text);margin:2rem 0 .75rem}.prose[data-astro-cid-7jjqptxk] p{margin-bottom:1rem}.prose[data-astro-cid-7jjqptxk] ul,.prose[data-astro-cid-7jjqptxk] ol{margin:.5rem 0 1rem 1.5rem}.prose[data-astro-cid-7jjqptxk] li{margin-bottom:.35rem}.prose[data-astro-cid-7jjqptxk] strong{color:var(--text);font-weight:600}.prose[data-astro-cid-7jjqptxk] code{font-family:var(--font-mono);font-size:.88em;background:var(--surface-3);padding:.15em .35em;border-radius:0;color:var(--primary)}.prose[data-astro-cid-7jjqptxk] a{color:var(--primary);text-decoration:none}.prose[data-astro-cid-7jjqptxk] a:hover{text-decoration:underline}@media(max-width:768px){.post-header[data-astro-cid-7jjqptxk]{padding:3rem 1rem 2rem}.post-body[data-astro-cid-7jjqptxk]{padding:2rem 1rem 3rem}}
+</style></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  <article class="post" data-astro-cid-7jjqptxk>
+    <header class="post-header" data-astro-cid-7jjqptxk>
+      <div class="post-header-inner" data-astro-cid-7jjqptxk>
+        <a href="/blog" class="back-link" data-astro-cid-7jjqptxk>Back to Work Diary</a>
+        <div class="post-meta" data-astro-cid-7jjqptxk>
+          <time datetime="2026-04-28" data-astro-cid-7jjqptxk>April 27, 2026</time>
+          
+        </div>
+        <h1 data-astro-cid-7jjqptxk>The Rubric Sits On Top Of The Spec: A Schema Validator Postmortem</h1>
+        <p class="post-desc" data-astro-cid-7jjqptxk>Postmortem on a schema validator debacle: when a stricter enterprise rubric is built on top of a permissive open spec, the rubric must be additive, never the spec&#39;s floor.</p>
+        <div class="post-tags" data-astro-cid-7jjqptxk>
+          <span class="tag" data-astro-cid-7jjqptxk>architecture</span><span class="tag" data-astro-cid-7jjqptxk>claude-code</span><span class="tag" data-astro-cid-7jjqptxk>release-engineering</span><span class="tag" data-astro-cid-7jjqptxk>devops</span><span class="tag" data-astro-cid-7jjqptxk>schema-design</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="post-body" data-astro-cid-7jjqptxk>
+      <div class="prose" data-astro-cid-7jjqptxk>
+        <p>When you author a stricter enterprise rubric on top of a permissive open spec, the rubric must sit additive on top of the spec — not replace its required-field set with the spec’s floor. Demoting required-field errors to warnings to “realign with the underlying spec” breaks the marketplace gate it was built to enforce.</p>
+<p>That sentence is the entire lesson from a multi-hour debacle on April 28th. The rest of this post explains how a confident plan to “realign the validator to Anthropic’s authoritative sources” tore down a working enterprise rubric, what got caught mid-flight, what survived the rebuild, and the NON-NEGOTIABLES section now pinned at the top of <code>SCHEMA_CHANGELOG.md</code> so it doesn’t happen again.</p>
+<h2 id="background-the-is-rubric-vs-anthropics-spec">Background: the IS rubric vs Anthropic’s spec</h2>
+<p>Two specs were in play.</p>
+<p>Anthropic’s published skills spec at <code>code.claude.com/docs/en/skills</code> is intentionally permissive. Almost every frontmatter field is optional. Even <code>description</code> is only “recommended” — if absent, the loader falls back to the first paragraph of markdown. The spec is an interpreter contract, not a quality bar. Its job is to say what Claude Code will accept without erroring out.</p>
+<p>The Intent Solutions enterprise rubric — which scores skills published to our marketplace — sits on top of that interpreter contract. Its 8-field <code>ALWAYS_REQUIRED</code> set is the original IS standard for marketplace-quality skills:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#6A737D"># scripts/validate-skills-schema.py — the original 8-field set</span></span>
+<span class="line"><span style="color:#79B8FF">ALWAYS_REQUIRED</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#9ECBFF">    'name'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">    'description'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">    'allowed-tools'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">    'version'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">    'author'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">    'license'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">    'compatibility'</span><span style="color:#E1E4E8">,   </span><span style="color:#6A737D"># was 'compatible-with' before this PR</span></span>
+<span class="line"><span style="color:#9ECBFF">    'tags'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>This set isn’t arbitrary. <code>name</code> and <code>description</code> are the Anthropic-spec basics. <code>version</code>, <code>author</code>, <code>license</code> are tracking metadata — required so the marketplace can attribute, version, and license-check at scale. <code>allowed-tools</code> makes the skill’s tool surface explicit. <code>compatibility</code> is free-text describing where the skill is designed to run. <code>tags</code> powers discovery.</p>
+<p>At marketplace tier the validator emits <strong>errors</strong> for any of these missing — not warnings. That’s the marketplace gate. A skill that fails the gate doesn’t ship.</p>
+<p>This is the architecture that worked. It is also the architecture that got demolished, then partly rebuilt, in a single afternoon.</p>
+<h2 id="the-dance">The dance</h2>
+<p>The day started with a real problem: existing IS skills used a field called <code>compatible-with</code> that takes a CSV list of platforms (<code>claude-code, claude-desktop, ...</code>). Anthropic’s actual skills spec uses a free-text field called <code>compatibility</code>. We were diverging from the published spec on a field name and shape, and that needed fixing.</p>
+<p>A small autonomous task — rename the field, write a migration helper, deprecate the old name — turned into something much bigger. The plan that landed in the editor was titled “Realign skill validator + master spec to Anthropic’s authoritative sources.” The framing was that the IS rubric had drifted into “pure inventions” that “don’t exist in any Anthropic spec or open standard,” and the credible move was to bring the rubric back to the spec’s floor.</p>
+<p>So the validator’s <code>ALWAYS_REQUIRED</code> got rewritten down to a 2-field minimum:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#6A737D"># The wrong direction — schema 3.0.0</span></span>
+<span class="line"><span style="color:#79B8FF">ALWAYS_REQUIRED</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> {</span><span style="color:#9ECBFF">'name'</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">'description'</span><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># version, author, license, allowed-tools, compatibility, tags</span></span>
+<span class="line"><span style="color:#6A737D"># all moved to MARKETPLACE_RECOMMENDED — which warns, not errors</span></span></code></pre>
+<p>And the marketplace tier’s presence-check logic was relaxed from errors to warnings — under the reasoning that “the underlying Anthropic spec marks these optional, so erroring is over-specification.”</p>
+<p>That isn’t realignment. It’s the rubric replacing itself with the spec’s floor.</p>
+<h2 id="why-working-off-summaries-failed">Why working off summaries failed</h2>
+<p>The deeper failure mode was the input: the plan was built from doc summaries, not from <code>code.claude.com/docs/en/skills</code> line by line. A summary of Anthropic’s spec emphasizes its permissiveness — “everything optional, name and description recommended, the rest situational.” That’s accurate as a one-line description of the interpreter contract. It’s also exactly the wrong frame for deciding what the marketplace rubric should require.</p>
+<p>Three things get lost in summarization:</p>
+<ol>
+<li><strong>The spec’s job vs the rubric’s job.</strong> Anthropic’s spec answers “will this load?” The IS rubric answers “is this fit to publish to a marketplace?” These are different questions with different correct answers. A summary that flattens both into “the requirements are X” hides that they have different audiences.</li>
+<li><strong>The ladder beneath each field.</strong> <code>version</code> is “optional” in Anthropic’s spec because the loader doesn’t need it. It’s “required” in the IS rubric because the marketplace needs it for changelog tracking, dependency resolution, and conflict reporting. A summary that says “version is optional” is technically correct in the loader’s frame and entirely wrong in the marketplace’s frame.</li>
+<li><strong>The conditional rules that don’t fit a table.</strong> Anthropic’s spec documents <code>argument-hint</code> as a “no” in the required column, but the spec body says it’s only meaningful when the skill is user-invocable — <code>user-invocable: false</code> makes the hint irrelevant because the skill is hidden from the <code>/</code> menu. A summary that flattens this to “argument-hint: optional” loses the conditional that the validator needs to encode. The body of the spec carries the rules; the table only carries the labels.</li>
+</ol>
+<p>The corrective rule that came out of this is short. <strong>Read primary source material line by line for any change to the required-fields set.</strong> Summaries are fine for orientation; they’re never enough to drive an architectural decision about what the rubric demands.</p>
+<p>There’s a meta-failure pattern under this one too. Summaries that come from a previous Claude session look authoritative because they’re well-organized and quote the right field names. They are still summaries. The cost of re-reading a 4,000-word spec doc is roughly twenty minutes; the cost of building a multi-hour reframe on a summary that elided the conditional rules is the rest of the afternoon. The asymmetry is not subtle. Read the source.</p>
+<h2 id="caught-mid-flight">Caught mid-flight</h2>
+<p>The reframe got partway through the codebase before I called it. By that point:</p>
+<ul>
+<li>Validator was at schema 3.0.0 with the 2-field <code>ALWAYS_REQUIRED</code>.</li>
+<li>Master spec doc 6767-b had been bumped to v3.0.0 with a “name + description are the standard” framing.</li>
+<li><code>frontmatter-spec.md</code> had been rewritten to teach the new minimum.</li>
+<li>Skill template had been pared down.</li>
+<li>The <code>compatibility</code> migration was in. The <code>when_to_use</code> non-deprecation was in. The YAML-list parsing for <code>allowed-tools</code> was in. The <code>arguments</code>, <code>paths</code>, <code>shell</code>, and <code>effort: xhigh</code> field acceptance was in.</li>
+</ul>
+<p>Some of those were real bugs against Anthropic’s spec — places where the validator was rejecting things Anthropic’s docs explicitly accept. Those are the “spec-compliance bug fixes” that should land. The rest of the diff was the architectural reframe: the 8-field set torn down to 2, and marketplace tier presence checks demoted from errors to warnings.</p>
+<p>The rebuild kept the bug fixes and reverted the reframe.</p>
+<h2 id="what-the-rebuild-looks-like">What the rebuild looks like</h2>
+<p>Here’s the validator after the restoration — schema 3.3.1, the version that shipped in PR #611:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#6A737D"># scripts/validate-skills-schema.py — restored 8-field set, schema 3.3.1</span></span>
+<span class="line"><span style="color:#79B8FF">SCHEMA_VERSION</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "3.3.1"</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79B8FF">ALWAYS_REQUIRED</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#9ECBFF">    'name'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">    'description'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">    'allowed-tools'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">    'version'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">    'author'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">    'license'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">    'compatibility'</span><span style="color:#E1E4E8">,   </span><span style="color:#6A737D"># the kept rename — was 'compatible-with'</span></span>
+<span class="line"><span style="color:#9ECBFF">    'tags'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79B8FF">DEPRECATED_FIELDS</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#9ECBFF">    'compatible-with'</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"Use `compatibility` (free-text per AgentSkills.io spec) "</span></span>
+<span class="line"><span style="color:#9ECBFF">                       "instead. Example: `compatibility: Designed for Claude Code`."</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>And the marketplace tier presence-check logic, restored to the strict form:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#F97583">def</span><span style="color:#B392F0"> check_required_fields</span><span style="color:#E1E4E8">(frontmatter, tier):</span></span>
+<span class="line"><span style="color:#9ECBFF">    """At marketplace tier, missing ALWAYS_REQUIRED fields are ERRORS, not warnings."""</span></span>
+<span class="line"><span style="color:#E1E4E8">    missing </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> ALWAYS_REQUIRED</span><span style="color:#F97583"> -</span><span style="color:#79B8FF"> set</span><span style="color:#E1E4E8">(frontmatter.keys())</span></span>
+<span class="line"><span style="color:#F97583">    if</span><span style="color:#F97583"> not</span><span style="color:#E1E4E8"> missing:</span></span>
+<span class="line"><span style="color:#F97583">        return</span><span style="color:#E1E4E8"> []</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">    if</span><span style="color:#E1E4E8"> tier </span><span style="color:#F97583">==</span><span style="color:#9ECBFF"> 'marketplace'</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#F97583">        return</span><span style="color:#E1E4E8"> [Error(</span><span style="color:#F97583">f</span><span style="color:#9ECBFF">"Missing required field: </span><span style="color:#79B8FF">{</span><span style="color:#E1E4E8">field</span><span style="color:#79B8FF">}</span><span style="color:#9ECBFF">"</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">for</span><span style="color:#E1E4E8"> field </span><span style="color:#F97583">in</span><span style="color:#E1E4E8"> missing]</span></span>
+<span class="line"><span style="color:#F97583">    elif</span><span style="color:#E1E4E8"> tier </span><span style="color:#F97583">==</span><span style="color:#9ECBFF"> 'standard'</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#F97583">        return</span><span style="color:#E1E4E8"> [</span><span style="color:#79B8FF">Warning</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">f</span><span style="color:#9ECBFF">"Missing recommended field: </span><span style="color:#79B8FF">{</span><span style="color:#E1E4E8">field</span><span style="color:#79B8FF">}</span><span style="color:#9ECBFF">"</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">for</span><span style="color:#E1E4E8"> field </span><span style="color:#F97583">in</span><span style="color:#E1E4E8"> missing]</span></span></code></pre>
+<p>Standard tier still warns — it mirrors Anthropic’s spec floor for skills that aren’t going to the IS marketplace. Marketplace tier errors, because the marketplace gate has a job to do.</p>
+<p>What survived from the failed direction:</p>
+<ul>
+<li><code>compatibility</code> replaces <code>compatible-with</code> as the canonical free-text field. CSV-platform lists are migrated automatically by <code>batch-remediate.py --migrate-compatible-with</code>.</li>
+<li><code>when_to_use</code> is <strong>not</strong> deprecated. It’s a documented Anthropic field that gets concatenated into the description for skill listings. Earlier validator versions had marked it deprecated; that was wrong.</li>
+<li><code>allowed-tools</code> and <code>arguments</code> accept either a space-separated string or a YAML list. Anthropic’s spec documents both forms; the validator now parses both.</li>
+<li><code>paths</code>, <code>shell</code>, and <code>arguments</code> are now first-class accepted fields with type validation.</li>
+<li><code>effort: xhigh</code> is in the value-validation allow-list (along with <code>low</code>, <code>medium</code>, <code>high</code>, <code>max</code>, <code>inherit</code>).</li>
+<li>Conditional-field rules: <code>argument-hint</code> no longer warns when <code>user-invocable: false</code> (skill is hidden from the <code>/</code> menu, so an autocomplete hint is irrelevant). Subagent fork context defaults to general-purpose if no <code>agent</code> is specified, matching Anthropic’s documented behavior.</li>
+</ul>
+<p>These are all real spec-compliance fixes. They land cleanly without touching the rubric’s required-field set. The test for “is this a bug fix or an architectural change” is exactly that: does the diff modify what the rubric demands, or does it modify how the rubric reads documented Anthropic fields? If the answer is “how it reads,” ship it. If the answer is “what it demands,” stop and get approval.</p>
+<p>A concrete example. The <code>allowed-tools</code> YAML-list parsing fix:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#6A737D"># Before: only space-separated string was accepted</span></span>
+<span class="line"><span style="color:#F97583">def</span><span style="color:#B392F0"> parse_allowed_tools</span><span style="color:#E1E4E8">(value):</span></span>
+<span class="line"><span style="color:#F97583">    return</span><span style="color:#E1E4E8"> value.split(</span><span style="color:#9ECBFF">','</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># After: both Anthropic-canonical forms — string OR YAML list</span></span>
+<span class="line"><span style="color:#F97583">def</span><span style="color:#B392F0"> parse_allowed_tools</span><span style="color:#E1E4E8">(value):</span></span>
+<span class="line"><span style="color:#F97583">    if</span><span style="color:#79B8FF"> isinstance</span><span style="color:#E1E4E8">(value, </span><span style="color:#79B8FF">list</span><span style="color:#E1E4E8">):</span></span>
+<span class="line"><span style="color:#F97583">        return</span><span style="color:#E1E4E8"> value</span></span>
+<span class="line"><span style="color:#F97583">    if</span><span style="color:#79B8FF"> isinstance</span><span style="color:#E1E4E8">(value, </span><span style="color:#79B8FF">str</span><span style="color:#E1E4E8">):</span></span>
+<span class="line"><span style="color:#6A737D">        # Anthropic's spec: space-separated, comma is a typo we tolerate</span></span>
+<span class="line"><span style="color:#F97583">        return</span><span style="color:#E1E4E8"> value.replace(</span><span style="color:#9ECBFF">','</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">' '</span><span style="color:#E1E4E8">).split()</span></span>
+<span class="line"><span style="color:#F97583">    raise</span><span style="color:#79B8FF"> ValueError</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">f</span><span style="color:#9ECBFF">"allowed-tools must be string or list, got </span><span style="color:#79B8FF">{type</span><span style="color:#E1E4E8">(value)</span><span style="color:#79B8FF">}</span><span style="color:#9ECBFF">"</span><span style="color:#E1E4E8">)</span></span></code></pre>
+<p>This is a bug fix. The rubric still requires <code>allowed-tools</code> at marketplace tier; the rubric still validates the resulting list against the known-tool registry; the rubric’s contract is unchanged. What changed is that the validator now accepts the second form Anthropic’s spec documents. Past validator versions would have errored on <code>allowed-tools: [Read, Edit, Bash]</code> even though the spec calls that out as canonical. That’s a spec-compliance bug, autonomously fixable.</p>
+<p>Compare to demoting marketplace-tier presence checks from errors to warnings. Same number of lines changed, same diff shape, completely different category. The first changes how a documented field is read. The second changes what the rubric demands. The first is a bug fix. The second is the dance.</p>
+<h2 id="what-the-rubric-does-on-top-of-the-spec">What the rubric does on top of the spec</h2>
+<p>The right mental model is two layers:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>+---------------------------------------------------+</span></span>
+<span class="line"><span>|  IS Marketplace Rubric (additive — strict)        |</span></span>
+<span class="line"><span>|  - 8-field ALWAYS_REQUIRED set                    |</span></span>
+<span class="line"><span>|  - Marketplace tier: missing = ERROR              |</span></span>
+<span class="line"><span>|  - 100-point quality grade                        |</span></span>
+<span class="line"><span>|  - Deep-eval dimensions                           |</span></span>
+<span class="line"><span>+---------------------------------------------------+</span></span>
+<span class="line"><span>|  Anthropic Skills Spec (interpreter — permissive) |</span></span>
+<span class="line"><span>|  - name, description recommended                  |</span></span>
+<span class="line"><span>|  - everything else optional                       |</span></span>
+<span class="line"><span>|  - documented field types and value sets          |</span></span>
+<span class="line"><span>|  - conditional-field semantics                    |</span></span>
+<span class="line"><span>+---------------------------------------------------+</span></span></code></pre>
+<p>The rubric is <strong>additive</strong> on top of the spec. Every field the spec defines is honored — same names, same types, same value sets. The rubric adds three things:</p>
+<ol>
+<li><strong>A required-field set for marketplace publication.</strong> Tracking metadata (<code>version</code>, <code>author</code>, <code>license</code>) and discovery metadata (<code>tags</code>) are demanded because the marketplace needs them. The spec doesn’t care; the marketplace does.</li>
+<li><strong>Stricter validation for fields the spec accepts loosely.</strong> A 1500-char description limit. Voice-and-tense regex enforcement. License-string format checks.</li>
+<li><strong>Polish recommendations</strong> that don’t fail the build but show up in the grade — examples in the body, references-section structure, command-block formatting.</li>
+</ol>
+<p>Because the rubric is additive, every skill that passes the rubric also passes the spec. The reverse isn’t true — a spec-valid skill can fail the rubric, and that’s the point. That’s what “marketplace quality” means.</p>
+<p>The reframe broke this layering by trying to push the rubric down to the spec’s floor. A 2-field rubric would have meant any spec-valid skill passes the marketplace gate. There would be no gate.</p>
+<h2 id="non-negotiables">NON-NEGOTIABLES</h2>
+<p>The postmortem produced six rules that are now pinned at the top of <code>000-docs/SCHEMA_CHANGELOG.md</code>. They exist specifically to make this dance impossible to repeat:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="markdown"><code><span class="line"><span style="color:#79B8FF;font-weight:bold">## NON-NEGOTIABLES (read before touching the validator)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FFAB70">1.</span><span style="color:#E1E4E8"> ALWAYS_REQUIRED is the IS enterprise 8-field set:</span></span>
+<span class="line"><span style="color:#E1E4E8">   {name, description, allowed-tools, version, author, license,</span></span>
+<span class="line"><span style="color:#E1E4E8">    compatibility, tags}.</span></span>
+<span class="line"><span style="color:#E1E4E8">   Do NOT reduce it. Do NOT reframe as "marketplace polish."</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FFAB70">2.</span><span style="color:#E1E4E8"> Marketplace tier = ERRORS for missing required fields, not warnings.</span></span>
+<span class="line"><span style="color:#E1E4E8">   Demoting required-field errors to warnings breaks the marketplace gate.</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FFAB70">3.</span><span style="color:#E1E4E8"> The IS rubric SITS ON TOP of Anthropic's spec. Anthropic's spec is</span></span>
+<span class="line"><span style="color:#E1E4E8">   intentionally permissive (everything optional); the IS marketplace is</span></span>
+<span class="line"><span style="color:#E1E4E8">   intentionally strict. Don't try to "realign" the IS rubric to</span></span>
+<span class="line"><span style="color:#E1E4E8">   Anthropic's spec floor — that's the dance from 2026-04-28.</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FFAB70">4.</span><span style="color:#E1E4E8"> Tracking metadata (version, author, license) is REQUIRED at</span></span>
+<span class="line"><span style="color:#E1E4E8">   marketplace tier. Not optional polish. Reframing them as "tracking</span></span>
+<span class="line"><span style="color:#E1E4E8">   recommendations" or "polish" is the bad direction.</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FFAB70">5.</span><span style="color:#E1E4E8"> Bug fixes that bring the validator into spec compliance are OK to</span></span>
+<span class="line"><span style="color:#E1E4E8">   apply autonomously (e.g., accepting YAML lists for allowed-tools,</span></span>
+<span class="line"><span style="color:#E1E4E8">   fixing conditional-field rules). These are technical corrections,</span></span>
+<span class="line"><span style="color:#E1E4E8">   not architectural changes.</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FFAB70">6.</span><span style="color:#E1E4E8"> Architectural changes need explicit approval BEFORE the change lands.</span></span>
+<span class="line"><span style="color:#E1E4E8">   "Architectural" = required-fields set, tier model, error vs warning</span></span>
+<span class="line"><span style="color:#E1E4E8">   semantics, source-classification labels.</span></span></code></pre>
+<p>The split between rules 5 and 6 is the operational core. Spec-compliance bug fixes are fine to ship autonomously — the YAML-list parsing, the <code>effort: xhigh</code> allow-list, the conditional-field rules. They don’t change the rubric’s contract; they fix the validator’s interpretation of fields it already validates.</p>
+<p>Architectural changes — the required-fields set, the error/warning semantics, the tier model — need approval before code lands. These are decisions about what the rubric <em>is</em>, not about how it parses.</p>
+<p>The global <code>~/.claude/CLAUDE.md</code> now has a “Claude Skills SOP” section that points directly at <code>SCHEMA_CHANGELOG.md</code> and lists the canonical sources by path:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="markdown"><code><span class="line"><span style="color:#E1E4E8">| Validator   | scripts/validate-skills-schema.py    |</span></span>
+<span class="line"><span style="color:#E1E4E8">| Schema log  | 000-docs/SCHEMA_CHANGELOG.md         |</span></span>
+<span class="line"><span style="color:#E1E4E8">| Master spec | 000-docs/6767-b-SPEC-DR-STND-...md   |</span></span>
+<span class="line"><span style="color:#E1E4E8">| Skill-creator | ~/.claude/skills/skill-creator/    |</span></span>
+<span class="line"><span style="color:#E1E4E8">| Anthropic primary | code.claude.com/docs/en/skills |</span></span>
+<span class="line"><span style="color:#E1E4E8">| AgentSkills.io   | agentskills.io/specification    |</span></span></code></pre>
+<p>The instruction is explicit: read primary sources, not summaries, before any required-fields-set change.</p>
+<h2 id="tradeoffs-of-additive-layering">Tradeoffs of additive layering</h2>
+<p>Additive layering isn’t free. Three real costs:</p>
+<p><strong>Coupling to Anthropic’s spec evolution.</strong> When Anthropic adds a field, the IS rubric has to decide whether to honor it, whether to add validation on top, and whether it should be required at marketplace tier. The migration from <code>compatible-with</code> to <code>compatibility</code> is the canonical example — Anthropic’s choice of name and shape forced an IS rename and a migration helper. Sitting on top means moving when the foundation moves.</p>
+<p><strong>Rubric inflation pressure.</strong> Every time someone says “this field would be useful at the marketplace tier,” the required-fields set wants to grow. Eight fields is already at the edge of what skill authors will accept without complaint. Adding a ninth needs a real reason. The SCHEMA_CHANGELOG entry for any change to <code>ALWAYS_REQUIRED</code> should answer “why does the marketplace fail without this field?” — not “wouldn’t it be nicer if we had it?”</p>
+<p><strong>Migration debt.</strong> Renaming a required field — even with a deprecation alias and a migration helper — is expensive across 3,385 public-repo skill files. The <code>compatible-with</code> → <code>compatibility</code> migration is tracked as its own follow-up PR for exactly this reason. Each rename burns a release on bulk migration.</p>
+<p>The alternative — a flat rubric that mirrors the spec’s permissive shape — is cheaper to maintain and useless as a quality gate. The cost of additive layering is the price of having a marketplace at all.</p>
+<p>There’s a fourth cost worth naming: <strong>cognitive load on skill authors.</strong> A skill author who reads Anthropic’s spec and a separate IS rubric has to hold both in their head. If the rubric is well-layered, this is fine — same field names, same value sets, just stricter requirements. If the rubric is poorly layered (renaming fields, redefining types), authors hit constant friction. The <code>compatible-with</code> → <code>compatibility</code> migration is the worst-case version of this: an IS-only field name that didn’t match the spec, costing every skill author who learned both standards a moment of “wait, which one is which?” The rebuild is intentionally trying to bring the rubric closer to spec-canonical names everywhere it can, while keeping the strictness of the required-fields set intact.</p>
+<h2 id="versions-and-what-landed">Versions and what landed</h2>
+<p>PR #611 squash-merged at commit <code>4dee593c7</code>, closing issue #610. The version trail tells the rebuild story:</p>
+<ul>
+<li><strong>3.0.0</strong> — wrong direction. 2-field <code>ALWAYS_REQUIRED</code>, marketplace warnings instead of errors. Not shipped to anyone.</li>
+<li><strong>3.1.0</strong> — partial reframe with <code>when_to_use</code> non-deprecation and field additions. Still on the wrong path for required-fields semantics.</li>
+<li><strong>3.2.0</strong> — reframe artifacts cleaned up but still permissive at the marketplace tier.</li>
+<li><strong>3.3.0</strong> — restoration. 8-field <code>ALWAYS_REQUIRED</code> back, errors at marketplace, all the kept technical fixes.</li>
+<li><strong>3.3.1</strong> — <code>${CLAUDE_EFFORT}</code> substitution variable added to YAML allow-list, <code>argument-hint</code> conditional logic fixed for <code>user-invocable: false</code> and <code>disable-model-invocation: true</code>. The version that shipped.</li>
+</ul>
+<p>Six files changed: 1,312 insertions, 203 deletions. New top-level doc: <code>000-docs/SCHEMA_CHANGELOG.md</code> with the NON-NEGOTIABLES section, the post-mortem narrative, and per-version entries from 3.0.0 through 3.3.1. The CHANGELOG.md got a single 4.29.2 entry that consolidated the failed-direction noise from earlier in the day into one clean release note.</p>
+<h2 id="also-shipped">Also shipped</h2>
+<p>Several tracks ran in parallel that day. Quick summaries:</p>
+<p><strong>SOW restructure for the Kobiton MCP plugin engagement.</strong> Three milestones reorganized around the SOW’s five evaluation criteria — usability/UX, suitability, setup/integration, functional completeness, spec/schema/standards. New labels (<code>sow:usability</code>, <code>sow:setup</code>, <code>sow:spec-standards</code>, etc.) tag every existing fork-audit issue (#1–9) and upstream filing (#11–20) so the SOW criterion each issue serves is explicit. Three IS demo PRs (#13–17) were filed to demonstrate the proposed schema/standards changes against real fork code.</p>
+<p><strong>Kobiton fork audit and upstream governance.</strong> The original validator-rubric framing in Kobiton issue #1 had been edited mid-debacle with the wrong “spec realignment” language. After the restoration, those edits got reverted to the enterprise-required-8-fields framing. A new governance audit on the upstream Kobiton repo (issue #21) covers fork-vs-upstream divergence and the contribution path back.</p>
+<p><strong>CCA cohort intake.</strong> Thirteen CCA applicants ran through parallel background-check agents — one agent per applicant, all dispatched at once. Twenty CRM populated with 13 People, 1 Opportunity, and 14 Notes from the runs. This is the kind of work parallel agents actually shine at: independent IO-bound tasks, no shared state, results aggregated in a CRM.</p>
+<p><strong>Twenty SMTP diagnosis.</strong> A separate side track — Twenty’s email-send was failing intermittently. Root cause turned out to be a misconfigured <code>MESSAGE_QUEUE_TYPE</code> interacting with the SMTP worker pool. Diagnosis ticket filed; fix queued for the next sprint.</p>
+<p><strong>Repo-sweep + snapshot tag.</strong> End-of-day repo housekeeping — stale branches pruned, security scan clean, snapshot tag cut on <code>claude-code-plugins-plus-skills</code> to mark the post-restoration state.</p>
+<h2 id="what-id-tell-my-past-self">What I’d tell my past self</h2>
+<p>If the small-scope task is “rename a field,” do not let it expand into “realign the rubric to the spec.” Those are different decisions, with different evidence requirements, made by different mechanisms. Field renames can be autonomous. Required-field-set changes need primary-source verification and explicit approval — even when the framing seems credible, even when the summary makes it sound like alignment.</p>
+<p>The marketplace gate exists because some quality bar above the spec floor is worth enforcing. The whole job of the rubric is to be stricter than the spec it sits on. When the rubric and the spec are saying the same thing, the rubric isn’t doing anything.</p>
+<p>The other thing I’d tell past me: when a plan title is “realign X to Y’s authoritative sources,” the framing itself is doing work. “Authoritative” sounds like the source of truth for <em>both</em> layers. It isn’t. Anthropic’s spec is the authoritative source of truth for the loader contract. The IS rubric is the authoritative source of truth for the marketplace gate. Realignment between two layers that legitimately disagree on requirements is not a goal; correct layering is.</p>
+<p>The NON-NEGOTIABLES section exists to make this layering visible at the top of the file every time someone opens <code>SCHEMA_CHANGELOG.md</code> to plan a change. It’s a guardrail, not a manifesto — short enough to read in thirty seconds, specific enough to refuse the dance.</p>
+<h2 id="related-posts">Related Posts</h2>
+<ul>
+<li><a href="/blog/design-tokens-and-validator-parity-marketplace-foundations/">Design Tokens and Validator Parity: Marketplace Foundations</a> — the marketplace validator’s role in the broader design-token system.</li>
+<li><a href="/blog/nuclear-option-day-validator-rewrite-414-plugins/">Nuclear Option Day: Validator Rewrite Across 414 Plugins</a> — when validator changes do warrant a bulk rewrite, and how to scope it.</li>
+<li><a href="/blog/debugging-critical-marketplace-schema-validation-failure/">Debugging a Critical Marketplace Schema Validation Failure</a> — earlier marketplace-validator failure mode and the gate’s recovery path.</li>
+</ul>
+      </div>
+    </div>
+  </article>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

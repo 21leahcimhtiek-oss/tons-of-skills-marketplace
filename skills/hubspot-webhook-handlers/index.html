@@ -1,0 +1,1103 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>hubspot-webhook-handlers - Agent Skill</title>
+    <meta name="description" content="Build and harden HubSpot v3 webhook handlers that survive production: HMAC-SHA256 signature verification, Redis SET NX deduplication, async batch processing with immediate 200 ACK, dead-letter queuing for permanent failures, and event-ordering guards for property-change streams. Use when implementing HubSpot webhooks for the first time, hardening an existing handler against retry storms or duplicate processing, debugging signature verification failures, or designing a reliable event pipeline for contact, company, or deal change events. Trigger with &quot;hubspot webhook&quot;, &quot;hubspot signature verification&quot;, &quot;hubspot webhook dedup&quot;, &quot;hubspot webhook retry storm&quot;, &quot;hubspot event handler&quot;, &quot;hubspot property change webhook&quot;, &quot;hubspot list membership webhook&quot;, &quot;hubspot dead letter queue&quot;.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://tonsofskills.com/tons-of-skills-marketplace/skills/hubspot-webhook-handlers/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/hubspot-webhook-handlers/">
+    <meta property="og:title" content="hubspot-webhook-handlers - Agent Skill">
+    <meta property="og:description" content="Build and harden HubSpot v3 webhook handlers that survive production: HMAC-SHA256 signature verification, Redis SET NX deduplication, async batch processing with immediate 200 ACK, dead-letter queuing for permanent failures, and event-ordering guards for property-change streams. Use when implementing HubSpot webhooks for the first time, hardening an existing handler against retry storms or duplicate processing, debugging signature verification failures, or designing a reliable event pipeline for contact, company, or deal change events. Trigger with &quot;hubspot webhook&quot;, &quot;hubspot signature verification&quot;, &quot;hubspot webhook dedup&quot;, &quot;hubspot webhook retry storm&quot;, &quot;hubspot event handler&quot;, &quot;hubspot property change webhook&quot;, &quot;hubspot list membership webhook&quot;, &quot;hubspot dead letter queue&quot;.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="hubspot-webhook-handlers - Agent Skill">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/hubspot-webhook-handlers/">
+    <meta name="twitter:title" content="hubspot-webhook-handlers - Agent Skill">
+    <meta name="twitter:description" content="Build and harden HubSpot v3 webhook handlers that survive production: HMAC-SHA256 signature verification, Redis SET NX deduplication, async batch processing with immediate 200 ACK, dead-letter queuing for permanent failures, and event-ordering guards for property-change streams. Use when implementing HubSpot webhooks for the first time, hardening an existing handler against retry storms or duplicate processing, debugging signature verification failures, or designing a reliable event pipeline for contact, company, or deal change events. Trigger with &quot;hubspot webhook&quot;, &quot;hubspot signature verification&quot;, &quot;hubspot webhook dedup&quot;, &quot;hubspot webhook retry storm&quot;, &quot;hubspot event handler&quot;, &quot;hubspot property change webhook&quot;, &quot;hubspot list membership webhook&quot;, &quot;hubspot dead letter queue&quot;.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"hubspot-webhook-handlers","description":"Build and harden HubSpot v3 webhook handlers that survive production: HMAC-SHA256 signature verification, Redis SET NX deduplication, async batch processing with immediate 200 ACK, dead-letter queuing for permanent failures, and event-ordering guards for property-change streams. Use when implementing HubSpot webhooks for the first time, hardening an existing handler against retry storms or duplicate processing, debugging signature verification failures, or designing a reliable event pipeline for contact, company, or deal change events. Trigger with \"hubspot webhook\", \"hubspot signature verification\", \"hubspot webhook dedup\", \"hubspot webhook retry storm\", \"hubspot event handler\", \"hubspot property change webhook\", \"hubspot list membership webhook\", \"hubspot dead letter queue\".","version":"2.9.0","author":{"@type":"Person","name":"Jeremy Longshore"},"license":"MIT","programmingLanguage":"Claude Code Agent Skill","isPartOf":{"@type":"SoftwareApplication","name":"hubspot-pack","applicationCategory":"unknown"}}</script>
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.breadcrumbs[data-astro-cid-ilhxcym7]{margin-bottom:var(--space-5)}.breadcrumbs__list[data-astro-cid-ilhxcym7]{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;list-style:none;padding:0;margin:0;font-family:var(--font-mono);font-size:var(--text-sm, .8rem)}.breadcrumbs__item[data-astro-cid-ilhxcym7]{display:flex;align-items:center;gap:.375rem}.breadcrumbs__link[data-astro-cid-ilhxcym7]{color:var(--text-3);text-decoration:none;transition:color var(--duration-fast, .2s) var(--ease-out)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:hover{color:var(--primary)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:0}.breadcrumbs__sep[data-astro-cid-ilhxcym7]{color:var(--text-3);user-select:none;font-size:.7em;line-height:1}.breadcrumbs__current[data-astro-cid-ilhxcym7]{color:var(--text-2)}.detail-cta[data-astro-cid-qcigfm7x]{background:var(--surface-3, var(--brand-light-gray));border-top:1px solid var(--border, var(--brand-light-gray));border-radius:var(--radius-lg);padding:2rem 1.5rem;margin-top:2rem;text-align:center}.detail-cta__headline[data-astro-cid-qcigfm7x]{font-family:var(--font-display);font-weight:700;font-size:1.35rem;color:var(--text, var(--brand-dark));margin-bottom:1.25rem}.detail-cta__actions[data-astro-cid-qcigfm7x]{display:flex;justify-content:center;gap:.75rem;flex-wrap:wrap}.detail-cta__primary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:var(--primary);color:#0a0a0c;border:none;border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;cursor:pointer;transition:background var(--duration-fast) var(--ease-out),transform var(--duration-fast) var(--ease-out)}.detail-cta__primary[data-astro-cid-qcigfm7x]:hover{background:var(--primary-dark, var(--primary-dark));transform:translateY(-1px)}.detail-cta__primary[data-astro-cid-qcigfm7x].copied{background:var(--positive, var(--brand-green))}.detail-cta__secondary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:transparent;color:var(--text, var(--brand-dark));border:1px solid var(--border, var(--brand-mid-gray));border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;text-decoration:none;transition:border-color var(--duration-fast) var(--ease-out),color var(--duration-fast) var(--ease-out)}.detail-cta__secondary[data-astro-cid-qcigfm7x]:hover{border-color:var(--primary);color:var(--primary)}@media(max-width:480px){.detail-cta__actions[data-astro-cid-qcigfm7x]{flex-direction:column;align-items:stretch}.detail-cta__primary[data-astro-cid-qcigfm7x],.detail-cta__secondary[data-astro-cid-qcigfm7x]{justify-content:center}}
+</style>
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/_slug_@_@astro.wF9emvVq.css"></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  
+  
+
+  <div class="skill-detail" data-astro-cid-jrlgpo3w>
+    <!-- 1. Breadcrumbs -->
+    <nav aria-label="Breadcrumb" class="breadcrumbs" data-astro-cid-ilhxcym7>
+  <ol class="breadcrumbs__list" itemscope itemtype="https://schema.org/BreadcrumbList" data-astro-cid-ilhxcym7>
+    <li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Home</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="1">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/skills/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Skills</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="2">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          <span class="breadcrumbs__current" aria-current="page" itemprop="name" data-astro-cid-ilhxcym7>
+              hubspot-webhook-handlers
+            </span>
+          <meta itemprop="position" content="3">
+        </li>
+  </ol>
+</nav>
+
+    <!-- 2. Header (enhanced) -->
+    <header class="skill-header" data-astro-cid-jrlgpo3w>
+      <h1 data-astro-cid-jrlgpo3w>hubspot-webhook-handlers</h1>
+      <p class="skill-description" data-astro-cid-jrlgpo3w>Build and harden HubSpot v3 webhook handlers that survive production: HMAC-SHA256 signature verification, Redis SET NX deduplication, async batch processing with immediate 200 ACK, dead-letter queuing for permanent failures, and event-ordering guards for property-change streams. Use when implementing HubSpot webhooks for the first time, hardening an existing handler against retry storms or duplicate processing, debugging signature verification failures, or designing a reliable event pipeline for contact, company, or deal change events. Trigger with &quot;hubspot webhook&quot;, &quot;hubspot signature verification&quot;, &quot;hubspot webhook dedup&quot;, &quot;hubspot webhook retry storm&quot;, &quot;hubspot event handler&quot;, &quot;hubspot property change webhook&quot;, &quot;hubspot list membership webhook&quot;, &quot;hubspot dead letter queue&quot;.</p>
+
+      <div class="skill-metadata" data-astro-cid-jrlgpo3w>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>v2.9.0</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>Jeremy Longshore</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>MIT</span>
+        </div>
+      </div>
+
+      
+    </header>
+
+    <!-- 4. Allowed Tools -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Allowed Tools</h2>
+      <div class="tools-grid" data-astro-cid-jrlgpo3w>
+        <span class="tool-badge" data-astro-cid-jrlgpo3w>Read</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Write</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Edit</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(curl:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(jq:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(python3:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Grep</span>
+      </div>
+      
+    </section>
+
+    <!-- 5. Provided by Plugin -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Provided by Plugin</h2>
+      <div class="plugin-info" data-astro-cid-jrlgpo3w>
+        <div class="plugin-details" data-astro-cid-jrlgpo3w>
+          <h3 data-astro-cid-jrlgpo3w>
+            <a href="/plugins/hubspot-pack/" data-astro-cid-jrlgpo3w>hubspot-pack</a>
+          </h3>
+          <p data-astro-cid-jrlgpo3w>Claude Code skill pack for HubSpot (10 production-engineer skills)</p>
+          <div class="plugin-meta" data-astro-cid-jrlgpo3w>
+            <span data-astro-cid-jrlgpo3w>unknown</span>
+            <span data-astro-cid-jrlgpo3w>v2.9.0</span>
+          </div>
+        </div>
+        <a href="/plugins/hubspot-pack/" class="btn-primary" data-astro-cid-jrlgpo3w>View Plugin</a>
+      </div>
+    </section>
+
+    <!-- 6. Installation -->
+    <section class="section-box dark" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Installation</h2>
+      <p class="install-note" style="color: var(--brand-light-gray); margin-bottom: 0.75rem;" data-astro-cid-jrlgpo3w>This skill is included in the hubspot-pack plugin:</p>
+      <pre class="install-command" data-copy="/plugin install hubspot-pack@claude-code-plugins-plus" data-astro-cid-jrlgpo3w><code data-astro-cid-jrlgpo3w>/plugin install hubspot-pack@claude-code-plugins-plus</code></pre>
+      <p class="install-note" data-astro-cid-jrlgpo3w>Click to copy</p>
+    </section>
+
+    <!-- 7. Skill Content (Markdown) -->
+    <section class="skill-content-section" data-astro-cid-jrlgpo3w>
+      <h2 data-astro-cid-jrlgpo3w>Instructions</h2>
+      <div class="skill-content" data-astro-cid-jrlgpo3w>
+        <div data-astro-cid-jrlgpo3w><h1>HubSpot Webhook Handlers</h1>
+<h2>Overview</h2>
+<p>Receive and process HubSpot webhook events reliably at production scale. This is not a walkthrough for getting your first event — it is the handler code your integration runs when HubSpot delivers 100 events in a single payload at 2am, when a misconfigured proxy silently strips your signature header, when a 3-day outage causes events to arrive in a burst after recovery, and when a rapid sequence of property updates arrives reversed because HubSpot sends in delivery order rather than chronological order.</p>
+<p>The six production failures this skill prevents:</p>
+<ol>
+<li><strong>Signature verification bypass</strong> — skipping or misconfiguring the HMAC-SHA256 check on <code>X-HubSpot-Signature-v3</code> allows any party to send spoofed webhook payloads to your endpoint. One misconfigured load balancer or proxy that strips the <code>X-HubSpot-Signature-v3</code> header silently disables all security — your handler returns 200 to unauthenticated requests without knowing it.</li>
+<li><strong>Duplicate delivery</strong> — HubSpot retries unacknowledged webhooks (non-200 response or timeout) for up to 3 days with exponential backoff. If your handler crashes after processing but before responding, the same contact-update event creates duplicate CRM mutations downstream. Redis SET NX on the event ID is the reliable guard.</li>
+<li><strong>No replay API — events are permanently lost after the 3-day retry window</strong> — if your handler is down for more than 3 days, HubSpot drops those events permanently. There is no replay endpoint. Dead-letter queues and recovery runbooks are your only mitigation.</li>
+<li><strong>Batch event explosion</strong> — a single webhook delivery contains up to 100 events. Synchronous processing of all 100 within the HTTP request context times out (HubSpot timeout: 5 seconds) and returns 5xx, which triggers a retry storm. The correct pattern is to ACK immediately with 200, enqueue the batch, and process asynchronously.</li>
+<li><strong>Property change ordering</strong> — HubSpot sends <code>contact.propertyChange</code> events in delivery order, not chronological order. A fast property update followed by a slow one can arrive reversed: your handler sees the newer value first, then overwrites it with the older value. Sequence guards on <code>occurredAt</code> are required.</li>
+<li><strong>List-membership scope mismatch</strong> — subscribing to <code>contact.propertyChange</code> for <code>lifecyclestage</code> does not automatically deliver list-membership changes. Those require a separate subscription to the list-membership event type and a separate <code>oauth</code> scope or <code>crm.lists.read</code> scope on the app.</li>
+</ol>
+<h2>Prerequisites</h2>
+<ul>
+<li>Node.js 18+ (TypeScript examples) or Python 3.10+</li>
+<li>Express 4.x (or any HTTP server that can expose a raw body buffer for HMAC verification)</li>
+<li>Redis 6+ (for SET NX deduplication)</li>
+<li>A message queue: BullMQ (Redis-backed), RabbitMQ, or SQS (for async batch processing)</li>
+<li>HubSpot app client secret (Settings → App → Client Secret) — not the access token</li>
+<li><code>HUBSPOT_CLIENT_SECRET</code> environment variable set in your runtime</li>
+<li>For list-membership events: <code>crm.lists.read</code> scope granted to your app</li>
+</ul>
+<h2>Instructions</h2>
+<p>Build in this order. Each section neutralizes one production failure mode.</p>
+<h3>1. Signature verification (neutralizes spoofing and proxy bypass)</h3>
+<p>HubSpot v3 signatures use HMAC-SHA256 over the concatenation of your client secret, HTTP method, full request URI (including query string), raw request body, and the timestamp from <code>X-HubSpot-Request-Timestamp</code>. You must compute this over the <strong>raw body bytes</strong>, not a parsed JSON string. Any body middleware that re-serializes JSON will produce a signature mismatch.</p>
+<p>The full algorithm:</p>
+<pre><code>
+HMAC-SHA256(
+  clientSecret,
+  httpMethod + requestUri + rawBody + timestamp
+)
+</code></pre>
+<p>The resulting hex digest must match the value in <code>X-HubSpot-Signature-v3</code>.</p>
+<p>Timestamp tolerance: reject any request where <code>abs(now - X-HubSpot-Request-Timestamp) &gt; 300 seconds</code> (5 minutes). This prevents replay attacks.</p>
+<pre data-lang="typescript"><code>
+import { createHmac } from &quot;crypto&quot;;
+import type { Request, Response, NextFunction } from &quot;express&quot;;
+
+const SIGNATURE_TOLERANCE_MS = 5 * 60 * 1000; // 5 minutes
+
+export function verifyHubSpotSignature(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): void {
+  const signature = req.headers[&quot;x-hubspot-signature-v3&quot;] as string | undefined;
+  const timestamp = req.headers[&quot;x-hubspot-request-timestamp&quot;] as string | undefined;
+
+  // Reject if either header is missing — do NOT silently pass
+  if (!signature || !timestamp) {
+    res.status(403).json({
+      error: &quot;missing_signature&quot;,
+      detail: &quot;X-HubSpot-Signature-v3 or X-HubSpot-Request-Timestamp header absent&quot;,
+    });
+    return;
+  }
+
+  // Reject stale requests — prevents replay attacks
+  const requestAge = Math.abs(Date.now() - parseInt(timestamp, 10));
+  if (requestAge &gt; SIGNATURE_TOLERANCE_MS) {
+    res.status(403).json({
+      error: &quot;timestamp_out_of_window&quot;,
+      detail: `Request is ${Math.round(requestAge / 1000)}s old; max is 300s`,
+    });
+    return;
+  }
+
+  // Build the signature input string
+  // rawBody must be set by express.raw() middleware — NOT express.json()
+  const rawBody: Buffer = (req as any).rawBody;
+  if (!rawBody) {
+    console.error(&quot;rawBody not available — check express.raw() middleware ordering&quot;);
+    res.status(500).json({ error: &quot;misconfigured_middleware&quot; });
+    return;
+  }
+
+  const method = req.method.toUpperCase();
+  // Full URI including query string
+  const uri = `${req.protocol}://${req.get(&quot;host&quot;)}${req.originalUrl}`;
+  const signingInput = `${method}${uri}${rawBody.toString(&quot;utf8&quot;)}${timestamp}`;
+
+  const expected = createHmac(&quot;sha256&quot;, process.env.HUBSPOT_CLIENT_SECRET!)
+    .update(signingInput, &quot;utf8&quot;)
+    .digest(&quot;hex&quot;);
+
+  // Constant-time comparison to prevent timing attacks
+  const receivedBuf = Buffer.from(signature, &quot;hex&quot;);
+  const expectedBuf = Buffer.from(expected, &quot;hex&quot;);
+
+  if (
+    receivedBuf.length !== expectedBuf.length ||
+    !crypto.timingSafeEqual(receivedBuf, expectedBuf)
+  ) {
+    console.warn(&quot;HubSpot signature mismatch&quot;, {
+      expected: expected.slice(0, 8) + &quot;...&quot;,
+      received: signature.slice(0, 8) + &quot;...&quot;,
+      uri,
+      timestamp,
+    });
+    res.status(403).json({ error: &quot;invalid_signature&quot; });
+    return;
+  }
+
+  // Attach parsed body for the route handler
+  (req as any).hubspotEvents = JSON.parse(rawBody.toString(&quot;utf8&quot;));
+  next();
+}
+</code></pre>
+<p><strong>Critical: configure Express to capture the raw body.</strong> Body middleware that calls <code>JSON.stringify(JSON.parse(...))</code> re-serializes the body and breaks signature verification:</p>
+<pre data-lang="typescript"><code>
+import express from &quot;express&quot;;
+
+const app = express();
+
+// Use raw() for the webhook route ONLY — not json()
+app.use(
+  &quot;/webhooks/hubspot&quot;,
+  express.raw({ type: &quot;application/json&quot;, limit: &quot;1mb&quot; }),
+  (req, _res, next) =&gt; {
+    // Preserve the raw buffer before any parsing
+    (req as any).rawBody = req.body as Buffer;
+    next();
+  },
+);
+</code></pre>
+<h3>2. Redis SET NX deduplication (neutralizes duplicate delivery)</h3>
+<p>HubSpot guarantees at-least-once delivery. Every event object carries a unique <code>eventId</code>. Use Redis SET NX (set if not exists) with a 24-hour TTL as an idempotency gate. Process the event only if the SET NX succeeds; skip it if the key already exists.</p>
+<pre data-lang="typescript"><code>
+import type { Redis } from &quot;ioredis&quot;;
+
+const DEDUP_TTL_SECONDS = 86_400; // 24 hours — HubSpot retries for up to 3 days
+
+async function isNewEvent(redis: Redis, eventId: number): Promise&lt;boolean&gt; {
+  const key = `hubspot:event:${eventId}`;
+  // SET key 1 EX 86400 NX — returns &quot;OK&quot; if set, null if already exists
+  const result = await redis.set(key, &quot;1&quot;, &quot;EX&quot;, DEDUP_TTL_SECONDS, &quot;NX&quot;);
+  return result === &quot;OK&quot;;
+}
+
+async function processEventIfNew(
+  redis: Redis,
+  event: HubSpotEvent,
+  handler: (event: HubSpotEvent) =&gt; Promise&lt;void&gt;,
+): Promise&lt;void&gt; {
+  const isNew = await isNewEvent(redis, event.eventId);
+  if (!isNew) {
+    console.debug(&quot;Skipping duplicate event&quot;, { eventId: event.eventId, type: event.subscriptionType });
+    return;
+  }
+
+  try {
+    await handler(event);
+  } catch (err) {
+    // If processing fails, delete the dedup key so retries can reprocess
+    // Only do this for transient failures — not for permanent business errors
+    await redis.del(`hubspot:event:${event.eventId}`);
+    throw err;
+  }
+}
+</code></pre>
+<h3>3. Immediate ACK with async batch processing (neutralizes retry storms)</h3>
+<p>HubSpot expects a 200 response within 5 seconds. For a batch of 100 events, synchronous processing will exceed this window under any real load. The correct pattern is to return 200 immediately, enqueue the batch, and process in a background worker.</p>
+<pre data-lang="typescript"><code>
+import { Queue } from &quot;bullmq&quot;;
+import type { Request, Response } from &quot;express&quot;;
+
+const eventQueue = new Queue(&quot;hubspot-events&quot;, {
+  connection: { host: process.env.REDIS_HOST, port: parseInt(process.env.REDIS_PORT ?? &quot;6379&quot;) },
+  defaultJobOptions: {
+    attempts: 5,
+    backoff: { type: &quot;exponential&quot;, delay: 2_000 },
+    removeOnComplete: { count: 1000 },
+    removeOnFail: false, // keep failed jobs for DLQ inspection
+  },
+});
+
+export async function webhookHandler(req: Request, res: Response): Promise&lt;void&gt; {
+  const events: HubSpotEvent[] = (req as any).hubspotEvents;
+
+  if (!Array.isArray(events) || events.length === 0) {
+    res.status(200).json({ accepted: 0 });
+    return;
+  }
+
+  // ACK immediately — do NOT await processing
+  res.status(200).json({ accepted: events.length });
+
+  // Enqueue each event as an individual job
+  // Individual jobs allow per-event retry, dedup, and DLQ routing
+  await Promise.all(
+    events.map((event) =&gt;
+      eventQueue.add(event.subscriptionType, event, {
+        jobId: `hubspot-${event.eventId}`, // deduplicate at queue level too
+      }),
+    ),
+  );
+}
+</code></pre>
+<h3>4. Dead-letter queue for permanent failures (neutralizes silent event loss)</h3>
+<p>Events that exhaust all retry attempts must land in a dead-letter structure where they can be inspected, replayed, or alerted on. BullMQ&#39;s failed job store provides this out of the box, but you need explicit monitoring.</p>
+<pre data-lang="typescript"><code>
+import { Worker, type Job } from &quot;bullmq&quot;;
+
+// Dead-letter handler — called when a job exhausts all attempts
+async function onJobFailed(job: Job | undefined, err: Error): Promise&lt;void&gt; {
+  if (!job) return;
+  if (job.attemptsMade &lt; (job.opts.attempts ?? 1)) return; // still has retries remaining
+
+  // This job is permanently dead — route to DLQ
+  const dlqKey = `hubspot:dlq:${job.name}`;
+  await redis.lpush(
+    dlqKey,
+    JSON.stringify({
+      jobId: job.id,
+      eventId: job.data.eventId,
+      portalId: job.data.portalId,
+      objectId: job.data.objectId,
+      subscriptionType: job.data.subscriptionType,
+      occurredAt: job.data.occurredAt,
+      failedAt: Date.now(),
+      error: err.message,
+      attempts: job.attemptsMade,
+    }),
+  );
+
+  // Alert — use your notification channel
+  console.error(&quot;HubSpot event permanently failed&quot;, {
+    jobId: job.id,
+    eventId: job.data.eventId,
+    type: job.data.subscriptionType,
+    error: err.message,
+  });
+}
+
+const worker = new Worker(
+  &quot;hubspot-events&quot;,
+  async (job) =&gt; {
+    await processEventIfNew(redis, job.data, routeEvent);
+  },
+  {
+    connection: { host: process.env.REDIS_HOST, port: parseInt(process.env.REDIS_PORT ?? &quot;6379&quot;) },
+    concurrency: 10, // process up to 10 events in parallel
+  },
+);
+
+worker.on(&quot;failed&quot;, onJobFailed);
+</code></pre>
+<p><strong>DLQ replay pattern</strong> — when your handler is recovered and you need to reprocess failed events:</p>
+<pre data-lang="typescript"><code>
+async function replayDeadLetterQueue(
+  redis: Redis,
+  subscriptionType: string,
+  limit = 100,
+): Promise&lt;number&gt; {
+  const dlqKey = `hubspot:dlq:${subscriptionType}`;
+  let replayed = 0;
+
+  for (let i = 0; i &lt; limit; i++) {
+    const raw = await redis.rpop(dlqKey);
+    if (!raw) break;
+
+    const dead = JSON.parse(raw) as { eventId: number; [key: string]: unknown };
+
+    // Delete the dedup key so the replayed event is treated as new
+    await redis.del(`hubspot:event:${dead.eventId}`);
+
+    await eventQueue.add(subscriptionType, dead, {
+      jobId: `hubspot-replay-${dead.eventId}-${Date.now()}`,
+    });
+
+    replayed++;
+  }
+
+  console.info(`Replayed ${replayed} dead-letter events for ${subscriptionType}`);
+  return replayed;
+}
+</code></pre>
+<h3>5. Property change ordering guard (neutralizes reversed updates)</h3>
+<p>HubSpot delivers <code>contact.propertyChange</code> events in delivery order, not chronological order. When a contact&#39;s property changes twice in rapid succession, the second change can arrive before the first. If you apply them in delivery order, you overwrite a newer value with an older one.</p>
+<p>Guard every write operation with an <code>occurredAt</code> comparison:</p>
+<pre data-lang="typescript"><code>
+type PropertyVersion = { value: string; occurredAt: number };
+
+async function applyPropertyChange(
+  redis: Redis,
+  objectId: number,
+  propertyName: string,
+  newValue: string,
+  occurredAt: number,
+): Promise&lt;void&gt; {
+  const versionKey = `hubspot:prop:${objectId}:${propertyName}`;
+
+  // Read the last-applied version
+  const existingRaw = await redis.get(versionKey);
+  const existing: PropertyVersion | null = existingRaw ? JSON.parse(existingRaw) : null;
+
+  if (existing &amp;&amp; existing.occurredAt &gt;= occurredAt) {
+    console.debug(&quot;Ignoring stale property change&quot;, {
+      objectId,
+      propertyName,
+      existingTimestamp: existing.occurredAt,
+      incomingTimestamp: occurredAt,
+    });
+    return;
+  }
+
+  // Safe to apply — this is the newest value seen for this property
+  await redis.set(
+    versionKey,
+    JSON.stringify({ value: newValue, occurredAt }),
+    &quot;EX&quot;,
+    7 * 86_400, // 7-day TTL — keep long enough to guard burst redeliveries
+  );
+
+  // Now apply the change to your downstream system
+  await updateContactProperty(objectId, propertyName, newValue);
+}
+</code></pre>
+<h3>6. List-membership subscription (neutralizes scope mismatch)</h3>
+<p><code>contact.propertyChange</code> for <code>lifecyclestage</code> does NOT deliver list-membership changes. These require a separate subscription. Use the webhook subscription API to register:</p>
+<pre data-lang="bash"><code>
+# Register a contact.propertyChange subscription
+curl -X POST &quot;https://api.hubapi.com/webhooks/v3/{appId}/subscriptions&quot; \
+  -H &quot;Authorization: Bearer $HUBSPOT_ACCESS_TOKEN&quot; \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{
+    &quot;eventType&quot;: &quot;contact.propertyChange&quot;,
+    &quot;propertyName&quot;: &quot;lifecyclestage&quot;,
+    &quot;active&quot;: true
+  }&#39;
+
+# Register a list-membership subscription (separate subscription required)
+# Note: HubSpot does not expose a direct list.membershipChange event type.
+# Use contact.propertyChange for hs_all_contact_vids or workflow enrollment events,
+# or poll GET /crm/v3/lists/{listId}/memberships for list-driven automation.
+</code></pre>
+<p>Verify active subscriptions before debugging delivery:</p>
+<pre data-lang="bash"><code>
+curl -s &quot;https://api.hubapi.com/webhooks/v3/{appId}/subscriptions&quot; \
+  -H &quot;Authorization: Bearer $HUBSPOT_ACCESS_TOKEN&quot; | jq &#39;.results[] | {id, eventType, propertyName, active}&#39;
+</code></pre>
+<h2>Error Handling</h2>
+<table><thead><tr>
+<th>HTTP Status</th>
+<th>Error</th>
+<th>Root Cause</th>
+<th>Action</th>
+</tr></thead><tbody>
+<tr>
+<td><code>403 FORBIDDEN</code></td>
+<td><code>missing_signature</code></td>
+<td><code>X-HubSpot-Signature-v3</code> or <code>X-HubSpot-Request-Timestamp</code> header absent</td>
+<td>Check proxy/load balancer header passthrough; add header logging at the edge</td>
+</tr>
+<tr>
+<td><code>403 FORBIDDEN</code></td>
+<td><code>invalid_signature</code></td>
+<td>HMAC digest does not match; raw body was re-serialized</td>
+<td>Verify <code>express.raw()</code> middleware is used (not <code>express.json()</code>); confirm <code>HUBSPOT_CLIENT_SECRET</code> is the app client secret, not the access token</td>
+</tr>
+<tr>
+<td><code>403 FORBIDDEN</code></td>
+<td><code>timestamp_out_of_window</code></td>
+<td>Request timestamp is &gt;5 minutes from server time</td>
+<td>Check server NTP sync; clock skew on container or serverless host</td>
+</tr>
+<tr>
+<td><code>500 INTERNAL_SERVER_ERROR</code></td>
+<td><code>misconfigured_middleware</code></td>
+<td><code>rawBody</code> buffer not attached to request</td>
+<td><code>express.raw()</code> must run before signature middleware on the webhook route</td>
+</tr>
+<tr>
+<td><code>200 OK</code> (but no events processed)</td>
+<td>Duplicate suppressed</td>
+<td>Redis SET NX returned null; event already processed</td>
+<td>Expected — dedup is working</td>
+</tr>
+<tr>
+<td><code>200 OK</code> (but DLQ growing)</td>
+<td>Permanent processing failure</td>
+<td>Downstream system error; event exhausted retries</td>
+<td>Inspect DLQ via <code>redis LRANGE hubspot:dlq:&lt;type&gt; 0 -1</code>; fix downstream, then replay</td>
+</tr>
+<tr>
+<td><code>429 TOO_MANY_REQUESTS</code></td>
+<td>Rate limit on subscription API</td>
+<td>Too many subscription management calls</td>
+<td>Back off; subscription changes are rare — cache the subscription list</td>
+</tr>
+<tr>
+<td>No delivery received</td>
+<td>Subscription inactive or app not installed</td>
+<td><code>active: false</code> on subscription or app revoked by portal admin</td>
+<td>Run <code>GET /webhooks/v3/{appId}/subscriptions</code> and verify <code>active: true</code></td>
+</tr>
+</tbody></table>
+<h2>Examples</h2>
+<h3>Minimal end-to-end wiring (Express)</h3>
+<pre data-lang="typescript"><code>
+import express from &quot;express&quot;;
+import { createClient } from &quot;ioredis&quot;;
+import { verifyHubSpotSignature } from &quot;./middleware/signature&quot;;
+import { webhookHandler } from &quot;./handlers/webhook&quot;;
+
+const app = express();
+const redis = createClient({ host: process.env.REDIS_HOST });
+
+// IMPORTANT: raw body capture before JSON parsing
+app.use(
+  &quot;/webhooks/hubspot&quot;,
+  express.raw({ type: &quot;application/json&quot;, limit: &quot;1mb&quot; }),
+  (req, _res, next) =&gt; {
+    (req as any).rawBody = req.body as Buffer;
+    next();
+  },
+  verifyHubSpotSignature,
+  webhookHandler,
+);
+
+app.listen(3000, () =&gt; console.log(&quot;Webhook listener on :3000&quot;));
+</code></pre>
+<h3>Test signature verification locally</h3>
+<pre data-lang="bash"><code>
+# Compute the expected signature for a test payload
+CLIENT_SECRET=&quot;your-client-secret&quot;
+METHOD=&quot;POST&quot;
+URI=&quot;https://your-host.example.com/webhooks/hubspot&quot;
+BODY=&#39;[{&quot;eventId&quot;:1,&quot;subscriptionType&quot;:&quot;contact.propertyChange&quot;}]&#39;
+TIMESTAMP=&quot;$(date +%s%3N)&quot;  # milliseconds
+
+EXPECTED=$(echo -n &quot;${METHOD}${URI}${BODY}${TIMESTAMP}&quot; | \
+  openssl dgst -sha256 -hmac &quot;$CLIENT_SECRET&quot; | awk &#39;{print $2}&#39;)
+
+curl -X POST &quot;$URI&quot; \
+  -H &quot;Content-Type: application/json&quot; \
+  -H &quot;X-HubSpot-Signature-v3: $EXPECTED&quot; \
+  -H &quot;X-HubSpot-Request-Timestamp: $TIMESTAMP&quot; \
+  -d &quot;$BODY&quot;
+</code></pre>
+<h3>Inspect the dead-letter queue</h3>
+<pre data-lang="bash"><code>
+# View all entries in the DLQ for contact.propertyChange
+redis-cli LRANGE hubspot:dlq:contact.propertyChange 0 -1 | python3 -m json.tool
+
+# Count DLQ depth per event type
+redis-cli KEYS &quot;hubspot:dlq:*&quot; | xargs -I{} sh -c &#39;echo &quot;{}: $(redis-cli LLEN {})&quot;&#39;
+
+# Replay up to 50 failed contact.deletion events
+node -e &quot;
+const { replayDeadLetterQueue } = require(&#39;./dist/dlq&#39;);
+replayDeadLetterQueue(redis, &#39;contact.deletion&#39;, 50).then(console.log);
+&quot;
+</code></pre>
+<h3>Register subscriptions for all CRM object types</h3>
+<pre data-lang="bash"><code>
+APP_ID=&quot;your-app-id&quot;
+TOKEN=&quot;$HUBSPOT_ACCESS_TOKEN&quot;
+BASE=&quot;https://api.hubapi.com/webhooks/v3/$APP_ID/subscriptions&quot;
+
+for EVENT_TYPE in contact.creation contact.deletion contact.propertyChange \
+                  contact.merge company.creation deal.creation deal.propertyChange; do
+  curl -s -X POST &quot;$BASE&quot; \
+    -H &quot;Authorization: Bearer $TOKEN&quot; \
+    -H &quot;Content-Type: application/json&quot; \
+    -d &quot;{\&quot;eventType\&quot;: \&quot;$EVENT_TYPE\&quot;, \&quot;active\&quot;: true}&quot; | jq &#39;{id, eventType, active}&#39;
+done
+</code></pre>
+<h2>Output</h2>
+<ul>
+<li>Express webhook handler with <code>express.raw()</code> body capture and HMAC-SHA256 signature verification</li>
+<li>Redis SET NX deduplication on <code>eventId</code> with 24-hour TTL</li>
+<li>Immediate 200 ACK with async BullMQ batch enqueue</li>
+<li>Dead-letter queue with <code>redis.lpush</code> for exhausted retries and a replay function</li>
+<li><code>occurredAt</code> ordering guard for <code>contact.propertyChange</code> events</li>
+<li>Subscription registration curl commands for all CRM event types</li>
+<li>Middleware ordering that prevents the re-serialization signature mismatch</li>
+</ul>
+<h2>Resources</h2>
+<ul>
+<li><a href="https://developers.hubspot.com/docs/guides/apps/webhooks/overview">HubSpot Webhooks Overview</a></li>
+<li><a href="https://developers.hubspot.com/docs/reference/api/app-management/webhooks">Webhooks v3 API Reference</a></li>
+<li><a href="https://developers.hubspot.com/docs/guides/apps/webhooks/validating-requests">Signature Verification Guide</a></li>
+<li><a href="https://developers.hubspot.com/docs/guides/apps/webhooks/event-types">Webhook Event Types</a></li>
+<li><a href="https://docs.bullmq.io/">BullMQ Documentation</a></li>
+<li><a href="https://redis.io/commands/set/">ioredis SET NX</a></li>
+<li><a href="references/API_REFERENCE.md">API_REFERENCE.md</a> — signature algorithm steps, event payload shapes, subscription endpoint, retry behavior spec</li>
+<li><a href="references/implementation-guide.md">implementation-guide.md</a> — complete Express handler, Redis dedup, BullMQ worker, DLQ pattern, ordering guard, Python equivalent</li>
+</ul></div>
+      </div>
+    </section>
+
+    <!-- 8. Bottom CTA -->
+    <section class="detail-cta" data-astro-cid-qcigfm7x>
+  <h2 class="detail-cta__headline" data-astro-cid-qcigfm7x>Ready to use hubspot-pack?</h2>
+  <div class="detail-cta__actions" data-astro-cid-qcigfm7x>
+    <button class="detail-cta__primary" data-copy-install="/plugin install hubspot-pack@claude-code-plugins-plus" data-astro-cid-qcigfm7x>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" data-astro-cid-qcigfm7x>
+        <rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" stroke-width="1.5" data-astro-cid-qcigfm7x></rect>
+        <path d="M3 11V3a1 1 0 011-1h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" data-astro-cid-qcigfm7x></path>
+      </svg>
+      <span class="detail-cta__btn-text" data-astro-cid-qcigfm7x>Copy Install Command</span>
+    </button>
+    
+  </div>
+</section>
+
+<script type="module">document.querySelectorAll("[data-copy-install]").forEach(t=>{t.addEventListener("click",async()=>{const a=t.dataset.copyInstall||"";await navigator.clipboard.writeText(a);const e=t.querySelector(".detail-cta__btn-text");if(e){const o=e.textContent;e.textContent="Copied!",t.classList.add("copied"),window.trackEvent&&window.trackEvent("install_copied",{plugin_name:a.split(" ").pop()||"",source:"detail_cta"}),setTimeout(()=>{e.textContent=o,t.classList.remove("copied")},2e3)}})});</script>
+
+    <!-- 9. Related Skills (6, with tool pills) -->
+    <section class="related-skills-section" data-astro-cid-jrlgpo3w>
+        <h2 class="related-skills-heading" data-astro-cid-jrlgpo3w>Related Skills</h2>
+        <div class="related-skills-grid" data-astro-cid-jrlgpo3w>
+          <a href="/skills/abridge-ci-integration/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-ci-integration</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Configure CI/CD pipeline for Abridge clinical AI integrations with GitHub Actions.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-common-errors/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-common-errors</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Diagnose and fix common Abridge clinical AI integration errors.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-a/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-a</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge ambient clinical documentation capture-to-note pipeline.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-b/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-b</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge patient-facing documentation and after-visit summary generation.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-cost-tuning/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-cost-tuning</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Optimize Abridge clinical AI costs through tier selection, session management, and usage monitoring for healthcare organizations.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-debug-bundle/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-debug-bundle</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Collect Abridge debug evidence for support tickets and troubleshooting.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a>
+        </div>
+      </section>
+
+  </div>
+
+  
+  <script>
+    document.querySelectorAll('.install-command').forEach(el => {
+      el.addEventListener('click', function() {
+        const text = this.dataset.copy || this.textContent;
+        navigator.clipboard.writeText(text).then(() => {
+          const originalText = this.textContent;
+          this.textContent = 'Copied to clipboard!';
+          this.style.color = 'var(--brand-green)';
+          setTimeout(() => {
+            this.textContent = originalText;
+            this.style.color = '';
+          }, 2000);
+        });
+      });
+    });
+  </script>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

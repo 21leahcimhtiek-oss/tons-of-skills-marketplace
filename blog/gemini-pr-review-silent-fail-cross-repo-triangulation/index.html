@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ending a Four-Month Silent Fail: Cross-Repo Triangulation on a Broken Gemini PR Workflow — Tons of Skills Work Diary</title>
+    <meta name="description" content="When a Gemini PR review workflow silently fails for four months, your first-principles fix is the suspect. Triangulate against a working reference.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://startaitools.com/posts/gemini-pr-review-silent-fail-cross-repo-triangulation/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/gemini-pr-review-silent-fail-cross-repo-triangulation/">
+    <meta property="og:title" content="Ending a Four-Month Silent Fail: Cross-Repo Triangulation on a Broken Gemini PR Workflow — Tons of Skills Work Diary">
+    <meta property="og:description" content="When a Gemini PR review workflow silently fails for four months, your first-principles fix is the suspect. Triangulate against a working reference.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="Ending a Four-Month Silent Fail: Cross-Repo Triangulation on a Broken Gemini PR Workflow — Tons of Skills Work Diary">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/gemini-pr-review-silent-fail-cross-repo-triangulation/">
+    <meta name="twitter:title" content="Ending a Four-Month Silent Fail: Cross-Repo Triangulation on a Broken Gemini PR Workflow — Tons of Skills Work Diary">
+    <meta name="twitter:description" content="When a Gemini PR review workflow silently fails for four months, your first-principles fix is the suspect. Triangulate against a working reference.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"Ending a Four-Month Silent Fail: Cross-Repo Triangulation on a Broken Gemini PR Workflow","description":"When a Gemini PR review workflow silently fails for four months, your first-principles fix is the suspect. Triangulate against a working reference.","datePublished":"2026-04-23","url":"https://tonsofskills.com/blog/undefined","author":{"@type":"Person","name":"Jeremy Longshore"},"publisher":{"@type":"Organization","name":"Tons of Skills","url":"https://tonsofskills.com"}}</script>
+  
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.post-header[data-astro-cid-7jjqptxk]{background:var(--panel);padding:4rem 1.5rem 3rem;border-bottom:1px solid var(--border)}.post-header-inner[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto}.back-link[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3);text-decoration:none;display:inline-block;margin-bottom:1.5rem;transition:color .2s}.back-link[data-astro-cid-7jjqptxk]:hover{color:var(--primary)}.post-meta[data-astro-cid-7jjqptxk]{display:flex;align-items:center;gap:.75rem;margin-bottom:1rem}time[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3)}.featured-badge[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.2rem .6rem;background:#ce114126;color:var(--red);border-radius:0;font-weight:600;text-transform:uppercase;letter-spacing:.05em}.post-header[data-astro-cid-7jjqptxk] h1[data-astro-cid-7jjqptxk]{font-family:var(--font-body);font-size:clamp(1.5rem,4vw,2.2rem);font-weight:700;color:var(--text);line-height:1.25;margin-bottom:.75rem;letter-spacing:0}.post-desc[data-astro-cid-7jjqptxk]{color:var(--text-2);font-size:1.05rem;line-height:1.6;margin-bottom:1rem}.post-tags[data-astro-cid-7jjqptxk]{display:flex;gap:.4rem;flex-wrap:wrap}.tag[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.15rem .5rem;background:var(--surface-3);color:var(--text-3);border-radius:0}.post-body[data-astro-cid-7jjqptxk]{padding:3rem 1.5rem 4rem}.prose[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto;color:var(--text-2);line-height:1.8;font-size:1rem}.prose[data-astro-cid-7jjqptxk] h2{font-family:var(--font-body);font-size:1.5rem;font-weight:700;color:var(--text);margin:2.5rem 0 1rem;letter-spacing:0}.prose[data-astro-cid-7jjqptxk] h3{font-size:1.2rem;font-weight:600;color:var(--text);margin:2rem 0 .75rem}.prose[data-astro-cid-7jjqptxk] p{margin-bottom:1rem}.prose[data-astro-cid-7jjqptxk] ul,.prose[data-astro-cid-7jjqptxk] ol{margin:.5rem 0 1rem 1.5rem}.prose[data-astro-cid-7jjqptxk] li{margin-bottom:.35rem}.prose[data-astro-cid-7jjqptxk] strong{color:var(--text);font-weight:600}.prose[data-astro-cid-7jjqptxk] code{font-family:var(--font-mono);font-size:.88em;background:var(--surface-3);padding:.15em .35em;border-radius:0;color:var(--primary)}.prose[data-astro-cid-7jjqptxk] a{color:var(--primary);text-decoration:none}.prose[data-astro-cid-7jjqptxk] a:hover{text-decoration:underline}@media(max-width:768px){.post-header[data-astro-cid-7jjqptxk]{padding:3rem 1rem 2rem}.post-body[data-astro-cid-7jjqptxk]{padding:2rem 1rem 3rem}}
+</style></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  <article class="post" data-astro-cid-7jjqptxk>
+    <header class="post-header" data-astro-cid-7jjqptxk>
+      <div class="post-header-inner" data-astro-cid-7jjqptxk>
+        <a href="/blog" class="back-link" data-astro-cid-7jjqptxk>Back to Work Diary</a>
+        <div class="post-meta" data-astro-cid-7jjqptxk>
+          <time datetime="2026-04-23" data-astro-cid-7jjqptxk>April 22, 2026</time>
+          
+        </div>
+        <h1 data-astro-cid-7jjqptxk>Ending a Four-Month Silent Fail: Cross-Repo Triangulation on a Broken Gemini PR Workflow</h1>
+        <p class="post-desc" data-astro-cid-7jjqptxk>When a Gemini PR review workflow silently fails for four months, your first-principles fix is the suspect. Triangulate against a working reference.</p>
+        <div class="post-tags" data-astro-cid-7jjqptxk>
+          <span class="tag" data-astro-cid-7jjqptxk>ai-agents</span><span class="tag" data-astro-cid-7jjqptxk>debugging</span><span class="tag" data-astro-cid-7jjqptxk>ci-cd</span><span class="tag" data-astro-cid-7jjqptxk>claude-code</span><span class="tag" data-astro-cid-7jjqptxk>github-actions</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="post-body" data-astro-cid-7jjqptxk>
+      <div class="prose" data-astro-cid-7jjqptxk>
+        <p>When an integration silently fails for months, your first-principles hypothesis is the suspect — find a working reference implementation in the same ecosystem and triangulate against its actual configuration before committing to a fix.</p>
+<p>That sentence is the whole lesson from today. The Gemini PR review workflow on <code>claude-code-plugins-plus-skills</code> had been silently failing on community PRs since December. Five contributor PRs were stalled with zero Gemini output. The pipeline’s <code>gemini-review</code> step kept reporting green. No one noticed because Gemini’s failure mode is “post nothing” — not “throw an error.”</p>
+<p>I had a clean theory for what was wrong, wrote the fix, opened PR #602, and was about to merge. Then I read one paragraph in a different repo’s workflow header and reversed the entire change. Below is the journey: the false hypothesis, the reversal, the triangulation method, and the patch that ended the silent fail across all five stalled PRs in under two minutes.</p>
+<p>The mechanic was reproducible: a contributor opens a PR from a fork. CI runs. The Gemini review job reports green. No review appears. The contributor waits a few days, eventually pings me, and I shrug because the dashboard says everything succeeded. Repeat across five contributors and four months and you have a queue of stalled work where the failure surface is <em>the absence of a thing</em>, not the presence of an error.</p>
+<h2 id="the-symptom-that-wasnt-a-symptom">The symptom that wasn’t a symptom</h2>
+<p>The wild ecosystem (the umbrella name for the Wild + IRSB constellation of plugins) ships its Gemini PR review via a shared workflow template. Every plugin repo inherits the same <code>gemini-review.yml</code> file, and every plugin repo points at the same shared GCP service account via Workload Identity Federation. It is the kind of design that pays off when it works — one fix, fleet-wide — and burns silently when it doesn’t.</p>
+<p>The CCPI marketplace repo (<code>claude-code-plugins-plus-skills</code>) inherited that template back in December 2025. Maintainer PRs got Gemini reviews. Community PRs from external forks got nothing. Five contributor PRs accumulated:</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>PR</th><th>Author</th><th>Age</th><th>Gemini output</th></tr></thead><tbody><tr><td>#547</td><td>mark1ian</td><td>14d</td><td>none</td></tr><tr><td>#534</td><td>external</td><td>38d</td><td>none</td></tr><tr><td>#529</td><td>external</td><td>41d</td><td>none</td></tr><tr><td>#528</td><td>external</td><td>41d</td><td>none</td></tr><tr><td>#527</td><td>external</td><td>42d</td><td>none</td></tr></tbody></table>
+<p>The CI dashboard reported all five as having “completed” Gemini runs — which was technically true. The job ran. It just posted nothing. GitHub’s Actions UI does not distinguish “Gemini posted a review” from “Gemini ran to completion and decided not to comment.” The silent fail was indistinguishable from a clean review of a PR that had no issues.</p>
+<h2 id="the-first-principles-hypothesis-which-was-wrong">The first-principles hypothesis (which was wrong)</h2>
+<p>The shared workflow template loads an MCP server inside the GitHub Actions runner — the official <code>ghcr.io/github/github-mcp-server:v0.27.0</code> container — and pipes its stdio into the Gemini CLI. The MCP server exposes three tools: <code>pull_request_read</code>, <code>add_comment_to_pending_review</code>, and <code>pull_request_review_write</code>.</p>
+<p>When I read this for the first time today, my engineering instinct said <em>that’s overcomplicated</em>. Gemini already knows how to call HTTP endpoints. GitHub already has REST and GraphQL APIs. Why interpose a docker sidecar that re-exposes three calls Gemini could make directly?</p>
+<p>The hypothesis: <strong>the MCP server is unnecessary indirection, and probably the cause of the silent failure</strong>. Some race condition between docker startup, runner stdio, and Gemini’s tool-call protocol. Strip it, use Gemini’s built-in HTTP capabilities, simpler workflow, no silent fails.</p>
+<p>I rewrote the workflow without MCP, added <code>pull_request_target</code> to fix the orthogonal fork-PR permission gap, layered in an <code>ENABLE</code> repo variable as a kill switch, persisted PR metadata for downstream Slack notifications, and shipped PR #602 with a self-congratulating commit message about removing unnecessary complexity.</p>
+<p>CI went green. Gemini posted nothing. <em>Same silent fail.</em></p>
+<p>That should have been the first hint. It wasn’t, because PR #602 was on a fork of my own repo and the new <code>pull_request_target</code> semantics meant the workflow was running against a different commit graph than I expected. I told myself the green CI was the empty-PR-nothing-to-review case. I was about to admin-merge.</p>
+<h2 id="the-reversal-one-paragraph-in-a-different-repo">The reversal: one paragraph in a different repo</h2>
+<p>Before merging, I checked the merge-gate surface — branch protection, CODEOWNERS, automerge sender check — and in passing went to look at how <code>claude-code-slack-channel</code> (CCSC, a sibling repo, also has a Gemini review workflow) configures its setup. Pure curiosity. The merge was 30 seconds away.</p>
+<p>A workflow header in CCSC’s <code>gemini-review.yml</code> documented why an earlier attempt (issue ccsc-304) had failed:</p>
+<blockquote>
+<p>The key pieces the first attempt missed: <code>mcpServers.github</code> declares the GitHub MCP server container that <strong>actually provides</strong> <code>pull_request_read</code> / <code>add_comment_to_pending_review</code> / <code>pull_request_review_write</code>. <strong>Without it the tools are unreachable and Gemini silently posts nothing.</strong></p>
+</blockquote>
+<p>That paragraph killed the merge. The header was telling me, in the past tense, that someone had already run my exact experiment six months earlier — strip the MCP server, see if Gemini’s built-in HTTP works — and watched it produce the same silent fail I was about to ship as a fix.</p>
+<p>The Gemini CLI does not fall back to direct HTTP for the <code>pull_request_*</code> tool family. Those tools only exist when the MCP server provides them. Without MCP, Gemini’s tool calls reach for endpoints that aren’t registered, fail silently inside the agent loop (no error surfaced to the runner), and the agent decides to post nothing because it has no successful tool call to base a review on.</p>
+<p>My “unnecessary indirection” was the only thing that made reviews possible.</p>
+<h2 id="the-triangulation-method">The triangulation method</h2>
+<p>Before I rewrote the rewrite, I forced myself to triangulate against three independent repos in the ecosystem:</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Repo</th><th>MCP server</th><th>Posts reviews</th></tr></thead><tbody><tr><td><code>claude-code-slack-channel</code> (CCSC reference)</td><td>yes, <code>v0.27.0</code></td><td>yes</td></tr><tr><td><code>wild-admin-tools-mcp</code> (current wild template, no MCP)</td><td>no</td><td><strong>no — same silent fail</strong></td></tr><tr><td><code>x-bug-triage-plugin</code> (standalone, has MCP)</td><td>yes, <code>v0.27.0</code></td><td>yes</td></tr></tbody></table>
+<p>Three data points. Two with MCP, one without. The two with MCP both work. The one without is broken in exactly the way <code>claude-code-plugins-plus-skills</code> is broken. The wild-template’s MCP-less design wasn’t a deliberate choice — it was a regression from a prior copy-paste, and every plugin that inherited from that template got the same broken config.</p>
+<p>This is what I mean by triangulation. A single working repo proves the integration <em>can</em> work. A single failing repo doesn’t tell you why. Three repos arranged across the variable you suspect — <em>with</em> MCP and <em>without</em> — let the configuration speak instead of the hypothesis.</p>
+<h2 id="the-patch">The patch</h2>
+<p>The actual fix was small. Restore the MCP server block, keep all the other improvements I had layered in (the <code>ENABLE</code> gate, <code>workflow_dispatch</code>, fork support via <code>pull_request_target</code>, SHA-pinned checkout, no credential persistence, debug flag, Slack notify hook).</p>
+<p>The MCP block:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#E1E4E8">- </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Run Gemini review</span></span>
+<span class="line"><span style="color:#85E89D">  uses</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">google-gemini/gemini-cli-action@v3</span></span>
+<span class="line"><span style="color:#85E89D">  env</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    GITHUB_TOKEN</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">${{ secrets.GITHUB_TOKEN }}</span></span>
+<span class="line"><span style="color:#85E89D">    PR_NUMBER</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">${{ github.event.pull_request.number }}</span></span>
+<span class="line"><span style="color:#85E89D">    GEMINI_DEBUG</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">${{ vars.GEMINI_DEBUG || 'false' }}</span></span>
+<span class="line"><span style="color:#85E89D">  with</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    settings</span><span style="color:#E1E4E8">: </span><span style="color:#F97583">|</span></span>
+<span class="line"><span style="color:#9ECBFF">      {</span></span>
+<span class="line"><span style="color:#9ECBFF">        "mcpServers": {</span></span>
+<span class="line"><span style="color:#9ECBFF">          "github": {</span></span>
+<span class="line"><span style="color:#9ECBFF">            "command": "docker",</span></span>
+<span class="line"><span style="color:#9ECBFF">            "args": [</span></span>
+<span class="line"><span style="color:#9ECBFF">              "run", "-i", "--rm",</span></span>
+<span class="line"><span style="color:#9ECBFF">              "-e", "GITHUB_PERSONAL_ACCESS_TOKEN",</span></span>
+<span class="line"><span style="color:#9ECBFF">              "ghcr.io/github/github-mcp-server:v0.27.0"</span></span>
+<span class="line"><span style="color:#9ECBFF">            ],</span></span>
+<span class="line"><span style="color:#9ECBFF">            "env": {</span></span>
+<span class="line"><span style="color:#9ECBFF">              "GITHUB_PERSONAL_ACCESS_TOKEN": "${{ secrets.GITHUB_TOKEN }}"</span></span>
+<span class="line"><span style="color:#9ECBFF">            }</span></span>
+<span class="line"><span style="color:#9ECBFF">          }</span></span>
+<span class="line"><span style="color:#9ECBFF">        },</span></span>
+<span class="line"><span style="color:#9ECBFF">        "coreTools": [</span></span>
+<span class="line"><span style="color:#9ECBFF">          "run_shell_command(echo)",</span></span>
+<span class="line"><span style="color:#9ECBFF">          "run_shell_command(gh)"</span></span>
+<span class="line"><span style="color:#9ECBFF">        ]</span></span>
+<span class="line"><span style="color:#9ECBFF">      }</span></span></code></pre>
+<p>(Note: <code>google-gemini/gemini-cli-action@v3</code> was the action this repo had been pinned to since the early-2026 install. As of late April 2026, Google’s officially-maintained successor is <code>google-github-actions/run-gemini-cli</code>; the MCP server image <code>github-mcp-server:v0.27.0</code> is also several minor versions behind current. Both are tracked for a follow-up bump — not part of this restore.)</p>
+<p>The <code>mcpServers.github</code> block runs the MCP container as a docker sidecar inside the GitHub Actions runner. The Gemini CLI talks to it over stdin/stdout. The server exposes three review-specific GitHub API tools to Gemini, and only those three — no write access to code, no merge, no push. Permission is bounded by what the MCP server registers, not what <code>GITHUB_TOKEN</code> could do in principle.</p>
+<p>The fork support was a separate but related gap. The original workflow used <code>on: pull_request</code>, which on community-fork PRs runs without secrets and with read-only <code>GITHUB_TOKEN</code>. Even if MCP had been wired up correctly, those PRs would fail to post because <code>pull_request_review_write</code> requires write scope. The fix is <code>pull_request_target</code>, which runs the workflow against the <strong>base</strong> repo’s secrets while still seeing the fork’s diff:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#79B8FF">on</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  pull_request_target</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    types</span><span style="color:#E1E4E8">: [</span><span style="color:#9ECBFF">opened</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">synchronize</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">reopened</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"><span style="color:#85E89D">    branches</span><span style="color:#E1E4E8">: [</span><span style="color:#9ECBFF">main</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">permissions</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  contents</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">read</span></span>
+<span class="line"><span style="color:#85E89D">  pull-requests</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">write</span></span>
+<span class="line"><span style="color:#85E89D">  issues</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">write</span></span></code></pre>
+<p><code>pull_request_target</code> is a foot-gun if you let it check out arbitrary fork code with secrets in scope. The mitigation is to checkout by SHA (not by ref), avoid persisting credentials, and never <code>npm install</code> from fork code. The workflow does all three:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#E1E4E8">- </span><span style="color:#85E89D">uses</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">actions/checkout@v4</span></span>
+<span class="line"><span style="color:#85E89D">  with</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    ref</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">${{ github.event.pull_request.head.sha }}</span></span>
+<span class="line"><span style="color:#85E89D">    persist-credentials</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">false</span></span></code></pre>
+<p>Reviews now run with the secrets they need; fork code never executes with those secrets in scope.</p>
+<h2 id="the-result">The result</h2>
+<p>I merged PR #602 with admin override (the merge gate I was hardening, CODEOWNERS-required review, was set up in the same PR), then kicked off the workflow manually on all five stalled community PRs. Two minutes later:</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>PR</th><th>Reviews posted</th><th>Inline comments</th></tr></thead><tbody><tr><td>#547</td><td>1</td><td>1</td></tr><tr><td>#534</td><td>1</td><td>0 (summary only)</td></tr><tr><td>#529</td><td>4</td><td>7</td></tr><tr><td>#528</td><td>1</td><td>2</td></tr><tr><td>#527</td><td>1</td><td>1</td></tr></tbody></table>
+<p>Eight reviews and 11 inline comments across five PRs that had been silent for over a month. The reviews used GitHub suggestion blocks, hit the actual contribution issues (one PR had a real <code>--arg</code> jq-injection bug Gemini caught and that I later folded into a separate fix), and read like a competent senior reviewer.</p>
+<p>The per-PR review quality breakdown was useful to walk through:</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>PR</th><th>Scope</th><th>What Gemini caught</th></tr></thead><tbody><tr><td>#547</td><td>18-line <code>sources.yaml</code> registration for skyvern browser automation skill</td><td>One inline comment on a malformed YAML key. Approved otherwise.</td></tr><tr><td>#534</td><td>Doc-only contribution</td><td>Summary review approving the change. No inline comments needed.</td></tr><tr><td>#529</td><td>Plane-sync workflow (GitHub → Plane bridge), 4 review rounds across multiple commits</td><td>Caught the <code>--arg</code> jq-injection vector. Flagged a fetch-all-issues N+1 loop concern (deferred — needs Plane API verification for <code>?sequence_id=X</code> support). The four sequential reviews tracked across pushes correctly.</td></tr><tr><td>#528</td><td>Plugin metadata fix</td><td>Two inline suggestions on YAML formatting.</td></tr><tr><td>#527</td><td>Skill registration</td><td>One inline suggestion. Approved.</td></tr></tbody></table>
+<p>The jq-injection finding alone justified the four-month effort. That bug had been sitting in an open community PR for 41 days. Without Gemini, it would have either been merged on a manual review that missed it, or sat for another four months while the contributor wondered why no one was reviewing the PR.</p>
+<p>One artifact of the SHA-pinned checkout: the new <code>gemini-review.toml</code> prompt customization (which adds Intent Solutions philosophy framing and CONTRIBUTING.md links) doesn’t apply to those five backfilled PRs. The Gemini CLI loads its prompt from the PR’s HEAD SHA, and those community branches were forked before the prompt change landed. The new prompt activates on the next push to any of those PRs or any new PR opened after today. That’s a feature, not a bug — fork PRs see the prompt that was in effect when they branched, which is the same security boundary that protects against malicious fork code editing the review prompt itself.</p>
+<h2 id="what-the-false-hypothesis-cost">What the false hypothesis cost</h2>
+<p>About three hours of work. Issue #604 (“MCP-less workflow reversal plan”) was the rollback design I had drafted before the CCSC workflow-header paragraph reversed it. The issue is now archived as a record of the wrong direction. Three hours of design work, ~150 lines of YAML written and discarded, and one PR rewritten end-to-end.</p>
+<p>The lesson — <em>find a working reference implementation in the same ecosystem and triangulate against its actual configuration</em> — is cheap to learn after the fact. Expensive to apply in the moment, because at the moment of designing the fix, the failing system is the only data point in front of you. The working reference is in some other repo you don’t currently have open. Going to look at it feels like procrastination. It is not procrastination.</p>
+<p>This is the whole shape of the bug: a silent-fail integration looks broken <strong>by your hypothesis</strong> the same way it looks broken <strong>by reality</strong>. Both produce the same observable: empty Gemini output. The hypothesis you arrived at first will keep generating consistent stories for new evidence. The way out is to add a data point you didn’t generate — a working reference, a sibling repo, a colleague’s prior post-mortem.</p>
+<h2 id="tradeoffs-i-gave-up">Tradeoffs I gave up</h2>
+<p>Restoring MCP brought back two things I wanted to remove:</p>
+<ol>
+<li><strong>A docker pull on every PR run.</strong> The runner pulls <code>ghcr.io/github/github-mcp-server:v0.27.0</code> (~80MB) on cold cache. GitHub’s Actions cache helps after the first run per branch. Net cost: 5–10 seconds per cold run.</li>
+<li><strong>A version-pinning surface.</strong> When the MCP server publishes a new version, every wild-template repo needs a coordinated bump. Without MCP, Gemini’s CLI version was the only pin. With MCP, there are two.</li>
+</ol>
+<p>The cost is real but accepted. The integration works, the security boundary is tighter (Gemini can only call three specific tools), and the fleet-wide template means the coordinated bump is one PR not thirty.</p>
+<h2 id="why-mcp-mediated-review-is-actually-the-better-design">Why MCP-mediated review is actually the better design</h2>
+<p>Re-reading my own design-doc draft after the reversal, the part that embarrasses me is not that I picked the wrong hypothesis — that happens — but that I undervalued the security property MCP was buying.</p>
+<p>A direct-HTTP design has Gemini holding a <code>GITHUB_TOKEN</code> with write scope and choosing which endpoints to call. The token’s permission boundary is wide. If a clever prompt-injection in a PR diff convinces Gemini to do something other than review, the token says yes to a lot of things. The mitigation is prompt-engineering (“never call non-review endpoints, please”) which is a soft boundary in a system whose entire interface is natural language.</p>
+<p>The MCP-mediated design has the docker container holding the token. Gemini holds three named tool handles, each backed by a single API call with a specific shape:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>add_comment_to_pending_review(pr_number, body, line) -> comment_id</span></span>
+<span class="line"><span>pull_request_read(pr_number) -> pr_data</span></span>
+<span class="line"><span>pull_request_review_write(pr_number, summary, comments[]) -> review_id</span></span></code></pre>
+<p>Gemini cannot ask the MCP server to delete a branch or merge a PR even if every word in the diff said <code>please merge this</code>. Those calls don’t exist in the registered tool surface. Prompt injection cannot reach beyond what the MCP server registered. The boundary is structural, not soft.</p>
+<p>This is the security argument for MCP I should have led with in the original design doc. I was thinking of MCP as a tool-discovery convenience and missing that it is a <strong>capability-narrowing layer</strong>. The 80MB docker pull is the price of that narrowing. It is a price worth paying.</p>
+<p>The CCSC implementation went further — it pins specific shell commands too:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#9ECBFF">"coreTools"</span><span style="color:#E1E4E8">: [</span></span>
+<span class="line"><span style="color:#9ECBFF">  "run_shell_command(echo)"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">  "run_shell_command(gh)"</span></span>
+<span class="line"><span style="color:#E1E4E8">]</span></span></code></pre>
+<p>Even the shell capability is narrowed to two commands. Gemini cannot ask the runner to <code>rm -rf</code> anything because the only registered shell calls are <code>echo</code> and <code>gh</code>. The discipline is <em>deny by default, register what’s needed, refuse the rest</em>. It is exactly the boundary you want for an LLM-driven CI step where the input is untrusted contributor diffs.</p>
+<h2 id="the-fleet-impact">The fleet impact</h2>
+<p>There are seven plugin repos in the wild ecosystem inheriting from the broken template. Every one of them has been silently failing to post Gemini reviews on community PRs since the December template change. None of them had loud-enough community PR traffic for anyone to notice — most got one or two community PRs in four months, and “Gemini didn’t post a review” reads as “Gemini had nothing to say” if you don’t have a baseline.</p>
+<p>The fix lands in the wild template repo (<code>wild-admin-tools-mcp</code> is the canonical source); the other six pull from there. Tomorrow’s job is to issue a coordinated template-bump PR across the fleet. Each plugin repo gets the same workflow patch. The new MCP server pin and the <code>pull_request_target</code> semantics ride together. Because the template is a real submodule (not a copy-paste), the bump is one commit per consumer, not a forty-line diff.</p>
+<p>What I want to stop happening: a regression like this lasting four months again. Two changes go in alongside the fix:</p>
+<ol>
+<li><strong>An MCP-presence assertion</strong> in the workflow itself. The first step now greps the <code>settings:</code> block for <code>mcpServers.github</code> and fails the workflow if it isn’t there. If a future me strips MCP again, CI fails loud instead of running silently to completion.</li>
+<li><strong>A weekly synthetic PR.</strong> A scheduled workflow opens a PR-against-itself once a week with a known-non-trivial diff and asserts that Gemini posts at least one review comment within 10 minutes. If the synthetic PR ever doesn’t get a review, an alert fires. This converts the silent-fail mode into a loud-fail mode at the cost of one bot-author PR per week per repo.</li>
+</ol>
+<p>Both changes are cheap. Neither would have helped if my hypothesis had been right (no Gemini = no synthetic alert = same silent fail). They help specifically against the failure mode I just lived through: <em>configuration drift inside a working integration</em>.</p>
+<h2 id="what-id-tell-my-december-self">What I’d tell my December self</h2>
+<p>If I were leaving notes for the engineer who set up the original wild template, the message would be short:</p>
+<blockquote>
+<p>The Gemini CLI requires an MCP server providing the <code>pull_request_*</code> tool family. Without it, reviews silently post nothing — the workflow runs to green. Pin <code>ghcr.io/github/github-mcp-server:v0.27.0</code> in the <code>settings.mcpServers.github</code> block. If you’re tempted to remove it because direct HTTP looks simpler, read this footnote first. It does not work and the failure mode is invisible.</p>
+</blockquote>
+<p>I would also tell that engineer to add the MCP-presence assertion at template-creation time, not as a retrofit. The class of bug — <em>invisible-when-broken integrations</em> — is the most expensive class of bug to find, and the cheapest class of bug to write a tripwire against. The asymmetry is enormous.</p>
+<p>The tripwire was the lesson missing from the December design. Today’s PR backports it.</p>
+<h2 id="what-this-changes-about-how-ill-set-up-future-integrations">What this changes about how I’ll set up future integrations</h2>
+<p>Three concrete changes to the template I use for any LLM-driven CI step from this point forward:</p>
+<ol>
+<li>
+<p><strong>Capability narrowing through MCP, not prompt engineering.</strong> Whenever an LLM is doing something in CI, the tools available to it are declared in a registry, not in natural language. If the integration supports an MCP layer, use it. If it doesn’t, write a thin proxy that exposes only the calls the LLM should be able to make. The boundary needs to be structural.</p>
+</li>
+<li>
+<p><strong>A liveness assertion in the workflow.</strong> Every LLM-driven CI step gets a final assertion that checks for an externally visible side effect — a comment posted, a status set, a file written. If the side effect is missing, the step fails. The principle: jobs that succeed by doing nothing are indistinguishable from jobs that fail by doing nothing, so make doing nothing a failure.</p>
+</li>
+<li>
+<p><strong>A scheduled smoke test against a synthetic input.</strong> Every integration that depends on external services (Gemini, Slack, Plane, GCP) gets a synthetic input that exercises the full path on a fixed cadence. The synthetic input has known properties so the assertion can be specific. The goal is converting silent fail into loud fail without waiting for real traffic to expose the regression.</p>
+</li>
+</ol>
+<p>These are not novel ideas. They are obvious in retrospect, expensive to write into a template prospectively, and trivial to omit during a “simplify” pass. The discipline I’m trying to build is to push the load-bearing properties down into the integration layer so that future simplification passes can’t remove them without making the failure visible.</p>
+<h2 id="also-shipped">Also shipped</h2>
+<p><strong>Frontmatter cleanup campaign — Phase 1 (PR #605).</strong> The CCPI marketplace had 182 frontmatter validation errors blocking <code>ccpi validate --strict</code>. Phase 1 was 5 trivial fixes — invalid <code>category</code> values on shipwright agents and one description over the 80-character limit. Merged. Phase 2A followed in two batches: PR #606 fixed the 12 fullstack-starter-pack agents missing <code>capabilities</code>, and PR #607 fixed 11 code-cleanup agents with the same issue. 23 agents cleared, 159 remaining. The campaign is tracked under issue #604 with phased rollout because most of the 159 are external contributor agents that need the contributor’s approval to amend.</p>
+<p><strong><code>claude-code-slack-channel</code> v0.9.0 release.</strong> Shipped with the lazy <code>allowFrom</code> snapshot diff design for <code>pairing.accepted</code> audit events. The skill runs outside the server process (no IPC channel exists), so the choice was between <code>fs.watch</code>, a new IPC mechanism, or diffing snapshots in the existing <code>getAccess()</code> hot path. Snapshot diff won — zero new infrastructure, zero new failure modes, and the diff cost is amortized over the existing read path. PR #150 closed the audit EventKind coverage gap from 18/19 to 19/19. After-action report at <code>000-docs/v0.9.0-release-aar.md</code>.</p>
+<p><strong><code>cad-dxf-agent</code> L0–L7 test infrastructure scaffolding.</strong> Ran <code>/audit-tests</code> then <code>/implement-tests</code> for the full 7-layer testing taxonomy. Staged 1,910 lines across 20 files on <code>feature/implement-tests-l0-l7</code> — git hooks (L0), static analysis (L1), unit + integration scaffolding (L3), full acceptance harness (L7). Nothing committed yet; staged for engineer review per the implement-tests SOP. The audit identified 5 personas to collapse from the original 25 (Design Author, Reviewer/Compliance, Estimator/Coordinator, Field/Operator, Platform Admin) and 30 Pydantic schema contract boundaries that anchor the L3 integration suite.</p>
+<p><strong>Braves Booth — SportsTalk ATL feed.</strong> Added SportsTalk ATL to the Local Coverage panel of the Braves Booth dashboard. The site’s bot-blocking is lightweight UA sniffing — it rejects <code>node-fetch</code>’s default user-agent but accepts any browser-looking UA. Distinguishes from MLB.com’s full IP-based blocks, which can’t be bypassed with header spoofing. v1.2.8 shipped. Useful taxonomy when scraping a new feed: try real browser headers first; if 403 turns into 200, it’s UA sniffing and the bypass is essentially free; if it still 403s, it’s IP-based and you need a residential proxy or vendor-supplied feed access.</p>
+<h2 id="why-the-wild-template-existed-in-the-broken-state">Why the wild-template existed in the broken state</h2>
+<p>Worth a moment on how the template ended up MCP-less in the first place, because the failure mode is instructive.</p>
+<p>The wild ecosystem template was originally forked from a working Gemini-review reference in mid-2025. The original reference had MCP wired up correctly. Sometime in the December 2025 refactor, the template was simplified during a “remove unnecessary complexity” pass that stripped the MCP block. The rationale in the commit message read like the rationale I had written this morning — <em>direct HTTP is simpler, fewer moving parts, less ops surface</em>. The change passed local validation because validation was “does the workflow YAML parse?” and the workflow YAML did parse.</p>
+<p>The change passed CI because CI was “does the workflow run to completion?” and the workflow did run to completion. The change passed code review because there were no community PRs against the affected repos that week, so no one observed the review-posting regression.</p>
+<p>This is the failure topology of soft tests against silent integrations. Each gate validated <em>something</em>, but no gate validated the load-bearing property: <em>does Gemini actually post a review?</em> A property no one had explicitly written down as a test, because at the time the template was created, the property was assumed to follow from the workflow being correct.</p>
+<p>The fix going forward is the MCP-presence assertion plus the weekly synthetic PR. Both encode the load-bearing property as an explicit gate. Both would have caught the December change before it shipped to seven downstream repos. Neither was particularly hard to write — the MCP-presence check is a 4-line shell <code>grep</code>, the synthetic PR is a 30-line scheduled workflow. The cost of writing them after the fact, paid in stalled community PRs and reversed redesigns, is roughly an order of magnitude higher than writing them in the first place.</p>
+<h2 id="how-i-would-have-known-sooner">How I would have known sooner</h2>
+<p>In retrospect there were three signals available the day the bug shipped, and I missed all three:</p>
+<p><strong>Signal 1: The maintainer-PR / community-PR asymmetry.</strong> Maintainer PRs ran with <code>pull_request</code> event and same-repo secrets, so even without MCP, Gemini’s tool calls would have <em>registered</em> (just hit empty endpoints). Community-fork PRs ran with read-only <code>GITHUB_TOKEN</code>, so the missing tools compounded with missing write scope. Both produced empty output, but the underlying causes were different. If I had asked “do <em>all</em> PRs fail or only fork PRs?”, the answer would have pointed at <code>pull_request_target</code> immediately. I assumed all PRs were failing because I didn’t have a recent maintainer PR to compare against.</p>
+<p><strong>Signal 2: Workflow run logs.</strong> GitHub Actions surfaces job stdout. The Gemini CLI logs each tool-call attempt at debug level. In a working run, you see <code>tool_call: pull_request_review_write</code> followed by a 200 response. In a broken run, you see <code>tool_call: pull_request_review_write</code> followed by <em>no response and no error</em> — Gemini’s agent loop swallows the failure and moves on. The signature is clear if you read the logs at debug level. The default verbosity hides it. Setting <code>GEMINI_DEBUG=true</code> is now baked into the workflow as a repo variable, defaulting on. The cost of debug logging is a few KB per run. The benefit is that the next silent fail won’t be silent.</p>
+<p><strong>Signal 3: Cross-repo comparison.</strong> This is the lesson of the post. If I had run the workflow on <code>wild-admin-tools-mcp</code> and <code>claude-code-slack-channel</code> side-by-side at template-adoption time and noticed one posts reviews and the other doesn’t, the divergence would have shown up immediately. Instead I trusted that the template was correct because the template <em>had been</em> correct in some previous version, and I didn’t re-validate after the December change.</p>
+<p>The general pattern: integrations that are silent when broken should always have a smoke test that runs in a known environment and asserts a visible side effect. The smoke test costs one synthetic PR per week. The bug it catches costs four months of stalled community contributions.</p>
+<h2 id="the-discipline">The discipline</h2>
+<p>Look at a working version of the thing you’re about to rewrite. The hypothesis you arrived at first is the suspect, especially when the bug has been silent for months and you’re the first person motivated to fix it. The longer the silent fail has lived, the higher the prior probability that the obvious fix has already been tried and discarded by someone whose post-mortem is sitting in a workflow header in a different repo, three directories away.</p>
+<p>When you’re staring at a green CI dashboard and zero output, the fix is not in the failing repo. The fix is in the working repo, the one you stopped looking at because it works. Go look at it.</p>
+<p>A meta-observation: the people most likely to ship this class of regression are the people most confident they understand the integration. Junior engineers tend to leave the working setup alone because they don’t fully understand it yet. Senior engineers are the ones who simplify it. The cost of bad simplification is silent fail, and the asymmetry between the two error modes — “I don’t understand this so I’ll leave it” versus “I understand this so I’ll change it” — gets paid by the contributors whose PRs go silent.</p>
+<p>The remediation is not “stop simplifying.” Simplifying is a real value. The remediation is <em>if you can’t articulate why each removed piece was there, leave it.</em> If you can articulate it, fine, simplify. If you remove the piece and the system still seems to work, prove it works on the path that actually exercises the removed piece — not on the path that already worked without it.</p>
+<p>That is the discipline. Today I bypassed it, caught myself in time because the CCSC workflow header was three keystrokes away, and shipped the right fix instead of the wrong one. Both versions of me would have produced a green CI dashboard. Only one version would have produced reviews on community PRs.</p>
+<p>The contributors whose PRs sat for forty days deserved better than a green dashboard. The fix lands today.</p>
+<h2 id="related-posts">Related posts</h2>
+<ul>
+<li><a href="/blog/ccsc-five-releases-one-day-security-sprint/">Four Releases in One Day: How the claude-code-slack-channel Security Sprint Actually Shipped</a> — the sibling repo whose workflow header reversed today’s hypothesis.</li>
+<li><a href="https://startaitools.com/posts/collaboratively-shaped-roadmap/">Four Primitives, Three Reviews: How a Contributor PR Reshaped a Roadmap</a> — earlier story on the CCPI contributor pipeline this fix unblocked.</li>
+<li><a href="https://startaitools.com/posts/ai-code-review-without-context-blind-test/">AI Code Review Blind Test: Where 5 Bots Shine</a> — what Gemini actually contributes once it’s wired up correctly.</li>
+</ul>
+      </div>
+    </div>
+  </article>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
