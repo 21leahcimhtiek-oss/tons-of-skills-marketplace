@@ -1,0 +1,1309 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compliance &amp; Audit Guide | Production Playbooks</title>
+    <meta name="description" content="SOC 2, GDPR, HIPAA, PCI DSS implementation. Audit logging with immutable signatures, RBAC, data privacy (PII redaction), and regulatory compliance.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://tonsofskills.com/tons-of-skills-marketplace/playbooks/07-compliance-audit/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/playbooks/07-compliance-audit/">
+    <meta property="og:title" content="Compliance &amp; Audit Guide | Production Playbooks">
+    <meta property="og:description" content="SOC 2, GDPR, HIPAA, PCI DSS implementation. Audit logging with immutable signatures, RBAC, data privacy (PII redaction), and regulatory compliance.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="Compliance &amp; Audit Guide | Production Playbooks">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/playbooks/07-compliance-audit/">
+    <meta name="twitter:title" content="Compliance &amp; Audit Guide | Production Playbooks">
+    <meta name="twitter:description" content="SOC 2, GDPR, HIPAA, PCI DSS implementation. Audit logging with immutable signatures, RBAC, data privacy (PII redaction), and regulatory compliance.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/_..-YgZcVYT.css"></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  <div class="playbook-page" data-astro-cid-hidutmah>
+    <header class="playbook-header" data-astro-cid-hidutmah>
+      <div class="container" data-astro-cid-hidutmah>
+        <nav class="breadcrumbs" aria-label="Breadcrumb" data-astro-cid-hidutmah>
+          <a href="/" data-astro-cid-hidutmah>Home</a>
+          <span class="breadcrumb-separator" data-astro-cid-hidutmah>/</span>
+          <a href="/playbooks" data-astro-cid-hidutmah>Playbooks</a>
+          <span class="breadcrumb-separator" data-astro-cid-hidutmah>/</span>
+          <span class="breadcrumb-current" data-astro-cid-hidutmah>Compliance &amp; Audit Guide</span>
+        </nav>
+
+        <div class="playbook-hero" data-astro-cid-hidutmah>
+          <span class="category-badge" data-astro-cid-hidutmah>Security</span>
+          <h1 class="playbook-title" data-astro-cid-hidutmah>Compliance &amp; Audit Guide</h1>
+          <p class="playbook-description" data-astro-cid-hidutmah>SOC 2, GDPR, HIPAA, PCI DSS implementation. Audit logging with immutable signatures, RBAC, data privacy (PII redaction), and regulatory compliance.</p>
+          <div class="playbook-meta" data-astro-cid-hidutmah>
+            <span class="meta-item" data-astro-cid-hidutmah>~30 min read</span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="playbook-main" data-astro-cid-hidutmah>
+      <div class="container" data-astro-cid-hidutmah>
+        <div class="playbook-layout" data-astro-cid-hidutmah>
+          <aside class="toc-sidebar" id="toc-sidebar" data-astro-cid-hidutmah>
+            <div class="toc-sticky" data-astro-cid-hidutmah>
+              <h2 class="toc-title" data-astro-cid-hidutmah>Table of Contents</h2>
+              <nav class="toc-nav" id="toc-nav" aria-label="Section navigation" data-astro-cid-hidutmah>
+                <!-- Populated by script below -->
+              </nav>
+            </div>
+          </aside>
+
+          <article class="playbook-content" data-astro-cid-hidutmah>
+            
+  <p><strong>Production Playbook for Security Teams and Compliance Officers</strong></p>
+<p>Ensuring Claude Code plugin workflows meet SOC 2, GDPR, HIPAA, and other regulatory requirements is critical for enterprise deployments. This playbook provides audit logging implementation, compliance checklists, data privacy patterns, access controls, and security hardening procedures for AI-powered automation.</p>
+<h2>Regulatory Frameworks</h2>
+<h3>Compliance Requirements Overview</h3>
+<table>
+<thead>
+<tr>
+<th>Framework</th>
+<th>Scope</th>
+<th>Key Requirements</th>
+<th>Claude Code Impact</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>SOC 2 Type II</strong></td>
+<td>Service organizations</td>
+<td>Security, availability, confidentiality</td>
+<td>Audit logs, access controls, encryption</td>
+</tr>
+<tr>
+<td><strong>GDPR</strong></td>
+<td>EU data subjects</td>
+<td>Consent, data minimization, right to erasure</td>
+<td>Data retention, anonymization, deletion</td>
+</tr>
+<tr>
+<td><strong>HIPAA</strong></td>
+<td>Healthcare data (PHI)</td>
+<td>Encryption, access logs, BAA required</td>
+<td>Self-hosted, audit trails, no cloud APIs</td>
+</tr>
+<tr>
+<td><strong>PCI DSS</strong></td>
+<td>Payment card data</td>
+<td>Encryption, access controls, logging</td>
+<td>Tokenization, secure storage</td>
+</tr>
+<tr>
+<td><strong>ISO 27001</strong></td>
+<td>Information security</td>
+<td>Risk management, controls framework</td>
+<td>Security policies, incident response</td>
+</tr>
+</tbody>
+</table>
+<h3>Risk Assessment</h3>
+<pre><code class="language-typescript">interface ComplianceRisk {
+  framework: 'SOC2' | 'GDPR' | 'HIPAA' | 'PCI' | 'ISO27001';
+  requirement: string;
+  currentState: 'compliant' | 'non-compliant' | 'partial';
+  risk: 'critical' | 'high' | 'medium' | 'low';
+  remediation: string;
+  dueDate: Date;
+}
+
+const risks: ComplianceRisk[] = [
+{
+framework: 'GDPR',
+requirement: 'Right to erasure (Article 17)',
+currentState: 'non-compliant',
+risk: 'high',
+remediation: 'Implement conversation deletion API',
+dueDate: new Date('2025-12-31')
+},
+{
+framework: 'SOC2',
+requirement: 'Audit logging (CC6.1)',
+currentState: 'partial',
+risk: 'medium',
+remediation: 'Enable immutable audit logs with timestamps',
+dueDate: new Date('2025-12-28')
+}
+];</code></pre>
+<hr>
+<h2>Audit Logging</h2>
+<h3>Comprehensive Audit Trail</h3>
+<p><strong>Required Events to Log</strong>:</p>
+<pre><code class="language-typescript">enum AuditEventType {
+  // Authentication
+  USER_LOGIN = 'user.login',
+  USER_LOGOUT = 'user.logout',
+  API_KEY_CREATED = 'api_key.created',
+  API_KEY_REVOKED = 'api_key.revoked',
+<p>// Data Access
+CONVERSATION_READ = ‘conversation.read’,
+CONVERSATION_CREATED = ‘conversation.created’,
+CONVERSATION_DELETED = ‘conversation.deleted’,
+DATA_EXPORT = ‘data.export’,</p>
+<p>// Configuration Changes
+PLUGIN_INSTALLED = ‘plugin.installed’,
+PLUGIN_UNINSTALLED = ‘plugin.uninstalled’,
+SETTINGS_CHANGED = ‘settings.changed’,</p>
+<p>// Security Events
+AUTHENTICATION_FAILED = ‘auth.failed’,
+AUTHORIZATION_DENIED = ‘authz.denied’,
+ENCRYPTION_KEY_ROTATED = ‘encryption.key_rotated’,
+SUSPICIOUS_ACTIVITY = ‘security.suspicious’
+}</p>
+</code><p><code class="language-typescript">interface AuditLog {
+id: string;
+timestamp: number;
+eventType: AuditEventType;
+userId: string;
+ipAddress: string;
+userAgent: string;
+resource: {
+type: string;
+id: string;
+};
+action: string;
+outcome: ‘success’ | ‘failure’;
+metadata: Record&#x3C;string, any>;
+signature: string;  // HMAC for tamper detection
+}</code></p></pre><p></p>
+<h3>Implementation</h3>
+<pre><code class="language-typescript">import crypto from 'crypto';
+
+class AuditLogger {
+private readonly secretKey: string;
+
+constructor(secretKey: string) {
+this.secretKey = secretKey;
+}
+
+async log(event: Omit<auditlog, &#x27;id&#x27;="" |="" &#x27;timestamp&#x27;="" &#x27;signature&#x27;="">): Promise<void> {
+const auditLog: AuditLog = {
+id: crypto.randomUUID(),
+timestamp: Date.now(),
+...event,
+signature: '' // Computed below
+};
+
+// Generate HMAC signature for tamper detection
+const data = JSON.stringify({
+id: auditLog.id,
+timestamp: auditLog.timestamp,
+eventType: auditLog.eventType,
+userId: auditLog.userId,
+resource: auditLog.resource,
+action: auditLog.action,
+outcome: auditLog.outcome
+});
+
+auditLog.signature = crypto
+.createHmac('sha256', this.secretKey)
+.update(data)
+.digest('hex');
+
+// Write to immutable log storage
+await this.writeToStorage(auditLog);
+}
+
+private async writeToStorage(log: AuditLog): Promise<void> {
+// Option 1: Append-only file (WORM - Write Once Read Many)
+await appendFile('/var/log/audit/audit.jsonl', JSON.stringify(log) + '\n');
+
+// Option 2: PostgreSQL with audit triggers
+await db.query(
+'INSERT INTO audit_logs (id, timestamp, event_type, user_id, data, signature) VALUES ($1, $2, $3, $4, $5, $6)',
+[log.id, log.timestamp, log.eventType, log.userId, log, log.signature]
+);
+
+// Option 3: Send to SIEM (Splunk, ELK)
+await fetch('https://siem.example.com/audit', {
+method: 'POST',
+headers: { 'Content-Type': 'application/json' },
+body: JSON.stringify(log)
+});
+}
+
+async verify(log: AuditLog): Promise<boolean> {
+const data = JSON.stringify({
+id: log.id,
+timestamp: log.timestamp,
+eventType: log.eventType,
+userId: log.userId,
+resource: log.resource,
+action: log.action,
+outcome: log.outcome
+});
+
+const expectedSignature = crypto
+.createHmac('sha256', this.secretKey)
+.update(data)
+.digest('hex');
+
+return log.signature === expectedSignature;
+}
+}</boolean></void></void></auditlog,></code></pre>
+<h3>Usage Example</h3>
+<pre><code class="language-typescript">const auditor = new AuditLogger(process.env.AUDIT_SECRET_KEY);
+
+// Log authentication event
+await auditor.log({
+eventType: AuditEventType.USER_LOGIN,
+userId: 'user-123',
+ipAddress: '192.168.1.100',
+userAgent: 'Mozilla/5.0...',
+resource: { type: 'session', id: 'session-abc' },
+action: 'authenticate',
+outcome: 'success',
+metadata: { method: 'api_key' }
+});
+
+// Log data access
+await auditor.log({
+eventType: AuditEventType.CONVERSATION_READ,
+userId: 'user-123',
+ipAddress: '192.168.1.100',
+userAgent: 'Claude Code CLI/1.0',
+resource: { type: 'conversation', id: 'conv-xyz' },
+action: 'read',
+outcome: 'success',
+metadata: { messageCount: 42 }
+});
+
+// Log deletion (GDPR right to erasure)
+await auditor.log({
+eventType: AuditEventType.CONVERSATION_DELETED,
+userId: 'user-123',
+ipAddress: '192.168.1.100',
+userAgent: 'Claude Code CLI/1.0',
+resource: { type: 'conversation', id: 'conv-xyz' },
+action: 'delete',
+outcome: 'success',
+metadata: { reason: 'user_request', gdpr_article: '17' }
+});</code></pre>
+<hr>
+<h2>Data Privacy &#x26; Retention</h2>
+<h3>GDPR Data Minimization</h3>
+<pre><code class="language-typescript">interface ConversationData {
+  id: string;
+  userId: string;
+  messages: Message[];
+  metadata: {
+    createdAt: number;
+    lastModified: number;
+    pluginsUsed: string[];
+  };
+}
+
+class GDPRCompliantStorage {
+// Data minimization: Only store what's necessary
+async storeConversation(data: ConversationData): Promise<void> {
+const minimized = {
+id: data.id,
+userId: data.userId,  // Keep for right to access
+messages: data.messages.map(m => ({
+role: m.role,
+content: this.redactPII(m.content),  // Remove PII
+timestamp: m.timestamp
+})),
+metadata: {
+createdAt: data.metadata.createdAt,
+pluginsUsed: data.metadata.pluginsUsed
+// Omit: IP addresses, user agents, detailed telemetry
+}
+};
+
+await db.conversations.insert(minimized);
+}
+
+// Redact personally identifiable information
+private redactPII(text: string): string {
+return text
+// Email addresses
+.replace(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g, '[EMAIL_REDACTED]')
+// Phone numbers
+.replace(/\b\d{3}[-.]?\d{3}[-.]?\d{4}\b/g, '[PHONE_REDACTED]')
+// SSN
+.replace(/\b\d{3}-\d{2}-\d{4}\b/g, '[SSN_REDACTED]')
+// Credit cards
+.replace(/\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b/g, '[CC_REDACTED]');
+}
+}</void></code></pre>
+<h3>Data Retention Policies</h3>
+<pre><code class="language-typescript">enum RetentionPolicy {
+  CONVERSATIONS = 90,      // 90 days
+  AUDIT_LOGS = 2555,       // 7 years (SOC 2 requirement)
+  ANALYTICS = 365,         // 1 year
+  BACKUPS = 30             // 30 days
+}
+
+class RetentionManager {
+async enforceRetention(): Promise<void> {
+const now = Date.now();
+
+// Delete old conversations (GDPR: storage limitation)
+const cutoff = now - (RetentionPolicy.CONVERSATIONS * 86400000);
+await db.conversations.deleteMany({
+lastModified: { $lt: cutoff }
+});
+
+// Archive (not delete) audit logs
+const auditCutoff = now - (RetentionPolicy.AUDIT_LOGS * 86400000);
+const oldLogs = await db.auditLogs.find({
+timestamp: { $lt: auditCutoff }
+});
+await this.archiveToS3(oldLogs);
+await db.auditLogs.deleteMany({
+timestamp: { $lt: auditCutoff }
+});
+
+// Delete old analytics
+const analyticsCutoff = now - (RetentionPolicy.ANALYTICS * 86400000);
+await db.analytics.deleteMany({
+timestamp: { $lt: analyticsCutoff }
+});
+}
+
+private async archiveToS3(logs: any[]): Promise<void> {
+const archive = JSON.stringify(logs);
+await s3.putObject({
+Bucket: 'audit-logs-archive',
+Key: `archive-${Date.now()}.json.gz`,
+Body: gzip(archive)
+});
+}
+}</void></void></code></pre>
+<h3>Right to Erasure (GDPR Article 17)</h3>
+<pre><code class="language-typescript">class GDPRErasureHandler {
+  async processErasureRequest(userId: string, requestId: string): Promise<void> {
+    // Log the request
+    await auditor.log({
+      eventType: AuditEventType.DATA_EXPORT,
+      userId,
+      ipAddress: 'internal',
+      userAgent: 'erasure-service',
+      resource: { type: 'user', id: userId },
+      action: 'gdpr_erasure',
+      outcome: 'success',
+      metadata: { requestId, article: '17' }
+    });
+
+// Delete all user data
+await db.conversations.deleteMany({ userId });
+await db.analytics.deleteMany({ userId });
+await db.preferences.deleteMany({ userId });
+
+// Anonymize audit logs (can't delete due to legal requirements)
+await db.auditLogs.updateMany(
+{ userId },
+{ $set: { userId: `ANONYMIZED_${crypto.randomUUID()}` } }
+);
+
+// Generate confirmation
+await this.sendErasureConfirmation(userId, requestId);
+}
+
+private async sendErasureConfirmation(userId: string, requestId: string): Promise<void> {
+// Email or other notification confirming erasure
+console.log(</void></void></code>Erasure completed for ${userId}, request ${requestId});
+}
+}</pre>
+<hr>
+<h2>Access Controls</h2>
+<h3>Role-Based Access Control (RBAC)</h3>
+<pre><code class="language-typescript">enum Role {
+  ADMIN = 'admin',
+  DEVELOPER = 'developer',
+  AUDITOR = 'auditor',
+  USER = 'user'
+}
+
+enum Permission {
+CONVERSATIONS_READ = 'conversations:read',
+CONVERSATIONS_WRITE = 'conversations:write',
+CONVERSATIONS_DELETE = 'conversations:delete',
+PLUGINS_INSTALL = 'plugins:install',
+SETTINGS_MODIFY = 'settings:modify',
+AUDIT_LOGS_READ = 'audit_logs:read',
+USERS_MANAGE = 'users:manage'
+}
+
+const rolePermissions: Record<role, permission[]=""> = {
+[Role.ADMIN]: [
+Permission.CONVERSATIONS_READ,
+Permission.CONVERSATIONS_WRITE,
+Permission.CONVERSATIONS_DELETE,
+Permission.PLUGINS_INSTALL,
+Permission.SETTINGS_MODIFY,
+Permission.AUDIT_LOGS_READ,
+Permission.USERS_MANAGE
+],
+[Role.DEVELOPER]: [
+Permission.CONVERSATIONS_READ,
+Permission.CONVERSATIONS_WRITE,
+Permission.PLUGINS_INSTALL
+],
+[Role.AUDITOR]: [
+Permission.AUDIT_LOGS_READ,
+Permission.CONVERSATIONS_READ
+],
+[Role.USER]: [
+Permission.CONVERSATIONS_READ,
+Permission.CONVERSATIONS_WRITE
+]
+};
+
+class AccessControl {
+hasPermission(userRole: Role, permission: Permission): boolean {
+return rolePermissions[userRole].includes(permission);
+}
+
+async enforcePermission(
+userId: string,
+permission: Permission,
+action: () => Promise<void>
+): Promise<void> {
+const user = await db.users.findOne({ id: userId });
+
+if (!this.hasPermission(user.role, permission)) {
+await auditor.log({
+eventType: AuditEventType.AUTHORIZATION_DENIED,
+userId,
+ipAddress: '0.0.0.0',
+userAgent: 'internal',
+resource: { type: 'permission', id: permission },
+action: 'check',
+outcome: 'failure',
+metadata: { role: user.role }
+});
+
+throw new Error(`Permission denied: ${permission}`);
+}
+
+await action();
+}
+}</void></void></role,></code></pre>
+<hr>
+<h2>SOC 2 Compliance</h2>
+<h3>SOC 2 Type II Common Criteria</h3>
+<p><strong>CC6: Logical and Physical Access Controls</strong></p>
+<pre><code class="language-typescript">// CC6.1: Access granted based on job function
+class SOC2AccessControl {
+  async grantAccess(userId: string, role: Role): Promise<void> {
+    // Verify user identity
+    const user = await this.verifyIdentity(userId);
+
+// Apply least privilege
+const permissions = rolePermissions[role];
+
+// Log access grant
+await auditor.log({
+eventType: AuditEventType.SETTINGS_CHANGED,
+userId: 'system',
+ipAddress: 'internal',
+userAgent: 'access-control',
+resource: { type: 'user', id: userId },
+action: 'grant_access',
+outcome: 'success',
+metadata: { role, permissions }
+});
+}
+
+// CC6.2: Access removed when no longer needed
+async revokeAccess(userId: string): Promise<void> {
+await db.users.update(
+{ id: userId },
+{ $set: { status: 'inactive', accessRevoked: Date.now() } }
+);
+
+await auditor.log({
+eventType: AuditEventType.SETTINGS_CHANGED,
+userId: 'system',
+ipAddress: 'internal',
+userAgent: 'access-control',
+resource: { type: 'user', id: userId },
+action: 'revoke_access',
+outcome: 'success',
+metadata: { reason: 'employment_termination' }
+});
+}
+
+// CC6.7: Detection and response to security incidents
+async detectSuspiciousActivity(userId: string): Promise<void> {
+const recentLogins = await db.auditLogs.find({
+userId,
+eventType: AuditEventType.USER_LOGIN,
+timestamp: { $gte: Date.now() - 3600000 } // Last hour
+});
+
+// Multiple failed logins
+const failedLogins = recentLogins.filter(l => l.outcome === 'failure');
+if (failedLogins.length >= 5) {
+await this.lockAccount(userId);
+await this.alertSecurityTeam(userId, 'brute_force_detected');
+}
+
+// Login from unusual location
+const locations = recentLogins.map(l => l.ipAddress);
+if (new Set(locations).size > 3) {
+await this.alertSecurityTeam(userId, 'multiple_locations');
+}
+}
+
+private async lockAccount(userId: string): Promise<void> {
+await db.users.update(
+{ id: userId },
+{ $set: { locked: true, lockedReason: 'suspicious_activity' } }
+);
+
+await auditor.log({
+eventType: AuditEventType.SUSPICIOUS_ACTIVITY,
+userId: 'system',
+ipAddress: 'internal',
+userAgent: 'security-monitor',
+resource: { type: 'user', id: userId },
+action: 'lock_account',
+outcome: 'success',
+metadata: { reason: 'brute_force_detected' }
+});
+}
+
+private async alertSecurityTeam(userId: string, reason: string): Promise<void> {
+// Send to PagerDuty, Slack, email, etc.
+console.log(`SECURITY ALERT: ${reason} for user ${userId}`);
+}
+
+private async verifyIdentity(userId: string): Promise<any> {
+// Multi-factor authentication check
+return await db.users.findOne({ id: userId });
+}
+}</any></void></void></void></void></void></code></pre>
+<h3>SOC 2 Evidence Collection</h3>
+<pre><code class="language-bash">#!/bin/bash
+# collect-soc2-evidence.sh - Automated evidence gathering
+
+EVIDENCE_DIR="/compliance/soc2/evidence-$(date +%Y-%m-%d)"
+mkdir -p $EVIDENCE_DIR
+
+# 1. Access control logs (CC6.1, CC6.2)
+pg_dump -t audit_logs --data-only > $EVIDENCE_DIR/access_logs.sql
+
+# 2. Configuration changes (CC7.2)
+git log --since="30 days ago" --pretty=format:"%h %an %ad %s" \
+> $EVIDENCE_DIR/config_changes.txt
+
+# 3. Backup verification (A1.2)
+ls -lh /backups/postgres/ > $EVIDENCE_DIR/backup_verification.txt
+
+# 4. Encryption status (CC6.6)
+openssl s_client -connect claude.example.com:443 &#x3C; /dev/null \
+| openssl x509 -text > $EVIDENCE_DIR/ssl_certificate.txt
+
+# 5. Vulnerability scans (CC7.1)
+docker scan ollama:latest > $EVIDENCE_DIR/vulnerability_scan.txt
+
+echo "Evidence collected: $EVIDENCE_DIR"</code></pre>
+<hr>
+<h2>GDPR Compliance</h2>
+<h3>GDPR Articles Implementation</h3>
+<table>
+<thead>
+<tr>
+<th>Article</th>
+<th>Requirement</th>
+<th>Implementation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Article 6</strong></td>
+<td>Lawful basis for processing</td>
+<td>Explicit consent on signup</td>
+</tr>
+<tr>
+<td><strong>Article 13</strong></td>
+<td>Information to be provided</td>
+<td>Privacy policy displayed</td>
+</tr>
+<tr>
+<td><strong>Article 15</strong></td>
+<td>Right of access</td>
+<td><code>/api/data-export</code> endpoint</td>
+</tr>
+<tr>
+<td><strong>Article 16</strong></td>
+<td>Right to rectification</td>
+<td>User can edit profile</td>
+</tr>
+<tr>
+<td><strong>Article 17</strong></td>
+<td>Right to erasure</td>
+<td><code>/api/delete-account</code> endpoint</td>
+</tr>
+<tr>
+<td><strong>Article 20</strong></td>
+<td>Right to data portability</td>
+<td>Export in JSON format</td>
+</tr>
+<tr>
+<td><strong>Article 32</strong></td>
+<td>Security of processing</td>
+<td>Encryption at rest and in transit</td>
+</tr>
+</tbody>
+</table>
+<h3>Data Subject Rights API</h3>
+<pre><code class="language-typescript">class GDPRDataSubjectRights {
+  // Article 15: Right of access
+  async exportUserData(userId: string): Promise<any> {
+    const data = {
+      profile: await db.users.findOne({ id: userId }),
+      conversations: await db.conversations.find({ userId }),
+      analytics: await db.analytics.find({ userId }),
+      auditLogs: await db.auditLogs.find({ userId }).limit(100) // Last 100 entries
+    };
+
+await auditor.log({
+eventType: AuditEventType.DATA_EXPORT,
+userId,
+ipAddress: 'internal',
+userAgent: 'gdpr-export-service',
+resource: { type: 'user', id: userId },
+action: 'export_data',
+outcome: 'success',
+metadata: { gdpr_article: '15' }
+});
+
+return data;
+}
+
+// Article 17: Right to erasure
+async deleteUserData(userId: string): Promise<void> {
+const erasure = new GDPRErasureHandler();
+await erasure.processErasureRequest(userId, crypto.randomUUID());
+}
+
+// Article 20: Right to data portability
+async exportPortableData(userId: string): Promise<string> {
+const data = await this.exportUserData(userId);
+
+// Export in machine-readable format (JSON)
+return JSON.stringify(data, null, 2);
+}
+}</string></void></any></code></pre>
+<hr>
+<h2>HIPAA Compliance</h2>
+<h3>HIPAA Technical Safeguards</h3>
+<p><strong>PHI (Protected Health Information) must never be sent to cloud APIs</strong>:</p>
+<pre><code class="language-typescript">class HIPAACompliantLLM {
+  async processHealthcareData(patientData: any): Promise<string> {
+    // ❌ HIPAA VIOLATION: Sending PHI to cloud
+    // const response = await anthropic.messages.create({
+    //   model: 'claude-3-5-sonnet-20241022',
+    //   messages: [{ role: 'user', content: `Analyze: ${patientData}` }]
+    // });
+
+// ✅ HIPAA COMPLIANT: Self-hosted Ollama
+const response = await fetch('http://localhost:11434/api/generate', {
+method: 'POST',
+body: JSON.stringify({
+model: 'llama3.3:70b',
+prompt: </string></code>Analyze patient data: ${patientData},
+stream: false
+})
+});
+
+const result = await response.json();
+
+// Audit log (required by HIPAA)
+await auditor.log({
+eventType: AuditEventType.CONVERSATION_CREATED,
+userId: 'healthcare-worker-123',
+ipAddress: '10.0.0.5',
+userAgent: 'medical-app/1.0',
+resource: { type: 'patient_analysis', id: 'patient-456' },
+action: 'process_phi',
+outcome: 'success',
+metadata: { model: 'llama3.3:70b', local: true }
+});
+
+return result.response;
+}
+}</pre>
+<h3>HIPAA Business Associate Agreement (BAA)</h3>
+<p><strong>Self-hosted = No BAA required</strong> (data never leaves your control)</p>
+<p><strong>Required Security Controls</strong>:</p>
+<pre><code class="language-bash"># Encryption at rest
+cryptsetup luksFormat /dev/sdb
+cryptsetup luksOpen /dev/sdb encrypted_volume
+mkfs.ext4 /dev/mapper/encrypted_volume
+<h1 id="encryption-in-transit-tls-13-only">Encryption in transit (TLS 1.3 only)</h1>
+<p>openssl s_server -accept 443 -cert server.crt -key server.key <br>
+-tls1_3 -cipher TLS_AES_256_GCM_SHA384</p>
+<h1 id="access-logging-required-by-hipaa">Access logging (required by HIPAA)</h1>
+</code><p><code class="language-bash">tail -f /var/log/audit/audit.log | grep PHI_ACCESS</code></p></pre><p></p>
+<hr>
+<h2>Security Hardening</h2>
+<h3>Security Checklist</h3>
+<pre><code class="language-markdown"><h2>Infrastructure Security</h2>
+<ul>
+<li>[ ] All services run with least privilege (non-root users)</li>
+<li>[ ] Firewall configured (UFW/iptables) with default-deny</li>
+<li>[ ] SSH access restricted (key-only, no password auth)</li>
+<li>[ ] Automatic security updates enabled</li>
+<li>[ ] Intrusion detection system deployed (OSSEC, Fail2ban)</li>
+</ul>
+
+<h2>Application Security</h2>
+<ul>
+<li>[ ] Input validation on all endpoints</li>
+<li>[ ] SQL injection prevention (parameterized queries)</li>
+<li>[ ] XSS prevention (output encoding)</li>
+<li>[ ] CSRF tokens on state-changing requests</li>
+<li>[ ] Rate limiting on APIs (429 responses)</li>
+</ul>
+
+<h2>Data Security</h2>
+<ul>
+<li>[ ] Encryption at rest (LUKS for disks)</li>
+<li>[ ] Encryption in transit (TLS 1.3)</li>
+<li>[ ] Database credentials rotated quarterly</li>
+<li>[ ] API keys rotated after employee departure</li>
+<li>[ ] Backups encrypted with separate key</li>
+</ul>
+
+<h2>Monitoring &#x26; Response</h2>
+</code><ul><code class="language-markdown">
+<li>[ ] SIEM configured (Splunk, ELK)</li>
+<li>[ ] Intrusion alerts sent to security team</li>
+<li>[ ] Vulnerability scanning automated (weekly)</li>
+<li>[ ] Penetration testing scheduled (annual)</li>
+</code><li><code class="language-markdown">[ ] Incident response plan documented</code></li></ul></pre>
+
+<hr>
+<h2>Best Practices</h2>
+<h3>DO ✅</h3>
+<ul>
+<li><strong>Log all security events</strong></li>
+</ul>
+   <pre><code class="language-typescript">await auditor.log({
+     eventType: AuditEventType.AUTHENTICATION_FAILED,
+     userId: 'unknown',
+     ipAddress,
+     // ... full details
+   });</code></pre>
+<ul>
+<li><strong>Encrypt sensitive data</strong></li>
+</ul>
+   <pre><code class="language-typescript">const encrypted = crypto.publicEncrypt(publicKey, Buffer.from(data));</code></pre>
+<ul>
+<li><strong>Implement data retention</strong></li>
+</ul>
+   <pre><code class="language-typescript">const retention = new RetentionManager();
+   setInterval(() => retention.enforceRetention(), 86400000); // Daily</code></pre>
+<h3>DON'T ❌</h3>
+<ul>
+<li><strong>Don't store PII unnecessarily</strong></li>
+</ul>
+   <pre><code class="language-typescript">// ❌ Store full conversation with PII
+   await db.save({ userId, messages: fullConversation });
+</code><p><code class="language-typescript">// ✅ Redact PII before storage
+await db.save({ userId, messages: redacted });</code></p></pre><p></p>
+<ul>
+<li><strong>Don't skip audit logging</strong></li>
+</ul>
+   <pre><code class="language-typescript">// ❌ No audit trail
+   await db.conversations.delete({ id });
+</code><p><code class="language-typescript">// ✅ Log deletion
+await auditor.log({ eventType: ‘conversation.deleted’, … });
+await db.conversations.delete({ id });</code></p></pre><p></p>
+<hr>
+<h2>Tools &#x26; Resources</h2>
+<h3>Compliance Automation</h3>
+<ul>
+<li><strong>Vanta</strong>: SOC 2 automation</li>
+<li><strong>Drata</strong>: Continuous compliance</li>
+<li><strong>OneTrust</strong>: GDPR automation</li>
+<li><strong>TrustArc</strong>: Privacy management</li>
+</ul>
+<h3>Security Scanning</h3>
+<ul>
+<li><strong>Nessus</strong>: Vulnerability scanning</li>
+<li><strong>OWASP ZAP</strong>: Web app security testing</li>
+<li><strong>Trivy</strong>: Container scanning</li>
+<li><strong>Snyk</strong>: Dependency scanning</li>
+</ul>
+<hr>
+<h2>Summary</h2>
+<p><strong>Key Takeaways</strong>:</p>
+<ul>
+<li><strong>Audit everything</strong> - Immutable logs with HMAC signatures</li>
+<li><strong>Minimize data</strong> - GDPR requires storage limitation</li>
+<li><strong>Self-host for HIPAA</strong> - Cloud APIs violate PHI rules</li>
+<li><strong>Implement RBAC</strong> - Least privilege access</li>
+<li><strong>Automate compliance</strong> - Evidence collection scripts</li>
+<li><strong>Encrypt data</strong> - At rest and in transit</li>
+<li><strong>Test regularly</strong> - Penetration tests, vulnerability scans</li>
+</ul>
+<p><strong>Compliance Checklist</strong>:</p>
+<ul>
+<li>[ ] Audit logging implemented (immutable, signed)</li>
+<li>[ ] Data retention policies enforced (90-day conversations)</li>
+<li>[ ] GDPR rights endpoints deployed (access, erasure, portability)</li>
+<li>[ ] RBAC configured (admin, developer, auditor, user roles)</li>
+<li>[ ] SOC 2 evidence collection automated</li>
+<li>[ ] HIPAA PHI never sent to cloud (self-hosted Ollama only)</li>
+<li>[ ] Encryption enabled (TLS 1.3, LUKS disk encryption)</li>
+<li>[ ] Security hardening complete (firewall, SSH, updates)</li>
+<li>[ ] Quarterly security reviews scheduled</li>
+<li>[ ] Annual penetration testing planned</li>
+</ul>
+<hr>
+<p><strong>Last Updated</strong>: 2025-12-24</p>
+<p><strong>Author</strong>: Jeremy Longshore</p>
+<p><strong>Related Playbooks</strong>: <a href="/playbooks/06-self-hosted-stack/">Self-Hosted Stack Setup</a>, <a href="/playbooks/03-mcp-reliability/">MCP Server Reliability</a></p>
+
+          </article>
+        </div>
+      </div>
+    </main>
+
+    <footer class="playbook-footer" data-astro-cid-hidutmah>
+      <div class="container" data-astro-cid-hidutmah>
+        <div class="footer-nav" data-astro-cid-hidutmah>
+          <a href="/playbooks/06-self-hosted-stack" class="nav-link nav-prev" data-astro-cid-hidutmah>
+              <span class="nav-label" data-astro-cid-hidutmah>Previous</span>
+              <span class="nav-title" data-astro-cid-hidutmah>Self-Hosted Stack Setup</span>
+            </a>
+          <a href="/playbooks/08-team-presets" class="nav-link nav-next" data-astro-cid-hidutmah>
+              <span class="nav-label" data-astro-cid-hidutmah>Next</span>
+              <span class="nav-title" data-astro-cid-hidutmah>Team Presets &amp; Workflows</span>
+            </a>
+        </div>
+
+        <div class="back-to-index" data-astro-cid-hidutmah>
+          <a href="/playbooks" class="back-link" data-astro-cid-hidutmah>← Back to All Playbooks</a>
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  
+
+  <script type="module">function i(){const r=document.querySelector(".playbook-content"),n=document.getElementById("toc-nav");if(!r||!n)return;const c=r.querySelectorAll("h2, h3");c.forEach((e,o)=>{e.id||(e.id=`section-${o}`);const t=document.createElement("a");t.href=`#${e.id}`,t.textContent=e.textContent,t.style.paddingLeft=e.tagName==="H3"?"1.5rem":"0.75rem",n.appendChild(t)});const a=new IntersectionObserver(e=>{e.forEach(o=>{if(o.isIntersecting){const t=o.target.id;n.querySelectorAll("a").forEach(s=>{s.classList.toggle("active",s.getAttribute("href")===`#${t}`)})}})},{rootMargin:"-100px 0px -66%"});c.forEach(e=>a.observe(e))}document.addEventListener("DOMContentLoaded",i);</script>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

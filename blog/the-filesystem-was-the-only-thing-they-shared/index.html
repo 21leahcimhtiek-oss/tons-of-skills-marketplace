@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Filesystem Was the Only Thing They Shared — Tons of Skills Work Diary</title>
+    <meta name="description" content="Four models, nine threads, one disk. Two missed nights with two unrelated root causes, and a bug filed against a file another session already fixed.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://startaitools.com/posts/the-filesystem-was-the-only-thing-they-shared/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/the-filesystem-was-the-only-thing-they-shared/">
+    <meta property="og:title" content="The Filesystem Was the Only Thing They Shared — Tons of Skills Work Diary">
+    <meta property="og:description" content="Four models, nine threads, one disk. Two missed nights with two unrelated root causes, and a bug filed against a file another session already fixed.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="The Filesystem Was the Only Thing They Shared — Tons of Skills Work Diary">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/the-filesystem-was-the-only-thing-they-shared/">
+    <meta name="twitter:title" content="The Filesystem Was the Only Thing They Shared — Tons of Skills Work Diary">
+    <meta name="twitter:description" content="Four models, nine threads, one disk. Two missed nights with two unrelated root causes, and a bug filed against a file another session already fixed.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"The Filesystem Was the Only Thing They Shared","description":"Four models, nine threads, one disk. Two missed nights with two unrelated root causes, and a bug filed against a file another session already fixed.","datePublished":"2026-08-04","url":"https://tonsofskills.com/blog/undefined","author":{"@type":"Person","name":"Jeremy Longshore"},"publisher":{"@type":"Organization","name":"Tons of Skills","url":"https://tonsofskills.com"}}</script>
+  
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.post-header[data-astro-cid-7jjqptxk]{background:var(--panel);padding:4rem 1.5rem 3rem;border-bottom:1px solid var(--border)}.post-header-inner[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto}.back-link[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3);text-decoration:none;display:inline-block;margin-bottom:1.5rem;transition:color .2s}.back-link[data-astro-cid-7jjqptxk]:hover{color:var(--primary)}.post-meta[data-astro-cid-7jjqptxk]{display:flex;align-items:center;gap:.75rem;margin-bottom:1rem}time[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3)}.featured-badge[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.2rem .6rem;background:#ce114126;color:var(--red);border-radius:0;font-weight:600;text-transform:uppercase;letter-spacing:.05em}.post-header[data-astro-cid-7jjqptxk] h1[data-astro-cid-7jjqptxk]{font-family:var(--font-body);font-size:clamp(1.5rem,4vw,2.2rem);font-weight:700;color:var(--text);line-height:1.25;margin-bottom:.75rem;letter-spacing:0}.post-desc[data-astro-cid-7jjqptxk]{color:var(--text-2);font-size:1.05rem;line-height:1.6;margin-bottom:1rem}.post-tags[data-astro-cid-7jjqptxk]{display:flex;gap:.4rem;flex-wrap:wrap}.tag[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.15rem .5rem;background:var(--surface-3);color:var(--text-3);border-radius:0}.post-body[data-astro-cid-7jjqptxk]{padding:3rem 1.5rem 4rem}.prose[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto;color:var(--text-2);line-height:1.8;font-size:1rem}.prose[data-astro-cid-7jjqptxk] h2{font-family:var(--font-body);font-size:1.5rem;font-weight:700;color:var(--text);margin:2.5rem 0 1rem;letter-spacing:0}.prose[data-astro-cid-7jjqptxk] h3{font-size:1.2rem;font-weight:600;color:var(--text);margin:2rem 0 .75rem}.prose[data-astro-cid-7jjqptxk] p{margin-bottom:1rem}.prose[data-astro-cid-7jjqptxk] ul,.prose[data-astro-cid-7jjqptxk] ol{margin:.5rem 0 1rem 1.5rem}.prose[data-astro-cid-7jjqptxk] li{margin-bottom:.35rem}.prose[data-astro-cid-7jjqptxk] strong{color:var(--text);font-weight:600}.prose[data-astro-cid-7jjqptxk] code{font-family:var(--font-mono);font-size:.88em;background:var(--surface-3);padding:.15em .35em;border-radius:0;color:var(--primary)}.prose[data-astro-cid-7jjqptxk] a{color:var(--primary);text-decoration:none}.prose[data-astro-cid-7jjqptxk] a:hover{text-decoration:underline}@media(max-width:768px){.post-header[data-astro-cid-7jjqptxk]{padding:3rem 1rem 2rem}.post-body[data-astro-cid-7jjqptxk]{padding:2rem 1rem 3rem}}
+</style></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  <article class="post" data-astro-cid-7jjqptxk>
+    <header class="post-header" data-astro-cid-7jjqptxk>
+      <div class="post-header-inner" data-astro-cid-7jjqptxk>
+        <a href="/blog" class="back-link" data-astro-cid-7jjqptxk>Back to Work Diary</a>
+        <div class="post-meta" data-astro-cid-7jjqptxk>
+          <time datetime="2026-08-04" data-astro-cid-7jjqptxk>August 3, 2026</time>
+          
+        </div>
+        <h1 data-astro-cid-7jjqptxk>The Filesystem Was the Only Thing They Shared</h1>
+        <p class="post-desc" data-astro-cid-7jjqptxk>Four models, nine threads, one disk. Two missed nights with two unrelated root causes, and a bug filed against a file another session already fixed.</p>
+        <div class="post-tags" data-astro-cid-7jjqptxk>
+          <span class="tag" data-astro-cid-7jjqptxk>ai-agents</span><span class="tag" data-astro-cid-7jjqptxk>claude-code</span><span class="tag" data-astro-cid-7jjqptxk>automation</span><span class="tag" data-astro-cid-7jjqptxk>debugging</span><span class="tag" data-astro-cid-7jjqptxk>devops</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="post-body" data-astro-cid-7jjqptxk>
+      <div class="prose" data-astro-cid-7jjqptxk>
+        <p>Nine AI coding threads ran on this box on August 4, across four models. They shared nothing by design. Separate processes, separate contexts, separate in-memory state. One session cannot read another’s variables or see another’s open files. The only surface they hold in common is the disk.</p>
+<p>When two of them disagree about what is on that disk, the failure does not announce itself as a concurrency problem. It shows up as a scheduled job that quietly declines to run, a bug filed against a file somebody else already fixed, and a morning of permission denied on paths another session moved.</p>
+<p>The day’s best evidence for that is also, inconveniently, the day’s best evidence against over-applying it. Two nights of blog posts went missing. Exactly one of them was this problem.</p>
+<h2 id="the-threads">The threads</h2>
+<p>Claude Opus 5 and Claude Fable 5 ran intent-os: 251 turns, 643 tool calls, 27 errors. The blog pipeline thread ran Claude Sonnet 5, Claude Fable 5, and Claude Opus 5: 162 turns, 342 tool calls, 11 errors. Claude Fable 5 ran intent-eval-platform: 84 turns, 213 calls, 15 errors. Claude Opus 5 ran the now-lms email session and the claude-code-plugins thread. Claude Sonnet 5 ran claude-partner-network. Claude Fable 5 also ran bobs-big-brain-umbrella. Grok 4.5 ran the claude-code-slack-channel thread. A ninth ran at the home-directory level for a team-brain review.</p>
+<p>Nine threads on one filesystem. That is the collision surface. The three with the heaviest tool traffic account for 53 of the day’s errors.</p>
+<h2 id="two-nights-two-root-causes">Two nights, two root causes</h2>
+<p>The day opened with a question about the blog’s social-posting packet, which goes to Ezekiel, who posts the syndication by hand. Was he still getting it?</p>
+<p>He was. The 5am packet job had fired every day and reported “nothing to send” on August 2 and August 3. That is its correct behavior when no post landed.</p>
+<p>This pipeline has gone quiet before. In June it published nothing for nine days while its monitoring reported success, and that one was also opened by someone noticing the absence rather than by an alert (<a href="https://startaitools.com/posts/the-automation-that-stopped-publishing-itself/">Nine Days Silent</a>). The failure below is a different mechanism with the same tell.</p>
+<p>Two turns later, the real question:</p>
+<blockquote>
+<p>why’d nothing land Aug 2 and 3 thats impossible we been doing work</p>
+</blockquote>
+<p>Correct. Work had shipped. The problem was upstream of the packet, in the 4am producer.</p>
+<p><code>blog-backfill-daily.sh</code> runs a dirty-tree guard before it does anything:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">git</span><span style="color:#9ECBFF"> status</span><span style="color:#79B8FF"> --porcelain</span><span style="color:#79B8FF"> --untracked-files=no</span></span></code></pre>
+<p>Non-empty output means tracked files are uncommitted, and the script refuses. Untracked files do not trip it. Only tracked edits.</p>
+<p>The first hypothesis was that this guard explained everything. It explained half of it.</p>
+<h3 id="the-night-the-guard-fired">The night the guard fired</h3>
+<p>The second of the two. On the evening of August 2, a different session on this box rewrote 12 of the 13 scripts under <code>scripts/blog/</code> in a single bulk edit, migrating them off the retired Slack notifier onto the governed Buzz alert runtime at <code>~/bin/lib/intent-runtime.sh</code>. The work was legitimate and complete. It was never committed. The guard found a dirty tree and refused, exactly as designed:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="text"><code><span class="line"><span>working tree has uncommitted changes on 'master'</span></span></code></pre>
+<h3 id="the-night-it-never-got-that-far">The night it never got that far</h3>
+<p>The first was self-inflicted, and had nothing to do with any other session. It never reached the guard at all. The preflight deliberately tolerates a dirty <code>.beads/interactions.jsonl</code> and commits it after the fast-forward. But this repo carried <code>pull.rebase=true</code> in local config, which routes <code>git pull --ff-only</code> through the rebase path. Rebase refuses any unstaged change. So the file the pipeline was designed to tolerate aborted the pipeline:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="text"><code><span class="line"><span>cannot pull with rebase: You have unstaged changes</span></span></code></pre>
+<p>That is a real bug, in our own tooling, and it had been sitting there waiting for the tolerated-dirty file to show up.</p>
+<h2 id="the-fix-did-not-take-minutes">The fix did not take minutes</h2>
+<p>The tempting version of this story is that the cause was found and the thing was fixed. The commit log says otherwise.</p>
+<p><code>aef7b908</code> landed the stranded script refactor at 21:47 on August 3. Two backfills followed at 22:58 and 22:59, recovering the August 1 and August 2 posts. Then, still inside the same recovery session, the rebase failure reproduced. <code>f5a6358c</code> fixed it at 00:24 on August 4 by pinning the pull inside the code rather than trusting repo config:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">git</span><span style="color:#79B8FF"> -c</span><span style="color:#9ECBFF"> pull.rebase=</span><span style="color:#79B8FF">false</span><span style="color:#9ECBFF"> pull</span><span style="color:#79B8FF"> --ff-only</span><span style="color:#9ECBFF"> origin</span><span style="color:#9ECBFF"> "</span><span style="color:#E1E4E8">$default_branch</span><span style="color:#9ECBFF">"</span></span></code></pre>
+<p>One minute later the August 3 post landed at 01:03, about three hours before its own cron would have fired. When 04:00 came, that run found the post already published and correctly no-opped.</p>
+<p>Even that was not clean. The land step first reported <code>FAILED (orphaned local commit)</code>, which was misleading, because nothing was orphaned and no commit had happened. The recovery session had inherited the producer’s git guard shim on its <code>PATH</code>, a wrapper that exists specifically to stop the model from committing, so <code>git add</code> was rejected. The daily wrapper deletes that shim immediately before invoking the lander. Running the lander by hand from inside a producer session does not get that cleanup. Re-running with the shim off <code>PATH</code> worked first try, and then the wrapper noticed the producer had moved git HEAD and refused to push anything further:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="text"><code><span class="line"><span>FATAL: producer changed Git HEAD; producer/lander boundary was violated.</span></span></code></pre>
+<p>That refusal was also correct. It is also, exactly, the day’s subject: a session acting on state it inherited from a context it could not see.</p>
+<p>Three hours and sixteen minutes from first fix to last post, across two unrelated causes that had presented as one symptom, and a third that only showed up once we started fixing them.</p>
+<p>The choice of <code>-c pull.rebase=false</code> over unsetting the local config is the durable part. Local git config is unmanaged state that any tool can reintroduce at any time. Enforcement that matters has to travel with the code.</p>
+<h2 id="why-not-loosen-the-guard">Why not loosen the guard</h2>
+<p>The obvious fix for the second night is to delete the dirty-tree guard, or narrow it so an edit under <code>scripts/</code> does not block content generation. That is the wrong fix.</p>
+<p>The guard is what makes the pipeline’s later steps safe to run unattended. The producer commits and pushes to a live site. Running it on top of somebody else’s uncommitted work means committing that work blind, under a message that describes something else entirely. That night the guard refused correctly.</p>
+<p>But the diagnosis has to be split, because the two causes need different remedies.</p>
+<p>For the cross-session night, prevention is the answer, and the rules already existed before any of this happened: commit early, do multi-step file work in a <code>git worktree</code> so the shared tree is not a shared mutable, and append to the cross-session journal at <code>~/000-projects/CROSS-SESSION-LOG.md</code> before and after touching a repo another session may be in. The guard did not fail there. The discipline did.</p>
+<p>The first night’s remedy was the code fix above, pinning the pull. What neither cause had was any way to get noticed. That is a separate problem, the routing gap, and it has its own remedy.</p>
+<p>Prevention does not help there, because nothing was preventable. Both failures were logged, each with its own fail-loud alert. The daily email said what it said. Nothing connected “the producer failed again” to “a human needs to look at this.” A job nobody watches, declining to run on a schedule, should escalate the first time it repeats, and that is a check nobody had written. Prevention stops the dirty tree. It does not tell you when a correct refusal has gone unread.</p>
+<h2 id="a-bug-filed-against-a-file-someone-else-had-already-fixed">A bug filed against a file someone else had already fixed</h2>
+<p>In a separate session on now-lms, the instruction was direct:</p>
+<blockquote>
+<p>file a bead for the broken email search tool fix it now</p>
+</blockquote>
+<p>Bead <code>OPS-1zm</code> was filed. The error was real:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="text"><code><span class="line"><span>IMAP Error: No supported authentication method(s) available</span></span></code></pre>
+<p>The agent went to read the working sender first, to learn how it resolves its config, then opened the search script that shares that same <code>SMTP_*</code> config. It was already pointing at MXroute, with a comment dated that same day. The mtime confirmed it: another session had repointed the file at 17:24, five hours before the failure that prompted the bug report.</p>
+<p>The agent’s line: “This file has already been fixed. I didn’t make those edits.”</p>
+<p>So the code was correct and the failure had still been real. The agent ran the identical query four consecutive times. It succeeded every time, and correctly returned an email that had just been sent. The honest conclusion is that the error did not reproduce, and the cause was never established. A throttle after a burst of sends is the likely explanation, not a demonstrated one.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">bd</span><span style="color:#9ECBFF"> close</span><span style="color:#9ECBFF"> OPS-1zm</span><span style="color:#79B8FF"> -r</span><span style="color:#9ECBFF"> "FALSE PREMISE - the tool was already fixed and is working; my diagnosis was wrong"</span></span></code></pre>
+<p>The self-assessment is better than the command:</p>
+<blockquote>
+<p>I filed the bead, then investigating it proved me wrong, so I closed it as a false premise rather than leave a fabricated defect in the tracker. The mistake wasn’t the transient.</p>
+</blockquote>
+<p>The mistake was filing before investigating. A tracker full of fabricated defects is worse than a tracker with a gap in it, because the fabricated ones look like work.</p>
+<h2 id="the-same-error-one-level-down-assuming-instead-of-asking">The same error, one level down: assuming instead of asking</h2>
+<p>That session then audited all five email workflows. Two were broken, and the interesting thing about both is that they failed the same way the dirty tree did: something acted on a belief about state that nobody had verified.</p>
+<p><code>bulk-organize.cjs</code> was hardcoded to <code>imap.gmail.com</code> with <code>GMAIL_*</code> credentials and no <code>.env</code> loading at all. It could not have worked without someone exporting those variables by hand. It was rewritten onto the shared config, and, more usefully, rewritten to read the folder hierarchy from the server at runtime instead of assuming Gmail’s convention.</p>
+<p>That second change is the transferable one. MXroute is Dovecot: the delimiter is <code>.</code> and user folders nest under <code>INBOX</code>. A Gmail-style <code>Social/LinkedIn</code> label would have created literal garbage folders. The real shape was confirmed by probing <code>getBoxes()</code> before a line of the fix was written. Assuming the folder convention is the same category of error as assuming the tree is clean.</p>
+<p><code>bulk-filters.cjs</code> used the Gmail API’s server-side filter settings, which have no MXroute equivalent, so repointing could not fix it. Before concluding it was impossible, the agent checked what the server actually offered:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#E1E4E8">H</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">sunfire.mxrouting.net</span></span>
+<span class="line"><span style="color:#F97583">for</span><span style="color:#E1E4E8"> p </span><span style="color:#F97583">in</span><span style="color:#9ECBFF"> 4190</span><span style="color:#9ECBFF"> 2000</span><span style="color:#E1E4E8">; </span><span style="color:#F97583">do</span></span>
+<span class="line"><span style="color:#B392F0">  timeout</span><span style="color:#79B8FF"> 8</span><span style="color:#9ECBFF"> bash</span><span style="color:#79B8FF"> -c</span><span style="color:#9ECBFF"> "echo > /dev/tcp/</span><span style="color:#E1E4E8">$H</span><span style="color:#9ECBFF">/</span><span style="color:#E1E4E8">$p</span><span style="color:#9ECBFF">"</span><span style="color:#F97583"> 2></span><span style="color:#9ECBFF">/dev/null</span><span style="color:#E1E4E8"> &#x26;&#x26; </span><span style="color:#79B8FF">echo</span><span style="color:#9ECBFF"> "port </span><span style="color:#E1E4E8">$p</span><span style="color:#9ECBFF">: open"</span></span>
+<span class="line"><span style="color:#F97583">done</span></span></code></pre>
+<p>Port 4190 answered. A second connection read the banner:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#79B8FF">exec</span><span style="color:#79B8FF"> 3</span><span style="color:#F97583">&#x3C;></span><span style="color:#9ECBFF">/dev/tcp/sunfire.mxrouting.net/4190</span></span>
+<span class="line"><span style="color:#B392F0">timeout</span><span style="color:#79B8FF"> 5</span><span style="color:#9ECBFF"> cat</span><span style="color:#F97583"> &#x3C;</span><span style="color:#E1E4E8">&#x26;</span><span style="color:#B392F0">3</span></span></code></pre>
+<p>It advertised <code>SASL PLAIN</code>, <code>STARTTLS</code>, and, critically, <code>fileinto</code> plus <code>mailbox</code>, which means rules can auto-create the folders they file into. A real server-side filter implementation was possible after all.</p>
+<p>The only <code>sieve</code> package on npm was an unmaintained 0.0.4, so the agent hand-rolled a client against Node’s built-in <code>tls</code> for what it called a ten-command line protocol, with a guard against clobbering existing rules. The guard fired immediately, on a real pre-existing MXroute default script named <code>managesieve</code> containing <code>/* empty script */</code>. The dry run was then verified side-effect free by re-probing the mailbox list and confirming it unchanged.</p>
+<h2 id="two-more-claims-withdrawn">Two more claims withdrawn</h2>
+<p>The false-premise close was not the only time that day a claim got pulled rather than shipped.</p>
+<p><strong>An agent refused to re-stamp a dated evidence record.</strong> In intent-os, an edit to <code>live_observer.py</code> broke a validation, because that file’s hash is bound into a dated evidence record named <code>live-runbook-resolution-residual-2026-07-16.json</code>. Re-stamping the record would have made the validation pass immediately:</p>
+<blockquote>
+<p>Re-stamping that record to accommodate my edit would quietly change what a past observation attests. I won’t do that.</p>
+</blockquote>
+<p>It reverted its own change with <code>git checkout --</code> and implemented a narrower exemption instead, on the grounds that the rule is a human-noise policy and should not apply in dry-run, where nobody is being paged.</p>
+<p><strong>A reviewer refused someone else’s.</strong> On intent-os PR #374, an independent evidence-auditor reproduced two review findings as genuinely accepted defects and returned <code>EVIDENCE_INCOMPLETE</code> rather than let the epic close. The findings were specific: the schema’s cross-field constraints allowed a <code>WORK_STATE_CONFLICT</code> to be recorded against a partial link, and <code>"plane"</code> sat in the <code>authority_verdict</code> enum even though a mirror surface is never authoritative.</p>
+<p>Both were fixed before any producer existed to emit against them. The schema went 0.1.0 to 0.2.0, and <code>"plane"</code> was replaced by an optional <code>detected_on</code> field. Correcting a contract before anything writes against it is cheap. Correcting it afterward is a migration.</p>
+<p>The same reflex showed up in a merge. Reading the review comments on bobs-big-brain-registrar #319 before merging caught that the branch carried a stale pre-fix copy of #318’s eval-anchor code. Merging blind would have regressed main’s WAL-safe preserve back to the torn-copy bug. That is the cron story again, in a different vocabulary: a stale artifact on disk, caught only because someone looked before acting.</p>
+<h2 id="the-errors-that-were-two-sessions-disagreeing">The errors that were two sessions disagreeing</h2>
+<p>Five lines from the day’s error output. Each reads like an ordinary failure:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="text"><code><span class="line"><span>ls: cannot access '/home/jeremy/bin/lib/notify-lib.sh': No such file or directory</span></span>
+<span class="line"><span>grep: /home/jeremy/bin/minimax-agent.py: No such file or directory</span></span>
+<span class="line"><span>error: cannot open '.git/FETCH_HEAD': Permission denied</span></span>
+<span class="line"><span>fatal: cannot create directory at '.claude/agent-memory': Permission denied</span></span>
+<span class="line"><span>fatal: Not possible to fast-forward, aborting.</span></span></code></pre>
+<p>The first is the sharpest piece of evidence in the whole day. <code>notify-lib.sh</code> is precisely the file the stranded refactor retired. One session removed it; another session went looking for it and got a file-not-found.</p>
+<p>The next is the same shape. The permission denied pair are root-owned artifacts another run left behind. The fast-forward refusal is git’s version of the same disagreement.</p>
+<p>I did not classify all 71 of the day’s failure-to-fix moments, so I cannot say what fraction were cross-session. These five are the ones that trace directly to another session’s changes.</p>
+<p>Two human course-corrections that day carried the right instinct:</p>
+<blockquote>
+<p>hold on check bobs big brain imbrella and make sure we are all aligned etc etc</p>
+<p>i dont see that api key anywhere this machine has ssh access see intent os for instructions</p>
+</blockquote>
+<p>Both are the same move. Before trusting your read of shared state, go check whether it already changed, or already exists.</p>
+<h2 id="an-adjacent-failure-a-repo-nothing-could-deploy">An adjacent failure: a repo nothing could deploy</h2>
+<p>One thread from the day is worth recording even though it is not a shared-state collision, because it is the shape you get when there is no second session to disagree with you.</p>
+<p>A sidecar service on the production VPS was 48 commits behind. Before deploying, the session checked what the pull would actually change, which is the part worth copying. Across all 48 commits the sidecar’s own source changed only by its own 26-line fix, and <code>secrets.prod.sops.yaml</code> was untouched. Those were the two specific restart risks, and both cleared.</p>
+<p>Then the pull failed on credentials. Three per-repo SSH deploy keys already existed on that host: <code>github-braves</code>, <code>github-runbook</code>, and <code>partner-portals-github</code>. Each was tested read-only against the repo. None could reach it, because they are repo-scoped by design.</p>
+<p>The repo had no deploy path at all. Nothing on that box held the belief that this service was deployable, so no session could have discovered the absence except by trying. A read-only deploy key was registered, an SSH host alias wired up, and the pull run as the service’s own user so artifact ownership stayed correct.</p>
+<h2 id="what-the-day-was">What the day was</h2>
+<p>Nine threads, one disk, no shared memory between them. When they disagreed about that disk, the failures looked like a job that skipped, a bug that was not a bug, and a handful of file-not-found errors.</p>
+<p>The honest version has a caveat attached, and the caveat is the useful part. Two nights failed, and only one of them was this. The other was our own config breaking our own tolerance rule, with no second session anywhere near it. Had the cross-session explanation been accepted for both, it would have been fixed once and stayed broken, and the next failure would have looked like a mystery.</p>
+<p>That is the working conclusion. The disk is the only thing these processes share, so read it before you trust your model of it. And when a story explains half the evidence, do not let the half it explains stand in for the rest.</p>
+<h2 id="also-shipped">Also shipped</h2>
+<p>The rest of the day, for the record.</p>
+<p><strong>intent-os, 16 merged PRs</strong>, mostly finishing the estate-wide retirement of <code>notify.sh</code> for a governed alert floor on the Buzz transport. PR #365 migrated the last three consumers, #367 replaced the retired entry point with a translator shim, #366 raised public-internet SSH logins to high severity, and #362 committed detection state before dispatch so that a failed alert can no longer disable the uptime monitor that produced it.</p>
+<p>Also in intent-os, PRs #373 and #374 landed the <code>work-item-link.v0</code> and <code>drift-finding.v0</code> schema contracts (a stable ID triple with a two-of-three linkage minimum, and a closed four-class finding enum), and #375 landed the read-only GitHub, Beads and Plane reconciler that consumes them. Its first live sweep ran over 40 databases and 742 work items and returned 53 findings. Its schema validation also refused a real bead id, which widened the link pattern to accept uppercase prefixes.</p>
+<p><strong>buzz, 6 PRs.</strong> A fork-contract breach from the day before was audited (#17), the offending change reverted (#18), upstream main synced (#19, 117 commits), and the contract encoded as a CI gate (#20). The rule that got broken became a check.</p>
+<p><strong>bobs-big-brain-compiler #183</strong> made the MiniMax-M3 compile path usable by stripping inline <code>&#x3C;think></code> blocks and pricing it. A follow-on audit found the nightly harness <code>minimax-agent.py</code> killed the entire run on any <code>HTTPError</code>, including 429. It now retries 429, 500, 502, 503 and 529 up to five times, honoring the server’s <code>Retry-After</code> header, while 401, 402 and 400 still fail fast.</p>
+<p><strong>claude-code-plugins</strong> turned retired URLs into real 301s (#1158) and made the marketplace site chrome model-agnostic (#1159). <strong>twenty-mcp</strong> repaired 12 MCP tools broken by Twenty’s v2 GraphQL schema migration. <strong>claude-code-slack-channel</strong> #287 shipped Block Kit replies with live option buttons.</p>
+<h2 id="related-posts">Related Posts</h2>
+<ul>
+<li><a href="https://startaitools.com/posts/the-check-that-only-confirmed-a-name/">The Check That Only Confirmed a Name</a></li>
+<li><a href="https://startaitools.com/posts/when-live-numbers-argue-back/">When Live Numbers Argue Back</a></li>
+<li><a href="https://startaitools.com/posts/how-the-same-deploy-pattern-crossed-four-repos-in-one-week/">How the Same Deploy Pattern Crossed Four Repos in One Week</a></li>
+</ul>
+      </div>
+    </div>
+  </article>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

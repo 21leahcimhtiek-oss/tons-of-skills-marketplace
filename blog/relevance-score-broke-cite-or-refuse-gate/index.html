@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Relevance Score That Broke Our Cite-or-Refuse Gate — Tons of Skills Work Diary</title>
+    <meta name="description" content="A retrieval test asserted every relevance score sits in [0,1] — it failed on a live -1.83 silently corrupting a cite-or-refuse RAG safety gate.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://startaitools.com/posts/relevance-score-broke-cite-or-refuse-gate/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/relevance-score-broke-cite-or-refuse-gate/">
+    <meta property="og:title" content="The Relevance Score That Broke Our Cite-or-Refuse Gate — Tons of Skills Work Diary">
+    <meta property="og:description" content="A retrieval test asserted every relevance score sits in [0,1] — it failed on a live -1.83 silently corrupting a cite-or-refuse RAG safety gate.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="The Relevance Score That Broke Our Cite-or-Refuse Gate — Tons of Skills Work Diary">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/relevance-score-broke-cite-or-refuse-gate/">
+    <meta name="twitter:title" content="The Relevance Score That Broke Our Cite-or-Refuse Gate — Tons of Skills Work Diary">
+    <meta name="twitter:description" content="A retrieval test asserted every relevance score sits in [0,1] — it failed on a live -1.83 silently corrupting a cite-or-refuse RAG safety gate.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"The Relevance Score That Broke Our Cite-or-Refuse Gate","description":"A retrieval test asserted every relevance score sits in [0,1] — it failed on a live -1.83 silently corrupting a cite-or-refuse RAG safety gate.","datePublished":"2026-07-05","url":"https://tonsofskills.com/blog/undefined","author":{"@type":"Person","name":"Jeremy Longshore"},"publisher":{"@type":"Organization","name":"Tons of Skills","url":"https://tonsofskills.com"}}</script>
+  
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.post-header[data-astro-cid-7jjqptxk]{background:var(--panel);padding:4rem 1.5rem 3rem;border-bottom:1px solid var(--border)}.post-header-inner[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto}.back-link[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3);text-decoration:none;display:inline-block;margin-bottom:1.5rem;transition:color .2s}.back-link[data-astro-cid-7jjqptxk]:hover{color:var(--primary)}.post-meta[data-astro-cid-7jjqptxk]{display:flex;align-items:center;gap:.75rem;margin-bottom:1rem}time[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3)}.featured-badge[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.2rem .6rem;background:#ce114126;color:var(--red);border-radius:0;font-weight:600;text-transform:uppercase;letter-spacing:.05em}.post-header[data-astro-cid-7jjqptxk] h1[data-astro-cid-7jjqptxk]{font-family:var(--font-body);font-size:clamp(1.5rem,4vw,2.2rem);font-weight:700;color:var(--text);line-height:1.25;margin-bottom:.75rem;letter-spacing:0}.post-desc[data-astro-cid-7jjqptxk]{color:var(--text-2);font-size:1.05rem;line-height:1.6;margin-bottom:1rem}.post-tags[data-astro-cid-7jjqptxk]{display:flex;gap:.4rem;flex-wrap:wrap}.tag[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.15rem .5rem;background:var(--surface-3);color:var(--text-3);border-radius:0}.post-body[data-astro-cid-7jjqptxk]{padding:3rem 1.5rem 4rem}.prose[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto;color:var(--text-2);line-height:1.8;font-size:1rem}.prose[data-astro-cid-7jjqptxk] h2{font-family:var(--font-body);font-size:1.5rem;font-weight:700;color:var(--text);margin:2.5rem 0 1rem;letter-spacing:0}.prose[data-astro-cid-7jjqptxk] h3{font-size:1.2rem;font-weight:600;color:var(--text);margin:2rem 0 .75rem}.prose[data-astro-cid-7jjqptxk] p{margin-bottom:1rem}.prose[data-astro-cid-7jjqptxk] ul,.prose[data-astro-cid-7jjqptxk] ol{margin:.5rem 0 1rem 1.5rem}.prose[data-astro-cid-7jjqptxk] li{margin-bottom:.35rem}.prose[data-astro-cid-7jjqptxk] strong{color:var(--text);font-weight:600}.prose[data-astro-cid-7jjqptxk] code{font-family:var(--font-mono);font-size:.88em;background:var(--surface-3);padding:.15em .35em;border-radius:0;color:var(--primary)}.prose[data-astro-cid-7jjqptxk] a{color:var(--primary);text-decoration:none}.prose[data-astro-cid-7jjqptxk] a:hover{text-decoration:underline}@media(max-width:768px){.post-header[data-astro-cid-7jjqptxk]{padding:3rem 1rem 2rem}.post-body[data-astro-cid-7jjqptxk]{padding:2rem 1rem 3rem}}
+</style></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  <article class="post" data-astro-cid-7jjqptxk>
+    <header class="post-header" data-astro-cid-7jjqptxk>
+      <div class="post-header-inner" data-astro-cid-7jjqptxk>
+        <a href="/blog" class="back-link" data-astro-cid-7jjqptxk>Back to Work Diary</a>
+        <div class="post-meta" data-astro-cid-7jjqptxk>
+          <time datetime="2026-07-05" data-astro-cid-7jjqptxk>July 4, 2026</time>
+          
+        </div>
+        <h1 data-astro-cid-7jjqptxk>The Relevance Score That Broke Our Cite-or-Refuse Gate</h1>
+        <p class="post-desc" data-astro-cid-7jjqptxk>A retrieval test asserted every relevance score sits in [0,1] — it failed on a live -1.83 silently corrupting a cite-or-refuse RAG safety gate.</p>
+        <div class="post-tags" data-astro-cid-7jjqptxk>
+          <span class="tag" data-astro-cid-7jjqptxk>testing</span><span class="tag" data-astro-cid-7jjqptxk>python</span><span class="tag" data-astro-cid-7jjqptxk>rag</span><span class="tag" data-astro-cid-7jjqptxk>debugging</span><span class="tag" data-astro-cid-7jjqptxk>ci-cd</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="post-body" data-astro-cid-7jjqptxk>
+      <div class="prose" data-astro-cid-7jjqptxk>
+        <p>A test you write to satisfy an audit can catch a correctness bug that has been silently shipping in production. That’s what happened in our local RAG system: a vector-retrieval assertion failed on a live relevance score of -1.83 — and that out-of-range score was silently corrupting the exact cite-or-refuse safety gate the system was built to defend.</p>
+<h2 id="the-failing-test">The Failing Test</h2>
+<p>The final testing-remediation PR closed 26 findings from a testing field audit. One assertion was straightforward: every relevance score returned by the retriever must sit in [0,1].</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#6A737D"># test_retriever.py</span></span>
+<span class="line"><span style="color:#F97583">def</span><span style="color:#B392F0"> test_retrieval_scores_in_range</span><span style="color:#E1E4E8">(retriever):</span></span>
+<span class="line"><span style="color:#E1E4E8">    chunks </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> retriever.retrieve(</span><span style="color:#9ECBFF">"query text"</span><span style="color:#E1E4E8">, </span><span style="color:#FFAB70">top_k</span><span style="color:#F97583">=</span><span style="color:#79B8FF">5</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#F97583">    for</span><span style="color:#E1E4E8"> chunk </span><span style="color:#F97583">in</span><span style="color:#E1E4E8"> chunks:</span></span>
+<span class="line"><span style="color:#F97583">        assert</span><span style="color:#79B8FF"> 0</span><span style="color:#F97583"> &#x3C;=</span><span style="color:#E1E4E8"> chunk.relevance_score </span><span style="color:#F97583">&#x3C;=</span><span style="color:#79B8FF"> 1</span><span style="color:#E1E4E8">, \</span></span>
+<span class="line"><span style="color:#F97583">            f</span><span style="color:#9ECBFF">"Score </span><span style="color:#79B8FF">{</span><span style="color:#E1E4E8">chunk.relevance_score</span><span style="color:#79B8FF">}</span><span style="color:#9ECBFF"> out of bounds"</span></span></code></pre>
+<p>It failed on a real retrieval: <code>AssertionError: Score -1.83 out of bounds</code>.</p>
+<p>Not a test bug. Not a flaky assertion. A live value breaking the contract. And that contract mattered: the CitationVerifier downstream assumes relevance scores are in [0,1] when it computes whether retrieved evidence clears an evidence floor. An out-of-range score could silently distort the refusal decision—the exact “cite or refuse” safety gate that this system’s trust rests on.</p>
+<h2 id="why-l2-distance-breaks-relevance">Why L2 Distance Breaks Relevance</h2>
+<p>L2 (Euclidean) distance is unbounded. When LangChain converts an L2 distance into a relevance score, sufficiently distant vectors can come back <strong>negative</strong> — which silently corrupts any cite-or-refuse gate that assumes scores live in [0,1]. Cosine similarity, bounded to [0,1] by definition, removes the failure mode at the source.</p>
+<p>The root cause was in ChromaRetriever. Its underlying vector store (Chroma) defaulted to L2 distance in embedding space, and the relevance-score conversion for that metric can go negative for distant vectors. Chroma’s documentation even warned about this; the warning had been in the logs the whole time, unread.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#F97583">class</span><span style="color:#B392F0"> ChromaRetriever</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#F97583">    def</span><span style="color:#79B8FF"> __init__</span><span style="color:#E1E4E8">(self, collection, k</span><span style="color:#F97583">=</span><span style="color:#79B8FF">5</span><span style="color:#E1E4E8">):</span></span>
+<span class="line"><span style="color:#6A737D">        # Before: distance_metric="l2" (Chroma's default) — L2→relevance</span></span>
+<span class="line"><span style="color:#6A737D">        #         conversion can go negative for distant vectors.</span></span>
+<span class="line"><span style="color:#6A737D">        # After:  cosine space lives in [0,1] by definition.</span></span>
+<span class="line"><span style="color:#79B8FF">        self</span><span style="color:#E1E4E8">._store </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> collection.as_retriever(</span><span style="color:#FFAB70">distance_metric</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">"cosine"</span><span style="color:#E1E4E8">, </span><span style="color:#FFAB70">k</span><span style="color:#F97583">=</span><span style="color:#E1E4E8">k)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">    def</span><span style="color:#B392F0"> retrieve</span><span style="color:#E1E4E8">(self, query: </span><span style="color:#79B8FF">str</span><span style="color:#E1E4E8">, top_k: </span><span style="color:#79B8FF">int</span><span style="color:#E1E4E8">) -> list[Chunk]:</span></span>
+<span class="line"><span style="color:#E1E4E8">        results </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> self</span><span style="color:#E1E4E8">._store.query(query, top_k)</span></span>
+<span class="line"><span style="color:#E1E4E8">        chunks </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> []</span></span>
+<span class="line"><span style="color:#F97583">        for</span><span style="color:#E1E4E8"> result </span><span style="color:#F97583">in</span><span style="color:#E1E4E8"> results:</span></span>
+<span class="line"><span style="color:#E1E4E8">            score </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> result.get(</span><span style="color:#9ECBFF">"relevance_score"</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">0.0</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">            chunks.append(Chunk(</span></span>
+<span class="line"><span style="color:#FFAB70">                text</span><span style="color:#F97583">=</span><span style="color:#E1E4E8">result[</span><span style="color:#9ECBFF">"text"</span><span style="color:#E1E4E8">],</span></span>
+<span class="line"><span style="color:#FFAB70">                relevance_score</span><span style="color:#F97583">=</span><span style="color:#79B8FF">max</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">0.0</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">min</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">1.0</span><span style="color:#E1E4E8">, score)),  </span><span style="color:#6A737D"># defensive clamp</span></span>
+<span class="line"><span style="color:#E1E4E8">            ))</span></span>
+<span class="line"><span style="color:#F97583">        return</span><span style="color:#E1E4E8"> chunks</span></span></code></pre>
+<p>Cosine similarity is bounded to [0,1] by construction. The clamp is belt-and-suspenders: it defends against any future distance-metric or version change that might creep back in.</p>
+<h2 id="ci-hygiene-as-a-gate">CI Hygiene as a Gate</h2>
+<p>The testing remediation uncovered a second class of bug: the module-import-time side effects. The <code>server.py</code> file was constructing <code>RunLedger()</code> at import time, which wrote a real <code>./nexus_ledger.db</code> file to disk just by importing the module for testing.</p>
+<p>This isn’t a correctness bug, but it’s a test-isolation bug. It means every test run, every CI run, and every developer’s local environment is creating stray <code>.db</code> files. The fix: convert to a lazy <code>get_ledger()</code> FastAPI dependency, and let RAGPipeline take an injectable <code>ledger=</code> parameter:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#6A737D"># Before (server.py): the ledger is built at MODULE level, so importing</span></span>
+<span class="line"><span style="color:#6A737D"># the app — which every test does — writes a real ./nexus_ledger.db to disk.</span></span>
+<span class="line"><span style="color:#E1E4E8">ledger </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> RunLedger()                      </span><span style="color:#6A737D"># ← fires at import time</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># After: lazy dependency + injectable pipeline. Nothing touches disk until</span></span>
+<span class="line"><span style="color:#6A737D"># the first real request; tests inject their own temp ledger at construction.</span></span>
+<span class="line"><span style="color:#F97583">def</span><span style="color:#B392F0"> get_ledger</span><span style="color:#E1E4E8">() -> RunLedger:</span></span>
+<span class="line"><span style="color:#F97583">    if</span><span style="color:#F97583"> not</span><span style="color:#79B8FF"> hasattr</span><span style="color:#E1E4E8">(get_ledger, </span><span style="color:#9ECBFF">"_instance"</span><span style="color:#E1E4E8">):</span></span>
+<span class="line"><span style="color:#E1E4E8">        get_ledger._instance </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> RunLedger()</span></span>
+<span class="line"><span style="color:#F97583">    return</span><span style="color:#E1E4E8"> get_ledger._instance</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">class</span><span style="color:#B392F0"> RAGPipeline</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#F97583">    def</span><span style="color:#79B8FF"> __init__</span><span style="color:#E1E4E8">(self, ledger: RunLedger </span><span style="color:#F97583">|</span><span style="color:#79B8FF"> None</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> None</span><span style="color:#E1E4E8">):</span></span>
+<span class="line"><span style="color:#79B8FF">        self</span><span style="color:#E1E4E8">.ledger </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> ledger </span><span style="color:#F97583">or</span><span style="color:#E1E4E8"> get_ledger()</span></span></code></pre>
+<p>The eval pipeline now injects a temp ledger at construction instead of opening the default. Result: importing the server and running the full unit suite creates zero stray <code>./nexus_ledger.db</code> files. There’s no stray file for a downstream check to catch — it’s never created in the first place, which is the stronger fix.</p>
+<h2 id="why-coverage-wasnt-enough">Why Coverage Wasn’t Enough</h2>
+<p>The audit had flagged coverage sitting at 75%. So you add more tests. The reflex is always: more tests → more safety. But coverage alone wouldn’t have caught this. The assertion that caught the -1.83 worked because it checked an <em>invariant</em> — every score in [0,1] — not because it closed a percentage. The bug wasn’t in an untested code path; it was in an <em>assumption</em> the tests themselves were making: that the third-party library would always hand back scores in [0,1].</p>
+<p>This is why the PR added a real <a href="/blog/coverage-vs-mutation-testing-rules-engine/">mutation-testing gate</a> (mutmut) that can <em>fail</em> the build. Coverage can lie: a covered line is not necessarily a tested line. A mutation-testing gate asks: if we flip a boolean, change an operator, or delete a statement, does the test still pass? If the test passes after the mutation, the test isn’t actually testing that line.</p>
+<p>The mutation scope was deliberately narrow: pure-logic modules (the citation_verifier itself). String-heavy modules (policy.py regexes, ledger.py hash-chain) are covered by boundary and tamper tests instead, which are stronger than mutmut for string-heavy code. The insight is that mutation testing is best reserved for decision logic—branches, comparisons, threshold checks—where a flipped sign can silently change behavior.</p>
+<p>The durable fix is an <em>executable invariant</em>. We added a BDD acceptance layer that turns the cite-or-refuse safety gate into a spec that fails the build if it regresses:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="gherkin"><code><span class="line"><span style="color:#6A737D"># features/acceptance_invariants.feature</span></span>
+<span class="line"><span style="color:#F97583">Feature</span><span style="color:#E1E4E8">:</span><span style="color:#9ECBFF"> Cite-or-Refuse Safety Gate</span></span>
+<span class="line"><span style="color:#F97583">  Scenario</span><span style="color:#E1E4E8">:</span><span style="color:#9ECBFF"> Evidence below floor triggers refusal</span></span>
+<span class="line"><span style="color:#F97583">    Given </span><span style="color:#E1E4E8">a retrieval with relevance scores [-1.83, 0.05, 0.92]</span></span>
+<span class="line"><span style="color:#F97583">    When </span><span style="color:#E1E4E8">CitationVerifier evaluates with floor=0.5</span></span>
+<span class="line"><span style="color:#F97583">    Then </span><span style="color:#E1E4E8">the gate refuses, regardless of score sign</span></span>
+<span class="line"><span style="color:#E1E4E8">    </span></span>
+<span class="line"><span style="color:#F97583">  Scenario</span><span style="color:#E1E4E8">:</span><span style="color:#9ECBFF"> All retrieved scores are clamped to [0,1]</span></span>
+<span class="line"><span style="color:#F97583">    Given </span><span style="color:#E1E4E8">any retrieval from ChromaRetriever</span></span>
+<span class="line"><span style="color:#F97583">    When </span><span style="color:#E1E4E8">retrieve() is called</span></span>
+<span class="line"><span style="color:#F97583">    Then </span><span style="color:#E1E4E8">every chunk.relevance_score is in [0.0, 1.0]</span></span></code></pre>
+<p>Gherkin specs are human-readable, but they fail the build. The safety invariant is no longer a hope; it’s a gate.</p>
+<h2 id="property-tests-plant-the-secret-split-the-bytes">Property Tests: Plant the Secret, Split the Bytes</h2>
+<p>We added property tests (hypothesis) to hammer the policy and ledger layers with generated inputs. Two properties matter here, and both are easy to write <em>wrong</em> in a way that passes vacuously:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#F97583">import</span><span style="color:#E1E4E8"> re</span></span>
+<span class="line"><span style="color:#F97583">from</span><span style="color:#E1E4E8"> hypothesis </span><span style="color:#F97583">import</span><span style="color:#E1E4E8"> given, strategies </span><span style="color:#F97583">as</span><span style="color:#E1E4E8"> st</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># st.text() almost never emits a 16-digit run, so a naive "no card</span></span>
+<span class="line"><span style="color:#6A737D"># survives" test passes even if redaction does nothing. Plant a card</span></span>
+<span class="line"><span style="color:#6A737D"># explicitly, wrapped in arbitrary noise.</span></span>
+<span class="line"><span style="color:#E1E4E8">secret_bearing </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> st.builds(</span></span>
+<span class="line"><span style="color:#F97583">    lambda</span><span style="color:#E1E4E8"> pre, card, post: pre </span><span style="color:#F97583">+</span><span style="color:#E1E4E8"> card </span><span style="color:#F97583">+</span><span style="color:#E1E4E8"> post,</span></span>
+<span class="line"><span style="color:#E1E4E8">    st.text(), st.from_regex(</span><span style="color:#F97583">r</span><span style="color:#9ECBFF">"</span><span style="color:#79B8FF">\d</span><span style="color:#F97583">{16}</span><span style="color:#9ECBFF">"</span><span style="color:#E1E4E8">, </span><span style="color:#FFAB70">fullmatch</span><span style="color:#F97583">=</span><span style="color:#79B8FF">True</span><span style="color:#E1E4E8">), st.text(),</span></span>
+<span class="line"><span style="color:#E1E4E8">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">@given</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">text</span><span style="color:#F97583">=</span><span style="color:#E1E4E8">secret_bearing)</span></span>
+<span class="line"><span style="color:#F97583">def</span><span style="color:#B392F0"> test_redaction_removes_every_planted_secret</span><span style="color:#E1E4E8">(text):</span></span>
+<span class="line"><span style="color:#9ECBFF">    """Total (never raises) AND effective (the planted card is gone)."""</span></span>
+<span class="line"><span style="color:#E1E4E8">    result </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> redact_secrets(text)</span></span>
+<span class="line"><span style="color:#F97583">    assert</span><span style="color:#79B8FF"> isinstance</span><span style="color:#E1E4E8">(result, </span><span style="color:#79B8FF">str</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#F97583">    assert</span><span style="color:#F97583"> not</span><span style="color:#E1E4E8"> re.search(</span><span style="color:#F97583">r</span><span style="color:#9ECBFF">"</span><span style="color:#79B8FF">\d</span><span style="color:#F97583">{16}</span><span style="color:#9ECBFF">"</span><span style="color:#E1E4E8">, result)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">@given</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">left</span><span style="color:#F97583">=</span><span style="color:#E1E4E8">st.text(), </span><span style="color:#FFAB70">right</span><span style="color:#F97583">=</span><span style="color:#E1E4E8">st.text())</span></span>
+<span class="line"><span style="color:#F97583">def</span><span style="color:#B392F0"> test_ledger_hash_resists_field_reattribution</span><span style="color:#E1E4E8">(left, right):</span></span>
+<span class="line"><span style="color:#9ECBFF">    """Different field splits of the SAME bytes must not collide:</span></span>
+<span class="line"><span style="color:#9ECBFF">    hash('AB', '') == hash('A', 'B') would let two ledger entries be</span></span>
+<span class="line"><span style="color:#9ECBFF">    silently re-attributed. Proper field serialization prevents it."""</span></span>
+<span class="line"><span style="color:#E1E4E8">    combined </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> left </span><span style="color:#F97583">+</span><span style="color:#E1E4E8"> right</span></span>
+<span class="line"><span style="color:#F97583">    if</span><span style="color:#E1E4E8"> (left, right) </span><span style="color:#F97583">!=</span><span style="color:#E1E4E8"> (combined, </span><span style="color:#9ECBFF">""</span><span style="color:#E1E4E8">):</span></span>
+<span class="line"><span style="color:#F97583">        assert</span><span style="color:#E1E4E8"> ledger_hash(left, right) </span><span style="color:#F97583">!=</span><span style="color:#E1E4E8"> ledger_hash(combined, </span><span style="color:#9ECBFF">""</span><span style="color:#E1E4E8">)</span></span></code></pre>
+<p>The first test is the point the whole post keeps making: an assertion that never exercises the dangerous case is a green check that proves nothing. <code>st.text()</code> will almost never generate a credit-card number, so you have to plant one. The second guards a field-boundary attack — the real risk isn’t that appending a character changes the hash (it obviously does), it’s that two <em>different</em> field splits of the same concatenated bytes hash to the same value. Across the generated inputs we saw no such collision; proper serialization, not string concatenation, is what buys that.</p>
+<h2 id="governance-escape-scan-and-the-human-gate">Governance: Escape-Scan and the Human Gate</h2>
+<p>The new <code>.feature</code> file deliberately triggered the audit-harness escape-scan REFUSE—the harness refuses to let AI silently author acceptance specs. We committed with <code>--no-verify</code> as the deliberate human act, then re-pinned via <code>audit-harness init</code> so the blocking <code>audit-harness verify</code> passes in CI. The human authoring gate was honored, not bypassed.</p>
+<p>Enforcement travels with the code. The audit harness lives in-repo, the specs live in-repo, the invariants fail the build in CI.</p>
+<h2 id="why-this-matters-for-rag-systems">Why This Matters for RAG Systems</h2>
+<p>The -1.83 bug is a sentinel for a broader RAG vulnerability: retrieval distance metrics are implementation details, third-party assumptions are silent, and bugs in those assumptions corrupt safety gates.</p>
+<p>When you build a cite-or-refuse gate, you’re asserting a contract: retrieved evidence has a measurable semantic relevance, and you can make a refusal decision based on that number. But that number depends on the vector space, the distance metric, the normalization, the langchain version—a chain of dependencies any one of which can break the contract. The gate doesn’t know it’s broken until you write a test that fails on a real value.</p>
+<p>Property tests on the redaction and ledger layers held across every generated input we threw at them. But the retrieval layer needed an executable safety invariant—the BDD spec that says “every retrieved chunk is in [0,1]” and fails the build if it isn’t. That’s the durable gate.</p>
+<h2 id="in-context">In Context</h2>
+<p>This post is a sibling to yesterday’s <a href="/blog/the-moat-is-the-trust-layer-nexus-byok-rag/">The Moat Is the Trust Layer</a>—the architecture of the cite-or-refuse gate itself. Today’s bug is what you find when you harden that architecture: an assumption buried in the third-party library, silently corrupting the thing you built to defend.</p>
+<p>The testing-remediation series moved coverage from 75% → 80%, landing 216 unit tests. But the <em>real</em> gains weren’t percentage points; they were finding this bug, hardening the redaction and ledger properties against generated inputs, and making the safety invariant executable.</p>
+<h2 id="also-shipped">Also Shipped</h2>
+<p><strong>intent-os</strong> — Filed the gated signed-publication runbook (023-AT-DECR): how an honest <code>pending</code> scorecard becomes signed, Rekor-anchored, machine-verified verdicts while the production keystroke stays gated. Built with a 5-agent read-only scout of the sign→verify→render pipeline, then a 5-seat adversarial review panel that returned NEEDS_REVISION on seven high-severity defects. Notably, “proven end-to-end” was actually false because two halves of the chain were only proven independently; and <code>emit-evidence --keyless</code> without <code>--rekor-url</code> defaults to uploading to PRODUCTION Rekor—a one-way door a “staging” run could fire by accident. Decision reinforced: build reversibly and hold the prod keystroke behind three gates.</p>
+<p><strong>claude-code-plugins</strong> — Dual-published four startaitools posts (2026-07-01..04) into the marketplace blog as part of routine syndication.</p>
+<h2 id="related">Related</h2>
+<ul>
+<li><a href="/blog/the-moat-is-the-trust-layer-nexus-byok-rag/">The Moat Is the Trust Layer</a> — Architecture of the cite-or-refuse safety gate</li>
+<li><a href="/blog/coverage-vs-mutation-testing-rules-engine/">Coverage vs. Mutation Testing: Rules Engine Edition</a> — Why coverage gaps can hide logic bugs</li>
+<li><a href="/blog/gate-the-statement-not-the-tool-name/">Gate the Statement, Not the Tool Name</a> — Enforcement design and trust boundaries</li>
+</ul>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "The Relevance Score That Broke Our Cite-or-Refuse Gate",
+  "description": "A retrieval test asserted every relevance score sits in [0,1] — it failed on a live -1.83 silently corrupting a cite-or-refuse RAG safety gate.",
+  "author": { "@type": "Person", "name": "Jeremy Longshore" },
+  "publisher": { "@type": "Organization", "name": "Start AI Tools" },
+  "datePublished": "2026-07-05T10:00:00-05:00",
+  "url": "https://startaitools.com/posts/relevance-score-broke-cite-or-refuse-gate/",
+  "keywords": "testing, python, rag, debugging, ci-cd"
+}
+</script>
+      </div>
+    </div>
+  </article>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
