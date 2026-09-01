@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>When --cap-drop ALL Broke the Gate Socket — Tons of Skills Work Diary</title>
+    <meta name="description" content="Hardening a container hid a permission bug: --cap-drop ALL stripped CAP_DAC_OVERRIDE, and a gate socket silently stopped governing every tool call.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://startaitools.com/posts/cap-drop-all-broke-the-gate-socket/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/cap-drop-all-broke-the-gate-socket/">
+    <meta property="og:title" content="When --cap-drop ALL Broke the Gate Socket — Tons of Skills Work Diary">
+    <meta property="og:description" content="Hardening a container hid a permission bug: --cap-drop ALL stripped CAP_DAC_OVERRIDE, and a gate socket silently stopped governing every tool call.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="When --cap-drop ALL Broke the Gate Socket — Tons of Skills Work Diary">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/cap-drop-all-broke-the-gate-socket/">
+    <meta name="twitter:title" content="When --cap-drop ALL Broke the Gate Socket — Tons of Skills Work Diary">
+    <meta name="twitter:description" content="Hardening a container hid a permission bug: --cap-drop ALL stripped CAP_DAC_OVERRIDE, and a gate socket silently stopped governing every tool call.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"When --cap-drop ALL Broke the Gate Socket","description":"Hardening a container hid a permission bug: --cap-drop ALL stripped CAP_DAC_OVERRIDE, and a gate socket silently stopped governing every tool call.","datePublished":"2026-06-12","url":"https://tonsofskills.com/blog/undefined","author":{"@type":"Person","name":"Jeremy Longshore"},"publisher":{"@type":"Organization","name":"Tons of Skills","url":"https://tonsofskills.com"}}</script>
+  
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.post-header[data-astro-cid-7jjqptxk]{background:var(--panel);padding:4rem 1.5rem 3rem;border-bottom:1px solid var(--border)}.post-header-inner[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto}.back-link[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3);text-decoration:none;display:inline-block;margin-bottom:1.5rem;transition:color .2s}.back-link[data-astro-cid-7jjqptxk]:hover{color:var(--primary)}.post-meta[data-astro-cid-7jjqptxk]{display:flex;align-items:center;gap:.75rem;margin-bottom:1rem}time[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3)}.featured-badge[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.2rem .6rem;background:#ce114126;color:var(--red);border-radius:0;font-weight:600;text-transform:uppercase;letter-spacing:.05em}.post-header[data-astro-cid-7jjqptxk] h1[data-astro-cid-7jjqptxk]{font-family:var(--font-body);font-size:clamp(1.5rem,4vw,2.2rem);font-weight:700;color:var(--text);line-height:1.25;margin-bottom:.75rem;letter-spacing:0}.post-desc[data-astro-cid-7jjqptxk]{color:var(--text-2);font-size:1.05rem;line-height:1.6;margin-bottom:1rem}.post-tags[data-astro-cid-7jjqptxk]{display:flex;gap:.4rem;flex-wrap:wrap}.tag[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.15rem .5rem;background:var(--surface-3);color:var(--text-3);border-radius:0}.post-body[data-astro-cid-7jjqptxk]{padding:3rem 1.5rem 4rem}.prose[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto;color:var(--text-2);line-height:1.8;font-size:1rem}.prose[data-astro-cid-7jjqptxk] h2{font-family:var(--font-body);font-size:1.5rem;font-weight:700;color:var(--text);margin:2.5rem 0 1rem;letter-spacing:0}.prose[data-astro-cid-7jjqptxk] h3{font-size:1.2rem;font-weight:600;color:var(--text);margin:2rem 0 .75rem}.prose[data-astro-cid-7jjqptxk] p{margin-bottom:1rem}.prose[data-astro-cid-7jjqptxk] ul,.prose[data-astro-cid-7jjqptxk] ol{margin:.5rem 0 1rem 1.5rem}.prose[data-astro-cid-7jjqptxk] li{margin-bottom:.35rem}.prose[data-astro-cid-7jjqptxk] strong{color:var(--text);font-weight:600}.prose[data-astro-cid-7jjqptxk] code{font-family:var(--font-mono);font-size:.88em;background:var(--surface-3);padding:.15em .35em;border-radius:0;color:var(--primary)}.prose[data-astro-cid-7jjqptxk] a{color:var(--primary);text-decoration:none}.prose[data-astro-cid-7jjqptxk] a:hover{text-decoration:underline}@media(max-width:768px){.post-header[data-astro-cid-7jjqptxk]{padding:3rem 1rem 2rem}.post-body[data-astro-cid-7jjqptxk]{padding:2rem 1rem 3rem}}
+</style></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  <article class="post" data-astro-cid-7jjqptxk>
+    <header class="post-header" data-astro-cid-7jjqptxk>
+      <div class="post-header-inner" data-astro-cid-7jjqptxk>
+        <a href="/blog" class="back-link" data-astro-cid-7jjqptxk>Back to Work Diary</a>
+        <div class="post-meta" data-astro-cid-7jjqptxk>
+          <time datetime="2026-06-12" data-astro-cid-7jjqptxk>June 11, 2026</time>
+          
+        </div>
+        <h1 data-astro-cid-7jjqptxk>When --cap-drop ALL Broke the Gate Socket</h1>
+        <p class="post-desc" data-astro-cid-7jjqptxk>Hardening a container hid a permission bug: --cap-drop ALL stripped CAP_DAC_OVERRIDE, and a gate socket silently stopped governing every tool call.</p>
+        <div class="post-tags" data-astro-cid-7jjqptxk>
+          <span class="tag" data-astro-cid-7jjqptxk>docker</span><span class="tag" data-astro-cid-7jjqptxk>debugging</span><span class="tag" data-astro-cid-7jjqptxk>ai-agents</span><span class="tag" data-astro-cid-7jjqptxk>devops</span><span class="tag" data-astro-cid-7jjqptxk>ci-cd</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="post-body" data-astro-cid-7jjqptxk>
+      <div class="prose" data-astro-cid-7jjqptxk>
+        <p>The dogfood run went green. The gate had governed zero calls.</p>
+<p>That is the agent-governance-plane’s entire job: run an AI coding agent inside a sandbox, route <em>every</em> tool call through a Unix-domain-socket gateway, and write a signed, hash-chained journal of every allow/deny. A green run that gated nothing isn’t a pass. It’s a governance plane governing air.</p>
+<h2 id="the-gate-that-catches-its-own-hollowness">The gate that catches its own hollowness</h2>
+<p>AGP’s CI dogfood doesn’t just check that the harness exits 0. <code>evidence-bundle.sh</code> fails on a 0-gated run — if the journal shows no decisions, the build is red regardless of process exit status. That guard is what surfaced this at all: the agent process came up, the harness reported success, but the bundle had no verdicts to verify. Red.</p>
+<p>That’s the last I’ll say about hollow-green detection here. It’s the door, not the room. The room is <em>why</em> zero calls reached the gate, and the answer turned out to be a collision between two things that look unrelated until you trace the syscall: Linux capabilities and a Unix socket’s permission bits.</p>
+<h2 id="the-wrong-theory">The wrong theory</h2>
+<p>The first hypothesis blamed the execution path. AGP has a dev-sandbox mode where the agent and the gate share a process, and a docker mode where the agent runs in a container talking to a host daemon over a bind-mounted socket. The theory was that the same-process path was short-circuiting the gate — agent and gate in one address space, the socket round-trip optimized away, decisions never journaled.</p>
+<p>Plausible. Wrong. The dev-sandbox path journaled fine in isolation. The failure only appeared in docker mode, and the moment that became clear the investigation moved from “which code path” to “what’s different about the container.”</p>
+<p>What’s different about the container is the security posture.</p>
+<h2 id="the-real-root-cause-caps-meet-a-missing-write-bit">The real root cause: caps meet a missing write bit</h2>
+<p>The short version: connecting to a Unix domain socket needs <em>write</em> permission on the socket file. <code>--cap-drop ALL</code> strips <code>CAP_DAC_OVERRIDE</code> — the capability that lets root ignore permission bits — so the container’s uid-0 process is bound by the socket’s mode bits like any other user. Mode 0775 gave “others” no write, so <code>connect()</code> failed with <code>EACCES</code> and not a single tool call reached the gate.</p>
+<p>The sandbox is hardened on purpose:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">docker</span><span style="color:#9ECBFF"> run</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --cap-drop</span><span style="color:#9ECBFF"> ALL</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --network</span><span style="color:#9ECBFF"> none</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --read-only</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  -v</span><span style="color:#9ECBFF"> "</span><span style="color:#E1E4E8">$GATE_SOCK</span><span style="color:#9ECBFF">:</span><span style="color:#E1E4E8">$GATE_SOCK</span><span style="color:#9ECBFF">"</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#9ECBFF">  agp-sandbox:latest</span></span></code></pre>
+<p><code>--network none</code> so the agent can’t exfiltrate. <code>--cap-drop ALL</code> so even though the agent runs as uid 0 inside the container, it holds none of root’s privileged capabilities. Fail-closed by default. This is the posture you <em>want</em>.</p>
+<p>The gate socket is an <code>AF_UNIX</code> socket created on the host by the AGP daemon, owned by the host user (a non-root uid), and bind-mounted into the container. Its mode was 0775:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">$</span><span style="color:#9ECBFF"> ls</span><span style="color:#79B8FF"> -l</span><span style="color:#9ECBFF"> /run/agp/gate.sock</span></span>
+<span class="line"><span style="color:#B392F0">srwxrwxr-x</span><span style="color:#79B8FF"> 1</span><span style="color:#9ECBFF"> agp</span><span style="color:#9ECBFF"> agp</span><span style="color:#79B8FF"> 0</span><span style="color:#9ECBFF"> Jun</span><span style="color:#79B8FF"> 12</span><span style="color:#9ECBFF"> 08:01</span><span style="color:#9ECBFF"> /run/agp/gate.sock</span></span>
+<span class="line"><span style="color:#6A737D">#  ^^^^^^^^^</span></span>
+<span class="line"><span style="color:#6A737D">#  owner rwx | group rwx | others r-x  ← others have NO write bit</span></span></code></pre>
+<p>Here is the part that bites. Connecting to a Unix domain socket is a <em>write</em> operation. From <code>unix(7)</code>:</p>
+<blockquote>
+<p>In order to connect to a socket, the connecting process needs to have <strong>write</strong> permission on the socket file.</p>
+</blockquote>
+<p>Read permission is not enough. <code>connect(2)</code> on an <code>AF_UNIX</code> pathname checks the write bit against the calling process’s credentials, exactly like opening a file for writing would.</p>
+<p>Normally none of this matters for a root process, because root carries <code>CAP_DAC_OVERRIDE</code> — the capability that lets a process bypass all file read/write/execute permission checks. That single capability is the entire mechanism behind “root can touch any file.” It is not magic in the kernel; it is a capability bit. When a process calls <code>connect()</code> on an <code>AF_UNIX</code> path, the kernel does a path lookup that ends in an inode permission check (<code>inode_permission</code> → <code>generic_permission</code>), and that check asks for <code>MAY_WRITE</code> on the socket inode. If the calling process fails the owner/group/other mode test, the kernel doesn’t refuse immediately — it first checks whether the process holds <code>CAP_DAC_OVERRIDE</code>, and if so, waives the failure. Root “ignoring permissions” is literally this one branch.</p>
+<p>Strip the capability and that branch never fires. The discretionary access control (DAC) mode bits become the final word.</p>
+<p><code>--cap-drop ALL</code> drops <code>CAP_DAC_OVERRIDE</code> along with everything else. So the in-container uid-0 process loses its permission-bypass crutch and becomes subject to ordinary mode bits like any unprivileged user. Walk the DAC check for that process against the socket:</p>
+<ul>
+<li>Is the process the socket’s <strong>owner</strong>? No — the socket is owned by the host <code>agp</code> user (a non-root uid), and the container’s uid-0 process is not <code>agp</code>. (Default Docker shares the host uid namespace, so this isn’t a remapping artifact: uid 0 in the container <em>is</em> uid 0 on the host — it simply isn’t the socket’s owner.)</li>
+<li>Is the process in the socket’s <strong>group</strong>? No.</li>
+<li>So it falls under <strong>others</strong>. Mode 0775 gives others <code>r-x</code>. <strong>No write bit.</strong></li>
+</ul>
+<p><code>connect()</code> is refused with a permission error — <code>EACCES</code>, the kernel’s way of saying “the mode bits don’t allow this.” The agent literally cannot reach the gate. Every tool call that should have been gated instead hit a socket it had no right to open. Zero calls reached the gate. Zero calls were governed. Green.</p>
+<p>What makes this insidious is that none of the three obvious places you’d look were lying. The container started. The agent process was alive. The bind mount was present and the socket existed on both sides. <code>docker inspect</code> showed the mount, <code>ls</code> inside the container showed the socket node. Every surface said “wired up.” The failure lived one syscall deeper than any of those checks reach — in the permission test that <code>connect()</code> runs and nothing else does.</p>
+<p>The capability you dropped for security was the only thing papering over a file mode that was wrong all along. In dev-sandbox mode the agent ran as the host user, owned the socket, and never needed the override — which is exactly why the bug hid until the container posture exposed it.</p>
+<h2 id="why-not-the-obvious-fixes">Why not the obvious fixes</h2>
+<p>There are three tempting ways out, and two of them are worse than the bug.</p>
+<p><strong>Re-add <code>CAP_DAC_OVERRIDE</code>.</strong> This works and is also exactly the wrong instinct. You’d be handing the sandboxed agent root’s blanket permission-bypass to fix one socket’s mode bit. The whole point of <code>--cap-drop ALL</code> is that the agent operates under least-privilege isolation, holding <em>nothing</em>. Punching a capability back in to dodge a <code>chmod</code> trades a hardened posture for a fragile one.</p>
+<p><strong>Match the uids</strong> so the container’s uid 0 maps to the socket owner via <code>--user</code> or a userns remap. Now the fix depends on uid arithmetic staying aligned across the host daemon, the container runtime, and any future namespace config. That’s a load-bearing coincidence waiting to drift: a namespace change down the road silently re-breaks <code>connect()</code>, trading a loud mode-bit error for a soft uid-mapping bug that only surfaces in production.</p>
+<p><strong>Fix the one file mode.</strong> The socket needs the write bit for “others” because the connecting process is, correctly, “others.” That’s a one-line <code>chmod</code>, and it’s honest about what’s actually being asked: let this socket be connected to.</p>
+<p>The mode 0775 → 0777 change is safe here for reasons specific to what this socket <em>is</em>, per ADR 029:</p>
+<ul>
+<li>It is <strong>local-only</strong>. <code>--network none</code> plus a host bind mount means the socket never touches a network interface. World-connectable is bounded to processes already on this host.</li>
+<li>It carries <strong>verdicts, not execution</strong>. The protocol over the socket is allow/deny gate decisions. Connecting to it doesn’t grant the ability to run anything; it grants the ability to <em>ask the gate and be told no</em>.</li>
+<li>Every decision is <strong>journaled and signed</strong>. An Ed25519 hash chain records each verdict; <code>agp verify</code> replays it offline. A rogue local connection can’t forge a verdict that survives verification.</li>
+</ul>
+<p>World-connectable on a single host, for a verdict-only, fully-audited socket, is a deliberate and narrow tradeoff — not a hole.</p>
+<h2 id="the-fix-and-the-proof">The fix and the proof</h2>
+<p><code>BunClaudeProcess</code>, the launcher for the Claude Code intendant, chmods the gate socket to 0777 before the container starts, so “others” gain the write bit and <code>connect()</code> succeeds:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#6A737D">// BunClaudeProcess: widen the gate socket before launching the sandbox.</span></span>
+<span class="line"><span style="color:#6A737D">// Local-only, verdict-only, journaled — see ADR 029.</span></span>
+<span class="line"><span style="color:#F97583">await</span><span style="color:#B392F0"> chmod</span><span style="color:#E1E4E8">(socketPath, </span><span style="color:#79B8FF">0o777</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#F97583">await</span><span style="color:#B392F0"> runDockerSandbox</span><span style="color:#E1E4E8">({</span></span>
+<span class="line"><span style="color:#E1E4E8">  capDrop: </span><span style="color:#9ECBFF">"ALL"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  network: </span><span style="color:#9ECBFF">"none"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  binds: [</span><span style="color:#9ECBFF">`${</span><span style="color:#E1E4E8">socketPath</span><span style="color:#9ECBFF">}:${</span><span style="color:#E1E4E8">socketPath</span><span style="color:#9ECBFF">}`</span><span style="color:#E1E4E8">],</span></span>
+<span class="line"><span style="color:#E1E4E8">});</span></span></code></pre>
+<p>After the change:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">$</span><span style="color:#9ECBFF"> ls</span><span style="color:#79B8FF"> -l</span><span style="color:#9ECBFF"> /run/agp/gate.sock</span></span>
+<span class="line"><span style="color:#B392F0">srwxrwxrwx</span><span style="color:#79B8FF"> 1</span><span style="color:#9ECBFF"> agp</span><span style="color:#9ECBFF"> agp</span><span style="color:#79B8FF"> 0</span><span style="color:#9ECBFF"> Jun</span><span style="color:#79B8FF"> 12</span><span style="color:#9ECBFF"> 08:14</span><span style="color:#9ECBFF"> /run/agp/gate.sock</span></span>
+<span class="line"><span style="color:#6A737D">#         ^ others now have the write bit → connect() succeeds</span></span></code></pre>
+<p>Then the payoff. Real Claude Code, inside a <code>--cap-drop ALL</code> container, governed end-to-end:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>gate verdicts (this run):</span></span>
+<span class="line"><span>  Bash       → DENY</span></span>
+<span class="line"><span>  Glob       → DENY</span></span>
+<span class="line"><span>  ToolSearch → DENY</span></span>
+<span class="line"><span>  Read       → ALLOW</span></span>
+<span class="line"><span>gate decisions: 4 (3 deny, 1 allow)</span></span>
+<span class="line"><span>agp verify: OK (rc=0, hash chain intact, 4 signatures valid)</span></span></code></pre>
+<p>Four gate decisions, not zero — three denials and one allow, each one signed. The denials landed, the allow landed, and the signed journal verified offline. To stop this regressing silently, a test asserts the socket is mode 0777 whenever the sandbox is in docker mode:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#B392F0">test</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"docker-mode gate socket is world-connectable"</span><span style="color:#E1E4E8">, </span><span style="color:#F97583">async</span><span style="color:#E1E4E8"> () </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> sock</span><span style="color:#F97583"> =</span><span style="color:#F97583"> await</span><span style="color:#B392F0"> launchDockerSandbox</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#E1E4E8"> { </span><span style="color:#79B8FF">mode</span><span style="color:#E1E4E8"> } </span><span style="color:#F97583">=</span><span style="color:#F97583"> await</span><span style="color:#B392F0"> stat</span><span style="color:#E1E4E8">(sock.path);</span></span>
+<span class="line"><span style="color:#6A737D">  // 0o777 — others need the write bit, because the container's</span></span>
+<span class="line"><span style="color:#6A737D">  // uid-0 process is "others" and connect() needs MAY_WRITE.</span></span>
+<span class="line"><span style="color:#B392F0">  expect</span><span style="color:#E1E4E8">(mode </span><span style="color:#F97583">&#x26;</span><span style="color:#79B8FF"> 0o777</span><span style="color:#E1E4E8">).</span><span style="color:#B392F0">toBe</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">0o777</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#E1E4E8">});</span></span></code></pre>
+<p>If a future refactor narrows the mode again — say someone “hardens” it back to 0775 without tracing the syscall — this test goes red before the dogfood does, and the failure message points straight at the write bit instead of at a mysterious unreachable socket.</p>
+<h2 id="the-transferable-rule">The transferable rule</h2>
+<p>Inside a hardened, cap-dropped container, root is just another uid. The capability that used to bypass your file modes — <code>CAP_DAC_OVERRIDE</code> — is gone the instant you drop it, and dropping it is usually the right call. So your permission bits have to be <em>actually correct</em>, not correct-because-root-ignores-them. And remember that <code>connect()</code> on a Unix domain socket is a write: a socket that’s only readable to a connecting process is a socket that process cannot use. The bug that looks like a broken code path is often a file mode that was always wrong and a privilege that was always hiding it.</p>
+<h2 id="also-shipped">Also shipped</h2>
+<p>The same day, away from the gate socket:</p>
+<ul>
+<li><strong>braves</strong> — taught the poller to survive “Delayed Start” game statuses and stop latching onto makeup games as if they were the scheduled matchup; added a SQLite fast-path for the batter game log.</li>
+<li><strong>claude-code-plugins</strong> — added an advisory CI gate enforcing kernel↔vendor version coupling (V ≤ C ≤ K) so a vendor bump can’t outrun the kernel it consumes.</li>
+<li><strong>claude-code-slack-channel</strong> — bound a no-gaps journal invariant to production dispatch, hardened chunked-reply durability, and cleared an esbuild RCE advisory via a <code>tsx</code> bump.</li>
+<li><strong>jeremylongshore/.github</strong> — fleet-wide pinned vps-deploy SHA bump chasing <code>actions/checkout@v6</code>.</li>
+</ul>
+<h2 id="related-posts">Related posts</h2>
+<ul>
+<li><a href="/blog/when-green-ci-proves-nothing/">When Green CI Proves Nothing</a> — the gate that counts only counts what reaches it</li>
+<li><a href="/blog/honor-the-gate-when-the-verdict-is-inconvenient/">Honor the Gate When the Verdict Is Inconvenient</a></li>
+<li><a href="/blog/hitl-delivery-is-a-fail-closed-exactly-once-problem/">HITL Delivery Is a Fail-Closed, Exactly-Once Problem</a></li>
+</ul>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "When --cap-drop ALL Broke the Gate Socket",
+  "description": "Hardening a container hid a permission bug: --cap-drop ALL stripped CAP_DAC_OVERRIDE, and a gate socket silently stopped governing every tool call.",
+  "datePublished": "2026-06-12T08:00:00-05:00",
+  "author": {
+    "@type": "Person",
+    "name": "Jeremy Longshore"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Start AI Tools",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "https://startaitools.com/images/og-image.png"
+    }
+  },
+  "articleBody": "A hardened AI-agent sandbox passed CI green while governing zero tool calls. The cause: docker run --cap-drop ALL removes CAP_DAC_OVERRIDE, the Linux capability that lets a root process bypass file permission checks. connect() on a Unix domain socket requires the write bit, and the gate socket's mode 0775 gave 'others' none — so the container's uid-0 process could not reach the gate. The fix is to chmod the local, verdict-only, journaled socket to 0777 before launching the container.",
+  "keywords": ["docker", "debugging", "ai-agents", "devops", "ci-cd", "linux-capabilities", "unix-socket", "container-hardening"]
+}
+</script>
+      </div>
+    </div>
+  </article>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
