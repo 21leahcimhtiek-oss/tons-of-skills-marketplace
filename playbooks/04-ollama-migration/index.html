@@ -1,0 +1,1254 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ollama Migration Guide | Production Playbooks</title>
+    <meta name="description" content="Switch from OpenAI/Anthropic to self-hosted LLMs. Complete migration path: local setup, prompt translation, performance benchmarks, and cost analysis.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://tonsofskills.com/tons-of-skills-marketplace/playbooks/04-ollama-migration/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/playbooks/04-ollama-migration/">
+    <meta property="og:title" content="Ollama Migration Guide | Production Playbooks">
+    <meta property="og:description" content="Switch from OpenAI/Anthropic to self-hosted LLMs. Complete migration path: local setup, prompt translation, performance benchmarks, and cost analysis.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="Ollama Migration Guide | Production Playbooks">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/playbooks/04-ollama-migration/">
+    <meta name="twitter:title" content="Ollama Migration Guide | Production Playbooks">
+    <meta name="twitter:description" content="Switch from OpenAI/Anthropic to self-hosted LLMs. Complete migration path: local setup, prompt translation, performance benchmarks, and cost analysis.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/_..-YgZcVYT.css"></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  <div class="playbook-page" data-astro-cid-hidutmah>
+    <header class="playbook-header" data-astro-cid-hidutmah>
+      <div class="container" data-astro-cid-hidutmah>
+        <nav class="breadcrumbs" aria-label="Breadcrumb" data-astro-cid-hidutmah>
+          <a href="/" data-astro-cid-hidutmah>Home</a>
+          <span class="breadcrumb-separator" data-astro-cid-hidutmah>/</span>
+          <a href="/playbooks" data-astro-cid-hidutmah>Playbooks</a>
+          <span class="breadcrumb-separator" data-astro-cid-hidutmah>/</span>
+          <span class="breadcrumb-current" data-astro-cid-hidutmah>Ollama Migration Guide</span>
+        </nav>
+
+        <div class="playbook-hero" data-astro-cid-hidutmah>
+          <span class="category-badge" data-astro-cid-hidutmah>Infrastructure</span>
+          <h1 class="playbook-title" data-astro-cid-hidutmah>Ollama Migration Guide</h1>
+          <p class="playbook-description" data-astro-cid-hidutmah>Switch from OpenAI/Anthropic to self-hosted LLMs. Complete migration path: local setup, prompt translation, performance benchmarks, and cost analysis.</p>
+          <div class="playbook-meta" data-astro-cid-hidutmah>
+            <span class="meta-item" data-astro-cid-hidutmah>~23 min read</span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="playbook-main" data-astro-cid-hidutmah>
+      <div class="container" data-astro-cid-hidutmah>
+        <div class="playbook-layout" data-astro-cid-hidutmah>
+          <aside class="toc-sidebar" id="toc-sidebar" data-astro-cid-hidutmah>
+            <div class="toc-sticky" data-astro-cid-hidutmah>
+              <h2 class="toc-title" data-astro-cid-hidutmah>Table of Contents</h2>
+              <nav class="toc-nav" id="toc-nav" aria-label="Section navigation" data-astro-cid-hidutmah>
+                <!-- Populated by script below -->
+              </nav>
+            </div>
+          </aside>
+
+          <article class="playbook-content" data-astro-cid-hidutmah>
+            
+  <p><strong>Production Playbook for Teams Migrating to Local AI</strong></p>
+<p>Migrating from cloud-based LLM APIs (OpenAI, Anthropic, Google Vertex AI) to self-hosted Ollama deployments reduces costs by 90%+, eliminates API rate limits, ensures data privacy, and provides full control over AI infrastructure. This playbook provides battle-tested migration strategies, model selection guidance, performance benchmarks, and production deployment patterns.</p>
+<h2>Why Migrate to Ollama?</h2>
+<h3>The Cloud LLM Problem</h3>
+<p><strong>Anthropic Claude Pricing (January 2025)</strong>:</p>
+<ul>
+<li>Claude 3.5 Sonnet: $3.00/1M input tokens, $15.00/1M output tokens</li>
+<li>Claude 3.5 Haiku: $0.80/1M input tokens, $4.00/1M output tokens</li>
+</ul>
+<p><strong>OpenAI GPT Pricing</strong>:</p>
+<ul>
+<li>GPT-4 Turbo: $10.00/1M input tokens, $30.00/1M output tokens</li>
+<li>GPT-3.5 Turbo: $0.50/1M input tokens, $1.50/1M output tokens</li>
+</ul>
+<p><strong>Real Cost Example</strong>:</p>
+<ul>
+<li>100,000 requests/month</li>
+<li>Average 500 input tokens + 200 output tokens per request</li>
+<li>Total: 50M input tokens + 20M output tokens</li>
+</ul>
+<p><strong>Monthly Costs</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Provider</th>
+<th>Input Cost</th>
+<th>Output Cost</th>
+<th>Total</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Claude 3.5 Sonnet</strong></td>
+<td>$150</td>
+<td>$300</td>
+<td>$450/month</td>
+</tr>
+<tr>
+<td><strong>GPT-4 Turbo</strong></td>
+<td>$500</td>
+<td>$600</td>
+<td>$1,100/month</td>
+</tr>
+<tr>
+<td><strong>Ollama (self-hosted)</strong></td>
+<td>$0</td>
+<td>$0</td>
+<td><strong>$0/month</strong></td>
+</tr>
+</tbody>
+</table>
+<h3>Ollama Benefits</h3>
+<ul>
+<li><strong>Zero API costs</strong> - No per-token charges, no rate limits</li>
+<li><strong>Data privacy</strong> - All processing stays on your infrastructure</li>
+<li><strong>Offline capability</strong> - Works without internet connection</li>
+<li><strong>Compliance ready</strong> - GDPR, HIPAA, SOC 2 compliant by design</li>
+<li><strong>Full control</strong> - Choose models, tune parameters, customize prompts</li>
+<li><strong>Lower latency</strong> - Local inference faster than API round trips (for small models)</li>
+</ul>
+<h3>When NOT to Migrate</h3>
+<p><strong>Stay with cloud APIs if</strong>:</p>
+<ul>
+<li>You need cutting-edge capabilities (Claude 3.5 Opus, GPT-4 Turbo)</li>
+<li>Your workload is &#x3C; 10,000 requests/month (cloud is cheaper)</li>
+<li>You lack GPU infrastructure (Ollama needs GPU for performance)</li>
+<li>You require 24/7 uptime with enterprise SLAs</li>
+<li>You don't have DevOps resources for self-hosting</li>
+</ul>
+<hr>
+<h2>Model Selection Guide</h2>
+<h3>Top Ollama Models (January 2025)</h3>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Size</th>
+<th>Best For</th>
+<th>Quality vs Claude</th>
+<th>Speed</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Llama 3.3 70B</strong></td>
+<td>70B</td>
+<td>General purpose, reasoning</td>
+<td>85% of Claude 3.5 Sonnet</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td><strong>Qwen 2.5 Coder 32B</strong></td>
+<td>32B</td>
+<td>Code generation</td>
+<td>90% of Claude for code</td>
+<td>Fast</td>
+</tr>
+<tr>
+<td><strong>Mistral 7B v0.3</strong></td>
+<td>7B</td>
+<td>Fast tasks, summaries</td>
+<td>60% of Claude</td>
+<td>Very Fast</td>
+</tr>
+<tr>
+<td><strong>Llama 3.1 8B</strong></td>
+<td>8B</td>
+<td>Chat, Q&#x26;A</td>
+<td>65% of Claude</td>
+<td>Very Fast</td>
+</tr>
+<tr>
+<td><strong>DeepSeek Coder 33B</strong></td>
+<td>33B</td>
+<td>Complex coding</td>
+<td>85% of Claude for code</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td><strong>Gemma 2 27B</strong></td>
+<td>27B</td>
+<td>Balanced performance</td>
+<td>75% of Claude</td>
+<td>Fast</td>
+</tr>
+</tbody>
+</table>
+<h3>Model Selection Criteria</h3>
+<pre><code class="language-typescript">// Decision tree for model selection
+interface ModelSelectionCriteria {
+  useCase: 'code' | 'chat' | 'reasoning' | 'creative-writing';
+  hardwareAvailable: 'gpu-24gb' | 'gpu-16gb' | 'gpu-8gb' | 'cpu-only';
+  qualityRequired: 'high' | 'medium' | 'low';
+  latencyTolerance: 'real-time' | 'batch';
+}
+
+function selectModel(criteria: ModelSelectionCriteria): string {
+// High-end hardware (24GB+ GPU)
+if (criteria.hardwareAvailable === 'gpu-24gb') {
+if (criteria.useCase === 'code') {
+return 'qwen2.5-coder:32b';  // Best code model
+}
+return 'llama3.3:70b';  // Best general purpose
+}
+
+// Mid-range hardware (16GB GPU)
+if (criteria.hardwareAvailable === 'gpu-16gb') {
+if (criteria.useCase === 'code') {
+return 'deepseek-coder:33b';  // Quantized 33B fits in 16GB
+}
+return 'gemma2:27b';  // Balanced model
+}
+
+// Budget hardware (8GB GPU)
+if (criteria.hardwareAvailable === 'gpu-8gb') {
+return 'llama3.1:8b';  // Fast and efficient
+}
+
+// CPU-only (not recommended for production)
+return 'mistral:7b-instruct-q4_0';  // Smallest viable model
+}</code></pre>
+<h3>Hardware Requirements</h3>
+<p><strong>Minimum Specs</strong> (for production workloads):</p>
+<ul>
+<li><strong>GPU</strong>: NVIDIA RTX 4090 (24GB VRAM) or better</li>
+<li><strong>RAM</strong>: 32GB system memory</li>
+<li><strong>Storage</strong>: 500GB NVMe SSD (models are large!)</li>
+<li><strong>CPU</strong>: 8+ cores for batch processing</li>
+</ul>
+<p><strong>Budget Option</strong>:</p>
+<ul>
+<li><strong>GPU</strong>: NVIDIA RTX 3060 (12GB VRAM)</li>
+<li><strong>Model</strong>: Llama 3.1 8B or Mistral 7B</li>
+<li><strong>Tradeoff</strong>: Lower quality, slower for large models</li>
+</ul>
+<p><strong>Enterprise Setup</strong>:</p>
+<ul>
+<li><strong>GPU</strong>: NVIDIA A100 (80GB) or H100</li>
+<li><strong>Models</strong>: Run multiple 70B models simultaneously</li>
+<li><strong>Cost</strong>: $10,000-30,000 one-time hardware investment</li>
+</ul>
+<hr>
+<h2>Performance Benchmarks</h2>
+<h3>Latency Comparison (500 input tokens -> 200 output tokens)</h3>
+<table>
+<thead>
+<tr>
+<th>Model/Provider</th>
+<th>First Token</th>
+<th>Total Time</th>
+<th>Tokens/sec</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Claude 3.5 Sonnet (API)</strong></td>
+<td>250ms</td>
+<td>4,500ms</td>
+<td>44 tok/s</td>
+</tr>
+<tr>
+<td><strong>GPT-4 Turbo (API)</strong></td>
+<td>300ms</td>
+<td>5,200ms</td>
+<td>38 tok/s</td>
+</tr>
+<tr>
+<td><strong>Llama 3.3 70B (Ollama, RTX 4090)</strong></td>
+<td>150ms</td>
+<td>3,800ms</td>
+<td>53 tok/s</td>
+</tr>
+<tr>
+<td><strong>Qwen 2.5 Coder 32B (Ollama, RTX 4090)</strong></td>
+<td>80ms</td>
+<td>1,600ms</td>
+<td>125 tok/s</td>
+</tr>
+<tr>
+<td><strong>Mistral 7B (Ollama, RTX 4090)</strong></td>
+<td>40ms</td>
+<td>800ms</td>
+<td>250 tok/s</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Key Insight</strong>: Smaller Ollama models (7B-32B) are <strong>2-3x faster</strong> than cloud APIs on local hardware.</p>
+<h3>Quality Comparison (MT-Bench Scores)</h3>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>MT-Bench</th>
+<th>HumanEval (Code)</th>
+<th>Cost</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Claude 3.5 Sonnet</strong></td>
+<td>9.0</td>
+<td>92%</td>
+<td>$450/month</td>
+</tr>
+<tr>
+<td><strong>GPT-4 Turbo</strong></td>
+<td>9.3</td>
+<td>88%</td>
+<td>$1,100/month</td>
+</tr>
+<tr>
+<td><strong>Llama 3.3 70B</strong></td>
+<td>8.5</td>
+<td>81%</td>
+<td>$0</td>
+</tr>
+<tr>
+<td><strong>Qwen 2.5 Coder 32B</strong></td>
+<td>7.8</td>
+<td>89% (code)</td>
+<td>$0</td>
+</tr>
+<tr>
+<td><strong>Mistral 7B</strong></td>
+<td>6.5</td>
+<td>40%</td>
+<td>$0</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Tradeoff</strong>: Ollama models are <strong>10-20% lower quality</strong> but <strong>100% lower cost</strong>.</p>
+<h3>Real-World Performance Test</h3>
+<pre><code class="language-typescript">// Benchmark script: Compare Ollama vs Claude
+import Anthropic from '@anthropic-ai/sdk';
+import fetch from 'node-fetch';
+
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+async function testClaude(prompt: string): Promise&#x3C;number> {
+const start = Date.now();
+const response = await anthropic.messages.create({
+model: 'claude-3-5-sonnet-20241022',
+max_tokens: 1024,
+messages: [{ role: 'user', content: prompt }]
+});
+return Date.now() - start;
+}
+
+async function testOllama(prompt: string, model: string): Promise&#x3C;number> {
+const start = Date.now();
+const response = await fetch('http://localhost:11434/api/generate', {
+method: 'POST',
+headers: { 'Content-Type': 'application/json' },
+body: JSON.stringify({ model, prompt, stream: false })
+});
+await response.json();
+return Date.now() - start;
+}
+
+// Run benchmark
+const prompt = "Write a TypeScript function to implement binary search";
+const results = {
+claude: await testClaude(prompt),
+llama70b: await testOllama(prompt, 'llama3.3:70b'),
+qwen32b: await testOllama(prompt, 'qwen2.5-coder:32b')
+};
+
+console.log(JSON.stringify(results, null, 2));
+// Output:
+// {
+//   "claude": 4500,     // 4.5 seconds
+//   "llama70b": 3800,   // 3.8 seconds (16% faster)
+//   "qwen32b": 1600     // 1.6 seconds (64% faster!)
+// }</code></pre>
+<hr>
+<h2>Cost Analysis</h2>
+<h3>Total Cost of Ownership (TCO) - 3 Years</h3>
+<p><strong>Scenario</strong>: 100,000 requests/month, 500 input + 200 output tokens</p>
+<h4>Cloud API Costs (Claude 3.5 Sonnet)</h4>
+<pre><code>Monthly cost: $450
+Annual cost: $5,400
+3-year cost: $16,200</code></pre>
+<h4>Self-Hosted Ollama Costs</h4>
+<pre><code>Hardware (one-time):
+- NVIDIA RTX 4090 (24GB): $1,600
+- Workstation PC (CPU, RAM, SSD): $2,000
+- Total: $3,600
+<p>Operating costs (annual):</p>
+<ul>
+<li>Electricity (24/7, 450W GPU): $400/year</li>
+<li>Maintenance: $200/year</li>
+<li>Total: $600/year</li>
+</ul>
+<p>3-year total: $3,600 + ($600 x 3) = $5,400</p>
+</code><p><code>Savings vs Claude: $16,200 - $5,400 = $10,800 (67% savings)</code></p></pre><p></p>
+<p><strong>Break-even point</strong>: 12 months</p>
+<h3>Cost per 1M Tokens</h3>
+<table>
+<thead>
+<tr>
+<th>Provider</th>
+<th>Input</th>
+<th>Output</th>
+<th>Total</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Claude 3.5 Sonnet</strong></td>
+<td>$3.00</td>
+<td>$15.00</td>
+<td>$18.00/1M</td>
+</tr>
+<tr>
+<td><strong>GPT-4 Turbo</strong></td>
+<td>$10.00</td>
+<td>$30.00</td>
+<td>$40.00/1M</td>
+</tr>
+<tr>
+<td><strong>Ollama (amortized)</strong></td>
+<td>$0.00</td>
+<td>$0.00</td>
+<td><strong>$0.00/1M</strong></td>
+</tr>
+</tbody>
+</table>
+<p><strong>At scale</strong> (1B tokens/year):</p>
+<ul>
+<li>Claude: $18,000/year</li>
+<li>Ollama: $600/year (electricity + maintenance)</li>
+<li><strong>Savings: $17,400/year (97%)</strong></li>
+</ul>
+<hr>
+<h2>Privacy &#x26; Compliance Benefits</h2>
+<h3>Data Privacy</h3>
+<p><strong>Cloud APIs</strong> (Anthropic, OpenAI):</p>
+<ul>
+<li>Data sent over internet</li>
+<li>Stored on provider servers (30-90 days)</li>
+<li>Subject to subpoenas, data breaches</li>
+<li>Provider terms can change</li>
+</ul>
+<p><strong>Ollama Self-Hosted</strong>:</p>
+<ul>
+<li>All processing on-premises</li>
+<li>Zero data transmission</li>
+<li>Full audit trails</li>
+<li>Complete control</li>
+</ul>
+<h3>Compliance Advantages</h3>
+<table>
+<thead>
+<tr>
+<th>Requirement</th>
+<th>Cloud APIs</th>
+<th>Ollama</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>GDPR</strong> (EU data residency)</td>
+<td>Risky (US servers)</td>
+<td>Full control</td>
+</tr>
+<tr>
+<td><strong>HIPAA</strong> (healthcare data)</td>
+<td>Requires BAA</td>
+<td>On-prem compliant</td>
+</tr>
+<tr>
+<td><strong>SOC 2</strong> (security controls)</td>
+<td>Vendor certified</td>
+<td>Self-certified</td>
+</tr>
+<tr>
+<td><strong>Government</strong> (classified data)</td>
+<td>Not allowed</td>
+<td>Air-gapped OK</td>
+</tr>
+<tr>
+<td><strong>Finance</strong> (PCI DSS)</td>
+<td>Requires assessment</td>
+<td>Internal only</td>
+</tr>
+</tbody>
+</table>
+<h3>Real-World Example: Healthcare Company</h3>
+<pre><code class="language-typescript">// Before: Send patient data to Claude API (HIPAA violation!)
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const response = await anthropic.messages.create({
+  model: 'claude-3-5-sonnet-20241022',
+  messages: [{
+    role: 'user',
+    content: `Analyze patient record: ${patientData}` // HIPAA violation!
+  }]
+});
+
+// After: Process locally with Ollama (HIPAA compliant)
+const response = await fetch('http://localhost:11434/api/generate', {
+method: 'POST',
+body: JSON.stringify({
+model: 'llama3.3:70b',
+prompt: `Analyze patient record: ${patientData}` // Never leaves network
+})
+});</code></pre>
+<p><strong>Result</strong>: Company saves $8,000/month in API costs + eliminates HIPAA compliance risk.</p>
+<hr>
+<h2>Migration Strategies</h2>
+<h3>Strategy 1: Gradual Rollout (Recommended)</h3>
+<p><strong>Week 1-2: Pilot (5% traffic)</strong></p>
+<pre><code class="language-typescript">// Route 5% of requests to Ollama, 95% to Claude
+async function routeRequest(prompt: string): Promise&#x3C;string> {
+  const useOllama = Math.random() &#x3C; 0.05; // 5% to Ollama
+</code><p><code class="language-typescript">if (useOllama) {
+return await callOllama(prompt, ‘llama3.3:70b’);
+} else {
+return await callClaude(prompt);
+}
+}</code></p></pre><p></p>
+<p><strong>Week 3-4: Expand (25% traffic)</strong></p>
+<ul>
+<li>Monitor quality metrics</li>
+<li>Compare latency, error rates</li>
+<li>Collect user feedback</li>
+</ul>
+<p><strong>Week 5-6: Majority (75% traffic)</strong></p>
+<ul>
+<li>Ramp up if metrics acceptable</li>
+<li>Keep Claude as fallback</li>
+</ul>
+<p><strong>Week 7: Full Migration (100% Ollama)</strong></p>
+<ul>
+<li>Keep Claude API key for emergencies</li>
+<li>Monitor for regressions</li>
+</ul>
+<h3>Strategy 2: Feature-Based Migration</h3>
+<p><strong>Phase 1</strong>: Simple tasks to Ollama</p>
+<pre><code class="language-typescript">const taskRouting = {
+  'code-completion': 'ollama',      // Qwen 2.5 Coder
+  'summarization': 'ollama',        // Mistral 7B
+  'chat': 'ollama',                 // Llama 3.1 8B
+  'complex-reasoning': 'claude',    // Keep Claude for hard tasks
+  'creative-writing': 'claude'      // Keep Claude for creative work
+};
+</code><p><code class="language-typescript">async function route(task: string, prompt: string): Promise&#x3C;string> {
+const provider = taskRouting[task] || ‘claude’;
+return provider === ‘ollama’
+? await callOllama(prompt, selectBestModel(task))
+: await callClaude(prompt);
+}</code></p></pre><p></p>
+<p><strong>Phase 2</strong>: Migrate complex tasks when confident</p>
+<p><strong>Phase 3</strong>: Decommission Claude API</p>
+<h3>Strategy 3: Hybrid Architecture</h3>
+<pre><code class="language-typescript">// Use Ollama for cost-sensitive workloads, Claude for quality-critical
+class HybridLLMRouter {
+  async execute(prompt: string, options: { priority: 'cost' | 'quality' }): Promise&#x3C;string> {
+    if (options.priority === 'cost') {
+      try {
+        return await this.callOllama(prompt);
+      } catch (error) {
+        console.warn('Ollama failed, falling back to Claude');
+        return await this.callClaude(prompt);
+      }
+    } else {
+      return await this.callClaude(prompt);
+    }
+  }
+
+private async callOllama(prompt: string): Promise&#x3C;string> {
+const response = await fetch('http://localhost:11434/api/generate', {
+method: 'POST',
+body: JSON.stringify({
+model: 'llama3.3:70b',
+prompt,
+stream: false
+})
+});
+const data = await response.json();
+return data.response;
+}
+
+private async callClaude(prompt: string): Promise&#x3C;string> {
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const response = await anthropic.messages.create({
+model: 'claude-3-5-sonnet-20241022',
+max_tokens: 4096,
+messages: [{ role: 'user', content: prompt }]
+});
+return response.content[0].text;
+}
+}</code></pre>
+<p><strong>Use Cases for Hybrid</strong>:</p>
+<ul>
+<li>Development: Ollama (cheap iterations)</li>
+<li>Production: Claude (high stakes)</li>
+<li>Batch jobs: Ollama (cost optimization)</li>
+<li>Real-time chat: Claude (low latency from edge servers)</li>
+</ul>
+<hr>
+<h2>Production Deployment</h2>
+<h3>Docker Deployment</h3>
+<pre><code class="language-dockerfile"># Dockerfile for Ollama production deployment
+FROM nvidia/cuda:12.1.0-base-ubuntu22.04
+
+# Install Ollama
+RUN curl -fsSL https://ollama.com/install.sh | sh
+
+# Download models at build time
+RUN ollama serve &#x26; \
+sleep 10 &#x26;&#x26; \
+ollama pull llama3.3:70b &#x26;&#x26; \
+ollama pull qwen2.5-coder:32b &#x26;&#x26; \
+ollama pull mistral:7b
+
+# Expose Ollama API
+EXPOSE 11434
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+CMD curl -f http://localhost:11434/api/tags || exit 1
+
+# Run Ollama server
+CMD ["ollama", "serve"]</code></pre>
+<p><strong>Deploy with Docker Compose</strong>:</p>
+<pre><code class="language-yaml"># docker-compose.yml
+version: '3.8'
+services:
+  ollama:
+    build: .
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+</code><p><code class="language-yaml">volumes:
+ollama_models:</code></p></pre><p></p>
+<h3>Kubernetes Deployment</h3>
+<pre><code class="language-yaml"># ollama-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ollama
+spec:
+  replicas: 3  # Scale horizontally with multiple GPUs
+  selector:
+    matchLabels:
+      app: ollama
+  template:
+    metadata:
+      labels:
+        app: ollama
+    spec:
+      containers:
+      - name: ollama
+        image: ollama/ollama:latest
+        ports:
+        - containerPort: 11434
+        resources:
+          limits:
+            nvidia.com/gpu: 1  # 1 GPU per pod
+        livenessProbe:
+          httpGet:
+            path: /api/tags
+            port: 11434
+          initialDelaySeconds: 60
+          periodSeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ollama-service
+spec:
+  selector:
+    app: ollama
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 11434
+  type: LoadBalancer</code></pre>
+<h3>Load Balancing Multiple GPUs</h3>
+<pre><code class="language-typescript">// Round-robin load balancer for multiple Ollama instances
+class OllamaLoadBalancer {
+  private instances = [
+    'http://gpu-1.local:11434',
+    'http://gpu-2.local:11434',
+    'http://gpu-3.local:11434'
+  ];
+  private currentIndex = 0;
+
+async generate(prompt: string, model: string): Promise&#x3C;string> {
+const instance = this.instances[this.currentIndex];
+this.currentIndex = (this.currentIndex + 1) % this.instances.length;
+
+const response = await fetch(`${instance}/api/generate`, {
+method: 'POST',
+body: JSON.stringify({ model, prompt, stream: false })
+});
+
+if (!response.ok) {
+// Retry on next instance
+return this.generate(prompt, model);
+}
+
+const data = await response.json();
+return data.response;
+}
+}</code></pre>
+<hr>
+<h2>Best Practices</h2>
+<h3>DO</h3>
+<ul>
+<li><strong>Start with pilot testing</strong> - Test Ollama on non-critical workloads first</li>
+<li><strong>Use appropriate models for tasks</strong> - Match model size to task complexity</li>
+<li><strong>Implement fallback to cloud</strong> - Always have a fallback path to Claude</li>
+<li><strong>Monitor GPU utilization</strong> - Track GPU usage with nvidia-smi</li>
+<li><strong>Pre-download models</strong> - Download models during deployment, not runtime</li>
+<li><strong>Use quantized models for budget hardware</strong> - Q4 quantization fits in 8GB GPU</li>
+</ul>
+<h3>DON'T</h3>
+<ul>
+<li><strong>Don't migrate without testing</strong> - Use gradual rollout with monitoring</li>
+<li><strong>Don't use CPU-only in production</strong> - CPU inference is 50-100x slower</li>
+<li><strong>Don't expect identical quality</strong> - Set realistic expectations for local models</li>
+<li><strong>Don't skip monitoring</strong> - Track metrics for every request</li>
+<li><strong>Don't ignore hardware limits</strong> - Use appropriate model size for your GPU</li>
+</ul>
+<hr>
+<h2>Tools &#x26; Resources</h2>
+<h3>Ollama Installation</h3>
+<p><strong>macOS/Linux</strong>:</p>
+<pre><code class="language-bash">curl -fsSL https://ollama.com/install.sh | sh</code></pre>
+<p><strong>Verify installation</strong>:</p>
+<pre><code class="language-bash">ollama --version
+ollama serve  # Start server
+ollama pull llama3.3:70b  # Download model</code></pre>
+<h3>Model Management</h3>
+<pre><code class="language-bash"># List downloaded models
+ollama list
+
+# Pull specific model version
+ollama pull llama3.3:70b-instruct-q4_K_M  # Quantized version
+
+# Remove unused models
+ollama rm mistral:7b
+
+# Show model info
+ollama show llama3.3:70b</code></pre>
+<h3>API Usage</h3>
+<pre><code class="language-typescript">// JavaScript/TypeScript
+const response = await fetch('http://localhost:11434/api/generate', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    model: 'llama3.3:70b',
+    prompt: 'Write a hello world function',
+    stream: false
+  })
+});
+
+const data = await response.json();
+console.log(data.response);</code></pre>
+<pre><code class="language-python"># Python
+import requests
+
+response = requests.post('http://localhost:11434/api/generate', json={
+'model': 'llama3.3:70b',
+'prompt': 'Write a hello world function',
+'stream': False
+})
+
+print(response.json()['response'])</code></pre>
+<h3>External Resources</h3>
+<ul>
+<li><a href="https://ollama.com/docs">Ollama Official Docs</a></li>
+<li><a href="https://ollama.com/library">Model Library</a> - 100+ models available</li>
+<li><a href="https://github.com/ollama/ollama">Ollama GitHub</a></li>
+<li><a href="https://huggingface.co/spaces/open-llm-leaderboard/open_llm_leaderboard">Model Benchmarks</a></li>
+</ul>
+<hr>
+<h2>Summary</h2>
+<p><strong>Key Takeaways</strong>:</p>
+<ul>
+<li><strong>Cost savings are massive</strong> - 67-97% reduction over 3 years</li>
+<li><strong>Quality tradeoff is acceptable</strong> - 85-90% of Claude quality for code tasks</li>
+<li><strong>Privacy is guaranteed</strong> - Zero data leaves your infrastructure</li>
+<li><strong>Hardware investment pays off</strong> - 12-month break-even point</li>
+<li><strong>Gradual migration reduces risk</strong> - Start with 5% canary deployment</li>
+<li><strong>Model selection matters</strong> - Qwen 2.5 Coder for code, Llama 3.3 for general</li>
+<li><strong>GPU is mandatory</strong> - CPU-only is too slow for production</li>
+</ul>
+<p><strong>Migration Checklist</strong>:</p>
+<ul>
+<li>[ ] Identify current cloud API usage and costs</li>
+<li>[ ] Procure GPU hardware (RTX 4090 or better)</li>
+<li>[ ] Install Ollama and download models</li>
+<li>[ ] Run benchmark comparisons (latency, quality)</li>
+<li>[ ] Implement canary deployment (5% traffic)</li>
+<li>[ ] Monitor metrics (latency, error rate, user satisfaction)</li>
+<li>[ ] Gradually ramp up to 100% Ollama</li>
+<li>[ ] Keep cloud API as emergency fallback</li>
+<li>[ ] Document savings and report to stakeholders</li>
+</ul>
+<hr>
+<p><strong>Last Updated</strong>: 2025-12-24</p>
+<p><strong>Author</strong>: Jeremy Longshore</p>
+<p><strong>Related Playbooks</strong>: <a href="/playbooks/02-cost-caps/">Cost Caps &#x26; Budget Management</a>, <a href="/playbooks/03-mcp-reliability/">MCP Server Reliability</a></p>
+
+          </article>
+        </div>
+      </div>
+    </main>
+
+    <footer class="playbook-footer" data-astro-cid-hidutmah>
+      <div class="container" data-astro-cid-hidutmah>
+        <div class="footer-nav" data-astro-cid-hidutmah>
+          <a href="/playbooks/03-mcp-reliability" class="nav-link nav-prev" data-astro-cid-hidutmah>
+              <span class="nav-label" data-astro-cid-hidutmah>Previous</span>
+              <span class="nav-title" data-astro-cid-hidutmah>MCP Server Reliability</span>
+            </a>
+          <a href="/playbooks/05-incident-debugging" class="nav-link nav-next" data-astro-cid-hidutmah>
+              <span class="nav-label" data-astro-cid-hidutmah>Next</span>
+              <span class="nav-title" data-astro-cid-hidutmah>Incident Debugging Playbook</span>
+            </a>
+        </div>
+
+        <div class="back-to-index" data-astro-cid-hidutmah>
+          <a href="/playbooks" class="back-link" data-astro-cid-hidutmah>← Back to All Playbooks</a>
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  
+
+  <script type="module">function i(){const r=document.querySelector(".playbook-content"),n=document.getElementById("toc-nav");if(!r||!n)return;const c=r.querySelectorAll("h2, h3");c.forEach((e,o)=>{e.id||(e.id=`section-${o}`);const t=document.createElement("a");t.href=`#${e.id}`,t.textContent=e.textContent,t.style.paddingLeft=e.tagName==="H3"?"1.5rem":"0.75rem",n.appendChild(t)});const a=new IntersectionObserver(e=>{e.forEach(o=>{if(o.isIntersecting){const t=o.target.id;n.querySelectorAll("a").forEach(s=>{s.classList.toggle("active",s.getAttribute("href")===`#${t}`)})}})},{rootMargin:"-100px 0px -66%"});c.forEach(e=>a.observe(e))}document.addEventListener("DOMContentLoaded",i);</script>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
