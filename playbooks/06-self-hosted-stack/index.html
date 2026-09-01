@@ -1,0 +1,1521 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Self-Hosted Stack Setup | Production Playbooks</title>
+    <meta name="description" content="Full infrastructure deployment with Docker/Kubernetes. Ollama, PostgreSQL, Redis, Prometheus, Grafana, Nginx - complete production stack with monitoring and backups.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://tonsofskills.com/tons-of-skills-marketplace/playbooks/06-self-hosted-stack/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/playbooks/06-self-hosted-stack/">
+    <meta property="og:title" content="Self-Hosted Stack Setup | Production Playbooks">
+    <meta property="og:description" content="Full infrastructure deployment with Docker/Kubernetes. Ollama, PostgreSQL, Redis, Prometheus, Grafana, Nginx - complete production stack with monitoring and backups.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="Self-Hosted Stack Setup | Production Playbooks">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/playbooks/06-self-hosted-stack/">
+    <meta name="twitter:title" content="Self-Hosted Stack Setup | Production Playbooks">
+    <meta name="twitter:description" content="Full infrastructure deployment with Docker/Kubernetes. Ollama, PostgreSQL, Redis, Prometheus, Grafana, Nginx - complete production stack with monitoring and backups.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/_..-YgZcVYT.css"></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  <div class="playbook-page" data-astro-cid-hidutmah>
+    <header class="playbook-header" data-astro-cid-hidutmah>
+      <div class="container" data-astro-cid-hidutmah>
+        <nav class="breadcrumbs" aria-label="Breadcrumb" data-astro-cid-hidutmah>
+          <a href="/" data-astro-cid-hidutmah>Home</a>
+          <span class="breadcrumb-separator" data-astro-cid-hidutmah>/</span>
+          <a href="/playbooks" data-astro-cid-hidutmah>Playbooks</a>
+          <span class="breadcrumb-separator" data-astro-cid-hidutmah>/</span>
+          <span class="breadcrumb-current" data-astro-cid-hidutmah>Self-Hosted Stack Setup</span>
+        </nav>
+
+        <div class="playbook-hero" data-astro-cid-hidutmah>
+          <span class="category-badge" data-astro-cid-hidutmah>Infrastructure</span>
+          <h1 class="playbook-title" data-astro-cid-hidutmah>Self-Hosted Stack Setup</h1>
+          <p class="playbook-description" data-astro-cid-hidutmah>Full infrastructure deployment with Docker/Kubernetes. Ollama, PostgreSQL, Redis, Prometheus, Grafana, Nginx - complete production stack with monitoring and backups.</p>
+          <div class="playbook-meta" data-astro-cid-hidutmah>
+            <span class="meta-item" data-astro-cid-hidutmah>~28 min read</span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="playbook-main" data-astro-cid-hidutmah>
+      <div class="container" data-astro-cid-hidutmah>
+        <div class="playbook-layout" data-astro-cid-hidutmah>
+          <aside class="toc-sidebar" id="toc-sidebar" data-astro-cid-hidutmah>
+            <div class="toc-sticky" data-astro-cid-hidutmah>
+              <h2 class="toc-title" data-astro-cid-hidutmah>Table of Contents</h2>
+              <nav class="toc-nav" id="toc-nav" aria-label="Section navigation" data-astro-cid-hidutmah>
+                <!-- Populated by script below -->
+              </nav>
+            </div>
+          </aside>
+
+          <article class="playbook-content" data-astro-cid-hidutmah>
+            
+  <p><strong>Production Playbook for Infrastructure Engineers and DevOps</strong></p>
+<p>Building a complete self-hosted AI infrastructure for Claude Code plugins eliminates cloud dependencies, ensures data privacy, and provides full control. This playbook provides production-ready Docker Compose configurations, Kubernetes deployments, monitoring with Prometheus/Grafana, automated backups, and disaster recovery procedures.</p>
+<h2>Architecture Overview</h2>
+<h3>Self-Hosted Stack Components</h3>
+<pre><code class="language-mermaid">graph TB
+    A[Claude Code CLI] --> B[Analytics Daemon]
+    A --> C[Ollama LLM Server]
+    A --> D[PostgreSQL Database]
+    A --> E[Redis Cache]
+
+B --> F[Prometheus Metrics]
+C --> F
+
+F --> G[Grafana Dashboard]
+
+D --> H[Backup Service]
+E --> H
+
+I[Nginx Reverse Proxy] --> B
+I --> C
+
+J[Let's Encrypt] --> I</code></pre>
+<h3>Infrastructure Tiers</h3>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Purpose</th>
+<th>Port</th>
+<th>Storage</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Ollama</strong></td>
+<td>Local LLM inference</td>
+<td>11434</td>
+<td>100GB (models)</td>
+</tr>
+<tr>
+<td><strong>Analytics Daemon</strong></td>
+<td>Real-time monitoring</td>
+<td>3333, 3456</td>
+<td>10GB (logs)</td>
+</tr>
+<tr>
+<td><strong>PostgreSQL</strong></td>
+<td>Persistent data</td>
+<td>5432</td>
+<td>50GB (database)</td>
+</tr>
+<tr>
+<td><strong>Redis</strong></td>
+<td>Caching, sessions</td>
+<td>6379</td>
+<td>5GB (cache)</td>
+</tr>
+<tr>
+<td><strong>Prometheus</strong></td>
+<td>Metrics collection</td>
+<td>9090</td>
+<td>20GB (metrics)</td>
+</tr>
+<tr>
+<td><strong>Grafana</strong></td>
+<td>Dashboards</td>
+<td>3000</td>
+<td>5GB (config)</td>
+</tr>
+<tr>
+<td><strong>Nginx</strong></td>
+<td>Reverse proxy, SSL</td>
+<td>80, 443</td>
+<td>1GB (logs)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Total Storage</strong>: ~191GB minimum</p>
+<hr>
+<h2>Docker Compose Setup</h2>
+<h3>Complete Stack (docker-compose.yml)</h3>
+<pre><code class="language-yaml"># docker-compose.yml
+version: '3.8'
+
+services:
+# Ollama LLM Server
+ollama:
+image: ollama/ollama:latest
+container_name: ollama
+ports:
+- "11434:11434"
+volumes:
+- ollama_models:/root/.ollama
+deploy:
+resources:
+reservations:
+devices:
+- driver: nvidia
+count: 1
+capabilities: [gpu]
+restart: unless-stopped
+healthcheck:
+test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+interval: 30s
+timeout: 10s
+retries: 3
+
+# Analytics Daemon
+analytics:
+build: ./packages/analytics-daemon
+container_name: analytics-daemon
+ports:
+- "3333:3333"  # HTTP API
+- "3456:3456"  # WebSocket
+volumes:
+- analytics_data:/data
+- ${HOME}/.claude:/root/.claude:ro
+environment:
+- NODE_ENV=production
+- PORT=3333
+- WS_PORT=3456
+restart: unless-stopped
+healthcheck:
+test: ["CMD", "curl", "-f", "http://localhost:3333/health"]
+interval: 30s
+timeout: 5s
+retries: 3
+
+# PostgreSQL Database
+postgres:
+image: postgres:16-alpine
+container_name: postgres
+ports:
+- "5432:5432"
+volumes:
+- postgres_data:/var/lib/postgresql/data
+- ./backups/postgres:/backups
+environment:
+- POSTGRES_USER=claude
+- POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+- POSTGRES_DB=claude_prod
+restart: unless-stopped
+healthcheck:
+test: ["CMD-SHELL", "pg_isready -U claude"]
+interval: 10s
+timeout: 5s
+retries: 5
+
+# Redis Cache
+redis:
+image: redis:7-alpine
+container_name: redis
+ports:
+- "6379:6379"
+volumes:
+- redis_data:/data
+command: redis-server --appendonly yes --maxmemory 2gb --maxmemory-policy allkeys-lru
+restart: unless-stopped
+healthcheck:
+test: ["CMD", "redis-cli", "ping"]
+interval: 10s
+timeout: 3s
+retries: 3
+
+# Prometheus Metrics
+prometheus:
+image: prom/prometheus:latest
+container_name: prometheus
+ports:
+- "9090:9090"
+volumes:
+- ./prometheus.yml:/etc/prometheus/prometheus.yml
+- prometheus_data:/prometheus
+command:
+- '--config.file=/etc/prometheus/prometheus.yml'
+- '--storage.tsdb.path=/prometheus'
+- '--storage.tsdb.retention.time=30d'
+restart: unless-stopped
+
+# Grafana Dashboards
+grafana:
+image: grafana/grafana:latest
+container_name: grafana
+ports:
+- "3000:3000"
+volumes:
+- grafana_data:/var/lib/grafana
+- ./grafana/dashboards:/etc/grafana/provisioning/dashboards
+- ./grafana/datasources:/etc/grafana/provisioning/datasources
+environment:
+- GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+- GF_INSTALL_PLUGINS=redis-datasource
+restart: unless-stopped
+depends_on:
+- prometheus
+
+# Nginx Reverse Proxy
+nginx:
+image: nginx:alpine
+container_name: nginx
+ports:
+- "80:80"
+- "443:443"
+volumes:
+- ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+- ./nginx/ssl:/etc/nginx/ssl:ro
+- nginx_logs:/var/log/nginx
+restart: unless-stopped
+depends_on:
+- ollama
+- analytics
+- grafana
+
+# Automated Backups
+backup:
+image: alpine:latest
+container_name: backup-service
+volumes:
+- postgres_data:/source/postgres:ro
+- redis_data:/source/redis:ro
+- analytics_data:/source/analytics:ro
+- ./backups:/backups
+command: |
+sh -c '
+apk add --no-cache postgresql-client redis
+while true; do
+DATE=$(date +%Y-%m-%d_%H-%M-%S)
+
+# Backup PostgreSQL
+PGPASSWORD=$$POSTGRES_PASSWORD pg_dump -h postgres -U claude claude_prod > /backups/postgres/backup_$$DATE.sql
+
+# Backup Redis
+redis-cli -h redis --rdb /backups/redis/dump_$$DATE.rdb
+
+# Backup Analytics
+tar -czf /backups/analytics/backup_$$DATE.tar.gz /source/analytics
+
+# Delete old backups (keep 7 days)
+find /backups -name "backup_*.sql" -mtime +7 -delete
+find /backups -name "dump_*.rdb" -mtime +7 -delete
+find /backups -name "backup_*.tar.gz" -mtime +7 -delete
+
+echo "Backup completed: $$DATE"
+sleep 86400  # Daily backups
+done
+'
+environment:
+- POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+restart: unless-stopped
+
+volumes:
+ollama_models:
+analytics_data:
+postgres_data:
+redis_data:
+prometheus_data:
+grafana_data:
+nginx_logs:
+
+networks:
+default:
+name: claude_network</code></pre>
+<h3>Environment Configuration (.env)</h3>
+<pre><code class="language-bash"># .env
+POSTGRES_PASSWORD=your-secure-password-here
+GRAFANA_PASSWORD=your-grafana-password-here</code></pre>
+<h3>Nginx Configuration</h3>
+<pre><code class="language-nginx"># nginx/nginx.conf
+events {
+    worker_connections 1024;
+}
+
+http {
+upstream ollama {
+server ollama:11434;
+}
+
+upstream analytics {
+server analytics:3333;
+}
+
+upstream grafana {
+server grafana:3000;
+}
+
+# HTTP -> HTTPS redirect
+server {
+listen 80;
+server_name claude.example.com;
+return 301 https://$server_name$request_uri;
+}
+
+# HTTPS
+server {
+listen 443 ssl http2;
+server_name claude.example.com;
+
+ssl_certificate /etc/nginx/ssl/fullchain.pem;
+ssl_certificate_key /etc/nginx/ssl/privkey.pem;
+ssl_protocols TLSv1.2 TLSv1.3;
+ssl_ciphers HIGH:!aNULL:!MD5;
+
+# Ollama API
+location /api/ollama/ {
+proxy_pass http://ollama/;
+proxy_set_header Host $host;
+proxy_set_header X-Real-IP $remote_addr;
+}
+
+# Analytics API
+location /api/analytics/ {
+proxy_pass http://analytics/api/;
+proxy_set_header Host $host;
+proxy_set_header X-Real-IP $remote_addr;
+}
+
+# Analytics WebSocket
+location /ws/ {
+proxy_pass http://analytics/;
+proxy_http_version 1.1;
+proxy_set_header Upgrade $http_upgrade;
+proxy_set_header Connection "upgrade";
+}
+
+# Grafana
+location / {
+proxy_pass http://grafana/;
+proxy_set_header Host $host;
+}
+}
+}</code></pre>
+<h3>Deployment Commands</h3>
+<pre><code class="language-bash"># Setup
+mkdir -p backups/{postgres,redis,analytics}
+mkdir -p grafana/{dashboards,datasources}
+touch .env  # Add passwords
+
+# Start stack
+docker-compose up -d
+
+# Download Ollama models
+docker exec ollama ollama pull llama3.3:70b
+docker exec ollama ollama pull qwen2.5-coder:32b
+
+# Verify health
+docker-compose ps
+docker-compose logs -f
+
+# Access services
+# Ollama: http://localhost:11434
+# Analytics: http://localhost:3333
+# Grafana: http://localhost:3000
+# Prometheus: http://localhost:9090</code></pre>
+<hr>
+<h2>Kubernetes Deployment</h2>
+<h3>Complete Kubernetes Manifests</h3>
+<p><strong>Namespace</strong>:</p>
+<pre><code class="language-yaml"># namespace.yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: claude-stack</code></pre>
+<p><strong>Ollama Deployment</strong>:</p>
+<pre><code class="language-yaml"># ollama-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ollama
+  namespace: claude-stack
+spec:
+  replicas: 3  # Scale with GPUs
+  selector:
+    matchLabels:
+      app: ollama
+  template:
+    metadata:
+      labels:
+        app: ollama
+    spec:
+      containers:
+      - name: ollama
+        image: ollama/ollama:latest
+        ports:
+        - containerPort: 11434
+        resources:
+          limits:
+            nvidia.com/gpu: 1
+          requests:
+            memory: "16Gi"
+            cpu: "4"
+        volumeMounts:
+        - name: models
+          mountPath: /root/.ollama
+        livenessProbe:
+          httpGet:
+            path: /api/tags
+            port: 11434
+          initialDelaySeconds: 60
+          periodSeconds: 30
+      volumes:
+      - name: models
+        persistentVolumeClaim:
+          claimName: ollama-models-pvc
+<hr>
+apiVersion: v1
+kind: Service
+metadata:
+name: ollama-service
+namespace: claude-stack
+spec:
+selector:
+app: ollama
+ports:
+- protocol: TCP
+port: 11434
+targetPort: 11434
+type: ClusterIP
+<hr>
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+name: ollama-models-pvc
+namespace: claude-stack
+spec:
+accessModes:
+- ReadWriteOnce
+resources:
+requests:
+storage: 100Gi
+storageClassName: fast-ssd</code></pre>
+<p><strong>PostgreSQL StatefulSet</strong>:</p>
+<pre><code class="language-yaml"># postgres-statefulset.yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: claude-stack
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:16-alpine
+        ports:
+        - containerPort: 5432
+        env:
+        - name: POSTGRES_USER
+          value: "claude"
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: password
+        - name: POSTGRES_DB
+          value: "claude_prod"
+        volumeMounts:
+        - name: postgres-data
+          mountPath: /var/lib/postgresql/data
+        resources:
+          requests:
+            memory: "4Gi"
+            cpu: "2"
+          limits:
+            memory: "8Gi"
+            cpu: "4"
+  volumeClaimTemplates:
+  - metadata:
+      name: postgres-data
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 50Gi
+      storageClassName: fast-ssd
+<hr>
+apiVersion: v1
+kind: Service
+metadata:
+name: postgres
+namespace: claude-stack
+spec:
+selector:
+app: postgres
+ports:
+- protocol: TCP
+port: 5432
+targetPort: 5432
+clusterIP: None</code></pre>
+<p><strong>Monitoring Stack</strong>:</p>
+<pre><code class="language-yaml"># prometheus-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  namespace: claude-stack
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus
+  template:
+    metadata:
+      labels:
+        app: prometheus
+    spec:
+      containers:
+      - name: prometheus
+        image: prom/prometheus:latest
+        ports:
+        - containerPort: 9090
+        volumeMounts:
+        - name: config
+          mountPath: /etc/prometheus
+        - name: data
+          mountPath: /prometheus
+        args:
+          - '--config.file=/etc/prometheus/prometheus.yml'
+          - '--storage.tsdb.retention.time=30d'
+      volumes:
+      - name: config
+        configMap:
+          name: prometheus-config
+      - name: data
+        persistentVolumeClaim:
+          claimName: prometheus-data-pvc
+<hr>
+apiVersion: v1
+kind: ConfigMap
+metadata:
+name: prometheus-config
+namespace: claude-stack
+data:
+prometheus.yml: |
+global:
+scrape_interval: 15s
+scrape_configs:
+- job_name: 'ollama'
+static_configs:
+- targets: ['ollama-service:11434']
+- job_name: 'postgres'
+static_configs:
+- targets: ['postgres:5432']
+- job_name: 'analytics'
+static_configs:
+- targets: ['analytics-service:3333']</code></pre>
+<h3>Deploy to Kubernetes</h3>
+<pre><code class="language-bash"># Create namespace
+kubectl apply -f namespace.yaml
+
+# Create secrets
+kubectl create secret generic postgres-secret \
+--from-literal=password='your-secure-password' \
+-n claude-stack
+
+# Deploy services
+kubectl apply -f ollama-deployment.yaml
+kubectl apply -f postgres-statefulset.yaml
+kubectl apply -f prometheus-deployment.yaml
+
+# Verify
+kubectl get pods -n claude-stack
+kubectl logs -f deployment/ollama -n claude-stack</code></pre>
+<hr>
+<h2>Monitoring with Prometheus &#x26; Grafana</h2>
+<h3>Prometheus Configuration</h3>
+<pre><code class="language-yaml"># prometheus.yml
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+# Ollama metrics
+- job_name: 'ollama'
+static_configs:
+- targets: ['ollama:11434']
+metrics_path: '/metrics'
+
+# Analytics daemon metrics
+- job_name: 'analytics'
+static_configs:
+- targets: ['analytics:3333']
+metrics_path: '/metrics'
+
+# PostgreSQL metrics (using postgres_exporter)
+- job_name: 'postgres'
+static_configs:
+- targets: ['postgres-exporter:9187']
+
+# Redis metrics (using redis_exporter)
+- job_name: 'redis'
+static_configs:
+- targets: ['redis-exporter:9121']
+
+# Node metrics
+- job_name: 'node'
+static_configs:
+- targets: ['localhost:9100']
+
+alerting:
+alertmanagers:
+- static_configs:
+- targets: ['alertmanager:9093']
+
+rule_files:
+- '/etc/prometheus/rules/*.yml'</code></pre>
+<h3>Alert Rules</h3>
+<pre><code class="language-yaml"># prometheus/rules/alerts.yml
+groups:
+  - name: claude_stack_alerts
+    interval: 30s
+    rules:
+      # High error rate
+      - alert: HighErrorRate
+        expr: rate(llm_errors_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High LLM error rate"
+          description: "Error rate is {{ $value | humanizePercentage }}"
+
+# Ollama down
+- alert: OllamaDown
+expr: up{job="ollama"} == 0
+for: 1m
+labels:
+severity: critical
+annotations:
+summary: "Ollama is down"
+
+# High memory usage
+- alert: HighMemoryUsage
+expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes > 0.9
+for: 5m
+labels:
+severity: warning
+annotations:
+summary: "High memory usage"
+description: "Memory usage is {{ $value | humanizePercentage }}"
+
+# Database connection issues
+- alert: PostgreSQLDown
+expr: up{job="postgres"} == 0
+for: 1m
+labels:
+severity: critical
+annotations:
+summary: "PostgreSQL is down"</code></pre>
+<h3>Grafana Dashboards</h3>
+<p><strong>Claude Stack Dashboard (JSON)</strong>:</p>
+<pre><code class="language-json">{
+  "dashboard": {
+    "title": "Claude Code Self-Hosted Stack",
+    "panels": [
+      {
+        "title": "LLM Requests/sec",
+        "targets": [
+          {
+            "expr": "rate(llm_requests_total[5m])"
+          }
+        ],
+        "type": "graph"
+      },
+      {
+        "title": "Error Rate",
+        "targets": [
+          {
+            "expr": "rate(llm_errors_total[5m]) / rate(llm_requests_total[5m])"
+          }
+        ],
+        "type": "graph"
+      },
+      {
+        "title": "Response Latency (p95)",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(llm_request_duration_seconds_bucket[5m]))"
+          }
+        ],
+        "type": "graph"
+      },
+      {
+        "title": "GPU Utilization",
+        "targets": [
+          {
+            "expr": "nvidia_gpu_duty_cycle"
+          }
+        ],
+        "type": "gauge"
+      },
+      {
+        "title": "Database Connections",
+        "targets": [
+          {
+            "expr": "pg_stat_database_numbackends"
+          }
+        ],
+        "type": "graph"
+      }
+    ]
+  }
+}</code></pre>
+<hr>
+<h2>Backup Strategies</h2>
+<h3>Automated Daily Backups</h3>
+<pre><code class="language-bash">#!/bin/bash
+# backup.sh - Automated backup script
+
+DATE=$(date +%Y-%m-%d_%H-%M-%S)
+BACKUP_DIR="/backups"
+
+# PostgreSQL backup
+echo "Backing up PostgreSQL..."
+PGPASSWORD=$POSTGRES_PASSWORD pg_dump -h localhost -U claude claude_prod | \
+gzip > $BACKUP_DIR/postgres/backup_$DATE.sql.gz
+
+# Redis backup
+echo "Backing up Redis..."
+redis-cli --rdb $BACKUP_DIR/redis/dump_$DATE.rdb
+
+# Analytics data
+echo "Backing up Analytics..."
+tar -czf $BACKUP_DIR/analytics/backup_$DATE.tar.gz /var/lib/analytics
+
+# Ollama models (weekly only)
+if [ $(date +%u) -eq 1 ]; then
+echo "Backing up Ollama models (weekly)..."
+tar -czf $BACKUP_DIR/ollama/models_$DATE.tar.gz /root/.ollama
+fi
+
+# Upload to S3 (optional)
+aws s3 sync $BACKUP_DIR s3://my-backups/claude-stack/
+
+# Delete old local backups (keep 7 days)
+find $BACKUP_DIR -name "backup_*.sql.gz" -mtime +7 -delete
+find $BACKUP_DIR -name "dump_*.rdb" -mtime +7 -delete
+find $BACKUP_DIR -name "backup_*.tar.gz" -mtime +7 -delete
+
+echo "Backup completed: $DATE"</code></pre>
+<h3>Restore Procedures</h3>
+<pre><code class="language-bash">#!/bin/bash
+# restore.sh - Restore from backup
+
+BACKUP_FILE=$1
+
+if [ -z "$BACKUP_FILE" ]; then
+echo "Usage: ./restore.sh <backup_file>"
+exit 1
+fi
+
+# Stop services
+docker-compose down
+
+# Restore PostgreSQL
+if [[ $BACKUP_FILE == *"postgres"* ]]; then
+gunzip -c $BACKUP_FILE | \
+PGPASSWORD=$POSTGRES_PASSWORD psql -h localhost -U claude claude_prod
+fi
+
+# Restore Redis
+if [[ $BACKUP_FILE == *"redis"* ]]; then
+cp $BACKUP_FILE /var/lib/redis/dump.rdb
+fi
+
+# Restore Analytics
+if [[ $BACKUP_FILE == *"analytics"* ]]; then
+tar -xzf $BACKUP_FILE -C /
+fi
+
+# Restart services
+docker-compose up -d
+
+echo "Restore completed from: $BACKUP_FILE"</backup_file></code></pre>
+<hr>
+<h2>Security Hardening</h2>
+<h3>Firewall Rules (UFW)</h3>
+<pre><code class="language-bash"># Allow SSH
+sudo ufw allow 22/tcp
+
+# Allow HTTP/HTTPS (nginx only)
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+
+# Block direct access to services
+sudo ufw deny 11434/tcp  # Ollama
+sudo ufw deny 3333/tcp   # Analytics
+sudo ufw deny 5432/tcp   # PostgreSQL
+sudo ufw deny 6379/tcp   # Redis
+
+# Enable firewall
+sudo ufw enable</code></pre>
+<h3>SSL/TLS Certificates (Let's Encrypt)</h3>
+<pre><code class="language-bash"># Install certbot
+sudo apt-get install certbot
+
+# Generate certificate
+sudo certbot certonly --standalone -d claude.example.com
+
+# Auto-renewal cron
+echo "0 0 * * * certbot renew --quiet" | sudo crontab -</code></pre>
+<h3>Database Security</h3>
+<pre><code class="language-sql">-- PostgreSQL hardening
+
+-- Create read-only user
+CREATE USER claude_readonly WITH PASSWORD 'readonly-password';
+GRANT CONNECT ON DATABASE claude_prod TO claude_readonly;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO claude_readonly;
+
+-- Disable remote root access
+ALTER USER postgres PASSWORD 'strong-random-password';
+REVOKE ALL ON DATABASE postgres FROM PUBLIC;
+
+-- Enable SSL
+ALTER SYSTEM SET ssl = on;
+ALTER SYSTEM SET ssl_cert_file = '/etc/ssl/certs/server.crt';
+ALTER SYSTEM SET ssl_key_file = '/etc/ssl/private/server.key';</code></pre>
+<hr>
+<h2>Scaling &#x26; High Availability</h2>
+<h3>Load Balancing Ollama</h3>
+<pre><code class="language-yaml"># ollama-ha.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: ollama-lb
+  namespace: claude-stack
+spec:
+  selector:
+    app: ollama
+  ports:
+  - protocol: TCP
+    port: 11434
+    targetPort: 11434
+  type: LoadBalancer
+  sessionAffinity: ClientIP  # Sticky sessions
+<hr>
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+name: ollama
+namespace: claude-stack
+spec:
+replicas: 5  # 5 GPU nodes
+strategy:
+type: RollingUpdate
+rollingUpdate:
+maxSurge: 1
+maxUnavailable: 1
+template:
+metadata:
+labels:
+app: ollama
+spec:
+containers:
+- name: ollama
+image: ollama/ollama:latest
+resources:
+limits:
+nvidia.com/gpu: 1</code></pre>
+<h3>PostgreSQL High Availability</h3>
+<pre><code class="language-yaml"># postgres-ha.yaml (using Patroni)
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres-ha
+  namespace: claude-stack
+spec:
+  serviceName: postgres-ha
+  replicas: 3  # Primary + 2 replicas
+  selector:
+    matchLabels:
+      app: postgres-ha
+  template:
+    metadata:
+      labels:
+        app: postgres-ha
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:16-alpine
+        env:
+        - name: PATRONI_SCOPE
+          value: "postgres-cluster"
+        - name: PATRONI_REPLICATION_USERNAME
+          value: "replicator"
+        - name: PATRONI_REPLICATION_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgres-ha-secret
+              key: replication-password</code></pre>
+<hr>
+<h2>Best Practices</h2>
+<h3>DO ✅</h3>
+<ul>
+<li><strong>Use persistent volumes</strong></li>
+</ul>
+   <pre><code class="language-yaml">volumes:
+     - ollama_models:/root/.ollama  # Persistent
+     - type: tmpfs                    # Temporary cache
+       target: /tmp</code></pre>
+<ul>
+<li><strong>Implement health checks</strong></li>
+</ul>
+   <pre><code class="language-yaml">healthcheck:
+     test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+     interval: 30s
+     timeout: 10s
+     retries: 3
+     start_period: 60s</code></pre>
+<ul>
+<li><strong>Use resource limits</strong></li>
+</ul>
+   <pre><code class="language-yaml">resources:
+     limits:
+       memory: "16Gi"
+       cpu: "4"
+       nvidia.com/gpu: 1
+     requests:
+       memory: "8Gi"
+       cpu: "2"</code></pre>
+<ul>
+<li><strong>Automate backups</strong></li>
+</ul>
+   <pre><code class="language-bash"># Daily cron
+   0 2 * * * /opt/backup.sh</code></pre>
+<h3>DON'T ❌</h3>
+<ul>
+<li><strong>Don't expose services publicly</strong></li>
+</ul>
+   <pre><code class="language-yaml"># ❌ Direct internet exposure
+   ports:
+     - "5432:5432"  # PostgreSQL exposed!
+<h1 id="-use-reverse-proxy">✅ Use reverse proxy</h1>
+</code><h1 id="access-via-nginx-only"><code class="language-yaml">Access via Nginx only</code></h1></pre>
+<ul>
+<li><strong>Don't skip SSL/TLS</strong></li>
+</ul>
+   <pre><code class="language-nginx"># ❌ HTTP only
+   listen 80;
+<h1 id="-https-with-redirect">✅ HTTPS with redirect</h1>
+</code><p><code class="language-nginx">listen 443 ssl http2;</code></p></pre><p></p>
+<ul>
+<li><strong>Don't use default passwords</strong></li>
+</ul>
+   <pre><code class="language-bash"># ❌ Weak password
+   POSTGRES_PASSWORD=password
+<h1 id="-strong-random-password">✅ Strong random password</h1>
+</code><p><code class="language-bash">POSTGRES_PASSWORD=$(openssl rand -base64 32)</code></p></pre><p></p>
+<hr>
+<h2>Tools &#x26; Resources</h2>
+<h3>Infrastructure as Code</h3>
+<p><strong>Terraform</strong> (provision cloud resources):</p>
+<pre><code class="language-hcl"># main.tf
+resource "aws_instance" "ollama_server" {
+  ami           = "ami-0c55b159cbfafe1f0"
+  instance_type = "g4dn.xlarge"  # GPU instance
+</code><p><code class="language-hcl">tags = {
+Name = “ollama-production”
+}
+}</code></p></pre><p></p>
+<p><strong>Ansible</strong> (configure servers):</p>
+<pre><code class="language-yaml"># playbook.yml
+<ul>
+<li>hosts: ollama_servers</li>
+</ul>
+tasks:
+- name: Install Docker
+apt:
+name: docker.io
+state: present
+</code><ul><code class="language-yaml">
+</code><li><code class="language-yaml">name: Deploy stack
+community.docker.docker_compose:
+project_src: /opt/claude-stack
+state: present</code></li></ul></pre>
+
+<h3>Monitoring Tools</h3>
+<ul>
+<li><strong>Prometheus</strong>: Metrics collection</li>
+<li><strong>Grafana</strong>: Dashboards</li>
+<li><strong>AlertManager</strong>: Alert routing</li>
+<li><strong>Loki</strong>: Log aggregation</li>
+<li><strong>Jaeger</strong>: Distributed tracing</li>
+</ul>
+<hr>
+<h2>Summary</h2>
+<p><strong>Key Takeaways</strong>:</p>
+<ul>
+<li><strong>Docker Compose for dev/small deployments</strong> - Simple, fast setup</li>
+<li><strong>Kubernetes for production/scale</strong> - High availability, auto-scaling</li>
+<li><strong>Monitor everything</strong> - Prometheus + Grafana provide visibility</li>
+<li><strong>Automate backups</strong> - Daily PostgreSQL, weekly models</li>
+<li><strong>Harden security</strong> - Firewalls, SSL, strong passwords</li>
+<li><strong>Scale horizontally</strong> - Multiple Ollama instances with load balancing</li>
+<li><strong>Test disaster recovery</strong> - Practice restores monthly</li>
+</ul>
+<p><strong>Self-Hosted Stack Checklist</strong>:</p>
+<ul>
+<li>[ ] Deploy Ollama with GPU support</li>
+<li>[ ] Set up PostgreSQL with backups</li>
+<li>[ ] Configure Redis for caching</li>
+<li>[ ] Deploy Analytics Daemon</li>
+<li>[ ] Install Prometheus + Grafana</li>
+<li>[ ] Configure Nginx reverse proxy</li>
+<li>[ ] Enable SSL/TLS with Let's Encrypt</li>
+<li>[ ] Set up automated backups (daily)</li>
+<li>[ ] Configure firewall rules</li>
+<li>[ ] Test disaster recovery</li>
+<li>[ ] Document runbooks</li>
+</ul>
+<hr>
+<p><strong>Last Updated</strong>: 2025-12-24</p>
+<p><strong>Author</strong>: Jeremy Longshore</p>
+<p><strong>Related Playbooks</strong>: <a href="/playbooks/04-ollama-migration/">Ollama Migration Guide</a>, <a href="/playbooks/03-mcp-reliability/">MCP Server Reliability</a></p>
+
+          </article>
+        </div>
+      </div>
+    </main>
+
+    <footer class="playbook-footer" data-astro-cid-hidutmah>
+      <div class="container" data-astro-cid-hidutmah>
+        <div class="footer-nav" data-astro-cid-hidutmah>
+          <a href="/playbooks/05-incident-debugging" class="nav-link nav-prev" data-astro-cid-hidutmah>
+              <span class="nav-label" data-astro-cid-hidutmah>Previous</span>
+              <span class="nav-title" data-astro-cid-hidutmah>Incident Debugging Playbook</span>
+            </a>
+          <a href="/playbooks/07-compliance-audit" class="nav-link nav-next" data-astro-cid-hidutmah>
+              <span class="nav-label" data-astro-cid-hidutmah>Next</span>
+              <span class="nav-title" data-astro-cid-hidutmah>Compliance &amp; Audit Guide</span>
+            </a>
+        </div>
+
+        <div class="back-to-index" data-astro-cid-hidutmah>
+          <a href="/playbooks" class="back-link" data-astro-cid-hidutmah>← Back to All Playbooks</a>
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  
+
+  <script type="module">function i(){const r=document.querySelector(".playbook-content"),n=document.getElementById("toc-nav");if(!r||!n)return;const c=r.querySelectorAll("h2, h3");c.forEach((e,o)=>{e.id||(e.id=`section-${o}`);const t=document.createElement("a");t.href=`#${e.id}`,t.textContent=e.textContent,t.style.paddingLeft=e.tagName==="H3"?"1.5rem":"0.75rem",n.appendChild(t)});const a=new IntersectionObserver(e=>{e.forEach(o=>{if(o.isIntersecting){const t=o.target.id;n.querySelectorAll("a").forEach(s=>{s.classList.toggle("active",s.getAttribute("href")===`#${t}`)})}})},{rootMargin:"-100px 0px -66%"});c.forEach(e=>a.observe(e))}document.addEventListener("DOMContentLoaded",i);</script>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
