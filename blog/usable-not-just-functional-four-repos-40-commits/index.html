@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Usable, Not Just Functional: Entity Selection, Binary Eval, and 6 UX Fixes Across 4 Repos — Tons of Skills Work Diary</title>
+    <meta name="description" content="40+ commits across 4 repos. CAD entity selection gets real bounding boxes, a binary eval framework bootstraps to v0.2.8, and the X triage plugin ships 6 UX features.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://startaitools.com/posts/usable-not-just-functional-four-repos-40-commits/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/usable-not-just-functional-four-repos-40-commits/">
+    <meta property="og:title" content="Usable, Not Just Functional: Entity Selection, Binary Eval, and 6 UX Fixes Across 4 Repos — Tons of Skills Work Diary">
+    <meta property="og:description" content="40+ commits across 4 repos. CAD entity selection gets real bounding boxes, a binary eval framework bootstraps to v0.2.8, and the X triage plugin ships 6 UX features.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="Usable, Not Just Functional: Entity Selection, Binary Eval, and 6 UX Fixes Across 4 Repos — Tons of Skills Work Diary">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/usable-not-just-functional-four-repos-40-commits/">
+    <meta name="twitter:title" content="Usable, Not Just Functional: Entity Selection, Binary Eval, and 6 UX Fixes Across 4 Repos — Tons of Skills Work Diary">
+    <meta name="twitter:description" content="40+ commits across 4 repos. CAD entity selection gets real bounding boxes, a binary eval framework bootstraps to v0.2.8, and the X triage plugin ships 6 UX features.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"Usable, Not Just Functional: Entity Selection, Binary Eval, and 6 UX Fixes Across 4 Repos","description":"40+ commits across 4 repos. CAD entity selection gets real bounding boxes, a binary eval framework bootstraps to v0.2.8, and the X triage plugin ships 6 UX features.","datePublished":"2026-03-24","url":"https://tonsofskills.com/blog/undefined","author":{"@type":"Person","name":"Jeremy Longshore"},"publisher":{"@type":"Organization","name":"Tons of Skills","url":"https://tonsofskills.com"}}</script>
+  
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.post-header[data-astro-cid-7jjqptxk]{background:var(--panel);padding:4rem 1.5rem 3rem;border-bottom:1px solid var(--border)}.post-header-inner[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto}.back-link[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3);text-decoration:none;display:inline-block;margin-bottom:1.5rem;transition:color .2s}.back-link[data-astro-cid-7jjqptxk]:hover{color:var(--primary)}.post-meta[data-astro-cid-7jjqptxk]{display:flex;align-items:center;gap:.75rem;margin-bottom:1rem}time[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3)}.featured-badge[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.2rem .6rem;background:#ce114126;color:var(--red);border-radius:0;font-weight:600;text-transform:uppercase;letter-spacing:.05em}.post-header[data-astro-cid-7jjqptxk] h1[data-astro-cid-7jjqptxk]{font-family:var(--font-body);font-size:clamp(1.5rem,4vw,2.2rem);font-weight:700;color:var(--text);line-height:1.25;margin-bottom:.75rem;letter-spacing:0}.post-desc[data-astro-cid-7jjqptxk]{color:var(--text-2);font-size:1.05rem;line-height:1.6;margin-bottom:1rem}.post-tags[data-astro-cid-7jjqptxk]{display:flex;gap:.4rem;flex-wrap:wrap}.tag[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.15rem .5rem;background:var(--surface-3);color:var(--text-3);border-radius:0}.post-body[data-astro-cid-7jjqptxk]{padding:3rem 1.5rem 4rem}.prose[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto;color:var(--text-2);line-height:1.8;font-size:1rem}.prose[data-astro-cid-7jjqptxk] h2{font-family:var(--font-body);font-size:1.5rem;font-weight:700;color:var(--text);margin:2.5rem 0 1rem;letter-spacing:0}.prose[data-astro-cid-7jjqptxk] h3{font-size:1.2rem;font-weight:600;color:var(--text);margin:2rem 0 .75rem}.prose[data-astro-cid-7jjqptxk] p{margin-bottom:1rem}.prose[data-astro-cid-7jjqptxk] ul,.prose[data-astro-cid-7jjqptxk] ol{margin:.5rem 0 1rem 1.5rem}.prose[data-astro-cid-7jjqptxk] li{margin-bottom:.35rem}.prose[data-astro-cid-7jjqptxk] strong{color:var(--text);font-weight:600}.prose[data-astro-cid-7jjqptxk] code{font-family:var(--font-mono);font-size:.88em;background:var(--surface-3);padding:.15em .35em;border-radius:0;color:var(--primary)}.prose[data-astro-cid-7jjqptxk] a{color:var(--primary);text-decoration:none}.prose[data-astro-cid-7jjqptxk] a:hover{text-decoration:underline}@media(max-width:768px){.post-header[data-astro-cid-7jjqptxk]{padding:3rem 1rem 2rem}.post-body[data-astro-cid-7jjqptxk]{padding:2rem 1rem 3rem}}
+</style></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  <article class="post" data-astro-cid-7jjqptxk>
+    <header class="post-header" data-astro-cid-7jjqptxk>
+      <div class="post-header-inner" data-astro-cid-7jjqptxk>
+        <a href="/blog" class="back-link" data-astro-cid-7jjqptxk>Back to Work Diary</a>
+        <div class="post-meta" data-astro-cid-7jjqptxk>
+          <time datetime="2026-03-24" data-astro-cid-7jjqptxk>March 23, 2026</time>
+          
+        </div>
+        <h1 data-astro-cid-7jjqptxk>Usable, Not Just Functional: Entity Selection, Binary Eval, and 6 UX Fixes Across 4 Repos</h1>
+        <p class="post-desc" data-astro-cid-7jjqptxk>40+ commits across 4 repos. CAD entity selection gets real bounding boxes, a binary eval framework bootstraps to v0.2.8, and the X triage plugin ships 6 UX features.</p>
+        <div class="post-tags" data-astro-cid-7jjqptxk>
+          <span class="tag" data-astro-cid-7jjqptxk>ai-agents</span><span class="tag" data-astro-cid-7jjqptxk>python</span><span class="tag" data-astro-cid-7jjqptxk>testing</span><span class="tag" data-astro-cid-7jjqptxk>architecture</span><span class="tag" data-astro-cid-7jjqptxk>claude-code</span><span class="tag" data-astro-cid-7jjqptxk>debugging</span><span class="tag" data-astro-cid-7jjqptxk>full-stack</span><span class="tag" data-astro-cid-7jjqptxk>react</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="post-body" data-astro-cid-7jjqptxk>
+      <div class="prose" data-astro-cid-7jjqptxk>
+        <p>Functional is table stakes. Usable is the moat.</p>
+<p>March 24th was a 40+ commit day spread across four repositories. The theme wasn’t new capabilities. It was making existing capabilities pleasant to operate. Entity selection that highlights the right rectangle instead of a wrong one. Confirmation feedback after every review command. Color-coded tags that match their overlay boxes. The kind of work that separates a prototype from a tool someone uses twice.</p>
+<h2 id="cad-entity-selection-the-bounding-box-problem">CAD Entity Selection: The Bounding Box Problem</h2>
+<p>The entity selection UX in <a href="https://github.com/jeremylongshore/cad-dxf-agent">cad-dxf-agent</a> had a fundamental problem. When you clicked an entity in the viewer, the highlight overlay was wrong.</p>
+<p>Not subtly wrong. Wrong by entire model units.</p>
+<p>The frontend was using hardcoded <code>±10</code> model units from the entity centroid to draw selection rectangles. For a door schedule text block that spans 200 units, the highlight covered maybe 5% of the actual entity. For a tiny dimension tick, the highlight was 20x too large. Every selection looked broken because it was.</p>
+<h3 id="real-bounding-boxes-from-the-backend">Real Bounding Boxes from the Backend</h3>
+<p>The fix required the backend to compute actual entity bounding boxes and send them to the frontend. Not approximate. Not “close enough.” Real bounds from the DXF geometry.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#F97583">def</span><span style="color:#B392F0"> compute_entity_bounds</span><span style="color:#E1E4E8">(entity) -> </span><span style="color:#79B8FF">dict</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#9ECBFF">    """Compute actual bounding box from entity geometry, not centroids."""</span></span>
+<span class="line"><span style="color:#F97583">    if</span><span style="color:#E1E4E8"> entity.dxftype() </span><span style="color:#F97583">==</span><span style="color:#9ECBFF"> 'LINE'</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">        start, end </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> entity.dxf.start, entity.dxf.end</span></span>
+<span class="line"><span style="color:#F97583">        return</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#9ECBFF">            'min_x'</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">min</span><span style="color:#E1E4E8">(start.x, end.x),</span></span>
+<span class="line"><span style="color:#9ECBFF">            'min_y'</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">min</span><span style="color:#E1E4E8">(start.y, end.y),</span></span>
+<span class="line"><span style="color:#9ECBFF">            'max_x'</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">max</span><span style="color:#E1E4E8">(start.x, end.x),</span></span>
+<span class="line"><span style="color:#9ECBFF">            'max_y'</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">max</span><span style="color:#E1E4E8">(start.y, end.y),</span></span>
+<span class="line"><span style="color:#E1E4E8">        }</span></span>
+<span class="line"><span style="color:#6A737D">    # INSERT, TEXT, MTEXT, LWPOLYLINE — each has its own geometry extraction</span></span>
+<span class="line"><span style="color:#79B8FF">    ...</span></span></code></pre>
+<p>Every DXF entity type stores its geometry differently. A LINE has start/end points. A LWPOLYLINE has a vertex list. An INSERT (block reference) requires resolving the block definition, applying scale and rotation, then computing the transformed bounds. TEXT and MTEXT need font metrics to get the width right.</p>
+<p>The hardcoded <code>±10</code> was a shortcut from week one. It worked well enough to prove the concept. But “well enough” in a selection UI means “wrong every time in a way the user notices immediately.”</p>
+<h3 id="color-cycling-selection-highlights">Color-Cycling Selection Highlights</h3>
+<p>With correct bounding boxes, the next step was visual differentiation. When you select three entities for a chat prompt, which highlight goes with which tag?</p>
+<p>Six-color palette, assigned by selection index:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="javascript"><code><span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> SELECTION_COLORS</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> [</span></span>
+<span class="line"><span style="color:#9ECBFF">  'rgba(59, 130, 246, 0.3)'</span><span style="color:#E1E4E8">,   </span><span style="color:#6A737D">// blue</span></span>
+<span class="line"><span style="color:#9ECBFF">  'rgba(16, 185, 129, 0.3)'</span><span style="color:#E1E4E8">,   </span><span style="color:#6A737D">// emerald</span></span>
+<span class="line"><span style="color:#9ECBFF">  'rgba(245, 158, 11, 0.3)'</span><span style="color:#E1E4E8">,   </span><span style="color:#6A737D">// amber</span></span>
+<span class="line"><span style="color:#9ECBFF">  'rgba(139, 92, 246, 0.3)'</span><span style="color:#E1E4E8">,   </span><span style="color:#6A737D">// purple</span></span>
+<span class="line"><span style="color:#9ECBFF">  'rgba(236, 72, 153, 0.3)'</span><span style="color:#E1E4E8">,   </span><span style="color:#6A737D">// pink</span></span>
+<span class="line"><span style="color:#9ECBFF">  'rgba(6, 182, 212, 0.3)'</span><span style="color:#E1E4E8">,    </span><span style="color:#6A737D">// cyan</span></span>
+<span class="line"><span style="color:#E1E4E8">];</span></span></code></pre>
+<p>The same color index applies to both the viewer overlay rectangle and the entity tag in the chat panel. Select entity #1, get a blue box and a blue tag. Entity #2 gets emerald. No guessing which tag maps to which highlight.</p>
+<h3 id="click-to-focus-operations">Click-to-Focus Operations</h3>
+<p>The diff comparison already generates a planned operations checklist — “MOVE door D-101 from grid A to grid B,” “DELETE redundant hatch pattern.” Those operations sat in a text list. You had to find the referenced entity yourself.</p>
+<p>Now they’re clickable. Click an operation, the viewer pans and zooms to the target entity. The backend computes bounds per operation, the frontend does the camera math. The drawing is the navigation UI.</p>
+<h3 id="the-diff-detection-fix">The Diff Detection Fix</h3>
+<p>Separate from the UX work, the diff comparison engine had a bug: MODIFIED and MOVED categories never appeared. Everything was either ADDED or DELETED.</p>
+<p>Root cause: <code>match_search_radius</code> and geometric <code>tolerance</code> were the same value. The search radius determines how far the algorithm looks for potential matches. The tolerance determines how close two entities must be to count as the same entity. When they’re identical, the algorithm finds a candidate and immediately rejects it — the match is <em>exactly</em> at the boundary, and floating-point rounding pushes it out.</p>
+<p>The fix split them:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#79B8FF">MATCH_SEARCH_RADIUS</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> 50.0</span><span style="color:#6A737D">   # how far to look for candidates</span></span>
+<span class="line"><span style="color:#79B8FF">GEOMETRIC_TOLERANCE</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> 1.0</span><span style="color:#6A737D">     # how close to count as "same entity"</span></span>
+<span class="line"><span style="color:#79B8FF">MOVE_THRESHOLD</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> 5.0</span><span style="color:#6A737D">          # minimum distance to classify as MOVED vs MODIFIED</span></span></code></pre>
+<p>Three distinct thresholds for three distinct questions. The <code>move_threshold</code> was also too low — entities with minor coordinate drift from re-export were classified as MOVED when they should have been MODIFIED. Raising it to 5.0 model units resolved the false positives.</p>
+<p>A separate bug: block ATTRIBs (text attributes on block references) weren’t captured during comparison. Two otherwise-identical door blocks with different room number ATTRIBs looked identical to the diff engine. Now ATTRIB text is included in the entity fingerprint.</p>
+<p>PR #129 landed with 16 files changed. PR review caught a missing <code>&#x3C;label></code> element for accessibility, an undocumented magic number, and a SIM103 lint warning. All fixed before merge.</p>
+<h2 id="j-rig-binary-eval-zero-to-v028">j-rig-binary-eval: Zero to v0.2.8</h2>
+<p>A brand new project went from <code>git init</code> to v0.2.8 in a single day. Thirty-plus commits.</p>
+<p>j-rig-binary-eval is a calibration framework for evaluating Claude Code skill quality. Not “does this skill run without errors” — that’s CI. Binary eval asks “does this skill produce output that a senior engineer would approve?” Judgment layers, calibration curves, scoring rubrics, experiment design.</p>
+<p>The day broke into phases.</p>
+<p><strong>Phase 1: Governance scaffolding.</strong> CLAUDE.md, beads integration, doc-filing index, master build blueprint. Ten epic reference files (EPIC-01 through EPIC-10) defining the full system architecture before writing a line of application code.</p>
+<p><strong>Phase 2: Templates library.</strong> Forty-seven reference files imported from the enterprise template collection. Immediately audited for bloat: 9 files deleted (~975 lines), 6 stale enterprise standards removed (~7,500 lines). The templates library was bigger than the project it was meant to serve.</p>
+<p>This is a pattern worth calling out. Enterprise template libraries grow monotonically. Nobody deletes templates. The audit removed files that hadn’t been referenced in 6+ months and standards documents from a previous org structure. The remaining templates are the ones that actually get used.</p>
+<p><strong>Phase 3: Pattern A README.</strong> The one-pager + operator-grade system analysis format. Title, tagline, badges, links, W5 table, stack table, key differentiators, then the full operator section. This README format exists so any engineer can understand the project in 90 seconds and operate it in 5 minutes.</p>
+<p>The project is pre-code. All 30+ commits are governance, architecture, and planning artifacts. No application logic yet. That’s intentional. The binary eval framework needs to be right before it’s fast. Getting the epic structure, scoring rubrics, and experiment design wrong means rebuilding the calibration pipeline later.</p>
+<h2 id="x-bug-triage-plugin-six-ux-enhancements">X Bug Triage Plugin: Six UX Enhancements</h2>
+<p>The <a href="https://github.com/jeremylongshore/x-bug-triage-plugin">x-bug-triage-plugin</a> shipped v0.4.4 with six targeted UX improvements via PR #19. Yesterday was the <a href="/blog/x-bug-triage-plugin-zero-to-v043-one-day/">zero-to-v0.4.3 sprint</a>. Today was making it feel finished.</p>
+<p><strong>E1: Action confirmation feedback.</strong> All 11 review commands (approve, reject, defer, escalate, etc.) now emit a structured confirmation response. Before: the command ran silently. The user had to query the state to confirm it worked. After: immediate feedback with the action taken, the affected entity, and the new state.</p>
+<p><strong>E2: Freshness assessment.</strong> Source data ages. A tweet from 3 hours ago is fresh. A tweet from 3 weeks ago might reference a bug that’s already fixed. The freshness system assigns <code>date_confidence</code> bands — HIGH (&#x3C; 24h), MEDIUM (1-7d), LOW (7-30d), STALE (> 30d) — and surfaces warnings when the triage pipeline processes stale data.</p>
+<p><strong>E3: Source status header.</strong> Aggregates a <code>DegradationReport</code> per X API endpoint. If the tweets endpoint is returning 429s, the header shows it. If the search endpoint is slow, the header shows latency. Operators see API health at a glance instead of discovering it when a command fails.</p>
+<p><strong>E4: File-based JSON cache.</strong> Opt-in caching layer for X API responses. Development and testing no longer require live API calls. The cache writes JSON files with request fingerprints as filenames. <code>DEBUG_CACHE</code> logging shows hit/miss rates.</p>
+<p><strong>E5: Hybrid dedup.</strong> The original dedup was exact-match on tweet ID. Duplicate <em>content</em> across different tweets (retweets, quote tweets, copy-paste reports) passed through. The new hybrid approach combines character-trigram similarity with token-Jaccard scoring. Two tweets with 85%+ trigram overlap and 80%+ token-Jaccard get flagged as semantic duplicates before clustering.</p>
+<p><strong>E6: Per-tier evidence counts.</strong> The summary and detail views now show evidence counts broken down by severity tier. “3 CRITICAL, 7 HIGH, 12 MEDIUM” instead of just “22 bugs.” Operators triage by tier, so the counts should match.</p>
+<p>Eight new files, 14 modifications, 70 new tests (348 total), zero breaking changes.</p>
+<p>PR review caught three things: magic numbers that should be extracted constants, fixed-width column padding that should be dynamic, and <code>DEBUG_CACHE</code> logging that was always on instead of opt-in. All addressed before merge.</p>
+<p>The mermaid architecture diagram in the README was also replaced with a plain text flow diagram. Mermaid doesn’t render on GitHub Pages. A tool that documents itself with diagrams nobody can see isn’t documenting itself.</p>
+<h2 id="the-pattern">The Pattern</h2>
+<p>Three projects, same lesson. The CAD tool had real entity selection from day one — the highlight was just in the wrong place. The triage plugin had all 11 review commands — they just didn’t confirm they worked. The binary eval framework had enterprise templates — most of them were dead weight.</p>
+<p>Functional is the first 80%. Usable is the remaining 80%.</p>
+<p>The common thread across all of today’s work: removing the gap between “this technically works” and “this is pleasant to use.” Correct bounding boxes. Color-coded selections. Confirmation messages. Freshness warnings. Evidence counts by tier. None of these are features. They’re the absence of friction.</p>
+<hr>
+<p><strong>Related Posts:</strong></p>
+<ul>
+<li><a href="/blog/x-bug-triage-plugin-zero-to-v043-one-day/">X Bug Triage Plugin: Zero to v0.4.3 in One Day</a> — the bootstrap sprint this work builds on</li>
+<li><a href="/blog/pdf-extraction-sweep-day-42-commits/">PDF Extraction Bugs, Broadcast Persistence, and a 42-Commit Sweep Day</a> — another heavy multi-repo day with CAD debugging</li>
+<li><a href="/blog/deterministic-dxf-comparison-engine-one-day-build/">Building a Deterministic DXF Comparison Engine in One Day</a> — the original diff engine that today’s MODIFIED/MOVED fix corrects</li>
+</ul>
+      </div>
+    </div>
+  </article>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
