@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>podium-auth - Agent Skill</title>
+    <meta name="description" content="Authenticate production Podium integrations and survive the auth-side failures — OAuth2 access-token expiry storms, refresh-token decay after 90 days of non-use, scope drift on re-grant, secret rotation without downtime, multi-tenant token routing, leakage in commits. Use when hardening token caching, building a refresh-token decay monitor, rotating Podium client credentials, or recovering from 401/403 auth cascades. Trigger with &quot;podium auth&quot;, &quot;podium oauth&quot;, &quot;podium token refresh&quot;, &quot;podium scope drift&quot;, &quot;podium credential rotation&quot;, &quot;podium multi-location auth&quot;.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://tonsofskills.com/tons-of-skills-marketplace/skills/podium-auth/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/podium-auth/">
+    <meta property="og:title" content="podium-auth - Agent Skill">
+    <meta property="og:description" content="Authenticate production Podium integrations and survive the auth-side failures — OAuth2 access-token expiry storms, refresh-token decay after 90 days of non-use, scope drift on re-grant, secret rotation without downtime, multi-tenant token routing, leakage in commits. Use when hardening token caching, building a refresh-token decay monitor, rotating Podium client credentials, or recovering from 401/403 auth cascades. Trigger with &quot;podium auth&quot;, &quot;podium oauth&quot;, &quot;podium token refresh&quot;, &quot;podium scope drift&quot;, &quot;podium credential rotation&quot;, &quot;podium multi-location auth&quot;.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="podium-auth - Agent Skill">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/podium-auth/">
+    <meta name="twitter:title" content="podium-auth - Agent Skill">
+    <meta name="twitter:description" content="Authenticate production Podium integrations and survive the auth-side failures — OAuth2 access-token expiry storms, refresh-token decay after 90 days of non-use, scope drift on re-grant, secret rotation without downtime, multi-tenant token routing, leakage in commits. Use when hardening token caching, building a refresh-token decay monitor, rotating Podium client credentials, or recovering from 401/403 auth cascades. Trigger with &quot;podium auth&quot;, &quot;podium oauth&quot;, &quot;podium token refresh&quot;, &quot;podium scope drift&quot;, &quot;podium credential rotation&quot;, &quot;podium multi-location auth&quot;.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"podium-auth","description":"Authenticate production Podium integrations and survive the auth-side failures — OAuth2 access-token expiry storms, refresh-token decay after 90 days of non-use, scope drift on re-grant, secret rotation without downtime, multi-tenant token routing, leakage in commits. Use when hardening token caching, building a refresh-token decay monitor, rotating Podium client credentials, or recovering from 401/403 auth cascades. Trigger with \"podium auth\", \"podium oauth\", \"podium token refresh\", \"podium scope drift\", \"podium credential rotation\", \"podium multi-location auth\".","version":"2.9.0","author":{"@type":"Person","name":"Jeremy Longshore"},"license":"MIT","programmingLanguage":"Claude Code Agent Skill","isPartOf":{"@type":"SoftwareApplication","name":"podium-pack","applicationCategory":"unknown"}}</script>
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.breadcrumbs[data-astro-cid-ilhxcym7]{margin-bottom:var(--space-5)}.breadcrumbs__list[data-astro-cid-ilhxcym7]{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;list-style:none;padding:0;margin:0;font-family:var(--font-mono);font-size:var(--text-sm, .8rem)}.breadcrumbs__item[data-astro-cid-ilhxcym7]{display:flex;align-items:center;gap:.375rem}.breadcrumbs__link[data-astro-cid-ilhxcym7]{color:var(--text-3);text-decoration:none;transition:color var(--duration-fast, .2s) var(--ease-out)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:hover{color:var(--primary)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:0}.breadcrumbs__sep[data-astro-cid-ilhxcym7]{color:var(--text-3);user-select:none;font-size:.7em;line-height:1}.breadcrumbs__current[data-astro-cid-ilhxcym7]{color:var(--text-2)}.detail-cta[data-astro-cid-qcigfm7x]{background:var(--surface-3, var(--brand-light-gray));border-top:1px solid var(--border, var(--brand-light-gray));border-radius:var(--radius-lg);padding:2rem 1.5rem;margin-top:2rem;text-align:center}.detail-cta__headline[data-astro-cid-qcigfm7x]{font-family:var(--font-display);font-weight:700;font-size:1.35rem;color:var(--text, var(--brand-dark));margin-bottom:1.25rem}.detail-cta__actions[data-astro-cid-qcigfm7x]{display:flex;justify-content:center;gap:.75rem;flex-wrap:wrap}.detail-cta__primary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:var(--primary);color:#0a0a0c;border:none;border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;cursor:pointer;transition:background var(--duration-fast) var(--ease-out),transform var(--duration-fast) var(--ease-out)}.detail-cta__primary[data-astro-cid-qcigfm7x]:hover{background:var(--primary-dark, var(--primary-dark));transform:translateY(-1px)}.detail-cta__primary[data-astro-cid-qcigfm7x].copied{background:var(--positive, var(--brand-green))}.detail-cta__secondary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:transparent;color:var(--text, var(--brand-dark));border:1px solid var(--border, var(--brand-mid-gray));border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;text-decoration:none;transition:border-color var(--duration-fast) var(--ease-out),color var(--duration-fast) var(--ease-out)}.detail-cta__secondary[data-astro-cid-qcigfm7x]:hover{border-color:var(--primary);color:var(--primary)}@media(max-width:480px){.detail-cta__actions[data-astro-cid-qcigfm7x]{flex-direction:column;align-items:stretch}.detail-cta__primary[data-astro-cid-qcigfm7x],.detail-cta__secondary[data-astro-cid-qcigfm7x]{justify-content:center}}
+</style>
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/_slug_@_@astro.wF9emvVq.css"></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  
+  
+
+  <div class="skill-detail" data-astro-cid-jrlgpo3w>
+    <!-- 1. Breadcrumbs -->
+    <nav aria-label="Breadcrumb" class="breadcrumbs" data-astro-cid-ilhxcym7>
+  <ol class="breadcrumbs__list" itemscope itemtype="https://schema.org/BreadcrumbList" data-astro-cid-ilhxcym7>
+    <li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Home</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="1">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/skills/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Skills</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="2">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          <span class="breadcrumbs__current" aria-current="page" itemprop="name" data-astro-cid-ilhxcym7>
+              podium-auth
+            </span>
+          <meta itemprop="position" content="3">
+        </li>
+  </ol>
+</nav>
+
+    <!-- 2. Header (enhanced) -->
+    <header class="skill-header" data-astro-cid-jrlgpo3w>
+      <h1 data-astro-cid-jrlgpo3w>podium-auth</h1>
+      <p class="skill-description" data-astro-cid-jrlgpo3w>Authenticate production Podium integrations and survive the auth-side failures — OAuth2 access-token expiry storms, refresh-token decay after 90 days of non-use, scope drift on re-grant, secret rotation without downtime, multi-tenant token routing, leakage in commits. Use when hardening token caching, building a refresh-token decay monitor, rotating Podium client credentials, or recovering from 401/403 auth cascades. Trigger with &quot;podium auth&quot;, &quot;podium oauth&quot;, &quot;podium token refresh&quot;, &quot;podium scope drift&quot;, &quot;podium credential rotation&quot;, &quot;podium multi-location auth&quot;.</p>
+
+      <div class="skill-metadata" data-astro-cid-jrlgpo3w>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>v2.9.0</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>Jeremy Longshore</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>MIT</span>
+        </div>
+      </div>
+
+      
+    </header>
+
+    <!-- 4. Allowed Tools -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Allowed Tools</h2>
+      <div class="tools-grid" data-astro-cid-jrlgpo3w>
+        <span class="tool-badge" data-astro-cid-jrlgpo3w>Read</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Write</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Edit</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(curl:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(jq:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(python3:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(openssl:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Grep</span>
+      </div>
+      
+    </section>
+
+    <!-- 5. Provided by Plugin -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Provided by Plugin</h2>
+      <div class="plugin-info" data-astro-cid-jrlgpo3w>
+        <div class="plugin-details" data-astro-cid-jrlgpo3w>
+          <h3 data-astro-cid-jrlgpo3w>
+            <a href="/plugins/podium-pack/" data-astro-cid-jrlgpo3w>podium-pack</a>
+          </h3>
+          <p data-astro-cid-jrlgpo3w>Claude Code skill pack for Podium (10 production-engineer skills)</p>
+          <div class="plugin-meta" data-astro-cid-jrlgpo3w>
+            <span data-astro-cid-jrlgpo3w>unknown</span>
+            <span data-astro-cid-jrlgpo3w>v2.9.0</span>
+          </div>
+        </div>
+        <a href="/plugins/podium-pack/" class="btn-primary" data-astro-cid-jrlgpo3w>View Plugin</a>
+      </div>
+    </section>
+
+    <!-- 6. Installation -->
+    <section class="section-box dark" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Installation</h2>
+      <p class="install-note" style="color: var(--brand-light-gray); margin-bottom: 0.75rem;" data-astro-cid-jrlgpo3w>This skill is included in the podium-pack plugin:</p>
+      <pre class="install-command" data-copy="/plugin install podium-pack@claude-code-plugins-plus" data-astro-cid-jrlgpo3w><code data-astro-cid-jrlgpo3w>/plugin install podium-pack@claude-code-plugins-plus</code></pre>
+      <p class="install-note" data-astro-cid-jrlgpo3w>Click to copy</p>
+    </section>
+
+    <!-- 7. Skill Content (Markdown) -->
+    <section class="skill-content-section" data-astro-cid-jrlgpo3w>
+      <h2 data-astro-cid-jrlgpo3w>Instructions</h2>
+      <div class="skill-content" data-astro-cid-jrlgpo3w>
+        <div data-astro-cid-jrlgpo3w><h1>Podium Auth</h1>
+<h2>Overview</h2>
+<p>Authenticate a service to the Podium API and operate the auth layer in production. This is not a setup walkthrough — it is the auth code your integration runs at 3am when a refresh token expires after the long weekend, when a Podium admin removes a scope on re-grant, when an agency credential router sends a request to the wrong location, and when on-call needs to rotate a leaked client secret without dropping in-flight call-transcript webhooks.</p>
+<p>The six production failures this skill prevents:</p>
+<ol>
+<li><strong>Access-token expiry storms</strong> — OAuth2 access tokens expire on the order of an hour. Every concurrent request notices expiry simultaneously, races to refresh, the token endpoint rate-limits, and the integration cascades to red. Reactive refresh on <code>401</code> is wrong.</li>
+<li><strong>Refresh-token decay (90-day non-use clock)</strong> — Podium refresh tokens expire after 90 days without use. Integrations with seasonal usage patterns (a campervan retailer&#39;s off-season) silently lose access on day 91 and require a full user reconnection.</li>
+<li><strong>Scope drift on re-grant</strong> — When a Podium organization admin re-grants the OAuth app, the new token&#39;s scope set may differ from the old one. Cached tokens start returning <code>403</code> on previously-working endpoints. Retrying does not help.</li>
+<li><strong>Secret leakage in commits</strong> — Podium client secrets are wide-scope and not auto-expiring. A single leaked commit exposes the entire integration. Standard <code>.env</code> hygiene is non-optional.</li>
+<li><strong>Multi-tenant credential routing</strong> — Agencies managing 50+ Podium organizations cannot use a single env var. Requests sent to the wrong organization silently operate on the wrong location&#39;s contacts and webchats with no error.</li>
+<li><strong>Rotation without downtime</strong> — Rotating a leaked client secret naively drops every in-flight webhook handler. Production rotation needs dual-credential overlap, drained refresh, and a verified health check before the old secret is revoked.</li>
+</ol>
+<h2>Prerequisites</h2>
+<ul>
+<li>Python 3.10+ (examples) or Node.js 18+</li>
+<li>Podium account with an OAuth app: Settings → Developer → Apps → Create app</li>
+<li><code>client_id</code>, <code>client_secret</code>, <code>redirect_uri</code> from the app&#39;s OAuth tab</li>
+<li>A user-completed authorization flow producing the initial <code>refresh_token</code></li>
+<li>A secret store the runtime can read at startup and on rotation signal (env var for dev, AWS Secrets Manager / GCP Secret Manager / SOPS for prod)</li>
+</ul>
+<h2>Instructions</h2>
+<p>Build in this order. Each section neutralizes one production failure mode.</p>
+<h3>1. Token-cache pattern (neutralizes expiry storms)</h3>
+<p>Cache the access token in-process keyed by organization, and refresh <strong>proactively</strong> at 80% of TTL behind a single-flight lock so concurrent callers serialize on one refresh.</p>
+<pre data-lang="python"><code>
+import asyncio
+import time
+from dataclasses import dataclass
+from typing import Optional
+import httpx
+
+@dataclass
+class CachedToken:
+    value: str
+    expires_at: float  # unix seconds
+
+class PodiumAuth:
+    TOKEN_URL = &quot;https://accounts.podium.com/oauth/token&quot;
+
+    def __init__(self, client_id: str, client_secret: str, refresh_token: str):
+        self.client_id = client_id
+        self.client_secret = client_secret
+        self.refresh_token = refresh_token
+        self._cached: Optional[CachedToken] = None
+        self._lock = asyncio.Lock()
+
+    async def get_token(self) -&gt; str:
+        # Refresh at 80% of TTL — token endpoint can throttle if every call refreshes
+        if self._cached and time.time() &lt; self._cached.expires_at - 600:
+            return self._cached.value
+
+        async with self._lock:
+            # Re-check inside the lock — another coroutine may have refreshed
+            if self._cached and time.time() &lt; self._cached.expires_at - 600:
+                return self._cached.value
+            await self._refresh()
+            return self._cached.value
+
+    async def _refresh(self) -&gt; None:
+        async with httpx.AsyncClient(timeout=10) as c:
+            r = await c.post(
+                self.TOKEN_URL,
+                data={
+                    &quot;grant_type&quot;: &quot;refresh_token&quot;,
+                    &quot;refresh_token&quot;: self.refresh_token,
+                    &quot;client_id&quot;: self.client_id,
+                    &quot;client_secret&quot;: self.client_secret,
+                },
+            )
+        if r.status_code != 200:
+            raise PodiumAuthError(r.status_code, r.text)
+        body = r.json()
+        self._cached = CachedToken(
+            value=body[&quot;access_token&quot;],
+            expires_at=time.time() + body[&quot;expires_in&quot;],
+        )
+        # Podium rotates the refresh token on every refresh — persist the new one
+        if &quot;refresh_token&quot; in body:
+            self.refresh_token = body[&quot;refresh_token&quot;]
+            await self._persist_refresh_token(body[&quot;refresh_token&quot;])
+
+class PodiumAuthError(Exception):
+    def __init__(self, status: int, body: str):
+        super().__init__(f&quot;Podium auth failed {status}: {body}&quot;)
+        self.status = status
+        self.body = body
+</code></pre>
+<p>The single-flight lock is non-negotiable. Under burst load (a Shopify webhook fans out 200 review requests at midnight when the access token has just expired), every request races to the token endpoint, Podium throttles, and the burst fails atomically.</p>
+<h3>2. Refresh-token rotation persistence (neutralizes silent rotation drift)</h3>
+<p>Podium <strong>rotates the refresh token on every successful refresh.</strong> The old refresh token is invalidated immediately. If your process refreshes successfully but crashes before persisting the new refresh token, the next process startup has a dead credential.</p>
+<p>Persist the new refresh token to your secret store inside the refresh call, before returning the new access token to the caller:</p>
+<pre data-lang="python"><code>
+async def _persist_refresh_token(self, new_refresh: str) -&gt; None:
+    # Replace with your secret store: AWS Secrets Manager, GCP Secret Manager, SOPS, etc.
+    # Atomic write — temp file + rename, never a partial write.
+    import os, tempfile, json
+    path = os.environ[&quot;PODIUM_REFRESH_TOKEN_FILE&quot;]
+    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path), prefix=&quot;.podium_refresh.&quot;)
+    try:
+        with os.fdopen(fd, &quot;w&quot;) as f:
+            json.dump({&quot;refresh_token&quot;: new_refresh, &quot;rotated_at&quot;: time.time()}, f)
+        os.replace(tmp, path)
+    except Exception:
+        os.unlink(tmp)
+        raise
+</code></pre>
+<h3>3. 90-day decay monitor (neutralizes refresh-token expiry)</h3>
+<p>Podium refresh tokens die after 90 days of non-use. Track <code>last_used_at</code> alongside the token; warn at day 60, page at day 75, hard-fail at day 85 with instructions for re-authorization.</p>
+<pre data-lang="python"><code>
+DECAY_WARN_DAYS = 60
+DECAY_PAGE_DAYS = 75
+DECAY_HARD_FAIL_DAYS = 85
+
+def check_decay(last_used_at: float) -&gt; None:
+    age_days = (time.time() - last_used_at) / 86400
+    if age_days &gt;= DECAY_HARD_FAIL_DAYS:
+        raise PodiumAuthError(
+            0,
+            f&quot;Refresh token unused for {age_days:.0f}d (&gt;{DECAY_HARD_FAIL_DAYS}d) — &quot;
+            &quot;user must re-authorize the Podium OAuth app before requests resume.&quot;,
+        )
+    if age_days &gt;= DECAY_PAGE_DAYS:
+        page_oncall(
+            f&quot;Podium refresh token nearing expiry: {age_days:.0f}d / 90d&quot;,
+            severity=&quot;high&quot;,
+        )
+    elif age_days &gt;= DECAY_WARN_DAYS:
+        log_warn(f&quot;Podium refresh token age: {age_days:.0f}d / 90d&quot;)
+</code></pre>
+<p>This protects the seasonal-business case explicitly: a campervan retailer&#39;s off-season is exactly the failure mode where naive integrations break silently and ship operators discover it when they reopen for summer.</p>
+<h3>4. Scope validation on every refresh (neutralizes scope drift)</h3>
+<p>When a Podium admin re-grants your app, the new access token&#39;s scope set is whatever the admin selected — which may be a subset of what you previously had. Validate scopes immediately after each refresh; fail loudly rather than discover the drift on a 403 in production:</p>
+<pre data-lang="python"><code>
+REQUIRED_SCOPES = {
+    &quot;conversations.read&quot;,
+    &quot;conversations.write&quot;,
+    &quot;contacts.read&quot;,
+    &quot;contacts.write&quot;,
+    &quot;reviews.read&quot;,
+    &quot;reviews.write&quot;,
+}
+
+def validate_scopes(token_body: dict) -&gt; None:
+    granted = set(token_body.get(&quot;scope&quot;, &quot;&quot;).split(&quot; &quot;))
+    missing = REQUIRED_SCOPES - granted
+    if missing:
+        raise PodiumAuthError(
+            0,
+            f&quot;Scope drift detected — missing: {sorted(missing)}. &quot;
+            &quot;A Podium org admin must re-grant these scopes in the OAuth app settings.&quot;,
+        )
+</code></pre>
+<p>Wire <code>validate_scopes(body)</code> into <code>_refresh()</code> immediately after the JSON parse, before assigning to <code>self._cached</code>.</p>
+<h3>5. Secret leakage prevention (neutralizes commit leakage)</h3>
+<p>Podium client secrets are long-lived and grant access to every endpoint the OAuth app is scoped for. <strong>Never put them in source code, log output, or git history.</strong></p>
+<pre data-lang="bash"><code>
+# .gitignore — verify these are present
+.env
+.env.local
+.env.*.local
+podium-credentials.json
+podium-refresh-token.json
+
+# Audit the repo for accidentally-committed credentials before this becomes prod
+git log --all --full-history --oneline -- .env
+grep -rnE &quot;podium.*(client_secret|refresh_token)\s*=\s*[&#39;\&quot;]&quot; --include=&quot;*.py&quot; --include=&quot;*.ts&quot; --include=&quot;*.json&quot; .
+</code></pre>
+<p>For prod, encrypt credentials at rest with SOPS + age (Intent Solutions standard) and decrypt in-process — never write the plaintext to disk.</p>
+<h3>6. Dual-credential rotation runbook (neutralizes downtime on rotation)</h3>
+<p>When rotating a leaked or aging client secret:</p>
+<ol>
+<li><strong>Create the new credential first</strong> — in the Podium developer console, generate a new client_secret for the same OAuth app. Both old and new are valid simultaneously for a short window.</li>
+<li><strong>Deploy the new secret to your secret store</strong> under a versioned key (<code>podium/client_secret_v2</code>).</li>
+<li><strong>Signal the running process to reload</strong> (SIGHUP, env var change trigger, or rolling restart). The token cache picks up the new secret on the next refresh.</li>
+<li><strong>Verify with a health-check call</strong> — fetch the OAuth token info endpoint and confirm the response carries the expected <code>client_id</code>.</li>
+<li><strong>Revoke the old secret</strong> in the Podium console only after the health check passes and queue depth has drained.</li>
+</ol>
+<pre data-lang="python"><code>
+async def verify_credential(token: str) -&gt; bool:
+    async with httpx.AsyncClient(timeout=5) as c:
+        r = await c.get(
+            &quot;https://api.podium.com/v4/me&quot;,
+            headers={&quot;Authorization&quot;: f&quot;Bearer {token}&quot;},
+        )
+    return r.status_code in (200, 204)
+</code></pre>
+<h2>Error Handling</h2>
+<table><thead><tr>
+<th>HTTP Status</th>
+<th>Podium Error</th>
+<th>Root Cause</th>
+<th>Action</th>
+</tr></thead><tbody>
+<tr>
+<td><code>401 Unauthorized</code></td>
+<td><code>invalid_token</code></td>
+<td>Access token expired or malformed</td>
+<td>Refresh; if refresh also 401, re-authorize</td>
+</tr>
+<tr>
+<td><code>401 Unauthorized</code></td>
+<td><code>invalid_grant</code></td>
+<td>Refresh token expired (90d) or revoked</td>
+<td>User must re-authorize the OAuth app</td>
+</tr>
+<tr>
+<td><code>403 Forbidden</code></td>
+<td><code>insufficient_scope</code></td>
+<td>Scope removed on re-grant</td>
+<td>Admin re-grants required scopes</td>
+</tr>
+<tr>
+<td><code>400 Bad Request</code></td>
+<td><code>invalid_client</code></td>
+<td>Wrong client_id/secret combination</td>
+<td>Verify against Podium dev console</td>
+</tr>
+<tr>
+<td><code>429 Too Many Requests</code></td>
+<td><code>rate_limited</code></td>
+<td>Token endpoint throttled (auth burst)</td>
+<td>Back off with <code>Retry-After</code> header</td>
+</tr>
+<tr>
+<td><code>500/502/503</code></td>
+<td><code>server_error</code></td>
+<td>Podium-side transient</td>
+<td>Exponential backoff with jitter, max 4 attempts</td>
+</tr>
+</tbody></table>
+<h2>Examples</h2>
+<h3>Minimal access-token request</h3>
+<pre data-lang="bash"><code>
+curl -s -X POST https://accounts.podium.com/oauth/token \
+  -d grant_type=refresh_token \
+  -d refresh_token=&quot;{your-refresh-token}&quot; \
+  -d client_id=&quot;{your-client-id}&quot; \
+  -d client_secret=&quot;{your-client-secret}&quot; | jq &#39;{access_token, expires_in, scope}&#39;
+</code></pre>
+<h3>Wire the cache into an HTTP client</h3>
+<pre data-lang="python"><code>
+auth = PodiumAuth(
+    client_id=os.environ[&quot;PODIUM_CLIENT_ID&quot;],
+    client_secret=os.environ[&quot;PODIUM_CLIENT_SECRET&quot;],
+    refresh_token=load_refresh_token(),
+)
+
+async def podium_get(path: str) -&gt; httpx.Response:
+    token = await auth.get_token()
+    async with httpx.AsyncClient() as c:
+        return await c.get(
+            f&quot;https://api.podium.com{path}&quot;,
+            headers={&quot;Authorization&quot;: f&quot;Bearer {token}&quot;},
+        )
+</code></pre>
+<h3>Multi-tenant router (agency case)</h3>
+<pre data-lang="python"><code>
+class PodiumOrgRouter:
+    def __init__(self, credentials: dict[str, dict]):
+        # credentials = {&quot;acme-rv&quot;: {client_id, client_secret, refresh_token}, ...}
+        self._auths: dict[str, PodiumAuth] = {
+            org: PodiumAuth(**creds) for org, creds in credentials.items()
+        }
+
+    async def get_token(self, org_slug: str) -&gt; str:
+        auth = self._auths.get(org_slug)
+        if not auth:
+            raise KeyError(f&quot;No Podium credentials for org: {org_slug}&quot;)
+        return await auth.get_token()
+</code></pre>
+<h2>Output</h2>
+<ul>
+<li>Token-cache module with single-flight refresh at 80% TTL</li>
+<li>Refresh-token rotation persistence (atomic write to secret store)</li>
+<li>90-day decay monitor with warn / page / hard-fail thresholds</li>
+<li>Scope validation invoked on every refresh</li>
+<li><code>.gitignore</code> audited for credential leakage patterns</li>
+<li>Dual-credential rotation runbook documented in the repo</li>
+</ul>
+<h2>Resources</h2>
+<ul>
+<li><a href="https://docs.podium.com/reference/authentication">Podium API docs — Authentication</a></li>
+<li><a href="https://docs.podium.com/reference/oauth-2-0">OAuth 2.0 Authorization Code Flow</a></li>
+<li><a href="https://www.podium.com/developer">Podium Developer Console</a></li>
+<li><a href="config/settings.yaml">config/settings.yaml</a> — TTL thresholds, decay alert routing, scope list</li>
+<li><a href="references/errors.md">references/errors.md</a> — ERR_AUTH_* codes with cause + solution</li>
+<li><a href="references/examples.md">references/examples.md</a> — 10 worked examples (single-tenant, multi-tenant, rotation, decay)</li>
+<li><a href="references/implementation.md">references/implementation.md</a> — Node.js equivalents, AWS/GCP secret-store wiring, SOPS+age integration</li>
+<li><a href="scripts/token_refresh.py">scripts/token_refresh.py</a> — CLI: manual token refresh with persistence</li>
+<li><a href="scripts/rotate_secret.py">scripts/rotate_secret.py</a> — CLI: dual-credential rotation orchestrator</li>
+<li><a href="scripts/verify_creds.py">scripts/verify_creds.py</a> — CLI: health-check a credential pair</li>
+<li><a href="scripts/scope_audit.py">scripts/scope_audit.py</a> — CLI: compare required vs granted scopes</li>
+</ul></div>
+      </div>
+    </section>
+
+    <!-- 8. Bottom CTA -->
+    <section class="detail-cta" data-astro-cid-qcigfm7x>
+  <h2 class="detail-cta__headline" data-astro-cid-qcigfm7x>Ready to use podium-pack?</h2>
+  <div class="detail-cta__actions" data-astro-cid-qcigfm7x>
+    <button class="detail-cta__primary" data-copy-install="/plugin install podium-pack@claude-code-plugins-plus" data-astro-cid-qcigfm7x>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" data-astro-cid-qcigfm7x>
+        <rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" stroke-width="1.5" data-astro-cid-qcigfm7x></rect>
+        <path d="M3 11V3a1 1 0 011-1h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" data-astro-cid-qcigfm7x></path>
+      </svg>
+      <span class="detail-cta__btn-text" data-astro-cid-qcigfm7x>Copy Install Command</span>
+    </button>
+    
+  </div>
+</section>
+
+<script type="module">document.querySelectorAll("[data-copy-install]").forEach(t=>{t.addEventListener("click",async()=>{const a=t.dataset.copyInstall||"";await navigator.clipboard.writeText(a);const e=t.querySelector(".detail-cta__btn-text");if(e){const o=e.textContent;e.textContent="Copied!",t.classList.add("copied"),window.trackEvent&&window.trackEvent("install_copied",{plugin_name:a.split(" ").pop()||"",source:"detail_cta"}),setTimeout(()=>{e.textContent=o,t.classList.remove("copied")},2e3)}})});</script>
+
+    <!-- 9. Related Skills (6, with tool pills) -->
+    <section class="related-skills-section" data-astro-cid-jrlgpo3w>
+        <h2 class="related-skills-heading" data-astro-cid-jrlgpo3w>Related Skills</h2>
+        <div class="related-skills-grid" data-astro-cid-jrlgpo3w>
+          <a href="/skills/abridge-ci-integration/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-ci-integration</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Configure CI/CD pipeline for Abridge clinical AI integrations with GitHub Actions.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-common-errors/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-common-errors</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Diagnose and fix common Abridge clinical AI integration errors.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-a/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-a</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge ambient clinical documentation capture-to-note pipeline.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-b/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-b</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge patient-facing documentation and after-visit summary generation.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-cost-tuning/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-cost-tuning</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Optimize Abridge clinical AI costs through tier selection, session management, and usage monitoring for healthcare organizations.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-debug-bundle/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-debug-bundle</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Collect Abridge debug evidence for support tickets and troubleshooting.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a>
+        </div>
+      </section>
+
+  </div>
+
+  
+  <script>
+    document.querySelectorAll('.install-command').forEach(el => {
+      el.addEventListener('click', function() {
+        const text = this.dataset.copy || this.textContent;
+        navigator.clipboard.writeText(text).then(() => {
+          const originalText = this.textContent;
+          this.textContent = 'Copied to clipboard!';
+          this.style.color = 'var(--brand-green)';
+          setTimeout(() => {
+            this.textContent = originalText;
+            this.style.color = '';
+          }, 2000);
+        });
+      });
+    });
+  </script>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

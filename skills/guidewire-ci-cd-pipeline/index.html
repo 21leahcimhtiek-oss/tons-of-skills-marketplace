@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>guidewire-ci-cd-pipeline - Agent Skill</title>
+    <meta name="description" content="Ship Gosu code and configuration changes through Guidewire Cloud Console deployment slots without breaking running policies — Gosu compile + GUnit + lint gates per PR, config-package promotion dev→UAT→prod, schema-change rollouts with rollback hazards documented, canary deploy for high-risk changes, and the rollback decision tree when a release affects already-bound policies. Use when designing the deploy pipeline for a new InsuranceSuite project, hardening an existing one, or recovering from a bad release. Trigger with &quot;guidewire ci cd&quot;, &quot;guidewire deploy&quot;, &quot;guidewire promotion&quot;, &quot;guidewire slots&quot;, &quot;guidewire rollback&quot;.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://tonsofskills.com/tons-of-skills-marketplace/skills/guidewire-ci-cd-pipeline/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/guidewire-ci-cd-pipeline/">
+    <meta property="og:title" content="guidewire-ci-cd-pipeline - Agent Skill">
+    <meta property="og:description" content="Ship Gosu code and configuration changes through Guidewire Cloud Console deployment slots without breaking running policies — Gosu compile + GUnit + lint gates per PR, config-package promotion dev→UAT→prod, schema-change rollouts with rollback hazards documented, canary deploy for high-risk changes, and the rollback decision tree when a release affects already-bound policies. Use when designing the deploy pipeline for a new InsuranceSuite project, hardening an existing one, or recovering from a bad release. Trigger with &quot;guidewire ci cd&quot;, &quot;guidewire deploy&quot;, &quot;guidewire promotion&quot;, &quot;guidewire slots&quot;, &quot;guidewire rollback&quot;.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="guidewire-ci-cd-pipeline - Agent Skill">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/guidewire-ci-cd-pipeline/">
+    <meta name="twitter:title" content="guidewire-ci-cd-pipeline - Agent Skill">
+    <meta name="twitter:description" content="Ship Gosu code and configuration changes through Guidewire Cloud Console deployment slots without breaking running policies — Gosu compile + GUnit + lint gates per PR, config-package promotion dev→UAT→prod, schema-change rollouts with rollback hazards documented, canary deploy for high-risk changes, and the rollback decision tree when a release affects already-bound policies. Use when designing the deploy pipeline for a new InsuranceSuite project, hardening an existing one, or recovering from a bad release. Trigger with &quot;guidewire ci cd&quot;, &quot;guidewire deploy&quot;, &quot;guidewire promotion&quot;, &quot;guidewire slots&quot;, &quot;guidewire rollback&quot;.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"guidewire-ci-cd-pipeline","description":"Ship Gosu code and configuration changes through Guidewire Cloud Console deployment slots without breaking running policies — Gosu compile + GUnit + lint gates per PR, config-package promotion dev→UAT→prod, schema-change rollouts with rollback hazards documented, canary deploy for high-risk changes, and the rollback decision tree when a release affects already-bound policies. Use when designing the deploy pipeline for a new InsuranceSuite project, hardening an existing one, or recovering from a bad release. Trigger with \"guidewire ci cd\", \"guidewire deploy\", \"guidewire promotion\", \"guidewire slots\", \"guidewire rollback\".","version":"1.25.0","author":{"@type":"Person","name":"Jeremy Longshore"},"license":"MIT","programmingLanguage":"Claude Code Agent Skill","isPartOf":{"@type":"SoftwareApplication","name":"guidewire-pack","applicationCategory":"unknown"}}</script>
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.breadcrumbs[data-astro-cid-ilhxcym7]{margin-bottom:var(--space-5)}.breadcrumbs__list[data-astro-cid-ilhxcym7]{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;list-style:none;padding:0;margin:0;font-family:var(--font-mono);font-size:var(--text-sm, .8rem)}.breadcrumbs__item[data-astro-cid-ilhxcym7]{display:flex;align-items:center;gap:.375rem}.breadcrumbs__link[data-astro-cid-ilhxcym7]{color:var(--text-3);text-decoration:none;transition:color var(--duration-fast, .2s) var(--ease-out)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:hover{color:var(--primary)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:0}.breadcrumbs__sep[data-astro-cid-ilhxcym7]{color:var(--text-3);user-select:none;font-size:.7em;line-height:1}.breadcrumbs__current[data-astro-cid-ilhxcym7]{color:var(--text-2)}.detail-cta[data-astro-cid-qcigfm7x]{background:var(--surface-3, var(--brand-light-gray));border-top:1px solid var(--border, var(--brand-light-gray));border-radius:var(--radius-lg);padding:2rem 1.5rem;margin-top:2rem;text-align:center}.detail-cta__headline[data-astro-cid-qcigfm7x]{font-family:var(--font-display);font-weight:700;font-size:1.35rem;color:var(--text, var(--brand-dark));margin-bottom:1.25rem}.detail-cta__actions[data-astro-cid-qcigfm7x]{display:flex;justify-content:center;gap:.75rem;flex-wrap:wrap}.detail-cta__primary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:var(--primary);color:#0a0a0c;border:none;border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;cursor:pointer;transition:background var(--duration-fast) var(--ease-out),transform var(--duration-fast) var(--ease-out)}.detail-cta__primary[data-astro-cid-qcigfm7x]:hover{background:var(--primary-dark, var(--primary-dark));transform:translateY(-1px)}.detail-cta__primary[data-astro-cid-qcigfm7x].copied{background:var(--positive, var(--brand-green))}.detail-cta__secondary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:transparent;color:var(--text, var(--brand-dark));border:1px solid var(--border, var(--brand-mid-gray));border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;text-decoration:none;transition:border-color var(--duration-fast) var(--ease-out),color var(--duration-fast) var(--ease-out)}.detail-cta__secondary[data-astro-cid-qcigfm7x]:hover{border-color:var(--primary);color:var(--primary)}@media(max-width:480px){.detail-cta__actions[data-astro-cid-qcigfm7x]{flex-direction:column;align-items:stretch}.detail-cta__primary[data-astro-cid-qcigfm7x],.detail-cta__secondary[data-astro-cid-qcigfm7x]{justify-content:center}}
+</style>
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/_slug_@_@astro.wF9emvVq.css"></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  
+  
+
+  <div class="skill-detail" data-astro-cid-jrlgpo3w>
+    <!-- 1. Breadcrumbs -->
+    <nav aria-label="Breadcrumb" class="breadcrumbs" data-astro-cid-ilhxcym7>
+  <ol class="breadcrumbs__list" itemscope itemtype="https://schema.org/BreadcrumbList" data-astro-cid-ilhxcym7>
+    <li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Home</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="1">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/skills/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Skills</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="2">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          <span class="breadcrumbs__current" aria-current="page" itemprop="name" data-astro-cid-ilhxcym7>
+              guidewire-ci-cd-pipeline
+            </span>
+          <meta itemprop="position" content="3">
+        </li>
+  </ol>
+</nav>
+
+    <!-- 2. Header (enhanced) -->
+    <header class="skill-header" data-astro-cid-jrlgpo3w>
+      <h1 data-astro-cid-jrlgpo3w>guidewire-ci-cd-pipeline</h1>
+      <p class="skill-description" data-astro-cid-jrlgpo3w>Ship Gosu code and configuration changes through Guidewire Cloud Console deployment slots without breaking running policies — Gosu compile + GUnit + lint gates per PR, config-package promotion dev→UAT→prod, schema-change rollouts with rollback hazards documented, canary deploy for high-risk changes, and the rollback decision tree when a release affects already-bound policies. Use when designing the deploy pipeline for a new InsuranceSuite project, hardening an existing one, or recovering from a bad release. Trigger with &quot;guidewire ci cd&quot;, &quot;guidewire deploy&quot;, &quot;guidewire promotion&quot;, &quot;guidewire slots&quot;, &quot;guidewire rollback&quot;.</p>
+
+      <div class="skill-metadata" data-astro-cid-jrlgpo3w>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>v1.25.0</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>Jeremy Longshore</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>MIT</span>
+        </div>
+      </div>
+
+      
+    </header>
+
+    <!-- 4. Allowed Tools -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Allowed Tools</h2>
+      <div class="tools-grid" data-astro-cid-jrlgpo3w>
+        <span class="tool-badge" data-astro-cid-jrlgpo3w>Read</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Write</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Edit</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(gradle:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(curl:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(jq:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(git:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Grep</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Glob</span>
+      </div>
+      
+    </section>
+
+    <!-- 5. Provided by Plugin -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Provided by Plugin</h2>
+      <div class="plugin-info" data-astro-cid-jrlgpo3w>
+        <div class="plugin-details" data-astro-cid-jrlgpo3w>
+          <h3 data-astro-cid-jrlgpo3w>
+            <a href="/plugins/guidewire-pack/" data-astro-cid-jrlgpo3w>guidewire-pack</a>
+          </h3>
+          <p data-astro-cid-jrlgpo3w>Claude Code skill pack for Guidewire InsuranceSuite (24 skills)</p>
+          <div class="plugin-meta" data-astro-cid-jrlgpo3w>
+            <span data-astro-cid-jrlgpo3w>unknown</span>
+            <span data-astro-cid-jrlgpo3w>v1.25.0</span>
+          </div>
+        </div>
+        <a href="/plugins/guidewire-pack/" class="btn-primary" data-astro-cid-jrlgpo3w>View Plugin</a>
+      </div>
+    </section>
+
+    <!-- 6. Installation -->
+    <section class="section-box dark" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Installation</h2>
+      <p class="install-note" style="color: var(--brand-light-gray); margin-bottom: 0.75rem;" data-astro-cid-jrlgpo3w>This skill is included in the guidewire-pack plugin:</p>
+      <pre class="install-command" data-copy="/plugin install guidewire-pack@claude-code-plugins-plus" data-astro-cid-jrlgpo3w><code data-astro-cid-jrlgpo3w>/plugin install guidewire-pack@claude-code-plugins-plus</code></pre>
+      <p class="install-note" data-astro-cid-jrlgpo3w>Click to copy</p>
+    </section>
+
+    <!-- 7. Skill Content (Markdown) -->
+    <section class="skill-content-section" data-astro-cid-jrlgpo3w>
+      <h2 data-astro-cid-jrlgpo3w>Instructions</h2>
+      <div class="skill-content" data-astro-cid-jrlgpo3w>
+        <div data-astro-cid-jrlgpo3w><h1>Guidewire CI/CD Pipeline</h1>
+<h2>Overview</h2>
+<p>Ship Gosu changes from a developer&#39;s branch to production without breaking running policies. Guidewire Cloud Console (GCC) deployment slots are the carrier-side promotion mechanism — <code>dev</code> → <code>uat</code> → <code>prod</code> — with config packages as the unit of promotion. The CI side validates compile, runs GUnit, and packages; the CD side promotes packages through slots with deploy-time gates.</p>
+<p>Five production failures this skill prevents:</p>
+<ol>
+<li><strong>Bypassed compile/test gates</strong> — a <code>gradle build</code> failure on a developer&#39;s machine reaches CI as &quot;works on my machine&quot;; CI runs the same gates as a clean clone, fails fast, never lands on a slot.</li>
+<li><strong>Promotion without UAT regression</strong> — UW logic change goes dev → prod skipping UAT; the change interacts badly with a product line not exercised in dev; bound policies start showing wrong premium.</li>
+<li><strong>Schema change without rollback plan</strong> — a Gosu interface adds a required field; rolling back the deploy is fine, but rolling back the database column requires a separate migration that may have been forgotten.</li>
+<li><strong>Canary that isn&#39;t a canary</strong> — &quot;canary&quot; deploy serves 100% of traffic immediately because the slot router has no per-slot routing; a real canary needs traffic split, not just a separate slot.</li>
+<li><strong>Rollback after policies bound on the new code</strong> — a defective rate-plan deploy bound 200 policies in the 30 minutes before detection; reverting the code does not unbind the policies; they need targeted endorsement-correction or rate adjustment.</li>
+</ol>
+<h2>Prerequisites</h2>
+<ul>
+<li>A working Guidewire Studio + runServer setup per <code>guidewire-local-dev-loop</code></li>
+<li>GCC tenant with at least three slots (<code>dev</code>, <code>uat</code>, <code>prod</code>) configured for the integration&#39;s product line</li>
+<li>A CI runner (GitHub Actions, GitLab CI, Jenkins) with JDK 17 and access to a private artifact registry for config packages</li>
+<li>An age private key (per <code>guidewire-security-and-rbac</code>) provisioned to CI for decrypting environment-specific secrets</li>
+</ul>
+<h2>Instructions</h2>
+<p>Build the pipeline in this order. Each step targets one of the five production failures listed in Overview.</p>
+<h3>1. PR-time gates (run on every push)</h3>
+<p>Three checks, all blocking. The PR cannot merge to <code>main</code> if any fails.</p>
+<pre data-lang="yaml"><code>
+# .github/workflows/ci.yml
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { java-version: 17, distribution: temurin }
+      - run: ./gradlew compileGosu                       # gate 1: code compiles
+      - run: ./gradlew test                              # gate 2: GUnit passes
+      - run: ./gradlew check                             # gate 3: lint + arch + style
+</code></pre>
+<p><code>compileGosu</code> catches type errors that Studio&#39;s incremental compile sometimes misses. <code>test</code> runs the GUnit suite — every UW rule, validation rule, and entity-level Gosu has tests, and CI runs them all in &lt;5 minutes for a normal config zone. <code>check</code> includes static analysis (ban on direct DB writes from Gosu, ban on certain plugin patterns, etc.).</p>
+<h3>2. Build the config package on merge to main</h3>
+<pre data-lang="yaml"><code>
+package:
+  needs: validate
+  if: github.ref == &#39;refs/heads/main&#39;
+  steps:
+    - uses: actions/checkout@v4
+    - run: ./gradlew packageConfig
+    - run: |
+        VERSION=$(git describe --tags --always)
+        aws s3 cp build/libs/configuration.zip \
+          s3://gw-config-artifacts/${{ github.event.repository.name }}/${VERSION}.zip
+</code></pre>
+<p>Config packages are immutable once published. Promotion deploys an existing package to a slot; never modifies it in place. The package name should encode the git SHA so traceability is exact.</p>
+<h3>3. Deploy to dev slot (continuous)</h3>
+<p>Every merge to <code>main</code> deploys to dev automatically. Dev is the first place real Cloud API runtime exercises the change.</p>
+<pre data-lang="bash"><code>
+# Promotion API (illustrative — exact GCC API surface varies by tenant)
+curl -X POST &quot;$GCC_API/slots/dev/deploy&quot; \
+  -H &quot;Authorization: Bearer $GCC_TOKEN&quot; \
+  -d &#39;{&quot;package&quot;: &quot;configuration-abc1234.zip&quot;}&#39;
+</code></pre>
+<p>Wait for deploy to complete (poll status), then run smoke tests against the dev tenant — at minimum, the verification probe from <code>guidewire-install-auth</code> and a synthetic FNOL from <code>guidewire-observability-and-incident-response</code>. If smoke fails, page the on-call author.</p>
+<h3>4. Promote to UAT with regression gate</h3>
+<p>UAT is where the product team&#39;s regression suite runs. Promotion to UAT is manual (a button in the CD tool) or scheduled (nightly). UAT regression covers:</p>
+<ul>
+<li>A representative submission per active product line (Personal Auto, BOP, Workers Comp, etc.)</li>
+<li>Quote-and-bind for each, asserting expected premium ranges</li>
+<li>A FNOL per loss-cause, asserting the claim opens with the expected exposure shape</li>
+<li>Renewal of a sample in-force policy, asserting the renewal premium falls in expected band</li>
+</ul>
+<p>Failed regression blocks promotion to prod automatically. Manual override requires an approver outside the deploying team.</p>
+<h3>5. Canary to prod with traffic split</h3>
+<p>For high-risk changes (rate plan changes, UW rule logic, payment authorization changes), use a true canary: a separate prod slot serving a percentage of real traffic. GCC supports slot-level traffic splitting on tenants where it&#39;s enabled.</p>
+<pre><code>
+prod slot:    serves 95% of traffic, runs the previous package
+prod-canary:  serves 5%, runs the new package
+</code></pre>
+<p>Watch the canary&#39;s bind-success-rate, FNOL p99 latency, and 4xx error rate against the main prod slot. After 24h with no SLO breach, ramp to 100% and retire the canary slot.</p>
+<p>For low-risk changes (UI text, localization, non-rule Gosu utility classes), skip the canary — single-step promotion to prod is acceptable.</p>
+<h3>6. Rollback decision tree</h3>
+<p>A bad change is detected. The rollback decision is not &quot;revert the package&quot;:</p>
+<pre><code>
+Bad change detected in prod
+├─ Has any policy been bound or claim opened against the bad code? → check the integration_audit table
+│   ├─ NO → revert the package; deploy the previous version; done
+│   └─ YES → revert the package AND determine if the bound resources are recoverable
+│           ├─ Premium calculation wrong → script-driven rate adjustment endorsements (per affected policy)
+│           ├─ Reserve / payment wrong → finance-team-led correction; do not silent-fix
+│           └─ FNOL routing wrong → rerun routing logic against affected claims
+└─ No policy/claim impact, just operational error (logs noisy, dashboard wrong) → revert and PIR
+</code></pre>
+<p>The bound-state recovery path is what makes Guidewire rollbacks different from typical SaaS rollbacks. Code reverts, regulatory state does not.</p>
+<h3>7. Schema-change rollouts (special discipline)</h3>
+<p>Schema changes (new entity, new column, changed column type) deploy in two phases to retain rollback capability:</p>
+<pre><code>
+Phase 1 (deploy):     add new column, code reads-old-or-new, writes-both
+Phase 2 (after soak): change code to read-new only, drop old column
+</code></pre>
+<p>A 1-week soak between phases gives time to detect issues; a phase-1 rollback drops the not-yet-load-bearing new column. Phase-2 rollback is harder — the old column is gone — so phase 2 only ships when phase 1 has been clean for the full soak.</p>
+<h2>Output</h2>
+<p>A production-grade CI/CD pipeline ships with all of the following:</p>
+<ul>
+<li>Three blocking PR gates: <code>compileGosu</code>, <code>test</code> (GUnit), <code>check</code> (lint/arch).</li>
+<li>An immutable config-package artifact published per merge to main, named by git SHA.</li>
+<li>Continuous dev deployment with smoke-test gate; failures page the merging author.</li>
+<li>Manual UAT promotion with product-team regression suite; failures block prod promotion.</li>
+<li>Canary deploy infrastructure for high-risk changes; bypass path documented for low-risk.</li>
+<li>A rollback runbook that distinguishes &quot;code revert&quot; from &quot;bound-state recovery&quot; and routes accordingly.</li>
+<li>Schema-change two-phase rollout discipline with documented soak times.</li>
+</ul>
+<h2>Examples</h2>
+<h3>Example 1 — GitHub Actions workflow (full pipeline excerpt)</h3>
+<pre data-lang="yaml"><code>
+name: gw-pipeline
+on: { push: { branches: [main] }, pull_request: {} }
+jobs:
+  validate:    { uses: ./.github/workflows/validate.yml }
+  package:     { needs: validate, if: github.ref == &#39;refs/heads/main&#39;, uses: ./.github/workflows/package.yml }
+  deploy-dev:  { needs: package, uses: ./.github/workflows/deploy.yml, with: { slot: dev } }
+  smoke-dev:   { needs: deploy-dev, uses: ./.github/workflows/smoke.yml, with: { env: dev } }
+</code></pre>
+<p><code>deploy.yml</code> and <code>smoke.yml</code> are reusable across environments; the <code>slot</code> and <code>env</code> inputs parameterize.</p>
+<h3>Example 2 — UAT regression gate (excerpt)</h3>
+<pre data-lang="yaml"><code>
+uat-regression:
+  runs-on: ubuntu-latest
+  steps:
+    - run: ./scripts/regress.sh personal-auto      # quote+bind a PA, assert premium in [800,1200]
+    - run: ./scripts/regress.sh bop                 # quote+bind a BOP
+    - run: ./scripts/regress.sh fnol-auto           # FNOL with vehcollision, assert exposure shape
+    - run: ./scripts/regress.sh renewal-pa          # renew a sample PA, assert renewal premium in band
+</code></pre>
+<h3>Example 3 — Rollback after bound impact</h3>
+<pre data-lang="bash"><code>
+# 1. Stop further deploys (block CI)
+gh workflow disable gw-pipeline.yml
+
+# 2. Revert the package on prod
+curl -X POST &quot;$GCC_API/slots/prod/deploy&quot; -d &#39;{&quot;package&quot;: &quot;configuration-abc0001.zip&quot;}&#39;  # previous SHA
+
+# 3. Identify affected policies
+psql -c &quot;SELECT resource_id FROM integration_audit 
+         WHERE at BETWEEN &#39;2026-04-15T14:00Z&#39; AND &#39;2026-04-15T14:45Z&#39; 
+         AND api_path LIKE &#39;%/bind&#39; AND status_code = 200&quot;
+
+# 4. Open finance-team ticket with the policy list and the corrective action
+# 5. Re-enable CI only after the corrective endorsements have run
+</code></pre>
+<h2>Error Handling</h2>
+<table><thead><tr>
+<th>Symptom</th>
+<th>Cause</th>
+<th>Solution</th>
+</tr></thead><tbody>
+<tr>
+<td>CI passes locally, fails in CI</td>
+<td>uncommitted file or environment-specific config</td>
+<td>the failing job log shows the file; commit or fix the env</td>
+</tr>
+<tr>
+<td><code>compileGosu</code> fails on a class that worked locally</td>
+<td>Studio incremental compile masked an error</td>
+<td>the CI failure is authoritative; fix the code</td>
+</tr>
+<tr>
+<td>GUnit times out in CI but passes locally</td>
+<td>flaky test using ambient sample data</td>
+<td>tests must self-fixture; never depend on shared dev DB state</td>
+</tr>
+<tr>
+<td>Dev deploy succeeds but smoke fails</td>
+<td>code change broke a Cloud API contract</td>
+<td>the failing smoke check identifies the contract; revert and re-design</td>
+</tr>
+<tr>
+<td>UAT regression flags a premium drift on a product line</td>
+<td>rate plan change interacts with a line not exercised in dev</td>
+<td>extend dev test coverage to include that line; do not promote to prod until UAT passes</td>
+</tr>
+<tr>
+<td>Canary shows elevated 4xx but main prod is clean</td>
+<td>the new code introduced a caller-error path</td>
+<td>inspect the 4xx response bodies; fix or retire the change</td>
+</tr>
+<tr>
+<td>Rollback completed but customer-facing system still serves bad data</td>
+<td>bound policies on the bad code are unaffected by the rollback</td>
+<td>follow the bound-state recovery path; rollback is necessary but not sufficient</td>
+</tr>
+<tr>
+<td>Schema phase 2 rolled back; old column gone</td>
+<td>phase 2 should not ship until phase 1 soak is clean — this scenario means the discipline was bypassed</td>
+<td>data recovery from backup; review schema-change discipline</td>
+</tr>
+<tr>
+<td><code>gradle packageConfig</code> produces a 500MB artifact</td>
+<td>unbounded log/build outputs included in the package</td>
+<td>tighten the package include patterns; package should be &lt;50MB for a typical config zone</td>
+</tr>
+</tbody></table>
+<p>For deeper coverage (multi-tenant CI fan-out, GitOps with Argo, blue-green deploys, infrastructure-as-code for slot configuration, change-management integration with ITIL ticketing), see <a href="references/implementation-guide.md">implementation guide</a> and <a href="references/API_REFERENCE.md">API reference</a>.</p>
+<h2>See Also</h2>
+<ul>
+<li><code>guidewire-local-dev-loop</code> — the same GUnit + sample-data patterns that run in CI</li>
+<li><code>guidewire-security-and-rbac</code> — encrypted secrets that promote with the package, scope assignment per environment</li>
+<li><code>guidewire-observability-and-incident-response</code> — the smoke-test, canary signal, and rollback-decision data this skill references</li>
+<li><code>guidewire-migration-and-upgrade</code> — the larger version-upgrade flow that uses this pipeline as substrate</li>
+</ul>
+<h2>Resources</h2>
+<ul>
+<li><a href="https://docs.github.com/en/actions/using-workflows/reusing-workflows">GitHub Actions reusable workflows</a></li>
+<li><a href="https://docs.guidewire.com/cloud/cloudcommons/latest/cloud_console/cc-deployment.html">GCC documentation — deployment slots</a></li>
+<li><a href="https://sre.google/sre-book/release-engineering/">Google SRE — release engineering</a></li>
+<li><a href="https://martinfowler.com/articles/evodb.html#expand-contract">Schema change patterns — expand-and-contract</a></li>
+</ul></div>
+      </div>
+    </section>
+
+    <!-- 8. Bottom CTA -->
+    <section class="detail-cta" data-astro-cid-qcigfm7x>
+  <h2 class="detail-cta__headline" data-astro-cid-qcigfm7x>Ready to use guidewire-pack?</h2>
+  <div class="detail-cta__actions" data-astro-cid-qcigfm7x>
+    <button class="detail-cta__primary" data-copy-install="/plugin install guidewire-pack@claude-code-plugins-plus" data-astro-cid-qcigfm7x>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" data-astro-cid-qcigfm7x>
+        <rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" stroke-width="1.5" data-astro-cid-qcigfm7x></rect>
+        <path d="M3 11V3a1 1 0 011-1h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" data-astro-cid-qcigfm7x></path>
+      </svg>
+      <span class="detail-cta__btn-text" data-astro-cid-qcigfm7x>Copy Install Command</span>
+    </button>
+    
+  </div>
+</section>
+
+<script type="module">document.querySelectorAll("[data-copy-install]").forEach(t=>{t.addEventListener("click",async()=>{const a=t.dataset.copyInstall||"";await navigator.clipboard.writeText(a);const e=t.querySelector(".detail-cta__btn-text");if(e){const o=e.textContent;e.textContent="Copied!",t.classList.add("copied"),window.trackEvent&&window.trackEvent("install_copied",{plugin_name:a.split(" ").pop()||"",source:"detail_cta"}),setTimeout(()=>{e.textContent=o,t.classList.remove("copied")},2e3)}})});</script>
+
+    <!-- 9. Related Skills (6, with tool pills) -->
+    <section class="related-skills-section" data-astro-cid-jrlgpo3w>
+        <h2 class="related-skills-heading" data-astro-cid-jrlgpo3w>Related Skills</h2>
+        <div class="related-skills-grid" data-astro-cid-jrlgpo3w>
+          <a href="/skills/abridge-ci-integration/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-ci-integration</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Configure CI/CD pipeline for Abridge clinical AI integrations with GitHub Actions.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-common-errors/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-common-errors</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Diagnose and fix common Abridge clinical AI integration errors.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-a/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-a</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge ambient clinical documentation capture-to-note pipeline.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-b/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-b</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge patient-facing documentation and after-visit summary generation.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-cost-tuning/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-cost-tuning</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Optimize Abridge clinical AI costs through tier selection, session management, and usage monitoring for healthcare organizations.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-debug-bundle/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-debug-bundle</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Collect Abridge debug evidence for support tickets and troubleshooting.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a>
+        </div>
+      </section>
+
+  </div>
+
+  
+  <script>
+    document.querySelectorAll('.install-command').forEach(el => {
+      el.addEventListener('click', function() {
+        const text = this.dataset.copy || this.textContent;
+        navigator.clipboard.writeText(text).then(() => {
+          const originalText = this.textContent;
+          this.textContent = 'Copied to clipboard!';
+          this.style.color = 'var(--brand-green)';
+          setTimeout(() => {
+            this.textContent = originalText;
+            this.style.color = '';
+          }, 2000);
+        });
+      });
+    });
+  </script>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

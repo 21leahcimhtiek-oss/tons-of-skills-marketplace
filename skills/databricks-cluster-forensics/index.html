@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>databricks-cluster-forensics - Agent Skill</title>
+    <meta name="description" content="Diagnose broken or unexplained Databricks compute — slow cold starts, failed cluster launches, Photon paying its premium without the speedup, DBR-upgrade landmines, and spot-interruption shuffle aborts — by correlating a cluster's live event stream across API surfaces. Use when a Databricks cluster won't start, died mid-run, is randomly slow to start, when planning a Databricks Runtime upgrade, or when a job keeps failing on spot loss. Trigger with &quot;databricks cluster won't start&quot;, &quot;cluster failed&quot;, &quot;why is my cluster slow&quot;, &quot;NPIP_TUNNEL_SETUP_FAILURE&quot;, &quot;databricks runtime upgrade&quot;, &quot;photon not helping&quot;.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://tonsofskills.com/tons-of-skills-marketplace/skills/databricks-cluster-forensics/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/databricks-cluster-forensics/">
+    <meta property="og:title" content="databricks-cluster-forensics - Agent Skill">
+    <meta property="og:description" content="Diagnose broken or unexplained Databricks compute — slow cold starts, failed cluster launches, Photon paying its premium without the speedup, DBR-upgrade landmines, and spot-interruption shuffle aborts — by correlating a cluster's live event stream across API surfaces. Use when a Databricks cluster won't start, died mid-run, is randomly slow to start, when planning a Databricks Runtime upgrade, or when a job keeps failing on spot loss. Trigger with &quot;databricks cluster won't start&quot;, &quot;cluster failed&quot;, &quot;why is my cluster slow&quot;, &quot;NPIP_TUNNEL_SETUP_FAILURE&quot;, &quot;databricks runtime upgrade&quot;, &quot;photon not helping&quot;.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="databricks-cluster-forensics - Agent Skill">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/databricks-cluster-forensics/">
+    <meta name="twitter:title" content="databricks-cluster-forensics - Agent Skill">
+    <meta name="twitter:description" content="Diagnose broken or unexplained Databricks compute — slow cold starts, failed cluster launches, Photon paying its premium without the speedup, DBR-upgrade landmines, and spot-interruption shuffle aborts — by correlating a cluster's live event stream across API surfaces. Use when a Databricks cluster won't start, died mid-run, is randomly slow to start, when planning a Databricks Runtime upgrade, or when a job keeps failing on spot loss. Trigger with &quot;databricks cluster won't start&quot;, &quot;cluster failed&quot;, &quot;why is my cluster slow&quot;, &quot;NPIP_TUNNEL_SETUP_FAILURE&quot;, &quot;databricks runtime upgrade&quot;, &quot;photon not helping&quot;.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"databricks-cluster-forensics","description":"Diagnose broken or unexplained Databricks compute — slow cold starts, failed cluster launches, Photon paying its premium without the speedup, DBR-upgrade landmines, and spot-interruption shuffle aborts — by correlating a cluster's live event stream across API surfaces. Use when a Databricks cluster won't start, died mid-run, is randomly slow to start, when planning a Databricks Runtime upgrade, or when a job keeps failing on spot loss. Trigger with \"databricks cluster won't start\", \"cluster failed\", \"why is my cluster slow\", \"NPIP_TUNNEL_SETUP_FAILURE\", \"databricks runtime upgrade\", \"photon not helping\".","version":"2.27.0","author":{"@type":"Person","name":"Jeremy Longshore"},"license":"MIT","programmingLanguage":"Claude Code Agent Skill","isPartOf":{"@type":"SoftwareApplication","name":"databricks-pack","applicationCategory":"unknown"}}</script>
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.breadcrumbs[data-astro-cid-ilhxcym7]{margin-bottom:var(--space-5)}.breadcrumbs__list[data-astro-cid-ilhxcym7]{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;list-style:none;padding:0;margin:0;font-family:var(--font-mono);font-size:var(--text-sm, .8rem)}.breadcrumbs__item[data-astro-cid-ilhxcym7]{display:flex;align-items:center;gap:.375rem}.breadcrumbs__link[data-astro-cid-ilhxcym7]{color:var(--text-3);text-decoration:none;transition:color var(--duration-fast, .2s) var(--ease-out)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:hover{color:var(--primary)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:0}.breadcrumbs__sep[data-astro-cid-ilhxcym7]{color:var(--text-3);user-select:none;font-size:.7em;line-height:1}.breadcrumbs__current[data-astro-cid-ilhxcym7]{color:var(--text-2)}.detail-cta[data-astro-cid-qcigfm7x]{background:var(--surface-3, var(--brand-light-gray));border-top:1px solid var(--border, var(--brand-light-gray));border-radius:var(--radius-lg);padding:2rem 1.5rem;margin-top:2rem;text-align:center}.detail-cta__headline[data-astro-cid-qcigfm7x]{font-family:var(--font-display);font-weight:700;font-size:1.35rem;color:var(--text, var(--brand-dark));margin-bottom:1.25rem}.detail-cta__actions[data-astro-cid-qcigfm7x]{display:flex;justify-content:center;gap:.75rem;flex-wrap:wrap}.detail-cta__primary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:var(--primary);color:#0a0a0c;border:none;border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;cursor:pointer;transition:background var(--duration-fast) var(--ease-out),transform var(--duration-fast) var(--ease-out)}.detail-cta__primary[data-astro-cid-qcigfm7x]:hover{background:var(--primary-dark, var(--primary-dark));transform:translateY(-1px)}.detail-cta__primary[data-astro-cid-qcigfm7x].copied{background:var(--positive, var(--brand-green))}.detail-cta__secondary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:transparent;color:var(--text, var(--brand-dark));border:1px solid var(--border, var(--brand-mid-gray));border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;text-decoration:none;transition:border-color var(--duration-fast) var(--ease-out),color var(--duration-fast) var(--ease-out)}.detail-cta__secondary[data-astro-cid-qcigfm7x]:hover{border-color:var(--primary);color:var(--primary)}@media(max-width:480px){.detail-cta__actions[data-astro-cid-qcigfm7x]{flex-direction:column;align-items:stretch}.detail-cta__primary[data-astro-cid-qcigfm7x],.detail-cta__secondary[data-astro-cid-qcigfm7x]{justify-content:center}}
+</style>
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/_slug_@_@astro.wF9emvVq.css"></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  
+  
+
+  <div class="skill-detail" data-astro-cid-jrlgpo3w>
+    <!-- 1. Breadcrumbs -->
+    <nav aria-label="Breadcrumb" class="breadcrumbs" data-astro-cid-ilhxcym7>
+  <ol class="breadcrumbs__list" itemscope itemtype="https://schema.org/BreadcrumbList" data-astro-cid-ilhxcym7>
+    <li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Home</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="1">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/skills/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Skills</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="2">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          <span class="breadcrumbs__current" aria-current="page" itemprop="name" data-astro-cid-ilhxcym7>
+              databricks-cluster-forensics
+            </span>
+          <meta itemprop="position" content="3">
+        </li>
+  </ol>
+</nav>
+
+    <!-- 2. Header (enhanced) -->
+    <header class="skill-header" data-astro-cid-jrlgpo3w>
+      <h1 data-astro-cid-jrlgpo3w>databricks-cluster-forensics</h1>
+      <p class="skill-description" data-astro-cid-jrlgpo3w>Diagnose broken or unexplained Databricks compute — slow cold starts, failed cluster launches, Photon paying its premium without the speedup, DBR-upgrade landmines, and spot-interruption shuffle aborts — by correlating a cluster&#39;s live event stream across API surfaces. Use when a Databricks cluster won&#39;t start, died mid-run, is randomly slow to start, when planning a Databricks Runtime upgrade, or when a job keeps failing on spot loss. Trigger with &quot;databricks cluster won&#39;t start&quot;, &quot;cluster failed&quot;, &quot;why is my cluster slow&quot;, &quot;NPIP_TUNNEL_SETUP_FAILURE&quot;, &quot;databricks runtime upgrade&quot;, &quot;photon not helping&quot;.</p>
+
+      <div class="skill-metadata" data-astro-cid-jrlgpo3w>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>v2.27.0</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>Jeremy Longshore</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>MIT</span>
+        </div>
+      </div>
+
+      
+    </header>
+
+    <!-- 4. Allowed Tools -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Allowed Tools</h2>
+      <div class="tools-grid" data-astro-cid-jrlgpo3w>
+        <span class="tool-badge" data-astro-cid-jrlgpo3w>Read</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Write</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Edit</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(databricks:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(jq:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(python3:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(bash:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Glob</span><span class="tool-badge" data-astro-cid-jrlgpo3w>mcp__databricks-workspace-mcp__clusters_get</span><span class="tool-badge" data-astro-cid-jrlgpo3w>mcp__databricks-workspace-mcp__clusters_events</span><span class="tool-badge" data-astro-cid-jrlgpo3w>mcp__databricks-workspace-mcp__clusters_list</span>
+      </div>
+      
+    </section>
+
+    <!-- 5. Provided by Plugin -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Provided by Plugin</h2>
+      <div class="plugin-info" data-astro-cid-jrlgpo3w>
+        <div class="plugin-details" data-astro-cid-jrlgpo3w>
+          <h3 data-astro-cid-jrlgpo3w>
+            <a href="/plugins/databricks-pack/" data-astro-cid-jrlgpo3w>databricks-pack</a>
+          </h3>
+          <p data-astro-cid-jrlgpo3w>5 live-detection Databricks skills — cost-leak-hunter, cluster-forensics, uc-migration-pilot, streaming-guardian, bundle-medic — backed by the databricks-workspace-mcp server.</p>
+          <div class="plugin-meta" data-astro-cid-jrlgpo3w>
+            <span data-astro-cid-jrlgpo3w>unknown</span>
+            <span data-astro-cid-jrlgpo3w>v2.27.0</span>
+          </div>
+        </div>
+        <a href="/plugins/databricks-pack/" class="btn-primary" data-astro-cid-jrlgpo3w>View Plugin</a>
+      </div>
+    </section>
+
+    <!-- 6. Installation -->
+    <section class="section-box dark" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Installation</h2>
+      <p class="install-note" style="color: var(--brand-light-gray); margin-bottom: 0.75rem;" data-astro-cid-jrlgpo3w>This skill is included in the databricks-pack plugin:</p>
+      <pre class="install-command" data-copy="/plugin install databricks-pack@claude-code-plugins-plus" data-astro-cid-jrlgpo3w><code data-astro-cid-jrlgpo3w>/plugin install databricks-pack@claude-code-plugins-plus</code></pre>
+      <p class="install-note" data-astro-cid-jrlgpo3w>Click to copy</p>
+    </section>
+
+    <!-- 7. Skill Content (Markdown) -->
+    <section class="skill-content-section" data-astro-cid-jrlgpo3w>
+      <h2 data-astro-cid-jrlgpo3w>Instructions</h2>
+      <div class="skill-content" data-astro-cid-jrlgpo3w>
+        <div data-astro-cid-jrlgpo3w><h1>Databricks Cluster Forensics</h1>
+<p>The operational SRE spine of the pack — what a Databricks engineer reaches for at 2 AM when the compute layer is broken or unexplained. It correlates a cluster&#39;s live event stream across API surfaces to name the failure with its <strong>actual error code</strong> and its <strong>version-specific mitigation</strong>, not &quot;network problem, try again&quot;.</p>
+<h2>Overview</h2>
+<p>Six real compute-layer failures live in this skill; each has a deterministic detector and an on-demand reference:</p>
+<ol>
+<li><strong>Cold-start long-tail</strong> (D01) — on VNet/VPC-injected workspaces a 5-minute start randomly takes 20-35, and Databricks reports only the aggregate. <code>scripts/cluster-coldstart-forensics.py</code> splits the PENDING window into stages (provisioning / init-scripts / spark-startup) so you see <em>which</em> stage spiked.</li>
+<li><strong>Photon premium without the speedup</strong> (D02) — Photon silently falls back to Spark on UDFs while the cluster still bills the ~2× Photon DBU premium for its whole uptime. See <code>references/photon-eligibility-and-fallback.md</code>.</li>
+<li><strong>DBR upgrade landmines</strong> (D03/D04/D05) — 14.x moved the working dir to the workspace filesystem (a ~500 MB cap that silently breaks large intermediate writes); 15.1 removed DBFS-root library storage and JDK 11; 15.4 flipped a JDBC calendar default. <code>scripts/find-cwd-writes.py</code> (AST) and <code>scripts/scan-jar-jdk.sh</code> (bytecode target) are the pre-upgrade detectors; <code>references/dbr-upgrade-paths.md</code> is the per-hop encyclopedia.</li>
+<li><strong>The launch-failure umbrella</strong> (D06) — <code>CLOUD_PROVIDER_LAUNCH_FAILURE</code> / <code>NPIP_TUNNEL_SETUP_FAILURE</code> each hide five distinct causes (subnet IP exhaustion, DNS, NSG/security-group block, deleted VNet, cloud throttling). <code>references/termination-codes.md</code> disambiguates them.</li>
+<li><strong>Spot shuffle aborts</strong> (D10) — a reclaimed spot node forces a shuffle recompute; lose another mid-recompute and the stage exceeds <code>spark.stage.maxConsecutiveAttempts</code> and the job aborts. <code>references/spot-vs-ondemand-decision.md</code> is the config decision tree.</li>
+</ol>
+<p>It is architecturally distinct from the v1 <code>databricks-common-errors</code> and <code>databricks-incident-runbook</code> skills: those narrate. This one reads live cluster events, buckets them deterministically (the arithmetic is in <code>scripts/</code>, never eyeballed), fans out parallel root-cause threads via the <code>cluster-event-investigator</code> subagent, and loads deep knowledge from <code>references/</code> only when a symptom needs it.</p>
+<p><strong>Two data planes.</strong> Cluster control-plane evidence (spec, state, event stream) comes from the custom <strong><code>databricks-workspace-mcp</code></strong> (<code>clusters_get</code> / <code>clusters_events</code> / <code>clusters_list</code>). The Photon audit&#39;s <code>system.query.history</code> read runs through the <strong>CLI Statement Execution API</strong> (<code>databricks api post /api/2.0/sql/statements</code>) — the same path <code>databricks-cost-leak-hunter</code> uses. Either surface absent, the skill degrades to <strong>advisory mode</strong> and accepts pasted event JSON / query plans so it still produces value.</p>
+<h2>Prerequisites</h2>
+<ul>
+<li><strong><code>databricks-workspace-mcp</code> registered</strong> — the source of <code>clusters_get</code>, <code>clusters_events</code>, <code>clusters_list</code>. Absent, the skill accepts a pasted <code>clusters.events</code> response and says so (advisory mode).</li>
+<li><strong>Databricks CLI</strong> authenticated (<code>databricks auth login</code>, or the <code>DATABRICKS_HOST</code> + <code>DATABRICKS_TOKEN</code> env pair) and <code>jq</code> — for the Photon <code>system.query.history</code> read.</li>
+<li><strong><code>DATABRICKS_WAREHOUSE_ID</code></strong> set to a running SQL warehouse — required only for the Photon audit (Step 2); the cold-start / launch-failure flows need only the workspace MCP.</li>
+<li><strong><code>unzip</code></strong> (and ideally a JDK&#39;s <code>javap</code>) on PATH for the DBR-15.1 JAR scan (<code>scan-jar-jdk.sh</code> falls back to reading class-file bytes if <code>javap</code> is absent).</li>
+</ul>
+<p>The skill checks which surfaces are present in Step 0 and reports what is missing before starting a flow it cannot finish.</p>
+<h2>Instructions</h2>
+<p>Pick the flow by symptom. Each is independent; run only what the question needs.</p>
+<h3>Step 0: Detect Available Surfaces</h3>
+<p>Confirm the workspace MCP answers (<code>clusters_list</code> returns) and, for a Photon audit, that the CLI is authenticated and <code>DATABRICKS_WAREHOUSE_ID</code> is set. Name any missing surface and switch that flow to advisory mode (pasted input) rather than failing mid-diagnosis.</p>
+<h3>Step 1: Cold-Start / Launch-Failure Forensics (D01, D06)</h3>
+<p>Pull the cluster&#39;s event stream and bucket its PENDING time:</p>
+<pre data-lang="bash"><code>
+# events from the workspace MCP (clusters_events) or the CLI, saved to a file:
+databricks clusters events --cluster-id &quot;$CLUSTER_ID&quot; --output json &gt; &quot;$OUT/events.json&quot;
+python3 &quot;${CLAUDE_SKILL_DIR}/scripts/cluster-coldstart-forensics.py&quot; \
+  --input &quot;$OUT/events.json&quot;
+</code></pre>
+<ul>
+<li>If the start <strong>succeeded but was slow</strong>, the dominant stage names the layer: provisioning → cloud VM allocation or network/DNS/NPIP; init-scripts → a slow init script or library install; spark-startup → driver spin-up.</li>
+<li>If the start <strong>failed</strong>, read the terminal <code>termination_reason.code</code> and disambiguate with <a href="references/termination-codes.md"><code>${CLAUDE_SKILL_DIR}/references/termination-codes.md</code></a> — especially the <code>CLOUD_PROVIDER_LAUNCH_FAILURE</code> / <code>NPIP_TUNNEL_SETUP_FAILURE</code> umbrella and its five sub-causes.</li>
+</ul>
+<p>For a messy failure, hand the <code>cluster_id</code> to the <strong><code>cluster-event-investigator</code></strong> subagent (<code>/investigate-cluster &lt;id&gt;</code>): it fans out one thread per cause class and returns the single most-likely cause with its evidence.</p>
+<h3>Step 2: Photon Fallback Audit (D02)</h3>
+<p>Check whether Photon is earning its premium. Query recent query history for plans that fell back to Spark, then corroborate the cluster is Photon (<code>runtime_engine</code> via <code>clusters_get</code>):</p>
+<pre data-lang="bash"><code>
+databricks api post /api/2.0/sql/statements --json &quot;$(jq -n --arg wh &quot;$DATABRICKS_WAREHOUSE_ID&quot; \
+  &#39;{warehouse_id:$wh, wait_timeout:&quot;30s&quot;,
+    statement:&quot;SELECT statement_id, executed_by, total_duration_ms FROM system.query.history WHERE end_time &gt; now() - INTERVAL 1 DAY ORDER BY total_duration_ms DESC LIMIT 50&quot;}&#39;)&quot;
+</code></pre>
+<p>Then read the physical plan of the slow statements for the &quot;Photon does not support&quot; seam and the <code>ColumnarToRow</code> / <code>RowToColumnar</code> boundaries — the detection recipe and the UDF-rewrite fixes are in <a href="references/photon-eligibility-and-fallback.md"><code>${CLAUDE_SKILL_DIR}/references/photon-eligibility-and-fallback.md</code></a>.</p>
+<h3>Step 3: DBR Upgrade Readiness (D03, D04, D05)</h3>
+<p>Before bumping the runtime, run the two pre-upgrade detectors against the job&#39;s code and libraries:</p>
+<pre data-lang="bash"><code>
+# D03 — writes to the CWD that the DBR-14 500 MB workspace-FS cap will break:
+python3 &quot;${CLAUDE_SKILL_DIR}/scripts/find-cwd-writes.py&quot; --risk-only path/to/job/
+
+# D04 — JARs built for a pre-17 JDK that DBR 15.1&#39;s JDK 17 may reject at runtime:
+bash &quot;${CLAUDE_SKILL_DIR}/scripts/scan-jar-jdk.sh&quot; path/to/libs/
+</code></pre>
+<p>Cross-reference each hop&#39;s landmines (the 14.x CWD cap, the 15.1 DBFS-root-library and JDK-11 removals, the 15.4 JDBC calendar flip) in <a href="references/dbr-upgrade-paths.md"><code>${CLAUDE_SKILL_DIR}/references/dbr-upgrade-paths.md</code></a>.</p>
+<h3>Step 4: Spot Configuration Review (D10)</h3>
+<p>If a job keeps aborting after <code>NODES_LOST</code> / <code>SPOT_INSTANCE_TERMINATION</code> around a shuffle, read the cluster&#39;s <code>aws_attributes</code> (<code>clusters_get</code>) and check the driver-on-demand rule and the spot ratio against <a href="references/spot-vs-ondemand-decision.md"><code>${CLAUDE_SKILL_DIR}/references/spot-vs-ondemand-decision.md</code></a>. The #1 fix is pinning the driver (and a floor of workers) to on-demand so a spot reclaim can never take the driver.</p>
+<h2>Output</h2>
+<ul>
+<li><strong>A cold-start stage breakdown</strong> — total PENDING time split into provisioning / init-scripts / spark-startup, the dominant stage named, and the layer to investigate (or, for a failed start, the terminal code + its cause).</li>
+<li><strong>A root-cause verdict</strong> (from <code>cluster-event-investigator</code>) — the single most-likely cause with the specific events/codes that point to it, and the cause classes ruled out.</li>
+<li><strong>A Photon audit</strong> — the queries paying the premium while falling back to Spark, with the plan seam and the UDF-rewrite fix.</li>
+<li><strong>A DBR-upgrade risk list</strong> — the CWD writes at risk under the 500 MB cap and the JARs built for a pre-17 JDK, each with its line/file, plus the per-hop breaking-change notes.</li>
+<li><strong>A spot recommendation</strong> — the corrected <code>aws_attributes</code> (driver on-demand, spot ratio) for the job class.</li>
+</ul>
+<h2>Error Handling</h2>
+<table><thead><tr>
+<th>Error</th>
+<th>Cause</th>
+<th>Solution</th>
+</tr></thead><tbody>
+<tr>
+<td><code>NPIP_TUNNEL_SETUP_FAILURE</code> / <code>CLOUD_PROVIDER_LAUNCH_FAILURE</code></td>
+<td>One of five sub-causes (IP exhaustion, DNS, NSG, deleted VNet, throttling)</td>
+<td>Disambiguate via <code>termination-codes.md</code>; the fix differs per sub-cause — do not blanket-retry.</td>
+</tr>
+<tr>
+<td><code>clusters_events</code> empty or truncated</td>
+<td>Databricks prunes old events</td>
+<td>Note the truncation; a missing <code>INIT_SCRIPTS_FINISHED</code> may mean &quot;pruned&quot;, not &quot;hung&quot; — do not infer an init-script hang from absence alone.</td>
+</tr>
+<tr>
+<td>Workspace MCP not registered</td>
+<td>Connector not set up</td>
+<td>Advisory mode: accept a pasted <code>clusters.events</code> JSON and run the forensics script on it.</td>
+</tr>
+<tr>
+<td>Photon audit returns nothing</td>
+<td>No <code>system.query.history</code> grant, or <code>DATABRICKS_WAREHOUSE_ID</code> unset</td>
+<td>Confirm the warehouse id and the <code>system.query</code> grant chain; degrade to reading a pasted query plan.</td>
+</tr>
+<tr>
+<td><code>scan-jar-jdk.sh</code> reports JDK <code>?</code></td>
+<td>JAR has no class files, or <code>unzip</code> missing</td>
+<td>Install <code>unzip</code>; a JDK <code>?</code> means the JAR is resources-only (no bytecode to check).</td>
+</tr>
+<tr>
+<td>Cold-start script says &quot;unmeasured&quot; for a stage</td>
+<td>The boundary events are absent (no init scripts, or pruned events)</td>
+<td>Expected — the script never folds an unmeasured stage into another; investigate the measured stages.</td>
+</tr>
+</tbody></table>
+<h2>Examples</h2>
+<h3>Example 1: &quot;My cluster randomly takes 25 minutes to start.&quot;</h3>
+<p>Step 1 buckets the events: <code>provisioning 21m (84%), init-scripts 1m, spark-startup 3m</code>. Dominant is provisioning → the skill points at cloud VM allocation / subnet-IP / DNS, not init scripts, and loads <code>termination-codes.md</code> for the provisioning sub-causes to check.</p>
+<h3>Example 2: &quot;Cluster failed with NPIP_TUNNEL_SETUP_FAILURE.&quot;</h3>
+<p>The investigator subagent runs its threads; the network/NPIP thread owns it and disambiguates to &quot;custom DNS could not resolve the control-plane hostname&quot; (vs the other four causes), citing the exact check from <code>termination-codes.md</code>.</p>
+<h3>Example 3: &quot;We&#39;re upgrading DBR 13.3 → 15.4. What breaks?&quot;</h3>
+<p>Step 3 runs <code>find-cwd-writes.py</code> (flags 3 <code>to_parquet(&quot;staging/…&quot;)</code> writes at risk under the 14.x cap) and <code>scan-jar-jdk.sh</code> (flags 2 JARs built for JDK 11), and <code>dbr-upgrade-paths.md</code> surfaces the 15.4 JDBC calendar flip for the pipeline&#39;s pre-Gregorian date handling.</p>
+<h3>Example 4: &quot;Job keeps dying after losing spot nodes.&quot;</h3>
+<p>Step 4 reads <code>aws_attributes</code>, finds the driver is on spot, and recommends <code>first_on_demand</code> covering the driver + a worker floor with <code>SPOT_WITH_FALLBACK</code>, citing the shuffle-recompute cascade in <code>spot-vs-ondemand-decision.md</code>.</p>
+<h2>Resources</h2>
+<ul>
+<li><a href="references/termination-codes.md"><code>${CLAUDE_SKILL_DIR}/references/termination-codes.md</code></a> — codebook for every <code>termination_reason.code</code>, with the five-cause launch-failure umbrella.</li>
+<li><a href="references/dbr-upgrade-paths.md"><code>${CLAUDE_SKILL_DIR}/references/dbr-upgrade-paths.md</code></a> — per-hop DBR breaking changes (14.x CWD cap, 15.1 lib/JDK removals, 15.4 calendar flip).</li>
+<li><a href="references/photon-eligibility-and-fallback.md"><code>${CLAUDE_SKILL_DIR}/references/photon-eligibility-and-fallback.md</code></a> — what drops Photon to Spark and how to detect the premium-without-speedup.</li>
+<li><a href="references/spot-vs-ondemand-decision.md"><code>${CLAUDE_SKILL_DIR}/references/spot-vs-ondemand-decision.md</code></a> — the spot config decision tree + driver-on-demand rule.</li>
+<li><a href="scripts/cluster-coldstart-forensics.py"><code>${CLAUDE_SKILL_DIR}/scripts/cluster-coldstart-forensics.py</code></a> — buckets cold-start PENDING time by stage.</li>
+<li><a href="scripts/find-cwd-writes.py"><code>${CLAUDE_SKILL_DIR}/scripts/find-cwd-writes.py</code></a> — AST scanner for DBR-14 CWD writes.</li>
+<li><a href="scripts/scan-jar-jdk.sh"><code>${CLAUDE_SKILL_DIR}/scripts/scan-jar-jdk.sh</code></a> — JAR bytecode-target (JDK) scanner.</li>
+<li><a href="agents/cluster-event-investigator.md"><code>${CLAUDE_SKILL_DIR}/agents/cluster-event-investigator.md</code></a> — parallel root-cause fanout subagent.</li>
+<li><a href="https://docs.databricks.com/api/workspace/clusters/events">Databricks cluster events API</a> · <a href="https://docs.databricks.com/aws/en/release-notes/runtime/">Databricks Runtime release notes</a> · <a href="https://docs.databricks.com/aws/en/compute/photon">Photon</a></li>
+</ul></div>
+      </div>
+    </section>
+
+    <!-- 8. Bottom CTA -->
+    <section class="detail-cta" data-astro-cid-qcigfm7x>
+  <h2 class="detail-cta__headline" data-astro-cid-qcigfm7x>Ready to use databricks-pack?</h2>
+  <div class="detail-cta__actions" data-astro-cid-qcigfm7x>
+    <button class="detail-cta__primary" data-copy-install="/plugin install databricks-pack@claude-code-plugins-plus" data-astro-cid-qcigfm7x>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" data-astro-cid-qcigfm7x>
+        <rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" stroke-width="1.5" data-astro-cid-qcigfm7x></rect>
+        <path d="M3 11V3a1 1 0 011-1h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" data-astro-cid-qcigfm7x></path>
+      </svg>
+      <span class="detail-cta__btn-text" data-astro-cid-qcigfm7x>Copy Install Command</span>
+    </button>
+    
+  </div>
+</section>
+
+<script type="module">document.querySelectorAll("[data-copy-install]").forEach(t=>{t.addEventListener("click",async()=>{const a=t.dataset.copyInstall||"";await navigator.clipboard.writeText(a);const e=t.querySelector(".detail-cta__btn-text");if(e){const o=e.textContent;e.textContent="Copied!",t.classList.add("copied"),window.trackEvent&&window.trackEvent("install_copied",{plugin_name:a.split(" ").pop()||"",source:"detail_cta"}),setTimeout(()=>{e.textContent=o,t.classList.remove("copied")},2e3)}})});</script>
+
+    <!-- 9. Related Skills (6, with tool pills) -->
+    <section class="related-skills-section" data-astro-cid-jrlgpo3w>
+        <h2 class="related-skills-heading" data-astro-cid-jrlgpo3w>Related Skills</h2>
+        <div class="related-skills-grid" data-astro-cid-jrlgpo3w>
+          <a href="/skills/abridge-ci-integration/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-ci-integration</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Configure CI/CD pipeline for Abridge clinical AI integrations with GitHub Actions.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-common-errors/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-common-errors</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Diagnose and fix common Abridge clinical AI integration errors.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-a/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-a</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge ambient clinical documentation capture-to-note pipeline.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-b/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-b</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge patient-facing documentation and after-visit summary generation.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-cost-tuning/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-cost-tuning</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Optimize Abridge clinical AI costs through tier selection, session management, and usage monitoring for healthcare organizations.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-debug-bundle/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-debug-bundle</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Collect Abridge debug evidence for support tickets and troubleshooting.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a>
+        </div>
+      </section>
+
+  </div>
+
+  
+  <script>
+    document.querySelectorAll('.install-command').forEach(el => {
+      el.addEventListener('click', function() {
+        const text = this.dataset.copy || this.textContent;
+        navigator.clipboard.writeText(text).then(() => {
+          const originalText = this.textContent;
+          this.textContent = 'Copied to clipboard!';
+          this.style.color = 'var(--brand-green)';
+          setTimeout(() => {
+            this.textContent = originalText;
+            this.style.color = '';
+          }, 2000);
+        });
+      });
+    });
+  </script>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

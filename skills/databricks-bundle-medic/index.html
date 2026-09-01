@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>databricks-bundle-medic - Agent Skill</title>
+    <meta name="description" content="Fix the deploy-time foot-guns of Databricks Asset Bundles (DAB) and the infrastructure operations around them: the bundle-bind gap for UC catalogs and external locations, the &quot;unexpected EOF reading terraform.tfstate&quot; redeploy failure, the schema-GRANT-ordering bug that fails the first deploy, customer-managed-key (CMK) rotation that requires draining the whole workspace, and the PrivateLink cost leak where S3/STS/Kinesis still traverse the NAT. Includes a PreToolUse hook that backs up and validates the bundle's terraform state before every deploy, and a PostToolUse hook that recognises the transient GRANT-ordering failure and recommends a single retry. Use when a databricks bundle deploy fails, before rotating a CMK, when a UC resource cannot be bound to a bundle, or when auditing PrivateLink networking cost. Trigger with &quot;bundle deploy failed&quot;, &quot;unexpected EOF terraform.tfstate&quot;, &quot;bundle bind external location&quot;, &quot;User does not have CREATE TABLE on Schema&quot;, &quot;rotate CMK&quot;, &quot;privatelink still using NAT&quot;.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://tonsofskills.com/tons-of-skills-marketplace/skills/databricks-bundle-medic/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/databricks-bundle-medic/">
+    <meta property="og:title" content="databricks-bundle-medic - Agent Skill">
+    <meta property="og:description" content="Fix the deploy-time foot-guns of Databricks Asset Bundles (DAB) and the infrastructure operations around them: the bundle-bind gap for UC catalogs and external locations, the &quot;unexpected EOF reading terraform.tfstate&quot; redeploy failure, the schema-GRANT-ordering bug that fails the first deploy, customer-managed-key (CMK) rotation that requires draining the whole workspace, and the PrivateLink cost leak where S3/STS/Kinesis still traverse the NAT. Includes a PreToolUse hook that backs up and validates the bundle's terraform state before every deploy, and a PostToolUse hook that recognises the transient GRANT-ordering failure and recommends a single retry. Use when a databricks bundle deploy fails, before rotating a CMK, when a UC resource cannot be bound to a bundle, or when auditing PrivateLink networking cost. Trigger with &quot;bundle deploy failed&quot;, &quot;unexpected EOF terraform.tfstate&quot;, &quot;bundle bind external location&quot;, &quot;User does not have CREATE TABLE on Schema&quot;, &quot;rotate CMK&quot;, &quot;privatelink still using NAT&quot;.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="databricks-bundle-medic - Agent Skill">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/databricks-bundle-medic/">
+    <meta name="twitter:title" content="databricks-bundle-medic - Agent Skill">
+    <meta name="twitter:description" content="Fix the deploy-time foot-guns of Databricks Asset Bundles (DAB) and the infrastructure operations around them: the bundle-bind gap for UC catalogs and external locations, the &quot;unexpected EOF reading terraform.tfstate&quot; redeploy failure, the schema-GRANT-ordering bug that fails the first deploy, customer-managed-key (CMK) rotation that requires draining the whole workspace, and the PrivateLink cost leak where S3/STS/Kinesis still traverse the NAT. Includes a PreToolUse hook that backs up and validates the bundle's terraform state before every deploy, and a PostToolUse hook that recognises the transient GRANT-ordering failure and recommends a single retry. Use when a databricks bundle deploy fails, before rotating a CMK, when a UC resource cannot be bound to a bundle, or when auditing PrivateLink networking cost. Trigger with &quot;bundle deploy failed&quot;, &quot;unexpected EOF terraform.tfstate&quot;, &quot;bundle bind external location&quot;, &quot;User does not have CREATE TABLE on Schema&quot;, &quot;rotate CMK&quot;, &quot;privatelink still using NAT&quot;.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"databricks-bundle-medic","description":"Fix the deploy-time foot-guns of Databricks Asset Bundles (DAB) and the infrastructure operations around them: the bundle-bind gap for UC catalogs and external locations, the \"unexpected EOF reading terraform.tfstate\" redeploy failure, the schema-GRANT-ordering bug that fails the first deploy, customer-managed-key (CMK) rotation that requires draining the whole workspace, and the PrivateLink cost leak where S3/STS/Kinesis still traverse the NAT. Includes a PreToolUse hook that backs up and validates the bundle's terraform state before every deploy, and a PostToolUse hook that recognises the transient GRANT-ordering failure and recommends a single retry. Use when a databricks bundle deploy fails, before rotating a CMK, when a UC resource cannot be bound to a bundle, or when auditing PrivateLink networking cost. Trigger with \"bundle deploy failed\", \"unexpected EOF terraform.tfstate\", \"bundle bind external location\", \"User does not have CREATE TABLE on Schema\", \"rotate CMK\", \"privatelink still using NAT\".","version":"2.27.0","author":{"@type":"Person","name":"Jeremy Longshore"},"license":"MIT","programmingLanguage":"Claude Code Agent Skill","isPartOf":{"@type":"SoftwareApplication","name":"databricks-pack","applicationCategory":"unknown"}}</script>
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.breadcrumbs[data-astro-cid-ilhxcym7]{margin-bottom:var(--space-5)}.breadcrumbs__list[data-astro-cid-ilhxcym7]{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;list-style:none;padding:0;margin:0;font-family:var(--font-mono);font-size:var(--text-sm, .8rem)}.breadcrumbs__item[data-astro-cid-ilhxcym7]{display:flex;align-items:center;gap:.375rem}.breadcrumbs__link[data-astro-cid-ilhxcym7]{color:var(--text-3);text-decoration:none;transition:color var(--duration-fast, .2s) var(--ease-out)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:hover{color:var(--primary)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:0}.breadcrumbs__sep[data-astro-cid-ilhxcym7]{color:var(--text-3);user-select:none;font-size:.7em;line-height:1}.breadcrumbs__current[data-astro-cid-ilhxcym7]{color:var(--text-2)}.detail-cta[data-astro-cid-qcigfm7x]{background:var(--surface-3, var(--brand-light-gray));border-top:1px solid var(--border, var(--brand-light-gray));border-radius:var(--radius-lg);padding:2rem 1.5rem;margin-top:2rem;text-align:center}.detail-cta__headline[data-astro-cid-qcigfm7x]{font-family:var(--font-display);font-weight:700;font-size:1.35rem;color:var(--text, var(--brand-dark));margin-bottom:1.25rem}.detail-cta__actions[data-astro-cid-qcigfm7x]{display:flex;justify-content:center;gap:.75rem;flex-wrap:wrap}.detail-cta__primary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:var(--primary);color:#0a0a0c;border:none;border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;cursor:pointer;transition:background var(--duration-fast) var(--ease-out),transform var(--duration-fast) var(--ease-out)}.detail-cta__primary[data-astro-cid-qcigfm7x]:hover{background:var(--primary-dark, var(--primary-dark));transform:translateY(-1px)}.detail-cta__primary[data-astro-cid-qcigfm7x].copied{background:var(--positive, var(--brand-green))}.detail-cta__secondary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:transparent;color:var(--text, var(--brand-dark));border:1px solid var(--border, var(--brand-mid-gray));border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;text-decoration:none;transition:border-color var(--duration-fast) var(--ease-out),color var(--duration-fast) var(--ease-out)}.detail-cta__secondary[data-astro-cid-qcigfm7x]:hover{border-color:var(--primary);color:var(--primary)}@media(max-width:480px){.detail-cta__actions[data-astro-cid-qcigfm7x]{flex-direction:column;align-items:stretch}.detail-cta__primary[data-astro-cid-qcigfm7x],.detail-cta__secondary[data-astro-cid-qcigfm7x]{justify-content:center}}
+</style>
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/_slug_@_@astro.wF9emvVq.css"></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  
+  
+
+  <div class="skill-detail" data-astro-cid-jrlgpo3w>
+    <!-- 1. Breadcrumbs -->
+    <nav aria-label="Breadcrumb" class="breadcrumbs" data-astro-cid-ilhxcym7>
+  <ol class="breadcrumbs__list" itemscope itemtype="https://schema.org/BreadcrumbList" data-astro-cid-ilhxcym7>
+    <li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Home</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="1">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/skills/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Skills</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="2">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          <span class="breadcrumbs__current" aria-current="page" itemprop="name" data-astro-cid-ilhxcym7>
+              databricks-bundle-medic
+            </span>
+          <meta itemprop="position" content="3">
+        </li>
+  </ol>
+</nav>
+
+    <!-- 2. Header (enhanced) -->
+    <header class="skill-header" data-astro-cid-jrlgpo3w>
+      <h1 data-astro-cid-jrlgpo3w>databricks-bundle-medic</h1>
+      <p class="skill-description" data-astro-cid-jrlgpo3w>Fix the deploy-time foot-guns of Databricks Asset Bundles (DAB) and the infrastructure operations around them: the bundle-bind gap for UC catalogs and external locations, the &quot;unexpected EOF reading terraform.tfstate&quot; redeploy failure, the schema-GRANT-ordering bug that fails the first deploy, customer-managed-key (CMK) rotation that requires draining the whole workspace, and the PrivateLink cost leak where S3/STS/Kinesis still traverse the NAT. Includes a PreToolUse hook that backs up and validates the bundle&#39;s terraform state before every deploy, and a PostToolUse hook that recognises the transient GRANT-ordering failure and recommends a single retry. Use when a databricks bundle deploy fails, before rotating a CMK, when a UC resource cannot be bound to a bundle, or when auditing PrivateLink networking cost. Trigger with &quot;bundle deploy failed&quot;, &quot;unexpected EOF terraform.tfstate&quot;, &quot;bundle bind external location&quot;, &quot;User does not have CREATE TABLE on Schema&quot;, &quot;rotate CMK&quot;, &quot;privatelink still using NAT&quot;.</p>
+
+      <div class="skill-metadata" data-astro-cid-jrlgpo3w>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>v2.27.0</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>Jeremy Longshore</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>MIT</span>
+        </div>
+      </div>
+
+      
+    </header>
+
+    <!-- 4. Allowed Tools -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Allowed Tools</h2>
+      <div class="tools-grid" data-astro-cid-jrlgpo3w>
+        <span class="tool-badge" data-astro-cid-jrlgpo3w>Read</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Write</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Edit</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(databricks:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(terraform:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(jq:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(python3:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(bash:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Glob</span><span class="tool-badge" data-astro-cid-jrlgpo3w>mcp__databricks-workspace-mcp__external_locations_list</span><span class="tool-badge" data-astro-cid-jrlgpo3w>mcp__databricks-workspace-mcp__storage_credentials_list</span>
+      </div>
+      
+    </section>
+
+    <!-- 5. Provided by Plugin -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Provided by Plugin</h2>
+      <div class="plugin-info" data-astro-cid-jrlgpo3w>
+        <div class="plugin-details" data-astro-cid-jrlgpo3w>
+          <h3 data-astro-cid-jrlgpo3w>
+            <a href="/plugins/databricks-pack/" data-astro-cid-jrlgpo3w>databricks-pack</a>
+          </h3>
+          <p data-astro-cid-jrlgpo3w>5 live-detection Databricks skills — cost-leak-hunter, cluster-forensics, uc-migration-pilot, streaming-guardian, bundle-medic — backed by the databricks-workspace-mcp server.</p>
+          <div class="plugin-meta" data-astro-cid-jrlgpo3w>
+            <span data-astro-cid-jrlgpo3w>unknown</span>
+            <span data-astro-cid-jrlgpo3w>v2.27.0</span>
+          </div>
+        </div>
+        <a href="/plugins/databricks-pack/" class="btn-primary" data-astro-cid-jrlgpo3w>View Plugin</a>
+      </div>
+    </section>
+
+    <!-- 6. Installation -->
+    <section class="section-box dark" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Installation</h2>
+      <p class="install-note" style="color: var(--brand-light-gray); margin-bottom: 0.75rem;" data-astro-cid-jrlgpo3w>This skill is included in the databricks-pack plugin:</p>
+      <pre class="install-command" data-copy="/plugin install databricks-pack@claude-code-plugins-plus" data-astro-cid-jrlgpo3w><code data-astro-cid-jrlgpo3w>/plugin install databricks-pack@claude-code-plugins-plus</code></pre>
+      <p class="install-note" data-astro-cid-jrlgpo3w>Click to copy</p>
+    </section>
+
+    <!-- 7. Skill Content (Markdown) -->
+    <section class="skill-content-section" data-astro-cid-jrlgpo3w>
+      <h2 data-astro-cid-jrlgpo3w>Instructions</h2>
+      <div class="skill-content" data-astro-cid-jrlgpo3w>
+        <div data-astro-cid-jrlgpo3w><h1>Databricks Bundle Medic</h1>
+<p>The deploy + infrastructure spine of the pack. Databricks Asset Bundles (DAB) is immature tooling — the replacement for the deprecated <code>dbx</code>, with a moving bug list across CLI versions — and the infrastructure operations around a deploy (encryption keys, networking, workspace config) bite production platform teams hardest. This skill turns the five worst deploy-time foot-guns into deterministic, reversible operations.</p>
+<h2>Overview</h2>
+<p>Five pains, all from the pack&#39;s deploy-ops research:</p>
+<p><strong>Asset Bundles (DAB).</strong> D4 — <code>databricks bundle bind</code> does NOT yet support UC catalogs or external locations (databricks/cli#4842), so existing UC resources cannot come under bundle management without hand-editing <code>terraform.tfstate</code> (hostile) or destroy-and-recreate (impossible with dependent tables). D5 — &quot;unexpected EOF reading terraform.tfstate&quot; on every redeploy after the first (databricks/cli#4986), which bricks the bundle until you switch to <code>DATABRICKS_BUNDLE_ENGINE=direct</code>. D6 — the schema GRANT-ordering bug (databricks/cli#4573): the first deploy to a fresh workspace fails with &quot;User does not have CREATE TABLE on Schema&quot;, but the second succeeds because the first applied the grants before dying.</p>
+<p><strong>Deploy-time infrastructure.</strong> D8 — rotating a workspace&#39;s customer-managed key (CMK) requires terminating every cluster, instance pool, and SQL warehouse first: a hard maintenance window. D9 — the PrivateLink trap: enabling PrivateLink for the control plane is mistaken for &quot;all traffic is private,&quot; but the data plane&#39;s S3 / STS / Kinesis calls still traverse the NAT, billing NAT-processing + cross-AZ transfer until each gets its own VPC endpoint.</p>
+<p><strong>The two hooks (this is the pack&#39;s only two-hook skill).</strong> A <code>PreToolUse</code> hook (<code>hooks/bundle-deploy-guard.py</code>) runs before every <code>databricks bundle deploy</code>: it validates the bundle&#39;s local terraform state parses as JSON, caches a timestamped known-good backup as a recovery escape hatch, and warns loudly if the state is corrupt or has shrunk (the D5 signature). A <code>PostToolUse</code> hook (<code>hooks/bundle-grant-retry.py</code>) watches a deploy&#39;s output and — ONLY on the exact D6 &quot;does not have … on Schema&quot; signature — adds context recommending one retry, with the reason. Both are advisory: the pre-hook never blocks a deploy, and the post-hook never masks a real error — it surfaces the diagnosis and stops recommending retries if the same failure persists.</p>
+<p>Deterministic work lives in <code>scripts/</code>; deep knowledge in <code>references/</code>. The <code>import-uc-resource-to-bundle.py</code> D4 workaround is <strong>self-deprecating</strong> — it exists only until #4842 closes and says so. Control-plane state comes from the <code>databricks-workspace-mcp</code> server (<code>external_locations_list</code>, <code>storage_credentials_list</code>) or the CLI; advisory-mode fallback accepts pasted input.</p>
+<h2>Prerequisites</h2>
+<ul>
+<li><strong>Databricks CLI</strong> authenticated, plus <code>terraform</code> and <code>jq</code> on PATH — for the bundle, import, and state operations.</li>
+<li><strong><code>databricks-workspace-mcp</code> registered</strong> (optional) — for <code>external_locations_list</code> and <code>storage_credentials_list</code>. Absent → the CLI (<code>databricks external-locations list</code>) or advisory mode on pasted input.</li>
+<li><strong>Account-level OAuth M2M</strong> (service principal) for CMK rotation — the D8 operations are account-scoped; a workspace PAT is insufficient. AWS/Azure/GCP CLI for the cloud-side key + VPC-endpoint work.</li>
+<li><strong>The two hooks are plugin-level</strong> — installed with the pack. The pre-hook is silent unless a state looks corrupt; the post-hook is silent unless the exact D6 error fires.</li>
+</ul>
+<h2>Instructions</h2>
+<p>Pick the flow by symptom. <strong>Always name the exact error string / issue id</strong> — <code>unexpected EOF reading terraform.tfstate</code> (#4986), <code>does not have CREATE TABLE on Schema</code> (#4573), the <code>bundle bind</code> UC gap (#4842) — an operator greps for those.</p>
+<h3>Step 1: A bundle deploy that fails on state (D5)</h3>
+<p>&quot;unexpected EOF reading terraform.tfstate&quot; after the first deploy is #4986. The <code>bundle-deploy-guard</code> PreToolUse hook already cached a known-good backup; restore it, or switch engines:</p>
+<pre data-lang="bash"><code>
+DATABRICKS_BUNDLE_ENGINE=direct databricks bundle deploy -t &quot;$TARGET&quot;
+</code></pre>
+<p>Engine tradeoffs + the migration steps: <a href="references/bundle-engine-tradeoffs.md"><code>${CLAUDE_SKILL_DIR}/references/bundle-engine-tradeoffs.md</code></a>.</p>
+<h3>Step 2: First deploy fails &quot;does not have CREATE TABLE on Schema&quot; (D6)</h3>
+<p>This is the transient GRANT-ordering bug (#4573). The <code>bundle-grant-retry</code> PostToolUse hook flags it; re-run the SAME deploy <strong>exactly once</strong> — the failed first pass already applied the grants. If the identical error persists after one retry, it is NOT this transient — treat it as a real missing privilege and stop retrying.</p>
+<h3>Step 3: A UC resource that will not bind (D4)</h3>
+<p><code>databricks bundle bind</code> cannot take a UC catalog or external location yet (#4842). Generate a review-first Terraform import plan (never hand-edit state):</p>
+<pre data-lang="bash"><code>
+python3 &quot;${CLAUDE_SKILL_DIR}/scripts/import-uc-resource-to-bundle.py&quot; \
+  --type external_location --name raw_zone --resource-key raw_zone_loc
+</code></pre>
+<p>The three workarounds, ranked by risk: <a href="references/uc-resource-binding-workarounds.md"><code>${CLAUDE_SKILL_DIR}/references/uc-resource-binding-workarounds.md</code></a>.</p>
+<h3>Step 4: Rotate a customer-managed key (D8)</h3>
+<p>CMK rotation needs the whole workspace drained. Inventory the running compute (via <code>external_locations_list</code> / the CLI), then plan the drain — dry-run by default:</p>
+<pre data-lang="bash"><code>
+databricks clusters list --output json &gt; /tmp/inv-clusters.json   # + warehouses, pools
+python3 &quot;${CLAUDE_SKILL_DIR}/scripts/drain-workspace.py&quot; --inventory inv.json          # dry-run
+python3 &quot;${CLAUDE_SKILL_DIR}/scripts/drain-workspace.py&quot; --inventory inv.json --execute --manifest drain.json
+# ... rotate the CMK per cloud, then:
+python3 &quot;${CLAUDE_SKILL_DIR}/scripts/drain-workspace.py&quot; --resume drain.json
+</code></pre>
+<p>Per-cloud playbooks (AWS/Azure/GCP): <a href="references/cmk-rotation-by-cloud.md"><code>${CLAUDE_SKILL_DIR}/references/cmk-rotation-by-cloud.md</code></a>.</p>
+<h3>Step 5: Audit the PrivateLink cost leak (D9)</h3>
+<p>PrivateLink covers the control plane only. Audit the data-plane VPC for the S3/STS/Kinesis endpoints and emit remediation Terraform for any that are missing:</p>
+<pre data-lang="bash"><code>
+python3 &quot;${CLAUDE_SKILL_DIR}/scripts/audit-vpc-endpoints.py&quot; \
+  --present s3 --vpc-id vpc-abc --region us-east-1 --emit-terraform
+</code></pre>
+<p>The full per-service leak/fix map: <a href="references/cost-leak-map.md"><code>${CLAUDE_SKILL_DIR}/references/cost-leak-map.md</code></a>.</p>
+<h2>Output</h2>
+<ul>
+<li><strong>A hook backup + advisory</strong> — before each deploy, a validated known-good state backup and, if the state is corrupt/shrunk, the #4986 recovery message.</li>
+<li><strong>A retry recommendation</strong> — on the exact D6 signature, a one-retry recommendation with the reason (never a masked error).</li>
+<li><strong>A UC import plan</strong> — the <code>resources:</code> YAML + Terraform <code>import</code> block/command to adopt an existing UC resource, with the self-deprecation notice.</li>
+<li><strong>A drain / resume plan</strong> — the idempotent list of compute to terminate for CMK rotation and the manifest to resume exactly what was drained.</li>
+<li><strong>A VPC-endpoint verdict</strong> — SAFE or a COST LEAK finding naming the missing S3/STS/Kinesis endpoints, with remediation Terraform.</li>
+</ul>
+<h2>Error Handling</h2>
+<table><thead><tr>
+<th>Error</th>
+<th>Cause</th>
+<th>Solution</th>
+</tr></thead><tbody>
+<tr>
+<td><code>unexpected EOF reading terraform.tfstate</code></td>
+<td>Terraform-engine state read bug on redeploy (D5, #4986)</td>
+<td>Restore the guard&#39;s cached backup, or <code>DATABRICKS_BUNDLE_ENGINE=direct</code>.</td>
+</tr>
+<tr>
+<td><code>User does not have CREATE TABLE on Schema &#39;…&#39;</code></td>
+<td>DAB GRANT-ordering (D6, #4573)</td>
+<td>Re-run the deploy once; grants were applied by the failed pass. Persists after one retry → real missing grant.</td>
+</tr>
+<tr>
+<td><code>bundle bind</code> rejects a UC catalog / external location</td>
+<td>Unsupported in the CLI (D4, #4842)</td>
+<td>Use <code>import-uc-resource-to-bundle.py</code> to generate a Terraform import plan; never hand-edit state.</td>
+</tr>
+<tr>
+<td>CMK rotation rejected — compute still running</td>
+<td>CMK update requires a drained workspace (D8)</td>
+<td><code>drain-workspace.py --execute</code>, rotate, then <code>--resume</code>.</td>
+</tr>
+<tr>
+<td>High NAT / cross-AZ cost after PrivateLink</td>
+<td>S3/STS/Kinesis have no VPC endpoint (D9)</td>
+<td><code>audit-vpc-endpoints.py --emit-terraform</code>; add Gateway (S3) + Interface (STS/Kinesis) endpoints.</td>
+</tr>
+</tbody></table>
+<h2>Examples</h2>
+<h3>Example 1: &quot;My second <code>bundle deploy</code> fails with unexpected EOF reading terraform.tfstate.&quot;</h3>
+<p>D5 (#4986). The <code>bundle-deploy-guard</code> hook already cached a known-good state before the deploy — restore it, then redeploy with <code>DATABRICKS_BUNDLE_ENGINE=direct</code> (the direct engine never reads the state file, so the EOF class cannot fire).</p>
+<h3>Example 2: &quot;First deploy to a fresh workspace: User does not have CREATE TABLE on Schema.&quot;</h3>
+<p>D6 (#4573). The <code>bundle-grant-retry</code> hook recognises the exact signature and recommends one retry — the failed first deploy applied the schema grants, so the second succeeds.</p>
+<h3>Example 3: &quot;I need to bring an existing external location under my bundle.&quot;</h3>
+<p>D4 (#4842) — <code>bundle bind</code> can&#39;t. <code>import-uc-resource-to-bundle.py --type external_location</code> emits the <code>resources:</code> YAML plus a Terraform <code>import</code> block to adopt it without recreating it or hand-editing state. The script self-deprecates when #4842 closes.</p>
+<h3>Example 4: &quot;We turned on PrivateLink but the NAT bill went up.&quot;</h3>
+<p>D9. <code>audit-vpc-endpoints.py --present s3</code> finds STS and Kinesis have no Interface endpoint, so credential-vending and log traffic still cross the NAT — it emits the remediation Terraform for both.</p>
+<h2>Resources</h2>
+<ul>
+<li><a href="references/uc-resource-binding-workarounds.md"><code>${CLAUDE_SKILL_DIR}/references/uc-resource-binding-workarounds.md</code></a> — the D4 <code>bundle bind</code> gap + 3 ranked workarounds (#4842).</li>
+<li><a href="references/bundle-engine-tradeoffs.md"><code>${CLAUDE_SKILL_DIR}/references/bundle-engine-tradeoffs.md</code></a> — Terraform vs direct engine, the D5 EOF bug (#4986).</li>
+<li><a href="references/cmk-rotation-by-cloud.md"><code>${CLAUDE_SKILL_DIR}/references/cmk-rotation-by-cloud.md</code></a> — AWS/Azure/GCP CMK rotation playbooks + the drain requirement (D8).</li>
+<li><a href="references/cost-leak-map.md"><code>${CLAUDE_SKILL_DIR}/references/cost-leak-map.md</code></a> — the PrivateLink S3/STS/Kinesis NAT cost leak + fix map (D9).</li>
+<li><a href="scripts/import-uc-resource-to-bundle.py"><code>${CLAUDE_SKILL_DIR}/scripts/import-uc-resource-to-bundle.py</code></a> — self-deprecating UC-resource import-plan generator (D4).</li>
+<li><a href="scripts/drain-workspace.py"><code>${CLAUDE_SKILL_DIR}/scripts/drain-workspace.py</code></a> — idempotent drain + resume for CMK rotation (D8).</li>
+<li><a href="scripts/audit-vpc-endpoints.py"><code>${CLAUDE_SKILL_DIR}/scripts/audit-vpc-endpoints.py</code></a> — VPC-endpoint audit + remediation Terraform (D9).</li>
+<li><a href="hooks/bundle-deploy-guard.py"><code>${CLAUDE_SKILL_DIR}/hooks/bundle-deploy-guard.py</code></a> — PreToolUse state backup + validation (D5).</li>
+<li><a href="hooks/bundle-grant-retry.py"><code>${CLAUDE_SKILL_DIR}/hooks/bundle-grant-retry.py</code></a> — PostToolUse D6 retry recommendation (D6).</li>
+<li><a href="https://docs.databricks.com/aws/en/dev-tools/bundles/">Databricks Asset Bundles</a> · <a href="https://docs.databricks.com/aws/en/security/keys/customer-managed-keys">Customer-managed keys</a> · <a href="https://docs.databricks.com/aws/en/security/network/classic/privatelink">PrivateLink</a></li>
+</ul></div>
+      </div>
+    </section>
+
+    <!-- 8. Bottom CTA -->
+    <section class="detail-cta" data-astro-cid-qcigfm7x>
+  <h2 class="detail-cta__headline" data-astro-cid-qcigfm7x>Ready to use databricks-pack?</h2>
+  <div class="detail-cta__actions" data-astro-cid-qcigfm7x>
+    <button class="detail-cta__primary" data-copy-install="/plugin install databricks-pack@claude-code-plugins-plus" data-astro-cid-qcigfm7x>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" data-astro-cid-qcigfm7x>
+        <rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" stroke-width="1.5" data-astro-cid-qcigfm7x></rect>
+        <path d="M3 11V3a1 1 0 011-1h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" data-astro-cid-qcigfm7x></path>
+      </svg>
+      <span class="detail-cta__btn-text" data-astro-cid-qcigfm7x>Copy Install Command</span>
+    </button>
+    
+  </div>
+</section>
+
+<script type="module">document.querySelectorAll("[data-copy-install]").forEach(t=>{t.addEventListener("click",async()=>{const a=t.dataset.copyInstall||"";await navigator.clipboard.writeText(a);const e=t.querySelector(".detail-cta__btn-text");if(e){const o=e.textContent;e.textContent="Copied!",t.classList.add("copied"),window.trackEvent&&window.trackEvent("install_copied",{plugin_name:a.split(" ").pop()||"",source:"detail_cta"}),setTimeout(()=>{e.textContent=o,t.classList.remove("copied")},2e3)}})});</script>
+
+    <!-- 9. Related Skills (6, with tool pills) -->
+    <section class="related-skills-section" data-astro-cid-jrlgpo3w>
+        <h2 class="related-skills-heading" data-astro-cid-jrlgpo3w>Related Skills</h2>
+        <div class="related-skills-grid" data-astro-cid-jrlgpo3w>
+          <a href="/skills/abridge-ci-integration/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-ci-integration</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Configure CI/CD pipeline for Abridge clinical AI integrations with GitHub Actions.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-common-errors/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-common-errors</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Diagnose and fix common Abridge clinical AI integration errors.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-a/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-a</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge ambient clinical documentation capture-to-note pipeline.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-b/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-b</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge patient-facing documentation and after-visit summary generation.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-cost-tuning/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-cost-tuning</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Optimize Abridge clinical AI costs through tier selection, session management, and usage monitoring for healthcare organizations.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-debug-bundle/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-debug-bundle</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Collect Abridge debug evidence for support tickets and troubleshooting.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a>
+        </div>
+      </section>
+
+  </div>
+
+  
+  <script>
+    document.querySelectorAll('.install-command').forEach(el => {
+      el.addEventListener('click', function() {
+        const text = this.dataset.copy || this.textContent;
+        navigator.clipboard.writeText(text).then(() => {
+          const originalText = this.textContent;
+          this.textContent = 'Copied to clipboard!';
+          this.style.color = 'var(--brand-green)';
+          setTimeout(() => {
+            this.textContent = originalText;
+            this.style.color = '';
+          }, 2000);
+        });
+      });
+    });
+  </script>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

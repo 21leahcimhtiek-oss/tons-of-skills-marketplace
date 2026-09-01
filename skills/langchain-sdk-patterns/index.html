@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>langchain-sdk-patterns - Agent Skill</title>
+    <meta name="description" content="Compose LangChain 1.0 Python runnables with the production defaults the docs do not warn about: parallel batching, narrow fallbacks, and brace-safe prompts. Use when building an LCEL chain with RunnableSequence / RunnableParallel, adding resilience via .with_fallbacks(), tuning throughput with .batch() or .abatch(), or wrapping user input in a prompt template. Trigger with &quot;langchain runnable&quot;, &quot;with_fallbacks&quot;, &quot;langchain batch&quot;, &quot;runnable sequence&quot;, &quot;lcel&quot;, &quot;runnableparallel&quot;, &quot;chain composition&quot;.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://tonsofskills.com/tons-of-skills-marketplace/skills/langchain-sdk-patterns/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/langchain-sdk-patterns/">
+    <meta property="og:title" content="langchain-sdk-patterns - Agent Skill">
+    <meta property="og:description" content="Compose LangChain 1.0 Python runnables with the production defaults the docs do not warn about: parallel batching, narrow fallbacks, and brace-safe prompts. Use when building an LCEL chain with RunnableSequence / RunnableParallel, adding resilience via .with_fallbacks(), tuning throughput with .batch() or .abatch(), or wrapping user input in a prompt template. Trigger with &quot;langchain runnable&quot;, &quot;with_fallbacks&quot;, &quot;langchain batch&quot;, &quot;runnable sequence&quot;, &quot;lcel&quot;, &quot;runnableparallel&quot;, &quot;chain composition&quot;.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="langchain-sdk-patterns - Agent Skill">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/langchain-sdk-patterns/">
+    <meta name="twitter:title" content="langchain-sdk-patterns - Agent Skill">
+    <meta name="twitter:description" content="Compose LangChain 1.0 Python runnables with the production defaults the docs do not warn about: parallel batching, narrow fallbacks, and brace-safe prompts. Use when building an LCEL chain with RunnableSequence / RunnableParallel, adding resilience via .with_fallbacks(), tuning throughput with .batch() or .abatch(), or wrapping user input in a prompt template. Trigger with &quot;langchain runnable&quot;, &quot;with_fallbacks&quot;, &quot;langchain batch&quot;, &quot;runnable sequence&quot;, &quot;lcel&quot;, &quot;runnableparallel&quot;, &quot;chain composition&quot;.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"langchain-sdk-patterns","description":"Compose LangChain 1.0 Python runnables with the production defaults the docs do not warn about: parallel batching, narrow fallbacks, and brace-safe prompts. Use when building an LCEL chain with RunnableSequence / RunnableParallel, adding resilience via .with_fallbacks(), tuning throughput with .batch() or .abatch(), or wrapping user input in a prompt template. Trigger with \"langchain runnable\", \"with_fallbacks\", \"langchain batch\", \"runnable sequence\", \"lcel\", \"runnableparallel\", \"chain composition\".","version":"2.5.0","author":{"@type":"Person","name":"Jeremy Longshore"},"license":"MIT","programmingLanguage":"Claude Code Agent Skill","isPartOf":{"@type":"SoftwareApplication","name":"langchain-py-pack","applicationCategory":"unknown"}}</script>
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.breadcrumbs[data-astro-cid-ilhxcym7]{margin-bottom:var(--space-5)}.breadcrumbs__list[data-astro-cid-ilhxcym7]{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;list-style:none;padding:0;margin:0;font-family:var(--font-mono);font-size:var(--text-sm, .8rem)}.breadcrumbs__item[data-astro-cid-ilhxcym7]{display:flex;align-items:center;gap:.375rem}.breadcrumbs__link[data-astro-cid-ilhxcym7]{color:var(--text-3);text-decoration:none;transition:color var(--duration-fast, .2s) var(--ease-out)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:hover{color:var(--primary)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:0}.breadcrumbs__sep[data-astro-cid-ilhxcym7]{color:var(--text-3);user-select:none;font-size:.7em;line-height:1}.breadcrumbs__current[data-astro-cid-ilhxcym7]{color:var(--text-2)}.detail-cta[data-astro-cid-qcigfm7x]{background:var(--surface-3, var(--brand-light-gray));border-top:1px solid var(--border, var(--brand-light-gray));border-radius:var(--radius-lg);padding:2rem 1.5rem;margin-top:2rem;text-align:center}.detail-cta__headline[data-astro-cid-qcigfm7x]{font-family:var(--font-display);font-weight:700;font-size:1.35rem;color:var(--text, var(--brand-dark));margin-bottom:1.25rem}.detail-cta__actions[data-astro-cid-qcigfm7x]{display:flex;justify-content:center;gap:.75rem;flex-wrap:wrap}.detail-cta__primary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:var(--primary);color:#0a0a0c;border:none;border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;cursor:pointer;transition:background var(--duration-fast) var(--ease-out),transform var(--duration-fast) var(--ease-out)}.detail-cta__primary[data-astro-cid-qcigfm7x]:hover{background:var(--primary-dark, var(--primary-dark));transform:translateY(-1px)}.detail-cta__primary[data-astro-cid-qcigfm7x].copied{background:var(--positive, var(--brand-green))}.detail-cta__secondary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:transparent;color:var(--text, var(--brand-dark));border:1px solid var(--border, var(--brand-mid-gray));border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;text-decoration:none;transition:border-color var(--duration-fast) var(--ease-out),color var(--duration-fast) var(--ease-out)}.detail-cta__secondary[data-astro-cid-qcigfm7x]:hover{border-color:var(--primary);color:var(--primary)}@media(max-width:480px){.detail-cta__actions[data-astro-cid-qcigfm7x]{flex-direction:column;align-items:stretch}.detail-cta__primary[data-astro-cid-qcigfm7x],.detail-cta__secondary[data-astro-cid-qcigfm7x]{justify-content:center}}
+</style>
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/_slug_@_@astro.wF9emvVq.css"></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  
+  
+
+  <div class="skill-detail" data-astro-cid-jrlgpo3w>
+    <!-- 1. Breadcrumbs -->
+    <nav aria-label="Breadcrumb" class="breadcrumbs" data-astro-cid-ilhxcym7>
+  <ol class="breadcrumbs__list" itemscope itemtype="https://schema.org/BreadcrumbList" data-astro-cid-ilhxcym7>
+    <li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Home</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="1">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/skills/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Skills</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="2">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          <span class="breadcrumbs__current" aria-current="page" itemprop="name" data-astro-cid-ilhxcym7>
+              langchain-sdk-patterns
+            </span>
+          <meta itemprop="position" content="3">
+        </li>
+  </ol>
+</nav>
+
+    <!-- 2. Header (enhanced) -->
+    <header class="skill-header" data-astro-cid-jrlgpo3w>
+      <h1 data-astro-cid-jrlgpo3w>langchain-sdk-patterns</h1>
+      <p class="skill-description" data-astro-cid-jrlgpo3w>Compose LangChain 1.0 Python runnables with the production defaults the docs do not warn about: parallel batching, narrow fallbacks, and brace-safe prompts. Use when building an LCEL chain with RunnableSequence / RunnableParallel, adding resilience via .with_fallbacks(), tuning throughput with .batch() or .abatch(), or wrapping user input in a prompt template. Trigger with &quot;langchain runnable&quot;, &quot;with_fallbacks&quot;, &quot;langchain batch&quot;, &quot;runnable sequence&quot;, &quot;lcel&quot;, &quot;runnableparallel&quot;, &quot;chain composition&quot;.</p>
+
+      <div class="skill-metadata" data-astro-cid-jrlgpo3w>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>v2.5.0</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>Jeremy Longshore</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>MIT</span>
+        </div>
+      </div>
+
+      
+    </header>
+
+    <!-- 4. Allowed Tools -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Allowed Tools</h2>
+      <div class="tools-grid" data-astro-cid-jrlgpo3w>
+        <span class="tool-badge" data-astro-cid-jrlgpo3w>Read</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Write</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Edit</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(python:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(pip:*)</span>
+      </div>
+      
+    </section>
+
+    <!-- 5. Provided by Plugin -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Provided by Plugin</h2>
+      <div class="plugin-info" data-astro-cid-jrlgpo3w>
+        <div class="plugin-details" data-astro-cid-jrlgpo3w>
+          <h3 data-astro-cid-jrlgpo3w>
+            <a href="/plugins/langchain-py-pack/" data-astro-cid-jrlgpo3w>langchain-py-pack</a>
+          </h3>
+          <p data-astro-cid-jrlgpo3w>Claude Code skill pack for LangChain 1.0 + LangGraph 1.0 (Python) - 34 skills covering chains, agents, RAG, middleware, checkpointing, HITL, streaming, and production patterns</p>
+          <div class="plugin-meta" data-astro-cid-jrlgpo3w>
+            <span data-astro-cid-jrlgpo3w>unknown</span>
+            <span data-astro-cid-jrlgpo3w>v2.5.0</span>
+          </div>
+        </div>
+        <a href="/plugins/langchain-py-pack/" class="btn-primary" data-astro-cid-jrlgpo3w>View Plugin</a>
+      </div>
+    </section>
+
+    <!-- 6. Installation -->
+    <section class="section-box dark" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Installation</h2>
+      <p class="install-note" style="color: var(--brand-light-gray); margin-bottom: 0.75rem;" data-astro-cid-jrlgpo3w>This skill is included in the langchain-py-pack plugin:</p>
+      <pre class="install-command" data-copy="/plugin install langchain-py-pack@claude-code-plugins-plus" data-astro-cid-jrlgpo3w><code data-astro-cid-jrlgpo3w>/plugin install langchain-py-pack@claude-code-plugins-plus</code></pre>
+      <p class="install-note" data-astro-cid-jrlgpo3w>Click to copy</p>
+    </section>
+
+    <!-- 7. Skill Content (Markdown) -->
+    <section class="skill-content-section" data-astro-cid-jrlgpo3w>
+      <h2 data-astro-cid-jrlgpo3w>Instructions</h2>
+      <div class="skill-content" data-astro-cid-jrlgpo3w>
+        <div data-astro-cid-jrlgpo3w><h1>LangChain SDK Patterns (Python)</h1>
+<h2>Overview</h2>
+<p><code>chain.batch(inputs)</code> in LangChain 1.0 does <strong>not</strong> parallelize by default. The <code>max_concurrency</code> parameter defaults to <strong>1</strong> in several provider packages (notably older <code>langchain-openai</code>), so a call like <code>chain.batch(inputs_1000)</code> runs 1,000 sequential round-trips — same wall-clock time as a <code>for</code> loop, plus the overhead of the batch machinery. Users file &quot;batch is slow&quot; tickets, benchmark it against asyncio, and move to a different framework — when the fix is two lines:</p>
+<pre data-lang="python"><code>
+# BAD — silently serializes (P08)
+chain.batch(inputs_1000)
+
+# GOOD — 10 in flight at once
+chain.batch(inputs_1000, config={&quot;max_concurrency&quot;: 10})
+</code></pre>
+<p>Then three more traps wait:</p>
+<ul>
+<li><strong>P07</strong> — <code>.with_fallbacks([backup])</code> defaults <code>exceptions_to_handle=(Exception,)</code>, and on Python &lt;3.12 that tuple includes <code>KeyboardInterrupt</code>. A <code>Ctrl+C</code> during a long run does not stop the process — it silently hands off to the fallback chain and keeps billing.</li>
+<li><strong>P57</strong> — <code>ChatPromptTemplate.from_messages(..., template_format=&quot;f-string&quot;)</code> (the default) parses every <code>{</code> in every string, including user input. A user who pastes <code>{&quot;error&quot;: &quot;...&quot;}</code> raises <code>KeyError: &#39;error&#39;</code> at invoke time.</li>
+<li><strong>P53</strong> — Pydantic v2 rejects extra fields by default; models cheerfully add <code>summary</code> or <code>confidence</code> to your <code>Plan</code> schema and <code>with_structured_output</code> crashes with <code>ValidationError: extra fields not permitted</code>.</li>
+</ul>
+<p>This skill walks through LCEL composition (<code>RunnableSequence</code>, <code>RunnableParallel</code>, <code>RunnableBranch</code>, <code>RunnablePassthrough</code>, <code>RunnableLambda</code>); the correct <code>exceptions_to_handle</code> whitelist per provider; <code>max_concurrency</code> tuning with safe ceilings (10 for most providers, 20+ with a semaphore); and prompt templates that survive untrusted input. Pin: <code>langchain-core 1.0.x</code>, <code>langchain-anthropic 1.0.x</code>, <code>langchain-openai 1.0.x</code>. Pain-catalog anchors: P07, P08, P53, P57.</p>
+<h2>Prerequisites</h2>
+<ul>
+<li>Python 3.10+ (3.12+ fixes the <code>KeyboardInterrupt</code> half of P07 — upgrade if you can)</li>
+<li><code>langchain-core &gt;= 1.0, &lt; 2.0</code></li>
+<li>At least one provider: <code>pip install langchain-anthropic langchain-openai</code></li>
+<li><code>pydantic &gt;= 2.0</code> for schema-aware composition</li>
+<li>Completed <code>langchain-model-inference</code> — the chat-model factory from that skill is reused here</li>
+</ul>
+<h2>Instructions</h2>
+<h3>Step 1 — Compose with typed runnables, not lambdas</h3>
+<pre data-lang="python"><code>
+from langchain_anthropic import ChatAnthropic
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.runnables import RunnableParallel, RunnablePassthrough
+
+llm = ChatAnthropic(model=&quot;claude-sonnet-4-6&quot;, timeout=30, max_retries=2)
+
+prompt = ChatPromptTemplate.from_messages(
+    [(&quot;system&quot;, &quot;You are a summarizer.&quot;), (&quot;human&quot;, &quot;{text}&quot;)],
+    template_format=&quot;jinja2&quot;,  # P57 — see Step 4
+)
+
+# Sequence: prompt -&gt; llm -&gt; str
+chain = prompt | llm | StrOutputParser()
+
+# Parallel: run two sub-chains and merge
+enriched = RunnableParallel(
+    summary=chain,
+    original=RunnablePassthrough(),
+)
+</code></pre>
+<p>The <code>|</code> operator creates a <code>RunnableSequence</code>. Each step has a declared input and output shape — swap a concrete model for a router and the type contract holds. See <a href="references/runnable-composition-matrix.md">Runnable Composition Matrix</a> for when to reach for <code>RunnableSequence</code> vs <code>RunnableParallel</code> vs <code>RunnableBranch</code> vs <code>RunnableLambda</code>, with input/output shape conventions for each.</p>
+<h3>Step 2 — Add fallbacks with a narrow exception whitelist</h3>
+<pre data-lang="python"><code>
+from anthropic import APIError, APITimeoutError, RateLimitError
+from langchain_openai import ChatOpenAI
+
+backup = ChatOpenAI(model=&quot;gpt-4o&quot;, timeout=30, max_retries=2)
+backup_chain = prompt | backup | StrOutputParser()
+
+# GOOD — only retry on transient provider errors
+resilient = chain.with_fallbacks(
+    [backup_chain],
+    exceptions_to_handle=(RateLimitError, APIError, APITimeoutError),
+)
+
+# BAD — default `(Exception,)` catches KeyboardInterrupt on Python &lt;3.12 (P07)
+# resilient_bad = chain.with_fallbacks([backup_chain])
+</code></pre>
+<p>The default <code>exceptions_to_handle=(Exception,)</code> on Python &lt;3.12 inherits <code>KeyboardInterrupt</code> and <code>SystemExit</code> into the caught set — which means a <code>Ctrl+C</code> during a long <code>.batch()</code> run falls through to the backup instead of stopping. Python 3.12+ moved these under <code>BaseException</code> directly, which fixes the inheritance path, but the default is still too broad: a Pydantic <code>ValidationError</code> or a <code>ToolException</code> will trigger a pointless backup call. See <a href="references/fallback-exception-list.md">Fallback Exception List</a> for the curated whitelist per provider with concrete imports.</p>
+<h3>Step 3 — Batch with explicit concurrency</h3>
+<pre data-lang="python"><code>
+import asyncio
+
+inputs = [{&quot;text&quot;: doc} for doc in documents]
+
+# Synchronous batch — blocks until done
+results = chain.batch(inputs, config={&quot;max_concurrency&quot;: 10})
+
+# Async batch — non-blocking
+results = await chain.abatch(inputs, config={&quot;max_concurrency&quot;: 10})
+</code></pre>
+<p>Safe ceilings: <strong>10</strong> for Anthropic and OpenAI at default tier; <strong>20+</strong> only behind an <code>asyncio.Semaphore</code> if you are also tracking rate-limit headers. Claude TPM/RPM limits vary by tier; OpenAI&#39;s TPD (tokens per day) is the binding limit at scale. See <a href="references/batch-concurrency-tuning.md">Batch Concurrency Tuning</a> for per-provider ceilings and the semaphore pattern.</p>
+<p><code>invoke</code> vs <code>batch</code> vs <code>stream</code> — when each is correct:</p>
+<table><thead><tr>
+<th>Method</th>
+<th>Input shape</th>
+<th>Concurrency</th>
+<th>Error behavior</th>
+<th>When to use</th>
+</tr></thead><tbody>
+<tr>
+<td><code>.invoke(x)</code></td>
+<td>Single</td>
+<td>1</td>
+<td>Raises on failure</td>
+<td>One-shot call, interactive, tests</td>
+</tr>
+<tr>
+<td><code>.batch(xs, config={&quot;max_concurrency&quot;: N})</code></td>
+<td>List</td>
+<td>N parallel</td>
+<td>Raises on first failure unless <code>return_exceptions=True</code></td>
+<td>Bulk sync workloads, ETL, eval harnesses</td>
+</tr>
+<tr>
+<td><code>.abatch(xs, config={&quot;max_concurrency&quot;: N})</code></td>
+<td>List</td>
+<td>N parallel (async)</td>
+<td>Same as <code>.batch</code></td>
+<td>Event loops, async web servers, LangGraph nodes</td>
+</tr>
+<tr>
+<td><code>.stream(x)</code></td>
+<td>Single</td>
+<td>1, chunked</td>
+<td>Raises on failure</td>
+<td>Interactive UI, live token display</td>
+</tr>
+<tr>
+<td><code>.astream(x)</code> / <code>.astream_events(x, version=&quot;v2&quot;)</code></td>
+<td>Single</td>
+<td>1, chunked (async)</td>
+<td>Raises on failure</td>
+<td>Async UIs, event-driven pipelines, token metering (see <code>langchain-model-inference</code>)</td>
+</tr>
+</tbody></table>
+<p>Pass <code>return_exceptions=True</code> in the config to keep a batch from aborting on the first failure — exceptions come back in the result list instead of raising.</p>
+<h3>Step 4 — Escape prompt templates for untrusted input</h3>
+<pre data-lang="python"><code>
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+
+# BAD — default f-string format crashes on literal `{` in user input (P57)
+bad = ChatPromptTemplate.from_messages(
+    [(&quot;system&quot;, &quot;Reply in JSON&quot;), (&quot;human&quot;, &quot;{user_text}&quot;)]
+)
+bad.invoke({&quot;user_text&quot;: &#39;{&quot;error&quot;: &quot;oops&quot;}&#39;})  # KeyError: &#39;error&#39;
+
+# GOOD — jinja2 treats `{...}` as literal, uses `{{ var }}` for substitution
+good = ChatPromptTemplate.from_messages(
+    [(&quot;system&quot;, &quot;Reply in JSON&quot;), (&quot;human&quot;, &quot;{{ user_text }}&quot;)],
+    template_format=&quot;jinja2&quot;,
+)
+good.invoke({&quot;user_text&quot;: &#39;{&quot;error&quot;: &quot;oops&quot;}&#39;})  # OK
+
+# MIXED — message history is a list, use MessagesPlaceholder
+with_history = ChatPromptTemplate.from_messages([
+    (&quot;system&quot;, &quot;You are a helpful assistant.&quot;),
+    MessagesPlaceholder(&quot;history&quot;),
+    (&quot;human&quot;, &quot;{{ question }}&quot;),
+], template_format=&quot;jinja2&quot;)
+</code></pre>
+<p>Rule of thumb: if any variable can contain user-provided free text (a paste, a transcript, a code block), use <code>template_format=&quot;jinja2&quot;</code>. The f-string format is fine for trusted template authors composing fixed instructions, but it is the wrong tool for user input. See <a href="references/prompt-template-escaping.md">Prompt Template Escaping</a> for the full brace-escaping rules and a <code>MessagesPlaceholder</code> reference.</p>
+<h3>Step 5 — Validate structured output with <code>extra=&quot;ignore&quot;</code></h3>
+<pre data-lang="python"><code>
+from pydantic import BaseModel, ConfigDict, Field
+
+class Plan(BaseModel):
+    # P53 — without this, the chain crashes when the model adds extra fields
+    model_config = ConfigDict(extra=&quot;ignore&quot;)
+    steps: list[str] = Field(default_factory=list)
+    estimated_minutes: int
+
+structured_chain = prompt | llm.with_structured_output(Plan, method=&quot;json_schema&quot;)
+</code></pre>
+<p>Pydantic v2 rejects unknown fields by default. Models trained on &quot;be helpful&quot; add <code>summary</code>, <code>confidence</code>, <code>rationale</code> — the schema crashes instead of dropping them. <code>extra=&quot;ignore&quot;</code> is the right default for model outputs.</p>
+<h2>Output</h2>
+<ul>
+<li><code>RunnableSequence</code> / <code>RunnableParallel</code> composition with declared input/output shapes</li>
+<li><code>.with_fallbacks(exceptions_to_handle=(...))</code> with a narrow, provider-specific whitelist</li>
+<li><code>.batch()</code> / <code>.abatch()</code> with explicit <code>max_concurrency</code> (10 default, 20+ behind semaphore)</li>
+<li><code>ChatPromptTemplate.from_messages(..., template_format=&quot;jinja2&quot;)</code> for any template touching user input</li>
+<li>Pydantic schemas with <code>ConfigDict(extra=&quot;ignore&quot;)</code> for structured output</li>
+<li>A clear <code>invoke</code> / <code>batch</code> / <code>abatch</code> / <code>stream</code> / <code>astream</code> decision matrix for each chain stage</li>
+</ul>
+<h2>Error Handling</h2>
+<table><thead><tr>
+<th>Error</th>
+<th>Cause</th>
+<th>Fix</th>
+</tr></thead><tbody>
+<tr>
+<td><code>Ctrl+C</code> does not stop a long <code>.batch()</code>; fallback keeps running</td>
+<td><code>exceptions_to_handle=(Exception,)</code> swallows <code>KeyboardInterrupt</code> on Python &lt;3.12 (P07)</td>
+<td>Pass a narrow tuple: <code>exceptions_to_handle=(RateLimitError, APIError, APITimeoutError)</code></td>
+</tr>
+<tr>
+<td><code>.batch(inputs)</code> takes same time as sequential loop</td>
+<td><code>max_concurrency</code> defaults to 1 (P08)</td>
+<td><code>config={&quot;max_concurrency&quot;: 10}</code>; raise to 20+ only with a semaphore</td>
+</tr>
+<tr>
+<td><code>KeyError: &#39;&lt;some-token&gt;&#39;</code> when invoking a <code>ChatPromptTemplate</code></td>
+<td>f-string parser reads user input&#39;s <code>{</code> as a variable (P57)</td>
+<td><code>template_format=&quot;jinja2&quot;</code>; escape literals as <code>{{</code>/<code>}}</code> in f-string mode</td>
+</tr>
+<tr>
+<td><code>ValidationError: extra fields not permitted</code> on structured output</td>
+<td>Pydantic v2 strict-by-default (P53)</td>
+<td><code>model_config = ConfigDict(extra=&quot;ignore&quot;)</code> on the schema</td>
+</tr>
+<tr>
+<td><code>ValidationError</code> caught by fallback and treated as transient</td>
+<td>Fallback whitelist too broad</td>
+<td>Remove <code>ValidationError</code> from <code>exceptions_to_handle</code> so it surfaces</td>
+</tr>
+<tr>
+<td><code>.batch</code> aborts on the first failure, losing all results</td>
+<td>Default raises on first error</td>
+<td>Pass <code>config={&quot;max_concurrency&quot;: 10, &quot;return_exceptions&quot;: True}</code> and filter</td>
+</tr>
+<tr>
+<td>Fallback chain never fires even on genuine <code>RateLimitError</code></td>
+<td>Provider&#39;s own <code>max_retries</code> consumes the error first</td>
+<td>Lower <code>max_retries=0</code> on the primary when a fallback chain is the retry strategy</td>
+</tr>
+</tbody></table>
+<h2>Examples</h2>
+<h3>Fan-out enrichment with RunnableParallel</h3>
+<p>A common pattern — given a document, produce a summary, extracted entities, and sentiment in parallel. <code>RunnableParallel</code> runs sub-chains concurrently and merges results into a dict. Combined with <code>.batch()</code> at the outer level, you get N documents times 3 sub-chains in flight up to <code>max_concurrency</code>.</p>
+<p>See <a href="references/runnable-composition-matrix.md">Runnable Composition Matrix</a> for the fan-out/fan-in pattern and the input/output shape of each runnable type.</p>
+<h3>Resilient chain with per-provider fallback</h3>
+<p>Primary: Claude Sonnet 4.6. Fallback: GPT-4o. Catch only <code>RateLimitError</code>, <code>APIError</code>, and <code>APITimeoutError</code> from each SDK — let <code>AuthenticationError</code> and <code>ValidationError</code> crash the process so they get debugged, not masked.</p>
+<p>See <a href="references/fallback-exception-list.md">Fallback Exception List</a> for the concrete imports per provider and a note on why <code>BadRequestError</code> should not be in the whitelist.</p>
+<h3>High-throughput batch with semaphore-bounded concurrency</h3>
+<p>At N &gt;= 20 concurrent in-flight calls, provider rate-limit headers become the bottleneck. Wrap <code>.abatch()</code> in an <code>asyncio.Semaphore</code> and honor the <code>retry-after</code> header on 429 responses.</p>
+<p>See <a href="references/batch-concurrency-tuning.md">Batch Concurrency Tuning</a> for the semaphore pattern and a table of provider TPM/RPM limits per tier.</p>
+<h3>Prompt template over user-pasted JSON payload</h3>
+<p>Support ticket triage where users paste arbitrary JSON from their app&#39;s error log. Without <code>template_format=&quot;jinja2&quot;</code>, every single ticket with a JSON body crashes the chain at template-render time.</p>
+<p>See <a href="references/prompt-template-escaping.md">Prompt Template Escaping</a> for the worked example and the <code>MessagesPlaceholder</code> pattern for chat history.</p>
+<h2>Resources</h2>
+<ul>
+<li><a href="https://python.langchain.com/docs/concepts/runnables/">LangChain Python: Runnable interface</a></li>
+<li><a href="https://python.langchain.com/docs/how_to/fallbacks/">LangChain Python: <code>with_fallbacks</code></a></li>
+<li><a href="https://python.langchain.com/docs/how_to/parallel/">LangChain Python: <code>batch</code> and <code>abatch</code></a></li>
+<li><a href="https://python.langchain.com/api_reference/core/prompts/langchain_core.prompts.chat.ChatPromptTemplate.html"><code>ChatPromptTemplate</code> reference</a></li>
+<li><a href="https://docs.pydantic.dev/latest/api/config/">Pydantic v2 <code>ConfigDict</code></a></li>
+<li><a href="https://blog.langchain.com/langchain-langgraph-1dot0/">LangChain 1.0 release notes</a></li>
+<li>Pack pain catalog: <code>docs/pain-catalog.md</code> (entries P07, P08, P53, P57)</li>
+</ul></div>
+      </div>
+    </section>
+
+    <!-- 8. Bottom CTA -->
+    <section class="detail-cta" data-astro-cid-qcigfm7x>
+  <h2 class="detail-cta__headline" data-astro-cid-qcigfm7x>Ready to use langchain-py-pack?</h2>
+  <div class="detail-cta__actions" data-astro-cid-qcigfm7x>
+    <button class="detail-cta__primary" data-copy-install="/plugin install langchain-py-pack@claude-code-plugins-plus" data-astro-cid-qcigfm7x>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" data-astro-cid-qcigfm7x>
+        <rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" stroke-width="1.5" data-astro-cid-qcigfm7x></rect>
+        <path d="M3 11V3a1 1 0 011-1h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" data-astro-cid-qcigfm7x></path>
+      </svg>
+      <span class="detail-cta__btn-text" data-astro-cid-qcigfm7x>Copy Install Command</span>
+    </button>
+    
+  </div>
+</section>
+
+<script type="module">document.querySelectorAll("[data-copy-install]").forEach(t=>{t.addEventListener("click",async()=>{const a=t.dataset.copyInstall||"";await navigator.clipboard.writeText(a);const e=t.querySelector(".detail-cta__btn-text");if(e){const o=e.textContent;e.textContent="Copied!",t.classList.add("copied"),window.trackEvent&&window.trackEvent("install_copied",{plugin_name:a.split(" ").pop()||"",source:"detail_cta"}),setTimeout(()=>{e.textContent=o,t.classList.remove("copied")},2e3)}})});</script>
+
+    <!-- 9. Related Skills (6, with tool pills) -->
+    <section class="related-skills-section" data-astro-cid-jrlgpo3w>
+        <h2 class="related-skills-heading" data-astro-cid-jrlgpo3w>Related Skills</h2>
+        <div class="related-skills-grid" data-astro-cid-jrlgpo3w>
+          <a href="/skills/abridge-ci-integration/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-ci-integration</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Configure CI/CD pipeline for Abridge clinical AI integrations with GitHub Actions.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-common-errors/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-common-errors</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Diagnose and fix common Abridge clinical AI integration errors.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-a/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-a</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge ambient clinical documentation capture-to-note pipeline.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-b/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-b</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge patient-facing documentation and after-visit summary generation.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-cost-tuning/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-cost-tuning</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Optimize Abridge clinical AI costs through tier selection, session management, and usage monitoring for healthcare organizations.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-debug-bundle/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-debug-bundle</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Collect Abridge debug evidence for support tickets and troubleshooting.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a>
+        </div>
+      </section>
+
+  </div>
+
+  
+  <script>
+    document.querySelectorAll('.install-command').forEach(el => {
+      el.addEventListener('click', function() {
+        const text = this.dataset.copy || this.textContent;
+        navigator.clipboard.writeText(text).then(() => {
+          const originalText = this.textContent;
+          this.textContent = 'Copied to clipboard!';
+          this.style.color = 'var(--brand-green)';
+          setTimeout(() => {
+            this.textContent = originalText;
+            this.style.color = '';
+          }, 2000);
+        });
+      });
+    });
+  </script>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

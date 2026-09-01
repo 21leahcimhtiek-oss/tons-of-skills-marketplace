@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitHub Release Workflow: When Yesterday&#39;s Updates Aren&#39;t Public (And How We Fixed It) — Tons of Skills Work Diary</title>
+    <meta name="description" content="A real-world walkthrough of diagnosing uncommitted changes, applying semantic versioning correctly, and executing a complete GitHub release workflow - including the mistake of using v2.1.0 instead of v2.1.1.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://startaitools.com/posts/github-release-workflow-when-yesterdays-updates-arent-public-and-how-we-fixed-it/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/github-release-workflow-uncommitted-changes-semantic-versioning/">
+    <meta property="og:title" content="GitHub Release Workflow: When Yesterday's Updates Aren't Public (And How We Fixed It) — Tons of Skills Work Diary">
+    <meta property="og:description" content="A real-world walkthrough of diagnosing uncommitted changes, applying semantic versioning correctly, and executing a complete GitHub release workflow - including the mistake of using v2.1.0 instead of v2.1.1.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="GitHub Release Workflow: When Yesterday's Updates Aren't Public (And How We Fixed It) — Tons of Skills Work Diary">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/github-release-workflow-uncommitted-changes-semantic-versioning/">
+    <meta name="twitter:title" content="GitHub Release Workflow: When Yesterday's Updates Aren't Public (And How We Fixed It) — Tons of Skills Work Diary">
+    <meta name="twitter:description" content="A real-world walkthrough of diagnosing uncommitted changes, applying semantic versioning correctly, and executing a complete GitHub release workflow - including the mistake of using v2.1.0 instead of v2.1.1.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"GitHub Release Workflow: When Yesterday's Updates Aren't Public (And How We Fixed It)","description":"A real-world walkthrough of diagnosing uncommitted changes, applying semantic versioning correctly, and executing a complete GitHub release workflow - including the mistake of using v2.1.0 instead of v2.1.1.","datePublished":"2025-10-03","url":"https://tonsofskills.com/blog/undefined","author":{"@type":"Person","name":"Jeremy Longshore"},"publisher":{"@type":"Organization","name":"Tons of Skills","url":"https://tonsofskills.com"}}</script>
+  
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.post-header[data-astro-cid-7jjqptxk]{background:var(--panel);padding:4rem 1.5rem 3rem;border-bottom:1px solid var(--border)}.post-header-inner[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto}.back-link[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3);text-decoration:none;display:inline-block;margin-bottom:1.5rem;transition:color .2s}.back-link[data-astro-cid-7jjqptxk]:hover{color:var(--primary)}.post-meta[data-astro-cid-7jjqptxk]{display:flex;align-items:center;gap:.75rem;margin-bottom:1rem}time[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3)}.featured-badge[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.2rem .6rem;background:#ce114126;color:var(--red);border-radius:0;font-weight:600;text-transform:uppercase;letter-spacing:.05em}.post-header[data-astro-cid-7jjqptxk] h1[data-astro-cid-7jjqptxk]{font-family:var(--font-body);font-size:clamp(1.5rem,4vw,2.2rem);font-weight:700;color:var(--text);line-height:1.25;margin-bottom:.75rem;letter-spacing:0}.post-desc[data-astro-cid-7jjqptxk]{color:var(--text-2);font-size:1.05rem;line-height:1.6;margin-bottom:1rem}.post-tags[data-astro-cid-7jjqptxk]{display:flex;gap:.4rem;flex-wrap:wrap}.tag[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.15rem .5rem;background:var(--surface-3);color:var(--text-3);border-radius:0}.post-body[data-astro-cid-7jjqptxk]{padding:3rem 1.5rem 4rem}.prose[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto;color:var(--text-2);line-height:1.8;font-size:1rem}.prose[data-astro-cid-7jjqptxk] h2{font-family:var(--font-body);font-size:1.5rem;font-weight:700;color:var(--text);margin:2.5rem 0 1rem;letter-spacing:0}.prose[data-astro-cid-7jjqptxk] h3{font-size:1.2rem;font-weight:600;color:var(--text);margin:2rem 0 .75rem}.prose[data-astro-cid-7jjqptxk] p{margin-bottom:1rem}.prose[data-astro-cid-7jjqptxk] ul,.prose[data-astro-cid-7jjqptxk] ol{margin:.5rem 0 1rem 1.5rem}.prose[data-astro-cid-7jjqptxk] li{margin-bottom:.35rem}.prose[data-astro-cid-7jjqptxk] strong{color:var(--text);font-weight:600}.prose[data-astro-cid-7jjqptxk] code{font-family:var(--font-mono);font-size:.88em;background:var(--surface-3);padding:.15em .35em;border-radius:0;color:var(--primary)}.prose[data-astro-cid-7jjqptxk] a{color:var(--primary);text-decoration:none}.prose[data-astro-cid-7jjqptxk] a:hover{text-decoration:underline}@media(max-width:768px){.post-header[data-astro-cid-7jjqptxk]{padding:3rem 1rem 2rem}.post-body[data-astro-cid-7jjqptxk]{padding:2rem 1rem 3rem}}
+</style></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  <article class="post" data-astro-cid-7jjqptxk>
+    <header class="post-header" data-astro-cid-7jjqptxk>
+      <div class="post-header-inner" data-astro-cid-7jjqptxk>
+        <a href="/blog" class="back-link" data-astro-cid-7jjqptxk>Back to Work Diary</a>
+        <div class="post-meta" data-astro-cid-7jjqptxk>
+          <time datetime="2025-10-03" data-astro-cid-7jjqptxk>October 2, 2025</time>
+          
+        </div>
+        <h1 data-astro-cid-7jjqptxk>GitHub Release Workflow: When Yesterday&#39;s Updates Aren&#39;t Public (And How We Fixed It)</h1>
+        <p class="post-desc" data-astro-cid-7jjqptxk>A real-world walkthrough of diagnosing uncommitted changes, applying semantic versioning correctly, and executing a complete GitHub release workflow - including the mistake of using v2.1.0 instead of v2.1.1.</p>
+        <div class="post-tags" data-astro-cid-7jjqptxk>
+          <span class="tag" data-astro-cid-7jjqptxk>github</span><span class="tag" data-astro-cid-7jjqptxk>release-management</span><span class="tag" data-astro-cid-7jjqptxk>version-control</span><span class="tag" data-astro-cid-7jjqptxk>git-workflow</span><span class="tag" data-astro-cid-7jjqptxk>semantic-versioning</span><span class="tag" data-astro-cid-7jjqptxk>ci-cd</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="post-body" data-astro-cid-7jjqptxk>
+      <div class="prose" data-astro-cid-7jjqptxk>
+        <h2 id="the-question-that-started-everything">The Question That Started Everything</h2>
+<p>“Can u make sure the updates for applied to the publix repo let me know if they did ir didnt then i will tell u ehag i need”</p>
+<p>It’s a straightforward question - are yesterday’s slash command fixes public? But the answer revealed a complete chain of uncommitted work sitting in a local branch, waiting to be released. This is the story of taking local improvements and turning them into a proper public release with semantic versioning.</p>
+<h2 id="the-investigation-whats-actually-committed">The Investigation: What’s Actually Committed?</h2>
+<p>First step: check the git status. Always start with git status.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">git</span><span style="color:#9ECBFF"> log</span><span style="color:#79B8FF"> --oneline</span><span style="color:#79B8FF"> --all</span><span style="color:#79B8FF"> -20</span></span></code></pre>
+<p>The output showed three commits:</p>
+<ul>
+<li><code>93f4278</code> - End-of-day savepoint v1.0.1</li>
+<li><code>c98ec0a</code> - End-of-day status report</li>
+<li><code>e48533f</code> - Initial repository setup v1.0.0</li>
+</ul>
+<p>But <code>git status</code> revealed a different story:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>Modified:</span></span>
+<span class="line"><span>  - 11 slash command files (all the blog-*.md commands)</span></span>
+<span class="line"><span>  - scripts/post_x_thread.py (enhanced tweet parsing)</span></span>
+<span class="line"><span>  - CHANGELOG.md, CLAUDE.md, VERSION</span></span>
+<span class="line"><span>  - Plus 8 new documentation files</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>Untracked:</span></span>
+<span class="line"><span>  - AUDIT_SUMMARY.md</span></span>
+<span class="line"><span>  - COMMANDS.md</span></span>
+<span class="line"><span>  - CONTENT-SYSTEMS-HANDOFF.md</span></span>
+<span class="line"><span>  - command-analytics.html</span></span>
+<span class="line"><span>  - And more...</span></span></code></pre>
+<p><strong>The reality</strong>: Yesterday’s X-Gen-System integration was done, tested, and working - but never committed or pushed. It existed only in the working directory.</p>
+<h2 id="what-we-actually-built-yesterday">What We Actually Built Yesterday</h2>
+<p>The uncommitted changes represented a major feature update:</p>
+<h3 id="x-gen-system-integration">X-Gen-System Integration</h3>
+<ul>
+<li>All 11 slash commands updated to use X-Gen-System for intelligent X/Twitter thread generation</li>
+<li>Character budgeting (280 chars with URL=23, emoji buffers)</li>
+<li>Proven hook patterns (counter-intuitive, mini-case, list-promise)</li>
+<li>A/B variant generation for engagement testing</li>
+<li>100% MCP schema compliance for automated API consumption</li>
+</ul>
+<h3 id="enhanced-tweet-parsing">Enhanced Tweet Parsing</h3>
+<p>The <code>post_x_thread.py</code> script got a complete overhaul:</p>
+<p><strong>Before</strong> (paragraph-based parsing):</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#6A737D"># Split by "---" to separate thread content</span></span>
+<span class="line"><span style="color:#E1E4E8">parts </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> content.split(</span><span style="color:#9ECBFF">'---'</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">thread_content </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> parts[</span><span style="color:#79B8FF">0</span><span style="color:#E1E4E8">].strip()</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Split by double newlines (paragraph breaks)</span></span>
+<span class="line"><span style="color:#E1E4E8">paragraphs </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> [p.strip() </span><span style="color:#F97583">for</span><span style="color:#E1E4E8"> p </span><span style="color:#F97583">in</span><span style="color:#E1E4E8"> thread_content.split(</span><span style="color:#9ECBFF">'</span><span style="color:#79B8FF">\n\n</span><span style="color:#9ECBFF">'</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">if</span><span style="color:#E1E4E8"> p.strip()]</span></span></code></pre>
+<p><strong>After</strong> (regex-based extraction):</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#6A737D"># Use regex to extract TWEET X/Y: sections properly</span></span>
+<span class="line"><span style="color:#F97583">import</span><span style="color:#E1E4E8"> re</span></span>
+<span class="line"><span style="color:#E1E4E8">tweet_pattern </span><span style="color:#F97583">=</span><span style="color:#F97583"> r</span><span style="color:#9ECBFF">'</span><span style="color:#DBEDFF">TWEET </span><span style="color:#79B8FF">(\d</span><span style="color:#F97583">+</span><span style="color:#79B8FF">)</span><span style="color:#DBEDFF">/</span><span style="color:#79B8FF">(\d</span><span style="color:#F97583">+</span><span style="color:#79B8FF">)</span><span style="color:#DBEDFF">:</span><span style="color:#79B8FF">\s</span><span style="color:#F97583">*</span><span style="color:#79B8FF">(.</span><span style="color:#F97583">*?</span><span style="color:#79B8FF">)</span><span style="color:#F97583">(?=</span><span style="color:#DBEDFF">TWEET </span><span style="color:#79B8FF">\d</span><span style="color:#F97583">+</span><span style="color:#DBEDFF">/</span><span style="color:#79B8FF">\d</span><span style="color:#F97583">+</span><span style="color:#DBEDFF">:</span><span style="color:#F97583">|</span><span style="color:#DBEDFF">===== CHARACTER COUNTS =====</span><span style="color:#F97583">|</span><span style="color:#79B8FF">$</span><span style="color:#F97583">)</span><span style="color:#9ECBFF">'</span></span>
+<span class="line"><span style="color:#E1E4E8">matches </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> re.findall(tweet_pattern, content, re.</span><span style="color:#79B8FF">DOTALL</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">for</span><span style="color:#E1E4E8"> match </span><span style="color:#F97583">in</span><span style="color:#E1E4E8"> matches:</span></span>
+<span class="line"><span style="color:#E1E4E8">    tweet_num, total_tweets, tweet_content </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> match</span></span>
+<span class="line"><span style="color:#E1E4E8">    clean_content </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> tweet_content.strip()</span></span>
+<span class="line"><span style="color:#E1E4E8">    tweets.append(clean_content)</span></span></code></pre>
+<p>This fixed a critical bug where tweets weren’t being properly extracted from X-Gen-System output.</p>
+<h3 id="documentation-suite">Documentation Suite</h3>
+<p>8 new documentation files:</p>
+<ul>
+<li><code>AUDIT_SUMMARY.md</code> - Repository health tracking</li>
+<li><code>COMMANDS.md</code> - Complete command reference</li>
+<li><code>command-analytics.html</code> - Interactive usage dashboard</li>
+<li><code>command-bible-complete.md</code> - Comprehensive guide</li>
+<li>And more…</li>
+</ul>
+<h2 id="the-release-process-step-by-step">The Release Process: Step by Step</h2>
+<h3 id="step-1-commit-everything">Step 1: Commit Everything</h3>
+<p>First, stage all the changes:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">git</span><span style="color:#9ECBFF"> add</span><span style="color:#79B8FF"> -A</span></span>
+<span class="line"><span style="color:#B392F0">git</span><span style="color:#9ECBFF"> status</span><span style="color:#79B8FF"> --short</span></span></code></pre>
+<p>24 files ready to commit. Now the commit message - this matters for changelog generation:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">git</span><span style="color:#9ECBFF"> commit</span><span style="color:#79B8FF"> -m</span><span style="color:#9ECBFF"> "feat: integrate X-Gen-System for intelligent X thread generation</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#9ECBFF">BREAKING CHANGE: X thread generation now uses X-Gen-System MCP integration</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#9ECBFF">## Major Improvements</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#9ECBFF">### X-Gen-System Integration</span></span>
+<span class="line"><span style="color:#9ECBFF">- All slash commands now use X-Gen-System for X thread generation</span></span>
+<span class="line"><span style="color:#9ECBFF">- Character budgeting with 280 char limits including numbering</span></span>
+<span class="line"><span style="color:#9ECBFF">- Proven hook patterns (counter-intuitive, mini-case, list-promise)</span></span>
+<span class="line"><span style="color:#9ECBFF">- A/B variant generation for engagement optimization</span></span>
+<span class="line"><span style="color:#9ECBFF">..."</span></span></code></pre>
+<p>The commit message follows <a href="https://www.conventionalcommits.org/">Conventional Commits</a>:</p>
+<ul>
+<li><code>feat:</code> prefix for new features</li>
+<li><code>BREAKING CHANGE:</code> footer for breaking changes</li>
+<li>Detailed description of what changed and why</li>
+</ul>
+<h3 id="step-2-push-to-remote">Step 2: Push to Remote</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">git</span><span style="color:#9ECBFF"> push</span><span style="color:#9ECBFF"> origin</span><span style="color:#9ECBFF"> chore/eod-2025-09-28</span></span></code></pre>
+<p>Branch pushed successfully. But this is just a feature branch - not yet public in <code>main</code>.</p>
+<h3 id="step-3-version-bump-the-first-mistake">Step 3: Version Bump (The First Mistake)</h3>
+<p>Check current version:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">cat</span><span style="color:#9ECBFF"> VERSION</span></span>
+<span class="line"><span style="color:#6A737D"># Output: 2.0.1</span></span></code></pre>
+<p>Looking at existing tags:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">git</span><span style="color:#9ECBFF"> tag</span><span style="color:#79B8FF"> -l</span></span>
+<span class="line"><span style="color:#6A737D"># v1.0.0</span></span>
+<span class="line"><span style="color:#6A737D"># v1.0.1</span></span>
+<span class="line"><span style="color:#6A737D"># v2.0.0</span></span></code></pre>
+<p>Wait - there’s already a v2.0.0? And v2.0.1 in the VERSION file?</p>
+<p>This is where semantic versioning gets critical:</p>
+<ul>
+<li><strong>Major</strong> (X.0.0): Breaking changes</li>
+<li><strong>Minor</strong> (x.X.0): New features, backward compatible</li>
+<li><strong>Patch</strong> (x.x.X): Bug fixes</li>
+</ul>
+<p>Our changes:</p>
+<ul>
+<li>✅ New features (X-Gen-System integration)</li>
+<li>✅ Bug fixes (tweet parsing)</li>
+<li>❌ Breaking changes? (noted in commit, but actually backward compatible)</li>
+</ul>
+<p><strong>My first decision</strong>: v2.1.0 (minor bump for new features)</p>
+<p>But the user corrected me: “it would br 2.1.1”</p>
+<p><strong>Why v2.1.1?</strong> Because there’s an unreleased v2.0.1 in the repo, so following chronological order:</p>
+<ul>
+<li>v2.0.0 → v2.0.1 → <strong>v2.1.1</strong> (next logical version)</li>
+</ul>
+<h3 id="step-4-update-changelog">Step 4: Update CHANGELOG</h3>
+<p>Good changelogs tell a story. Here’s what we added for v2.1.1:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="markdown"><code><span class="line"><span style="color:#79B8FF;font-weight:bold">## [</span><span style="color:#DBEDFF;text-decoration:underline">2.1.1</span><span style="color:#79B8FF;font-weight:bold">] - 2025-10-03</span></span>
+<span class="line"><span style="color:#79B8FF;font-weight:bold">### Added</span></span>
+<span class="line"><span style="color:#FFAB70">-</span><span style="color:#E1E4E8;font-weight:bold"> **Enhanced Documentation Suite**</span><span style="color:#E1E4E8">: 8 new docs files</span></span>
+<span class="line"><span style="color:#FFAB70">-</span><span style="color:#E1E4E8"> X-Gen-System integration across all 11 commands</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79B8FF;font-weight:bold">### Improved</span></span>
+<span class="line"><span style="color:#FFAB70">-</span><span style="color:#E1E4E8;font-weight:bold"> **Enhanced Tweet Parsing**</span><span style="color:#E1E4E8">: Regex-based extraction</span></span>
+<span class="line"><span style="color:#FFAB70">-</span><span style="color:#E1E4E8"> Session analysis optimization: 14 days → 24 hours fallback</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79B8FF;font-weight:bold">### Fixed</span></span>
+<span class="line"><span style="color:#FFAB70">-</span><span style="color:#E1E4E8"> Command execution issues with X-Gen-System</span></span>
+<span class="line"><span style="color:#FFAB70">-</span><span style="color:#E1E4E8"> Tweet formatting inconsistencies</span></span>
+<span class="line"><span style="color:#FFAB70">-</span><span style="color:#E1E4E8"> Character count validation</span></span></code></pre>
+<h3 id="step-5-merge-to-main-the-unrelated-histories-problem">Step 5: Merge to Main (The Unrelated Histories Problem)</h3>
+<p>Fetch main branch:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">git</span><span style="color:#9ECBFF"> fetch</span><span style="color:#9ECBFF"> origin</span><span style="color:#9ECBFF"> main:main</span></span></code></pre>
+<p>Try to merge:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">git</span><span style="color:#9ECBFF"> merge</span><span style="color:#9ECBFF"> chore/eod-2025-09-28</span><span style="color:#79B8FF"> --no-ff</span></span></code></pre>
+<p><strong>Error</strong>: “refusing to merge unrelated histories”</p>
+<p>This happens when branches have completely different commit histories. Solution:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">git</span><span style="color:#9ECBFF"> merge</span><span style="color:#9ECBFF"> chore/eod-2025-09-28</span><span style="color:#79B8FF"> --allow-unrelated-histories</span><span style="color:#79B8FF"> --no-ff</span></span></code></pre>
+<p><strong>Conflict</strong>: Two files had merge conflicts (<code>.gitignore</code> and <code>scripts/post_x_thread.py</code>)</p>
+<p><strong>Resolution</strong>: Accept the branch versions (they had the updates):</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">git</span><span style="color:#9ECBFF"> checkout</span><span style="color:#79B8FF"> --theirs</span><span style="color:#9ECBFF"> .gitignore</span><span style="color:#9ECBFF"> scripts/post_x_thread.py</span></span>
+<span class="line"><span style="color:#B392F0">git</span><span style="color:#9ECBFF"> add</span><span style="color:#9ECBFF"> .gitignore</span><span style="color:#9ECBFF"> scripts/post_x_thread.py</span></span>
+<span class="line"><span style="color:#B392F0">git</span><span style="color:#9ECBFF"> commit</span><span style="color:#79B8FF"> --no-edit</span></span></code></pre>
+<p>Merge complete. Push to main:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">git</span><span style="color:#9ECBFF"> push</span><span style="color:#9ECBFF"> origin</span><span style="color:#9ECBFF"> main</span></span></code></pre>
+<h3 id="step-6-create-release-the-version-number-mistake">Step 6: Create Release (The Version Number Mistake)</h3>
+<p>Create tag:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">git</span><span style="color:#9ECBFF"> tag</span><span style="color:#79B8FF"> -a</span><span style="color:#9ECBFF"> v2.1.0</span><span style="color:#79B8FF"> -m</span><span style="color:#9ECBFF"> "Release v2.1.0 - Complete X-Gen-System Integration..."</span></span>
+<span class="line"><span style="color:#B392F0">git</span><span style="color:#9ECBFF"> push</span><span style="color:#9ECBFF"> origin</span><span style="color:#9ECBFF"> v2.1.0</span></span></code></pre>
+<p>Create GitHub release:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">gh</span><span style="color:#9ECBFF"> release</span><span style="color:#9ECBFF"> create</span><span style="color:#9ECBFF"> v2.1.0</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --title</span><span style="color:#9ECBFF"> "v2.1.0 - Complete X-Gen-System Integration"</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --notes</span><span style="color:#9ECBFF"> "..."</span></span></code></pre>
+<p><strong>Success!</strong> Release published at: <a href="https://github.com/jeremylongshore/Content-Nuke-Claude/releases/tag/v2.1.0">https://github.com/jeremylongshore/Content-Nuke-Claude/releases/tag/v2.1.0</a></p>
+<p>But wait… the user corrected me again: <strong>“it would br 2.1.1”</strong></p>
+<p>Oh no. I used v2.1.0 but should have used v2.1.1 to follow the chronological version sequence.</p>
+<h3 id="step-7-fix-the-version-number">Step 7: Fix the Version Number</h3>
+<p>Delete wrong release and tag:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">gh</span><span style="color:#9ECBFF"> release</span><span style="color:#9ECBFF"> delete</span><span style="color:#9ECBFF"> v2.1.0</span><span style="color:#79B8FF"> --yes</span></span>
+<span class="line"><span style="color:#B392F0">git</span><span style="color:#9ECBFF"> tag</span><span style="color:#79B8FF"> -d</span><span style="color:#9ECBFF"> v2.1.0</span></span>
+<span class="line"><span style="color:#B392F0">git</span><span style="color:#9ECBFF"> push</span><span style="color:#9ECBFF"> origin</span><span style="color:#9ECBFF"> :refs/tags/v2.1.0</span></span></code></pre>
+<p>Update VERSION file and CHANGELOG:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#79B8FF">echo</span><span style="color:#9ECBFF"> "2.1.1"</span><span style="color:#F97583"> ></span><span style="color:#9ECBFF"> VERSION</span></span>
+<span class="line"><span style="color:#6A737D"># Edit CHANGELOG.md: s/2.1.0/2.1.1/</span></span>
+<span class="line"><span style="color:#B392F0">git</span><span style="color:#9ECBFF"> add</span><span style="color:#9ECBFF"> VERSION</span><span style="color:#9ECBFF"> CHANGELOG.md</span></span>
+<span class="line"><span style="color:#B392F0">git</span><span style="color:#9ECBFF"> commit</span><span style="color:#79B8FF"> -m</span><span style="color:#9ECBFF"> "chore: correct version to 2.1.1"</span></span>
+<span class="line"><span style="color:#B392F0">git</span><span style="color:#9ECBFF"> push</span><span style="color:#9ECBFF"> origin</span><span style="color:#9ECBFF"> main</span></span></code></pre>
+<p>Create correct release:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">git</span><span style="color:#9ECBFF"> tag</span><span style="color:#79B8FF"> -a</span><span style="color:#9ECBFF"> v2.1.1</span><span style="color:#79B8FF"> -m</span><span style="color:#9ECBFF"> "Release v2.1.1..."</span></span>
+<span class="line"><span style="color:#B392F0">git</span><span style="color:#9ECBFF"> push</span><span style="color:#9ECBFF"> origin</span><span style="color:#9ECBFF"> v2.1.1</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">gh</span><span style="color:#9ECBFF"> release</span><span style="color:#9ECBFF"> create</span><span style="color:#9ECBFF"> v2.1.1</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --title</span><span style="color:#9ECBFF"> "v2.1.1 - Complete X-Gen-System Integration"</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --notes</span><span style="color:#9ECBFF"> "..."</span></span></code></pre>
+<p><strong>Final verification</strong>:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">gh</span><span style="color:#9ECBFF"> release</span><span style="color:#9ECBFF"> view</span><span style="color:#9ECBFF"> v2.1.1</span><span style="color:#79B8FF"> --json</span><span style="color:#9ECBFF"> url,name,publishedAt</span></span>
+<span class="line"><span style="color:#6A737D"># ✅ Published successfully</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">git</span><span style="color:#9ECBFF"> tag</span><span style="color:#79B8FF"> -l</span><span style="color:#F97583"> |</span><span style="color:#B392F0"> sort</span><span style="color:#79B8FF"> -V</span></span>
+<span class="line"><span style="color:#6A737D"># v1.0.0</span></span>
+<span class="line"><span style="color:#6A737D"># v1.0.1</span></span>
+<span class="line"><span style="color:#6A737D"># v2.0.0</span></span>
+<span class="line"><span style="color:#6A737D"># v2.1.1  ✅ Correct version sequence</span></span></code></pre>
+<h2 id="what-i-learned">What I Learned</h2>
+<h3 id="1-always-check-git-status-first">1. Always Check Git Status First</h3>
+<p>Don’t assume work is committed just because it’s done. Always verify with <code>git status</code> before claiming something is public.</p>
+<h3 id="2-semantic-versioning-context-matters">2. Semantic Versioning Context Matters</h3>
+<p>Version numbers aren’t just about the changes in your current work - they need to follow the chronological sequence in the repository. If v2.0.1 exists (even unreleased), the next minor version is v2.1.1, not v2.1.0.</p>
+<h3 id="3-conventional-commits-pay-off">3. Conventional Commits Pay Off</h3>
+<p>Using <code>feat:</code>, <code>fix:</code>, and <code>BREAKING CHANGE:</code> in commit messages makes changelog generation much easier and communicates intent clearly.</p>
+<h3 id="4-merge-conflicts-are-opportunities">4. Merge Conflicts Are Opportunities</h3>
+<p>The <code>.gitignore</code> and <code>post_x_thread.py</code> conflicts revealed that the chore branch had the correct implementations. Conflicts force you to review what’s changing.</p>
+<h3 id="5-github-cli-is-powerful">5. GitHub CLI Is Powerful</h3>
+<p>The <code>gh</code> CLI made release management trivial:</p>
+<ul>
+<li><code>gh release create</code> - Create releases with notes</li>
+<li><code>gh release delete</code> - Clean up mistakes</li>
+<li><code>gh release view</code> - Verify publication</li>
+</ul>
+<h3 id="6-release-notes-should-tell-a-story">6. Release Notes Should Tell a Story</h3>
+<p>Don’t just list changes - explain what they mean:</p>
+<ul>
+<li>❌ “Updated 11 files”</li>
+<li>✅ “X-Gen-System integration across all 11 slash commands with character budgeting and proven hook patterns”</li>
+</ul>
+<h2 id="the-final-result">The Final Result</h2>
+<p><strong>Version v2.1.1 successfully published</strong> with:</p>
+<ul>
+<li>✅ All 24 files committed and pushed</li>
+<li>✅ Comprehensive changelog</li>
+<li>✅ Proper semantic version (2.1.1)</li>
+<li>✅ GitHub release with detailed notes</li>
+<li>✅ All tags in correct chronological order</li>
+</ul>
+<p><strong>Files changed</strong>: 24 files, +1,867 insertions, -148 deletions</p>
+<p>The X-Gen-System enhancements that were sitting uncommitted in a local branch yesterday are now public, versioned, and documented for the world to use.</p>
+<h2 id="practical-takeaways">Practical Takeaways</h2>
+<p>If you’re managing releases for your projects:</p>
+<ol>
+<li><strong>Check git status religiously</strong> - Don’t assume work is committed</li>
+<li><strong>Follow semantic versioning strictly</strong> - Context matters for version numbers</li>
+<li><strong>Use conventional commits</strong> - Makes changelog generation automatic</li>
+<li><strong>Handle merge conflicts carefully</strong> - They reveal important changes</li>
+<li><strong>Don’t be afraid to fix version mistakes</strong> - Delete and recreate if needed</li>
+<li><strong>Write detailed release notes</strong> - Future you will thank present you</li>
+<li><strong>Verify publication</strong> - Use <code>gh release view</code> to confirm</li>
+</ol>
+<p>The best debugging often starts with the simplest question: “Is it actually committed?” And sometimes the answer is a 24-file release workflow waiting to happen.</p>
+<h2 id="related-posts">Related Posts</h2>
+<ul>
+<li><a href="/blog/debugging-claude-code-slash-commands-silent-deployment-failures/">Debugging Claude Code Slash Commands: When Your Blog Automation Silently Fails</a> - Another git workflow debugging session</li>
+<li><a href="https://startaitools.com/posts/when-commands-dont-work-debugging-journey-through-automated-content-systems/">When Commands Don’t Work: A Debugging Journey Through Automated Content Systems</a> - Troubleshooting content automation</li>
+<li><a href="/blog/building-multi-brand-rss-validation-system-97-feeds-tested/">Building Multi-Brand RSS Validation System: Testing 97 Feeds, Learning Hard Lessons</a> - Real-world debugging patterns</li>
+</ul>
+      </div>
+    </div>
+  </article>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

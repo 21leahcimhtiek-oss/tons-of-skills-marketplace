@@ -1,0 +1,1249 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Incident Debugging Playbook | Production Playbooks</title>
+    <meta name="description" content="SEV-1/2/3/4 incident response protocols. Log analysis, root cause investigation (5 Whys, Fishbone), postmortem templates, and on-call procedures.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://tonsofskills.com/tons-of-skills-marketplace/playbooks/05-incident-debugging/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/playbooks/05-incident-debugging/">
+    <meta property="og:title" content="Incident Debugging Playbook | Production Playbooks">
+    <meta property="og:description" content="SEV-1/2/3/4 incident response protocols. Log analysis, root cause investigation (5 Whys, Fishbone), postmortem templates, and on-call procedures.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="Incident Debugging Playbook | Production Playbooks">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/playbooks/05-incident-debugging/">
+    <meta name="twitter:title" content="Incident Debugging Playbook | Production Playbooks">
+    <meta name="twitter:description" content="SEV-1/2/3/4 incident response protocols. Log analysis, root cause investigation (5 Whys, Fishbone), postmortem templates, and on-call procedures.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/_..-YgZcVYT.css"></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  <div class="playbook-page" data-astro-cid-hidutmah>
+    <header class="playbook-header" data-astro-cid-hidutmah>
+      <div class="container" data-astro-cid-hidutmah>
+        <nav class="breadcrumbs" aria-label="Breadcrumb" data-astro-cid-hidutmah>
+          <a href="/" data-astro-cid-hidutmah>Home</a>
+          <span class="breadcrumb-separator" data-astro-cid-hidutmah>/</span>
+          <a href="/playbooks" data-astro-cid-hidutmah>Playbooks</a>
+          <span class="breadcrumb-separator" data-astro-cid-hidutmah>/</span>
+          <span class="breadcrumb-current" data-astro-cid-hidutmah>Incident Debugging Playbook</span>
+        </nav>
+
+        <div class="playbook-hero" data-astro-cid-hidutmah>
+          <span class="category-badge" data-astro-cid-hidutmah>Operations</span>
+          <h1 class="playbook-title" data-astro-cid-hidutmah>Incident Debugging Playbook</h1>
+          <p class="playbook-description" data-astro-cid-hidutmah>SEV-1/2/3/4 incident response protocols. Log analysis, root cause investigation (5 Whys, Fishbone), postmortem templates, and on-call procedures.</p>
+          <div class="playbook-meta" data-astro-cid-hidutmah>
+            <span class="meta-item" data-astro-cid-hidutmah>~25 min read</span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="playbook-main" data-astro-cid-hidutmah>
+      <div class="container" data-astro-cid-hidutmah>
+        <div class="playbook-layout" data-astro-cid-hidutmah>
+          <aside class="toc-sidebar" id="toc-sidebar" data-astro-cid-hidutmah>
+            <div class="toc-sticky" data-astro-cid-hidutmah>
+              <h2 class="toc-title" data-astro-cid-hidutmah>Table of Contents</h2>
+              <nav class="toc-nav" id="toc-nav" aria-label="Section navigation" data-astro-cid-hidutmah>
+                <!-- Populated by script below -->
+              </nav>
+            </div>
+          </aside>
+
+          <article class="playbook-content" data-astro-cid-hidutmah>
+            
+  <p><strong>Production Playbook for DevOps and Plugin Maintainers</strong></p>
+<p>Debugging production incidents in multi-agent Claude Code workflows requires systematic approaches to log analysis, root cause identification, and rapid remediation. This playbook provides battle-tested debugging techniques, incident response workflows, postmortem templates, and real-world examples of common failure modes.</p>
+<h2>Incident Classification</h2>
+<h3>Severity Levels</h3>
+<table>
+<thead>
+<tr>
+<th>Severity</th>
+<th>Impact</th>
+<th>Response Time</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>SEV-1</strong></td>
+<td>Production down</td>
+<td>Immediate</td>
+<td>All agents failing, API completely offline</td>
+</tr>
+<tr>
+<td><strong>SEV-2</strong></td>
+<td>Major degradation</td>
+<td>15 minutes</td>
+<td>50%+ error rate, critical features broken</td>
+</tr>
+<tr>
+<td><strong>SEV-3</strong></td>
+<td>Minor degradation</td>
+<td>1 hour</td>
+<td>Intermittent failures, single plugin broken</td>
+</tr>
+<tr>
+<td><strong>SEV-4</strong></td>
+<td>Cosmetic issues</td>
+<td>24 hours</td>
+<td>UI bugs, non-critical warnings</td>
+</tr>
+</tbody>
+</table>
+<h3>Common Incident Types</h3>
+<pre><code class="language-typescript">enum IncidentType {
+  API_FAILURE = 'api_failure',           // Claude API unreachable
+  RATE_LIMIT = 'rate_limit',             // 429 errors from API
+  TIMEOUT = 'timeout',                    // Agent/tool timeouts
+  MEMORY_LEAK = 'memory_leak',           // Process memory exhaustion
+  PLUGIN_CRASH = 'plugin_crash',         // Plugin process died
+  DATA_CORRUPTION = 'data_corruption',   // Invalid data in DB/cache
+  PERFORMANCE = 'performance',           // Slow response times
+  AUTHENTICATION = 'authentication'      // Auth failures
+}
+
+interface Incident {
+id: string;
+severity: 'SEV-1' | 'SEV-2' | 'SEV-3' | 'SEV-4';
+type: IncidentType;
+startTime: number;
+affectedUsers: number;
+errorRate: number;
+description: string;
+}</code></pre>
+<hr>
+<h2>Initial Response Protocol</h2>
+<h3>First 5 Minutes (SEV-1/SEV-2)</h3>
+<p><strong>Step 1: Assess Impact</strong></p>
+<pre><code class="language-bash"># Check current error rate
+tail -n 1000 /var/log/claude-code.log | grep -c ERROR
+<h1 id="check-affected-users">Check affected users</h1>
+<p>grep “ERROR” /var/log/claude-code.log | awk ‘{print $5}’ | sort -u | wc -l</p>
+<h1 id="check-service-health">Check service health</h1>
+</code><p><code class="language-bash">curl <a href="http://localhost:3333/api/status">http://localhost:3333/api/status</a></code></p></pre><p></p>
+<p><strong>Step 2: Check Obvious Issues</strong></p>
+<pre><code class="language-typescript">// Quick health check script
+async function quickHealthCheck(): Promise&#x3C;{ healthy: boolean; issues: string[] }> {
+  const issues: string[] = [];
+<p>// 1. Check Claude API connectivity
+try {
+const response = await fetch(”, {
+method: ‘POST’,
+headers: { ‘x-api-key’: process.env.ANTHROPIC_API_KEY },
+body: JSON.stringify({ model: ‘claude-3-5-haiku-20241022’, messages: [{ role: ‘user’, content: ‘test’ }], max_tokens: 10 })
+});
+if (!response.ok) issues.push(‘Claude API unreachable’);
+} catch (error) {
+issues.push(‘Network connectivity issue’);
+}</p>
+<p>// 2. Check disk space
+const { stdout } = await execAsync(“df -h / | tail -1 | awk ‘{print $5}’ | sed ‘s/%//’”);
+if (parseInt(stdout) > 90) issues.push(‘Disk space critical’);</p>
+<p>// 3. Check memory
+const memUsage = process.memoryUsage();
+if (memUsage.heapUsed / memUsage.heapTotal > 0.9) issues.push(‘Memory exhaustion’);</p>
+</code><p><code class="language-typescript">return { healthy: issues.length === 0, issues };
+}</code></p></pre><p></p>
+<p><strong>Step 3: Stabilize (if possible)</strong></p>
+<pre><code class="language-bash"># Restart failed services
+systemctl restart claude-code-daemon
+pm2 restart all
+<h1 id="clear-cache-if-corrupted">Clear cache if corrupted</h1>
+<p>redis-cli FLUSHALL</p>
+<h1 id="rate-limit-protection">Rate limit protection</h1>
+</code><p><code class="language-bash">iptables -A INPUT -p tcp —dport 80 -m limit —limit 25/minute —limit-burst 100 -j ACCEPT</code></p></pre><p></p>
+<h3>Communication Template</h3>
+<pre><code class="language-markdown"># Incident Alert: [TITLE]
+
+<strong>Severity</strong>: SEV-2
+<strong>Status</strong>: Investigating
+<strong>Started</strong>: 2025-12-24 14:35 UTC
+<strong>Affected</strong>: ~1,200 users (15% of total)
+
+<h2>Current Impact</h2>
+<ul>
+<li>Agent execution failing with 429 errors</li>
+<li>Error rate: 68% (normal: &#x3C;1%)</li>
+<li>No data loss</li>
+</ul>
+
+<h2>Actions Taken</h2>
+<ul>
+<li>✅ Identified rate limit exhaustion (14:40)</li>
+<li>✅ Implemented emergency rate limiting (14:42)</li>
+<li>🔄 Monitoring recovery (14:45)</li>
+</ul>
+
+<h2>Next Update</h2>
+In 15 minutes or when resolved.</code></pre>
+<hr>
+<h2>Common Failure Modes</h2>
+<h3>1. Rate Limit Exhaustion</h3>
+<p><strong>Symptoms</strong>:</p>
+<p>\`\`<code></code></p><code>
+<p>Error 429: Rate limit exceeded</p>
+<p>anthropic-ratelimit-requests-remaining: 0</p>
+<p>anthropic-ratelimit-requests-reset: 2025-12-24T15:00:00Z</p>
+<code>\`</code>
+<p><strong>Diagnosis</strong>:</p>
+<pre><code class="language-typescript">async function diagnoseRateLimits(): Promise<void> {
+  // Check recent API calls
+  const recentCalls = await queryLogs('SELECT COUNT(*) FROM api_calls WHERE timestamp > NOW() - INTERVAL 1 MINUTE');
+  console.log(`API calls in last minute: ${recentCalls}`);
+</void></code><p><code class="language-typescript">// Check rate limit headers from last successful call
+const lastHeaders = await getLastAPIHeaders();
+console.log(‘Remaining requests:’, lastHeaders[‘anthropic-ratelimit-requests-remaining’]);
+console.log(‘Reset time:’, lastHeaders[‘anthropic-ratelimit-requests-reset’]);
+}</code></p></pre><p></p>
+<p><strong>Fix</strong>:</p>
+<pre><code class="language-typescript">// Implement token bucket rate limiter
+class EmergencyRateLimiter {
+  private tokens = 50; // Match API tier
+  private lastRefill = Date.now();
+<p>async throttle(): Promise<void> {
+this.refill();
+while (this.tokens &#x3C; 1) {
+await sleep(100);
+this.refill();
+}
+this.tokens—;
+}</void></p>
+</code><p><code class="language-typescript">private refill() {
+const now = Date.now();
+const elapsed = (now - this.lastRefill) / 1000;
+const tokensToAdd = elapsed * (50 / 60); // 50 per minute
+this.tokens = Math.min(50, this.tokens + tokensToAdd);
+this.lastRefill = now;
+}
+}</code></p></pre><p></p>
+<h3>2. Agent Timeout</h3>
+<p><strong>Symptoms</strong>:</p>
+<code>\`</code>
+<p>Error: Agent execution timed out after 300000ms</p>
+<p>Task: code-review</p>
+<p>Conversation: abc-123-def</p>
+<code>\`</code>
+<p><strong>Diagnosis</strong>:</p>
+<pre><code class="language-bash"># Check for hung processes
+ps aux | grep claude | grep -v grep
+<h1 id="check-system-load">Check system load</h1>
+<p>uptime</p>
+<h1 id="output-load-average-125-83-52-cpu-overload">Output: load average: 12.5, 8.3, 5.2 (CPU overload!)</h1>
+<h1 id="check-for-blocking-io">Check for blocking I/O</h1>
+</code><p><code class="language-bash">iotop -o -d 5</code></p></pre><p></p>
+<p><strong>Fix</strong>:</p>
+<pre><code class="language-typescript">// Implement aggressive timeouts
+class TimeoutManager {
+  async executeWithTimeout<t>(
+    fn: () => Promise<t>,
+    timeoutMs: number
+  ): Promise<t> {
+    return Promise.race([
+      fn(),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error(`Timeout after ${timeoutMs}ms`)), timeoutMs)
+      )
+    ]);
+  }
+}
+</never></t></t></t></code><p><code class="language-typescript">// Usage
+const timeout = new TimeoutManager();
+const result = await timeout.executeWithTimeout(
+() => agent.execute(task),
+30000 // 30 second hard limit
+);</code></p></pre><p></p>
+<h3>3. Memory Leak</h3>
+<p><strong>Symptoms</strong>:</p>
+<pre><code class="language-bash"># Memory usage climbing over time
+free -m
+#              total   used   free
+# Mem:         16384  15892    492  # Critical!
+<h1 id="process-memory">Process memory</h1>
+<p>ps aux —sort=-%mem | head -5</p>
+</code><h1 id="claude-daemon-82gb-"><code class="language-bash">claude-daemon: 8.2GB (!)</code></h1></pre>
+<p><strong>Diagnosis</strong>:</p>
+<pre><code class="language-typescript">// Track memory usage over time
+setInterval(() => {
+  const usage = process.memoryUsage();
+  console.log(JSON.stringify({
+    timestamp: Date.now(),
+    heapUsed: usage.heapUsed / 1024 / 1024, // MB
+    heapTotal: usage.heapTotal / 1024 / 1024,
+    external: usage.external / 1024 / 1024,
+    rss: usage.rss / 1024 / 1024
+  }));
+</code><p><code class="language-typescript">// Trigger GC if usage > 80%
+if (usage.heapUsed / usage.heapTotal > 0.8) {
+global.gc(); // Requires —expose-gc flag
+}
+}, 60000); // Every minute</code></p></pre><p></p>
+<p><strong>Common Causes</strong>:</p>
+<pre><code class="language-typescript">// ❌ Leak: Global cache never cleared
+const cache = new Map<string, any="">();
+function addToCache(key: string, value: any) {
+  cache.set(key, value); // Grows forever!
+}
+</string,></code><p><code class="language-typescript">// ✅ Fix: LRU cache with size limit
+import LRU from ‘lru-cache’;
+const cache = new LRU&#x3C;string, any>({ max: 1000 });</code></p></pre><p></p>
+<h3>4. Plugin Crash Loop</h3>
+<p><strong>Symptoms</strong>:</p>
+<pre><code class="language-bash"># PM2 showing rapid restarts
+pm2 status
+# plugin-server | errored | 47 restarts in 2 minutes
+<h1 id="logs-show-crash">Logs show crash</h1>
+<p>tail -f /var/log/pm2/plugin-server-error.log</p>
+<h1 id="error-econnrefused-1270015432">Error: ECONNREFUSED 127.0.0.1:5432</h1>
+</code><h1 id="postgresql-connection-failed"><code class="language-bash">(PostgreSQL connection failed)</code></h1></pre>
+<p><strong>Diagnosis</strong>:</p>
+<pre><code class="language-bash"># Check dependencies
+docker ps | grep postgres
+# (empty - PostgreSQL container not running!)
+<h1 id="check-network">Check network</h1>
+<p>netstat -tulpn | grep 5432</p>
+</code><h1 id="no-listener-on-port-5432"><code class="language-bash">(no listener on port 5432)</code></h1></pre>
+<p><strong>Fix</strong>:</p>
+<pre><code class="language-bash"># Restart dependency
+docker-compose up -d postgres
+<h1 id="verify-connectivity">Verify connectivity</h1>
+<p>psql -h localhost -U user -d database -c “SELECT 1”</p>
+<h1 id="restart-plugin">Restart plugin</h1>
+</code><p><code class="language-bash">pm2 restart plugin-server</code></p></pre><p></p>
+<hr>
+<h2>Debugging Techniques</h2>
+<h3>1. Binary Search Debugging</h3>
+<p><strong>Problem</strong>: Unknown change broke production</p>
+<pre><code class="language-bash"># Use git bisect to find breaking commit
+git bisect start
+git bisect bad HEAD              # Current version is broken
+git bisect good v1.2.0           # Last known good version
+
+# Git will check out commits for testing
+# Test each commit:
+npm install &#x26;&#x26; npm run build &#x26;&#x26; npm test
+
+# Mark results
+git bisect good   # if tests pass
+git bisect bad    # if tests fail
+
+# Git will find the exact breaking commit</code></pre>
+<h3>2. Correlation Analysis</h3>
+<p><strong>Find patterns in failures</strong>:</p>
+<pre><code class="language-typescript">interface FailureEvent {
+  timestamp: number;
+  errorType: string;
+  userId?: string;
+  pluginName?: string;
+  duration: number;
+}
+<p>function analyzeFailureCorrelations(failures: FailureEvent[]): void {
+// Group by time windows
+const byHour = groupBy(failures, f => Math.floor(f.timestamp / 3600000));</p>
+<p>// Find spike times
+const spikes = Object.entries(byHour)
+.filter(([_, events]) => events.length > 100)
+.map(([hour, events]) => ({
+hour: new Date(parseInt(hour) * 3600000),
+count: events.length,
+topError: mode(events.map(e => e.errorType))
+}));</p>
+<p>console.log(‘Failure spikes:’, spikes);</p>
+<p>// Find common attributes
+const byPlugin = groupBy(failures, f => f.pluginName);
+const suspiciousPlugin = Object.entries(byPlugin)
+.sort((a, b) => b[1].length - a[1].length)[0];</p>
+</code><p><code class="language-typescript">console.log(<code>Most failures from plugin: ${suspiciousPlugin[0]} (${suspiciousPlugin[1].length} errors)</code>);
+}</code></p></pre><p></p>
+<h3>3. Distributed Tracing</h3>
+<p><strong>Track request across services</strong>:</p>
+<pre><code class="language-typescript">import { trace, context, SpanStatusCode } from '@opentelemetry/api';
+<p>const tracer = trace.getTracer(‘claude-code’);</p>
+<p>async function executeAgent(agentName: string, task: any): Promise<any> {
+const span = tracer.startSpan(‘agent.execute’, {
+attributes: {
+‘agent.name’: agentName,
+‘task.id’: task.id
+}
+});</any></p>
+<p>try {
+// Execute agent logic
+const result = await agent.run(task);</p>
+<p>span.setStatus({ code: SpanStatusCode.OK });
+span.setAttribute(‘result.success’, true);</p>
+</code><p><code class="language-typescript">return result;
+} catch (error) {
+span.setStatus({
+code: SpanStatusCode.ERROR,
+message: error.message
+});
+span.recordException(error);
+throw error;
+} finally {
+span.end();
+}
+}</code></p></pre><p></p>
+<hr>
+<h2>Log Analysis</h2>
+<h3>Parsing Claude Code Logs</h3>
+<p><strong>Log Format</strong>:</p>
+<code>\`</code>
+<p>[2025-12-24T14:35:22.123Z] [ERROR] [agent:code-review] Rate limit exceeded</p>
+<p>conversationId: abc-123-def</p>
+<p>userId: user-456</p>
+<p>errorCode: 429</p>
+<p>retryAfter: 12</p>
+<p>stack: Error: Rate limit exceeded</p>
+<p>at callClaude (/app/src/api.ts:45:11)</p>
+<code>\`</code>
+<p><strong>Analysis Script</strong>:</p>
+<pre><code class="language-typescript">import { readFileSync } from 'fs';
+<p>interface LogEntry {
+timestamp: Date;
+level: ‘ERROR’ | ‘WARN’ | ‘INFO’;
+component: string;
+message: string;
+metadata: Record&#x3C;string, any>;
+}</p>
+<p>function parseLog(line: string): LogEntry | null {
+const match = line.match(/[(.<em>?)] [(.</em>?)] [(.<em>?)] (.</em>)/);
+if (!match) return null;</p>
+<p>const [, timestamp, level, component, rest] = match;
+const lines = rest.split(‘\n’);
+const message = lines[0];</p>
+<p>// Parse metadata
+const metadata: Record&#x3C;string, any> = {};
+for (const line of lines.slice(1)) {
+const metaMatch = line.match(/^\s*(\w+): (.+)$/);
+if (metaMatch) {
+const [, key, value] = metaMatch;
+metadata[key] = value;
+}
+}</p>
+<p>return {
+timestamp: new Date(timestamp),
+level: level as any,
+component,
+message,
+metadata
+};
+}</p>
+<p>function analyzeLogs(logPath: string): void {
+const content = readFileSync(logPath, ‘utf-8’);
+const logs = content.split(‘\n’)
+.map(parseLog)
+.filter(Boolean) as LogEntry[];</p>
+<p>// Error rate by component
+const errorsByComponent = groupBy(
+logs.filter(l => l.level === ‘ERROR’),
+l => l.component
+);</p>
+<p>console.log(‘Errors by component:’);
+Object.entries(errorsByComponent)
+.sort((a, b) => b[1].length - a[1].length)
+.forEach(([component, errors]) => {
+console.log(<code>${component}: ${errors.length}</code>);
+});</p>
+<p>// Recent errors (last 5 minutes)
+const recentErrors = logs.filter(l =>
+l.level === ‘ERROR’ &#x26;&#x26;
+Date.now() - l.timestamp.getTime() &#x3C; 300000
+);</p>
+</code><p><code class="language-typescript">console.log(<code>\nRecent errors: ${recentErrors.length}</code>);
+recentErrors.slice(0, 10).forEach(err => {
+console.log(<code>${err.timestamp.toISOString()} - ${err.message}</code>);
+});
+}</code></p></pre><p></p>
+<h3>Using Analytics Daemon</h3>
+<pre><code class="language-typescript">// Query analytics daemon for incident patterns
+const ws = new WebSocket('ws://localhost:3456');
+
+ws.onmessage = (event) => {
+const data = JSON.parse(event.data);
+
+// Track rate limit warnings
+if (data.type === 'rate_limit.warning') {
+console.warn(`⚠️ Rate limit approaching: ${data.current}/${data.limit}`);
+}
+
+// Track errors
+if (data.type === 'llm.call' &#x26;&#x26; data.error) {
+console.error(`❌ LLM call failed: ${data.error}`);
+}
+};
+
+// Query historical data
+const response = await fetch('http://localhost:3333/api/sessions');
+const sessions = await response.json();
+const failedSessions = sessions.filter(s => s.errorCount > 0);
+
+console.log(`Failed sessions: ${failedSessions.length}/${sessions.length}`);</code></pre>
+<hr>
+<h2>Root Cause Analysis</h2>
+<h3>The 5 Whys Method</h3>
+<p><strong>Example: Agent Timeout Incident</strong></p>
+<ul>
+<li><strong>Why did the agent timeout?</strong></li>
+</ul>
+<p>→ Because it took > 300 seconds to respond</p>
+<ul>
+<li><strong>Why did it take so long?</strong></li>
+</ul>
+<p>→ Because the Claude API call was slow (280s)</p>
+<ul>
+<li><strong>Why was the API call slow?</strong></li>
+</ul>
+<p>→ Because we sent a 50,000 token prompt</p>
+<ul>
+<li><strong>Why did we send such a large prompt?</strong></li>
+</ul>
+<p>→ Because the code-reviewer agent included entire codebase in context</p>
+<ul>
+<li><strong>Why did it include the entire codebase?</strong></li>
+</ul>
+</code><p><code>→ <strong>Root Cause</strong>: File globbing pattern </code>**/*<code> matched all files including node_modules (500MB)</code></p><code>
+<p><strong>Fix</strong>: Update file globbing to exclude node_modules</p>
+<pre><code class="language-typescript">// Before: includes everything
+const files = glob.sync('**/*');
+</code><p><code class="language-typescript">// After: exclude dependencies
+const files = glob.sync(’<strong>/*’, {
+ignore: [‘node_modules/<strong>’, ‘.git/</strong>’, ‘dist/</strong>’]
+});</code></p></pre><p></p>
+<h3>Fishbone Diagram (Ishikawa)</h3>
+<pre><code class="language-typescript">interface RootCauseAnalysis {
+  problem: string;
+  categories: {
+    people?: string[];
+    process?: string[];
+    technology?: string[];
+    environment?: string[];
+  };
+  rootCause: string;
+  fix: string;
+}
+
+const analysis: RootCauseAnalysis = {
+problem: 'Agent timeout causing 68% error rate',
+categories: {
+people: [
+'Developer added file globbing without testing',
+'No code review caught the issue'
+],
+process: [
+'No integration tests for large codebases',
+'No performance testing in CI/CD'
+],
+technology: [
+'Glob pattern included node_modules (500MB)',
+'No size limit on prompts',
+'No timeout on file reading'
+],
+environment: [
+'Production codebase larger than test repos',
+'No staging environment for testing'
+]
+},
+rootCause: 'Missing file size validation and glob pattern filtering',
+fix: 'Add file exclusion patterns and max prompt size validation'
+};</code></pre>
+<hr>
+<h2>Recovery Procedures</h2>
+<h3>Emergency Rollback</h3>
+<pre><code class="language-bash"># Immediate rollback to last known good version
+git log --oneline | head -5
+# c534df4 (HEAD) feat: Add new feature (BROKEN)
+# 3946b1f docs: Update README
+# fc73caa (tag: v1.2.0) fix: Bug fix (LAST GOOD)
+
+# Rollback
+git reset --hard fc73caa
+npm install
+npm run build
+pm2 restart all
+
+# Deploy
+./deploy.sh production
+
+# Verify
+curl http://api.example.com/health</code></pre>
+<h3>Circuit Breaker Reset</h3>
+<pre><code class="language-typescript">// Manually reset circuit breaker after fixing issue
+class CircuitBreakerManager {
+  private breakers = new Map<string, circuitbreaker="">();
+
+reset(serviceName: string): void {
+const breaker = this.breakers.get(serviceName);
+if (breaker) {
+breaker.state = 'closed';
+breaker.failures = 0;
+console.log(`✓ Reset circuit breaker for ${serviceName}`);
+}
+}
+
+resetAll(): void {
+for (const [service, breaker] of this.breakers) {
+this.reset(service);
+}
+console.log('✓ Reset all circuit breakers');
+}
+}</string,></code></pre>
+<h3>Data Recovery</h3>
+<pre><code class="language-bash"># Recover from backup
+BACKUP_DATE="2025-12-24-14:00"
+
+# Stop services
+pm2 stop all
+
+# Restore database
+pg_restore -d database_prod backups/backup_${BACKUP_DATE}.sql
+
+# Restore files
+rsync -av backups/files_${BACKUP_DATE}/ /var/lib/claude-code/
+
+# Restart
+pm2 restart all
+
+# Verify data integrity
+psql -d database_prod -c "SELECT COUNT(*) FROM conversations"</code></pre>
+<hr>
+<h2>Postmortem Templates</h2>
+<h3>Incident Postmortem</h3>
+</code><pre><code><code class="language-markdown"># Postmortem: Agent Timeout Incident (2025-12-24)
+
+<strong>Date</strong>: 2025-12-24
+<strong>Duration</strong>: 14:35 - 15:15 UTC (40 minutes)
+<strong>Severity</strong>: SEV-2
+<strong>Impact</strong>: 1,200 users (15%), 68% error rate
+
+<h2>Summary</h2>
+Code-reviewer agent began timing out due to excessive file inclusion in prompts, causing 68% error rate for 40 minutes.
+
+<h2>Timeline (UTC)</h2>
+<ul>
+<li><strong>14:35</strong> - First timeout alerts</li>
+<li><strong>14:40</strong> - Error rate reaches 68%</li>
+<li><strong>14:42</strong> - On-call engineer paged</li>
+<li><strong>14:45</strong> - Root cause identified (file globbing)</li>
+<li><strong>14:50</strong> - Fix deployed to staging</li>
+<li><strong>14:55</strong> - Fix deployed to production</li>
+<li><strong>15:00</strong> - Error rate drops to 5%</li>
+<li><strong>15:15</strong> - Incident resolved, error rate &#x3C; 1%</li>
+</ul>
+
+<h2>Root Cause</h2>
+File globbing pattern </code>**/*<code> included </code>node_modules/</code> directory (500MB), creating prompts exceeding Claude API's context limits and causing timeouts.
+
+<h2>Contributing Factors</h2>
+<ul>
+<li>No file size validation before prompt construction</li>
+<li>No integration tests with large codebases</li>
+<li>No staging environment for testing</li>
+</ul>
+
+<h2>What Went Well</h2>
+<ul>
+<li>Fast root cause identification (10 minutes)</li>
+<li>Effective rollback procedure</li>
+<li>Clear communication to affected users</li>
+</ul>
+
+<h2>What Went Poorly</h2>
+<ul>
+<li>No monitoring alerts before user reports</li>
+<li>No prompt size limits prevented the issue</li>
+<li>Fix took 20 minutes to deploy</li>
+</ul>
+
+<h2>Action Items</h2>
+<ul>
+<li>[ ] <strong>P0</strong>: Add file size validation (Owner: @dev, Due: 2025-12-25)</li>
+<li>[ ] <strong>P0</strong>: Implement max prompt size limit (Owner: @dev, Due: 2025-12-25)</li>
+<li>[ ] <strong>P1</strong>: Add monitoring for agent timeouts (Owner: @ops, Due: 2025-12-27)</li>
+<li>[ ] <strong>P1</strong>: Create staging environment (Owner: @ops, Due: 2025-12-30)</li>
+<li>[ ] <strong>P2</strong>: Add integration tests with large repos (Owner: @qa, Due: 2026-01-05)</li>
+</ul>
+
+<h2>Lessons Learned</h2>
+<ul>
+<li>File operations need size limits</li>
+<li>Production testing with realistic data is critical</li>
+<li>Monitoring must detect issues before users report them</li></ul></pre>
+
+<hr>
+<h2>Best Practices</h2>
+<h3>DO ✅</h3>
+<ul>
+<li><strong>Log structured data</strong></li>
+</ul>
+   <pre><code class="language-typescript">// ✅ Structured logging
+   logger.error('Agent execution failed', {
+     agentName: 'code-reviewer',
+     conversationId: 'abc-123',
+     errorCode: 429,
+     duration: 1234
+   });
+</code><p><code class="language-typescript">// ❌ Unstructured
+console.log(‘Error in code-reviewer agent’);</code></p></pre><p></p>
+<ul>
+<li><strong>Set up alerts before incidents</strong></li>
+</ul>
+   <pre><code class="language-typescript">// Alert on error rate > 5%
+   if (errorRate > 0.05) {
+     pagerDuty.trigger({
+       severity: 'critical',
+       title: 'High error rate detected',
+       details: `Error rate: ${(errorRate * 100).toFixed(1)}%`
+     });
+   }</code></pre>
+<ul>
+<li><strong>Keep runbooks updated</strong></li>
+</ul>
+   <pre><code class="language-markdown"># Agent Timeout Runbook
+</code><ol><code class="language-markdown">
+<li>Check logs: <code>tail -f /var/log/claude-code.log | grep TIMEOUT</code></li>
+<li>Identify pattern: Which agents are timing out?</li>
+</code><li><code class="language-markdown">Check system resources: <code>top, free -m</code>, </code>df -h`</li>
+<li>If rate limits: Implement emergency throttling</li>
+<li>If resource exhaustion: Restart services</li></ol></pre>
+
+<ul>
+<li><strong>Test recovery procedures</strong></li>
+</ul>
+   <pre><code class="language-bash"># Monthly disaster recovery drill
+   ./test-recovery.sh
+   # 1. Trigger circuit breaker
+   # 2. Verify monitoring alerts
+   # 3. Execute rollback
+   # 4. Verify service restoration</code></pre>
+<h3>DON'T ❌</h3>
+<ul>
+<li><strong>Don't skip postmortems</strong></li>
+</ul>
+   <pre><code class="language-typescript">// ❌ Mark as resolved without learning
+   incident.status = 'resolved';
+</code><p><code class="language-typescript">// ✅ Document and learn
+incident.status = ‘resolved’;
+await createPostmortem(incident);
+await scheduleReview(incident);</code></p></pre><p></p>
+<ul>
+<li><strong>Don't blame individuals</strong></li>
+</ul>
+   <pre><code class="language-markdown"># ❌ Blame-focused
+   Root cause: Developer X wrote bad code
+<h1 id="-system-focused">✅ System-focused</h1>
+</code><p><code class="language-markdown">Root cause: Missing code review process for file operations</code></p></pre><p></p>
+<ul>
+<li><strong>Don't ignore warning signs</strong></li>
+</ul>
+   <pre><code class="language-typescript">// ❌ Suppress warnings
+   if (memoryUsage > 0.8) {
+     // TODO: Fix later
+   }
+</code><p><code class="language-typescript">// ✅ Alert and track
+if (memoryUsage > 0.8) {
+logger.warn(‘High memory usage’, { usage: memoryUsage });
+metrics.gauge(‘memory.usage’, memoryUsage);
+}</code></p></pre><p></p>
+<hr>
+<h2>Tools &#x26; Resources</h2>
+<h3>Monitoring Tools</h3>
+<p><strong>Analytics Daemon</strong> (from this marketplace):</p>
+<pre><code class="language-bash">cd packages/analytics-daemon
+pnpm start
+# Real-time monitoring on http://localhost:3333</code></pre>
+<p><strong>System Monitoring</strong>:</p>
+<pre><code class="language-bash"># CPU, memory, disk
+htop
+<h1 id="network">Network</h1>
+<p>iftop</p>
+<h1 id="disk-io">Disk I/O</h1>
+</code><p><code class="language-bash">iotop</code></p></pre><p></p>
+<h3>Log Aggregation</h3>
+<p><strong>Centralized logging</strong>:</p>
+<pre><code class="language-bash"># Ship logs to central server
+tail -f /var/log/claude-code.log | \
+  nc logserver.example.com 514</code></pre>
+<h3>External Tools</h3>
+<ul>
+<li><a href="https://www.datadoghq.com/">Datadog</a> - APM and monitoring</li>
+<li><a href="https://sentry.io/">Sentry</a> - Error tracking</li>
+<li><a href="https://www.pagerduty.com/">PagerDuty</a> - Incident management</li>
+<li><a href="https://grafana.com/">Grafana</a> - Dashboards</li>
+<li><a href="https://www.elastic.co/elk-stack">ELK Stack</a> - Log analysis</li>
+</ul>
+<hr>
+<h2>Summary</h2>
+<p><strong>Key Takeaways</strong>:</p>
+<ul>
+<li><strong>Classify incidents immediately</strong> - SEV-1/2 require immediate response</li>
+<li><strong>Follow response protocol</strong> - Assess, stabilize, communicate</li>
+<li><strong>Use systematic debugging</strong> - Binary search, correlation analysis, tracing</li>
+<li><strong>Analyze logs effectively</strong> - Structured logging enables fast analysis</li>
+<li><strong>Find root causes</strong> - 5 Whys and Fishbone diagrams prevent recurrence</li>
+<li><strong>Document everything</strong> - Postmortems are learning opportunities</li>
+<li><strong>Test recovery procedures</strong> - Practice makes perfect</li>
+</ul>
+<p><strong>Incident Response Checklist</strong>:</p>
+<ul>
+<li>[ ] Classify severity (SEV-1 through SEV-4)</li>
+<li>[ ] Assess impact (error rate, affected users)</li>
+<li>[ ] Check obvious issues (API, disk, memory)</li>
+<li>[ ] Stabilize systems (restart, rate limit, rollback)</li>
+<li>[ ] Communicate status to stakeholders</li>
+<li>[ ] Identify root cause (5 Whys, logs, metrics)</li>
+<li>[ ] Deploy fix and verify recovery</li>
+<li>[ ] Write postmortem within 24 hours</li>
+<li>[ ] Create action items with owners and dates</li>
+<li>[ ] Schedule review meeting with team</li>
+</ul>
+<hr>
+<p><strong>Last Updated</strong>: 2025-12-24</p>
+<p><strong>Author</strong>: Jeremy Longshore</p>
+<p><strong>Related Playbooks</strong>: <a href="/playbooks/01-multi-agent-rate-limits/">Multi-Agent Rate Limits</a>, <a href="/playbooks/03-mcp-reliability/">MCP Server Reliability</a></p>
+
+          </article>
+        </div>
+      </div>
+    </main>
+
+    <footer class="playbook-footer" data-astro-cid-hidutmah>
+      <div class="container" data-astro-cid-hidutmah>
+        <div class="footer-nav" data-astro-cid-hidutmah>
+          <a href="/playbooks/04-ollama-migration" class="nav-link nav-prev" data-astro-cid-hidutmah>
+              <span class="nav-label" data-astro-cid-hidutmah>Previous</span>
+              <span class="nav-title" data-astro-cid-hidutmah>Ollama Migration Guide</span>
+            </a>
+          <a href="/playbooks/06-self-hosted-stack" class="nav-link nav-next" data-astro-cid-hidutmah>
+              <span class="nav-label" data-astro-cid-hidutmah>Next</span>
+              <span class="nav-title" data-astro-cid-hidutmah>Self-Hosted Stack Setup</span>
+            </a>
+        </div>
+
+        <div class="back-to-index" data-astro-cid-hidutmah>
+          <a href="/playbooks" class="back-link" data-astro-cid-hidutmah>← Back to All Playbooks</a>
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  
+
+  <script type="module">function i(){const r=document.querySelector(".playbook-content"),n=document.getElementById("toc-nav");if(!r||!n)return;const c=r.querySelectorAll("h2, h3");c.forEach((e,o)=>{e.id||(e.id=`section-${o}`);const t=document.createElement("a");t.href=`#${e.id}`,t.textContent=e.textContent,t.style.paddingLeft=e.tagName==="H3"?"1.5rem":"0.75rem",n.appendChild(t)});const a=new IntersectionObserver(e=>{e.forEach(o=>{if(o.isIntersecting){const t=o.target.id;n.querySelectorAll("a").forEach(s=>{s.classList.toggle("active",s.getAttribute("href")===`#${t}`)})}})},{rootMargin:"-100px 0px -66%"});c.forEach(e=>a.observe(e))}document.addEventListener("DOMContentLoaded",i);</script>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

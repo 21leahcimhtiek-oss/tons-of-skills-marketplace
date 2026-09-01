@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>guidewire-security-and-rbac - Agent Skill</title>
+    <meta name="description" content="Lock down a Guidewire Cloud API integration so it survives a SOC 2 audit, an NAIC Model Audit Rule review, and a real-world incident — least-privilege role design, encrypted committed secrets via SOPS+age, PII redaction in logs (SSN/DOB/claim narrative), audit-trail capture, cross-tenant isolation for multi-carrier integrations, and detect-and-rotate response to token leaks. Use when designing the security posture for a new integration, hardening an existing one before audit, or responding to a leaked credential. Trigger with &quot;guidewire security&quot;, &quot;guidewire rbac&quot;, &quot;guidewire pii redaction&quot;, &quot;guidewire audit trail&quot;, &quot;guidewire secret leak&quot;.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://tonsofskills.com/tons-of-skills-marketplace/skills/guidewire-security-and-rbac/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/guidewire-security-and-rbac/">
+    <meta property="og:title" content="guidewire-security-and-rbac - Agent Skill">
+    <meta property="og:description" content="Lock down a Guidewire Cloud API integration so it survives a SOC 2 audit, an NAIC Model Audit Rule review, and a real-world incident — least-privilege role design, encrypted committed secrets via SOPS+age, PII redaction in logs (SSN/DOB/claim narrative), audit-trail capture, cross-tenant isolation for multi-carrier integrations, and detect-and-rotate response to token leaks. Use when designing the security posture for a new integration, hardening an existing one before audit, or responding to a leaked credential. Trigger with &quot;guidewire security&quot;, &quot;guidewire rbac&quot;, &quot;guidewire pii redaction&quot;, &quot;guidewire audit trail&quot;, &quot;guidewire secret leak&quot;.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="guidewire-security-and-rbac - Agent Skill">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/guidewire-security-and-rbac/">
+    <meta name="twitter:title" content="guidewire-security-and-rbac - Agent Skill">
+    <meta name="twitter:description" content="Lock down a Guidewire Cloud API integration so it survives a SOC 2 audit, an NAIC Model Audit Rule review, and a real-world incident — least-privilege role design, encrypted committed secrets via SOPS+age, PII redaction in logs (SSN/DOB/claim narrative), audit-trail capture, cross-tenant isolation for multi-carrier integrations, and detect-and-rotate response to token leaks. Use when designing the security posture for a new integration, hardening an existing one before audit, or responding to a leaked credential. Trigger with &quot;guidewire security&quot;, &quot;guidewire rbac&quot;, &quot;guidewire pii redaction&quot;, &quot;guidewire audit trail&quot;, &quot;guidewire secret leak&quot;.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"guidewire-security-and-rbac","description":"Lock down a Guidewire Cloud API integration so it survives a SOC 2 audit, an NAIC Model Audit Rule review, and a real-world incident — least-privilege role design, encrypted committed secrets via SOPS+age, PII redaction in logs (SSN/DOB/claim narrative), audit-trail capture, cross-tenant isolation for multi-carrier integrations, and detect-and-rotate response to token leaks. Use when designing the security posture for a new integration, hardening an existing one before audit, or responding to a leaked credential. Trigger with \"guidewire security\", \"guidewire rbac\", \"guidewire pii redaction\", \"guidewire audit trail\", \"guidewire secret leak\".","version":"1.25.0","author":{"@type":"Person","name":"Jeremy Longshore"},"license":"MIT","programmingLanguage":"Claude Code Agent Skill","isPartOf":{"@type":"SoftwareApplication","name":"guidewire-pack","applicationCategory":"unknown"}}</script>
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.breadcrumbs[data-astro-cid-ilhxcym7]{margin-bottom:var(--space-5)}.breadcrumbs__list[data-astro-cid-ilhxcym7]{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;list-style:none;padding:0;margin:0;font-family:var(--font-mono);font-size:var(--text-sm, .8rem)}.breadcrumbs__item[data-astro-cid-ilhxcym7]{display:flex;align-items:center;gap:.375rem}.breadcrumbs__link[data-astro-cid-ilhxcym7]{color:var(--text-3);text-decoration:none;transition:color var(--duration-fast, .2s) var(--ease-out)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:hover{color:var(--primary)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:0}.breadcrumbs__sep[data-astro-cid-ilhxcym7]{color:var(--text-3);user-select:none;font-size:.7em;line-height:1}.breadcrumbs__current[data-astro-cid-ilhxcym7]{color:var(--text-2)}.detail-cta[data-astro-cid-qcigfm7x]{background:var(--surface-3, var(--brand-light-gray));border-top:1px solid var(--border, var(--brand-light-gray));border-radius:var(--radius-lg);padding:2rem 1.5rem;margin-top:2rem;text-align:center}.detail-cta__headline[data-astro-cid-qcigfm7x]{font-family:var(--font-display);font-weight:700;font-size:1.35rem;color:var(--text, var(--brand-dark));margin-bottom:1.25rem}.detail-cta__actions[data-astro-cid-qcigfm7x]{display:flex;justify-content:center;gap:.75rem;flex-wrap:wrap}.detail-cta__primary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:var(--primary);color:#0a0a0c;border:none;border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;cursor:pointer;transition:background var(--duration-fast) var(--ease-out),transform var(--duration-fast) var(--ease-out)}.detail-cta__primary[data-astro-cid-qcigfm7x]:hover{background:var(--primary-dark, var(--primary-dark));transform:translateY(-1px)}.detail-cta__primary[data-astro-cid-qcigfm7x].copied{background:var(--positive, var(--brand-green))}.detail-cta__secondary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:transparent;color:var(--text, var(--brand-dark));border:1px solid var(--border, var(--brand-mid-gray));border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;text-decoration:none;transition:border-color var(--duration-fast) var(--ease-out),color var(--duration-fast) var(--ease-out)}.detail-cta__secondary[data-astro-cid-qcigfm7x]:hover{border-color:var(--primary);color:var(--primary)}@media(max-width:480px){.detail-cta__actions[data-astro-cid-qcigfm7x]{flex-direction:column;align-items:stretch}.detail-cta__primary[data-astro-cid-qcigfm7x],.detail-cta__secondary[data-astro-cid-qcigfm7x]{justify-content:center}}
+</style>
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/_slug_@_@astro.wF9emvVq.css"></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  
+  
+
+  <div class="skill-detail" data-astro-cid-jrlgpo3w>
+    <!-- 1. Breadcrumbs -->
+    <nav aria-label="Breadcrumb" class="breadcrumbs" data-astro-cid-ilhxcym7>
+  <ol class="breadcrumbs__list" itemscope itemtype="https://schema.org/BreadcrumbList" data-astro-cid-ilhxcym7>
+    <li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Home</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="1">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/skills/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Skills</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="2">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          <span class="breadcrumbs__current" aria-current="page" itemprop="name" data-astro-cid-ilhxcym7>
+              guidewire-security-and-rbac
+            </span>
+          <meta itemprop="position" content="3">
+        </li>
+  </ol>
+</nav>
+
+    <!-- 2. Header (enhanced) -->
+    <header class="skill-header" data-astro-cid-jrlgpo3w>
+      <h1 data-astro-cid-jrlgpo3w>guidewire-security-and-rbac</h1>
+      <p class="skill-description" data-astro-cid-jrlgpo3w>Lock down a Guidewire Cloud API integration so it survives a SOC 2 audit, an NAIC Model Audit Rule review, and a real-world incident — least-privilege role design, encrypted committed secrets via SOPS+age, PII redaction in logs (SSN/DOB/claim narrative), audit-trail capture, cross-tenant isolation for multi-carrier integrations, and detect-and-rotate response to token leaks. Use when designing the security posture for a new integration, hardening an existing one before audit, or responding to a leaked credential. Trigger with &quot;guidewire security&quot;, &quot;guidewire rbac&quot;, &quot;guidewire pii redaction&quot;, &quot;guidewire audit trail&quot;, &quot;guidewire secret leak&quot;.</p>
+
+      <div class="skill-metadata" data-astro-cid-jrlgpo3w>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>v1.25.0</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>Jeremy Longshore</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>MIT</span>
+        </div>
+      </div>
+
+      
+    </header>
+
+    <!-- 4. Allowed Tools -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Allowed Tools</h2>
+      <div class="tools-grid" data-astro-cid-jrlgpo3w>
+        <span class="tool-badge" data-astro-cid-jrlgpo3w>Read</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Write</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Edit</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(sops:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(age:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(curl:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Grep</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Glob</span>
+      </div>
+      
+    </section>
+
+    <!-- 5. Provided by Plugin -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Provided by Plugin</h2>
+      <div class="plugin-info" data-astro-cid-jrlgpo3w>
+        <div class="plugin-details" data-astro-cid-jrlgpo3w>
+          <h3 data-astro-cid-jrlgpo3w>
+            <a href="/plugins/guidewire-pack/" data-astro-cid-jrlgpo3w>guidewire-pack</a>
+          </h3>
+          <p data-astro-cid-jrlgpo3w>Claude Code skill pack for Guidewire InsuranceSuite (24 skills)</p>
+          <div class="plugin-meta" data-astro-cid-jrlgpo3w>
+            <span data-astro-cid-jrlgpo3w>unknown</span>
+            <span data-astro-cid-jrlgpo3w>v1.25.0</span>
+          </div>
+        </div>
+        <a href="/plugins/guidewire-pack/" class="btn-primary" data-astro-cid-jrlgpo3w>View Plugin</a>
+      </div>
+    </section>
+
+    <!-- 6. Installation -->
+    <section class="section-box dark" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Installation</h2>
+      <p class="install-note" style="color: var(--brand-light-gray); margin-bottom: 0.75rem;" data-astro-cid-jrlgpo3w>This skill is included in the guidewire-pack plugin:</p>
+      <pre class="install-command" data-copy="/plugin install guidewire-pack@claude-code-plugins-plus" data-astro-cid-jrlgpo3w><code data-astro-cid-jrlgpo3w>/plugin install guidewire-pack@claude-code-plugins-plus</code></pre>
+      <p class="install-note" data-astro-cid-jrlgpo3w>Click to copy</p>
+    </section>
+
+    <!-- 7. Skill Content (Markdown) -->
+    <section class="skill-content-section" data-astro-cid-jrlgpo3w>
+      <h2 data-astro-cid-jrlgpo3w>Instructions</h2>
+      <div class="skill-content" data-astro-cid-jrlgpo3w>
+        <div data-astro-cid-jrlgpo3w><h1>Guidewire Security and RBAC</h1>
+<h2>Overview</h2>
+<p>Build the security posture an integration needs in production: secrets that cannot leak from the repo, roles that cannot escalate beyond their job, logs that cannot exfiltrate PII, and an audit trail that satisfies SOC 2 and NAIC Model Audit Rule reviewers. This skill is the application of generic security practice to the specific shape of Guidewire Cloud API — claim and policy data carry regulated PII; a leaked client_secret can read or write a carrier&#39;s entire book of business; carriers operate under state-level insurance regulator scrutiny.</p>
+<p>Five real-world failures this skill prevents:</p>
+<ol>
+<li><strong>Plaintext <code>.env</code> in the repo</strong> — a <code>git push</code> to a public mirror leaks live credentials; the only defense is to never have plaintext in the tree, full stop.</li>
+<li><strong>Over-scoped Service Application</strong> — every integration starts with <code>pc.account.write</code> &quot;to make development easier&quot; and is never narrowed; the audit finding cites OWASP A01 broken access control.</li>
+<li><strong>PII in observability</strong> — <code>console.log(claim)</code> dumps SSN, DOB, claim narrative, and phone numbers into the logging pipeline, where they replicate to every downstream tool the company uses.</li>
+<li><strong>No audit trail of what the integration did</strong> — security review asks &quot;what did this service touch in the last 90 days&quot; and the answer is &quot;everything in the access log, but we cannot tell which actor&quot;; the audit fails.</li>
+<li><strong>Cross-tenant data bleed</strong> — a multi-tenant integration uses one set of credentials per environment instead of per tenant; a bug in tenant routing leaks Carrier A&#39;s data into Carrier B&#39;s response.</li>
+</ol>
+<h2>Prerequisites</h2>
+<ul>
+<li>A working auth + SDK layer per <code>guidewire-install-auth</code> and <code>guidewire-sdk-patterns</code></li>
+<li><code>sops</code> and <code>age</code> installed locally (<code>brew install sops age</code> / <code>apt install sops</code> / <code>mise install age</code>)</li>
+<li>Access to GCC for the integration&#39;s Service Application configuration</li>
+<li>A logging/observability stack the integration writes to (Datadog, Splunk, ELK, or similar) — required for the redaction patterns to apply</li>
+</ul>
+<h2>Instructions</h2>
+<p>Build the posture in this order. Each layer addresses one of the five failures listed in Overview.</p>
+<h3>1. Encrypted committed secrets via SOPS + age</h3>
+<p>Plaintext <code>.env</code> files committed to a repo are the single largest source of credential leaks in the SaaS world. SOPS + age allows secrets to live in the repo as ciphertext that only holders of the age private key can read. The audit trail of &quot;who rotated what when&quot; comes free with <code>git log</code>.</p>
+<pre data-lang="bash"><code>
+sops-init                                    # writes .sops.yaml + .env.sops + scripts/sops-env (idempotent)
+sops secrets.prod.sops.yaml                  # interactive edit; saves re-encrypted
+git add secrets.prod.sops.yaml &amp;&amp; git commit -m &quot;chore(secrets): rotate gw client secret&quot;
+</code></pre>
+<p>In the runtime, decrypt via the anchored regex pattern (do not use the naive <code>sed &#39;s/^/export /&#39;</code> — see <code>guidewire-install-auth</code> for the bare-export-leak failure mode):</p>
+<pre data-lang="bash"><code>
+eval &quot;$(sops -d secrets.prod.sops.yaml | sed -nE &#39;s/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/export \1=\2/p&#39;)&quot;
+</code></pre>
+<p>Per-environment recipient lists in <code>.sops.yaml</code> mean dev keys cannot decrypt prod secrets — limit blast radius of a compromised dev workstation.</p>
+<h3>2. Least-privilege roles per Service Application</h3>
+<p>In <strong>GCC &gt; Identity &amp; Access &gt; Applications &gt; [your-app] &gt; Permissions</strong>, assign only the roles the integration actually needs. A read-only reporting integration should hold <code>pc.account.read</code> and <code>pc.policy.read</code> only; a webhook event consumer needs zero write roles.</p>
+<pre><code>
+Reporting integration:        pc.account.read, pc.policy.read, cc.claim.read
+Broker portal (read+quote):   pc.account.read, pc.account.write, pc.submission.write
+Renewal job:                  pc.policy.read, pc.policy.write
+Claims FNOL intake:           cc.claim.write, cc.contact.write
+Webhook event consumer:       (no Cloud API roles — just receives App Events)
+</code></pre>
+<p>Validate the issued token carries only the expected scopes on every refresh (<code>guidewire-install-auth</code>&#39;s scope-drift gate). A token with extra scopes is a configuration error; alert and treat as an incident.</p>
+<h3>3. PII redaction in logs</h3>
+<p>Guidewire claim and contact resources carry regulated PII: SSN, date of birth, driver&#39;s license number, claim narrative, phone, email, address. Redact at the logging boundary, not in the calling code (which always misses cases). Apply the redactor to every structured log entry the integration emits.</p>
+<pre data-lang="typescript"><code>
+const PII_PATHS = [
+  &quot;ssn&quot;, &quot;taxId&quot;, &quot;dateOfBirth&quot;, &quot;driversLicenseNumber&quot;,
+  &quot;primaryPhone.phoneNumber&quot;, &quot;workPhone.phoneNumber&quot;, &quot;primaryEmail&quot;,
+  &quot;addressLine1&quot;, &quot;addressLine2&quot;, &quot;description&quot;, // claim narrative
+];
+
+export function redactPii&lt;T extends object&gt;(record: T): T {
+  const clone = JSON.parse(JSON.stringify(record));
+  for (const path of PII_PATHS) {
+    setByPath(clone, path, redactValue(getByPath(clone, path)));
+  }
+  return clone;
+}
+
+function redactValue(v: unknown): string | unknown {
+  if (typeof v !== &quot;string&quot; || !v) return v;
+  if (/^\d{3}-?\d{2}-?\d{4}$/.test(v)) return &quot;***-**-****&quot;;       // SSN
+  if (/^\d{4}-\d{2}-\d{2}/.test(v)) return v.slice(0, 4) + &quot;-**-**&quot;; // DOB → year only
+  if (v.length &lt;= 4) return &quot;***&quot;;
+  return v.slice(0, 2) + &quot;***&quot; + v.slice(-2);
+}
+</code></pre>
+<p>Wire the redactor into the logger transport (Pino redact, Winston format, OpenTelemetry log processor) so every log entry passes through it before serialization. Per-call <code>console.log(redactPii(claim))</code> works in theory and fails in practice — engineers forget.</p>
+<h3>4. Audit trail of integration actions</h3>
+<p>Every state-mutating Cloud API call should leave a row in an internal audit table the integration owns. Cloud API has its own audit, but it cannot tell investigators which logical operation drove a request, only that the Service Application made the call.</p>
+<pre data-lang="sql"><code>
+CREATE TABLE integration_audit (
+  id UUID PRIMARY KEY,
+  correlation_id UUID NOT NULL,
+  actor TEXT NOT NULL,                 -- the upstream user, broker, or job triggering the call
+  service_app TEXT NOT NULL,           -- the GCC Service Application id
+  api_method TEXT NOT NULL,            -- POST / PATCH / DELETE
+  api_path TEXT NOT NULL,              -- /pc/rest/v1/policies/pc:8001
+  resource_id TEXT,                    -- post-response id
+  idempotency_key UUID NOT NULL,
+  status_code INT NOT NULL,
+  reason TEXT,                         -- &quot;renewal-window-open&quot;, &quot;broker-quote-flow&quot;, etc.
+  at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+</code></pre>
+<p>Each row pairs to one Cloud API call. SOC 2 reviewers ask &quot;show me every write this integration made on behalf of broker <code>acme-insurance</code> in March&quot;; this table makes the answer a SQL query, not a forensic exercise.</p>
+<h3>5. Cross-tenant isolation for multi-carrier integrations</h3>
+<p>If the integration serves more than one carrier, every carrier gets:</p>
+<ul>
+<li>A separate Service Application registration in GCC (separate <code>client_id</code>/<code>client_secret</code>)</li>
+<li>A separate entry in <code>secrets.[carrier-slug].sops.yaml</code> encrypted to a tenant-specific recipient</li>
+<li>A separate row in tenant-routing config that maps inbound requests to outbound credentials</li>
+<li>A separate scope assignment audited per the role table above</li>
+</ul>
+<p>Sharing one Service Application across tenants creates legal and contractual exposure beyond the technical risk; a single compromised credential reveals every tenant&#39;s data, and an audit finding will cite SOC 2 CC6.1 (logical access controls).</p>
+<h3>6. Detect-and-rotate response to suspected secret leak</h3>
+<p>When a secret is suspected leaked (a developer pasted it into a Slack message, a CI log captured it, a public commit briefly contained it):</p>
+<pre data-lang="bash"><code>
+# 1. Rotate immediately in GCC — generates a new client_secret
+# 2. Update the encrypted secret file
+sops secrets.prod.sops.yaml             # set GW_CLIENT_SECRET to the new value
+git commit -m &quot;rotate(secrets): GW client secret — leak suspected $(date -Iseconds)&quot;
+# 3. Deploy to all environments
+# 4. Use dual-secret window (per guidewire-install-auth) so in-flight requests do not fail
+# 5. Audit Cloud API access logs for unauthorized calls during the leak window
+# 6. Document the incident in the audit table per step 4
+</code></pre>
+<p>Do not &quot;wait until business hours&quot; — credential leaks compound by the minute. The rotation is reversible; the data exfiltration is not.</p>
+<h2>Output</h2>
+<p>A production-grade security posture ships with all of the following:</p>
+<ul>
+<li>All secrets stored as <code>secrets.*.sops.yaml</code> files committed to git, encrypted to per-environment age recipients; no plaintext <code>.env</code> files anywhere in the tree.</li>
+<li>Service Application roles assigned per least privilege, validated on every token refresh by the scope-drift gate.</li>
+<li>A logger configured to apply <code>redactPii()</code> to every structured log entry before serialization.</li>
+<li>An <code>integration_audit</code> table populated synchronously with every state-mutating Cloud API call.</li>
+<li>Per-tenant Service Applications and secret files for any multi-carrier integration.</li>
+<li>A documented detect-and-rotate runbook with a target rotation time of &lt;30 minutes from suspicion to deploy.</li>
+</ul>
+<h2>Examples</h2>
+<h3>Example 1 — <code>.sops.yaml</code> recipient layering</h3>
+<pre data-lang="yaml"><code>
+creation_rules:
+  - path_regex: secrets\.dev\.sops\.yaml$
+    age: age1devkey...,age1leadkey...
+  - path_regex: secrets\.uat\.sops\.yaml$
+    age: age1uatkey...,age1leadkey...
+  - path_regex: secrets\.prod\.sops\.yaml$
+    age: age1prodkey...,age1leadkey...
+</code></pre>
+<p>A developer&#39;s age key decrypts dev only; the lead&#39;s key decrypts every environment for incident response. Rotation of an environment&#39;s age recipient is <code>sops updatekeys secrets.&lt;env&gt;.sops.yaml</code>.</p>
+<h3>Example 2 — Pino redactor wiring</h3>
+<pre data-lang="typescript"><code>
+import pino from &quot;pino&quot;;
+const log = pino({
+  redact: {
+    paths: [
+      &quot;*.ssn&quot;, &quot;*.taxId&quot;, &quot;*.dateOfBirth&quot;,
+      &quot;*.primaryPhone.phoneNumber&quot;, &quot;*.primaryEmail&quot;,
+      &quot;*.description&quot;,
+    ],
+    censor: &quot;[REDACTED]&quot;,
+  },
+});
+log.info({ claim: claimResource }, &quot;claim received&quot;);
+</code></pre>
+<h3>Example 3 — Audit row on a write</h3>
+<pre data-lang="typescript"><code>
+await db.insert(&quot;integration_audit&quot;, {
+  id: crypto.randomUUID(),
+  correlation_id: ctx.correlationId,
+  actor: ctx.user.id,
+  service_app: process.env.GW_CLIENT_ID,
+  api_method: &quot;POST&quot;,
+  api_path: &quot;/pc/rest/v1/policies/pc:8001/endorse&quot;,
+  resource_id: response.data.id,
+  idempotency_key: idempotencyKey,
+  status_code: 200,
+  reason: &quot;broker-portal-mid-term-coverage-add&quot;,
+});
+</code></pre>
+<h2>Error Handling</h2>
+<table><thead><tr>
+<th>Symptom</th>
+<th>Cause</th>
+<th>Solution</th>
+</tr></thead><tbody>
+<tr>
+<td><code>403 Forbidden</code> despite valid token</td>
+<td>scope drift — GCC admin removed a role</td>
+<td>scope-drift gate alerts on every refresh; not a transport failure, surface as incident</td>
+</tr>
+<tr>
+<td>Plaintext <code>.env</code> discovered in git history</td>
+<td>committed before SOPS adoption</td>
+<td>rotate every credential in the leaked file immediately; rewrite history with <code>git filter-repo</code> if the leak is recent</td>
+</tr>
+<tr>
+<td>Logger emits SSN to Splunk</td>
+<td><code>redactPii</code> not wired into the transport</td>
+<td>add at the logger config, not at call sites; remove the per-call <code>redactPii()</code> in favor of transport-level</td>
+</tr>
+<tr>
+<td>SOPS commit accidentally encrypted to wrong recipient</td>
+<td><code>.sops.yaml</code> regex did not match</td>
+<td>run <code>sops updatekeys</code> on the affected file; recipients are visible in the YAML metadata</td>
+</tr>
+<tr>
+<td>Bare <code>export</code> in cron mail leaks every env var</td>
+<td>naive <code>sed &#39;s/^/export /&#39;</code> instead of anchored regex</td>
+<td>switch to <code>sed -nE &#39;s/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/export \1=\2/p&#39;</code></td>
+</tr>
+<tr>
+<td>Audit query &quot;what did integration do for broker X last month&quot; returns nothing</td>
+<td>audit table not populated</td>
+<td>wire <code>integration_audit</code> insert into every write helper; backfill is impossible</td>
+</tr>
+<tr>
+<td>One client_secret used across two carriers</td>
+<td>shared Service Application</td>
+<td>split immediately; rotate both halves to scope the blast radius</td>
+</tr>
+<tr>
+<td>Token in a CI log</td>
+<td>secret printed accidentally during deployment</td>
+<td>rotate via the detect-and-rotate runbook; audit access during the leak window</td>
+</tr>
+</tbody></table>
+<p>For deeper coverage (Vault Agent integration, dynamic secrets, token-binding, federated identity, FIPS-140 trust stores), see <a href="references/implementation-guide.md">implementation guide</a> and <a href="references/API_REFERENCE.md">API reference</a>.</p>
+<h2>See Also</h2>
+<ul>
+<li><code>guidewire-install-auth</code> — the auth layer this hardens; scope-drift gate, dual-secret rotation</li>
+<li><code>guidewire-sdk-patterns</code> — error mapping that surfaces <code>403</code> as a structured exception this skill alerts on</li>
+<li><code>guidewire-observability-and-incident-response</code> — emits the alerts this skill&#39;s audit table powers</li>
+<li><code>guidewire-ci-cd-pipeline</code> — promotes encrypted secrets through environments without plaintext exposure</li>
+</ul>
+<h2>Resources</h2>
+<ul>
+<li><a href="https://github.com/getsops/sops">SOPS — Secrets OPerationS</a></li>
+<li><a href="https://github.com/FiloSottile/age">age encryption tool</a></li>
+<li><a href="https://owasp.org/Top10/A01_2021-Broken_Access_Control/">OWASP A01:2021 — Broken Access Control</a></li>
+<li><a href="https://owasp.org/Top10/A02_2021-Cryptographic_Failures/">OWASP A02:2021 — Cryptographic Failures</a></li>
+<li><a href="https://www.aicpa-cima.com/topic/audit-assurance/soc-for-service-organizations">SOC 2 CC6.1 — Logical Access Controls</a></li>
+<li>NAIC Model Audit Rule (MAR)</li>
+</ul></div>
+      </div>
+    </section>
+
+    <!-- 8. Bottom CTA -->
+    <section class="detail-cta" data-astro-cid-qcigfm7x>
+  <h2 class="detail-cta__headline" data-astro-cid-qcigfm7x>Ready to use guidewire-pack?</h2>
+  <div class="detail-cta__actions" data-astro-cid-qcigfm7x>
+    <button class="detail-cta__primary" data-copy-install="/plugin install guidewire-pack@claude-code-plugins-plus" data-astro-cid-qcigfm7x>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" data-astro-cid-qcigfm7x>
+        <rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" stroke-width="1.5" data-astro-cid-qcigfm7x></rect>
+        <path d="M3 11V3a1 1 0 011-1h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" data-astro-cid-qcigfm7x></path>
+      </svg>
+      <span class="detail-cta__btn-text" data-astro-cid-qcigfm7x>Copy Install Command</span>
+    </button>
+    
+  </div>
+</section>
+
+<script type="module">document.querySelectorAll("[data-copy-install]").forEach(t=>{t.addEventListener("click",async()=>{const a=t.dataset.copyInstall||"";await navigator.clipboard.writeText(a);const e=t.querySelector(".detail-cta__btn-text");if(e){const o=e.textContent;e.textContent="Copied!",t.classList.add("copied"),window.trackEvent&&window.trackEvent("install_copied",{plugin_name:a.split(" ").pop()||"",source:"detail_cta"}),setTimeout(()=>{e.textContent=o,t.classList.remove("copied")},2e3)}})});</script>
+
+    <!-- 9. Related Skills (6, with tool pills) -->
+    <section class="related-skills-section" data-astro-cid-jrlgpo3w>
+        <h2 class="related-skills-heading" data-astro-cid-jrlgpo3w>Related Skills</h2>
+        <div class="related-skills-grid" data-astro-cid-jrlgpo3w>
+          <a href="/skills/abridge-ci-integration/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-ci-integration</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Configure CI/CD pipeline for Abridge clinical AI integrations with GitHub Actions.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-common-errors/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-common-errors</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Diagnose and fix common Abridge clinical AI integration errors.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-a/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-a</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge ambient clinical documentation capture-to-note pipeline.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-b/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-b</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge patient-facing documentation and after-visit summary generation.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-cost-tuning/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-cost-tuning</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Optimize Abridge clinical AI costs through tier selection, session management, and usage monitoring for healthcare organizations.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-debug-bundle/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-debug-bundle</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Collect Abridge debug evidence for support tickets and troubleshooting.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a>
+        </div>
+      </section>
+
+  </div>
+
+  
+  <script>
+    document.querySelectorAll('.install-command').forEach(el => {
+      el.addEventListener('click', function() {
+        const text = this.dataset.copy || this.textContent;
+        navigator.clipboard.writeText(text).then(() => {
+          const originalText = this.textContent;
+          this.textContent = 'Copied to clipboard!';
+          this.style.color = 'var(--brand-green)';
+          setTimeout(() => {
+            this.textContent = originalText;
+            this.style.color = '';
+          }, 2000);
+        });
+      });
+    });
+  </script>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
