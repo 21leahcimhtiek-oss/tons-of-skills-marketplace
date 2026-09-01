@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Agent&#39;s Mistakes Were the Fast Ones — Tons of Skills Work Diary</title>
+    <meta name="description" content="Six agent failures on a self-hosted team relay. Five traced back to a rule I wrote down and never made anything actually enforce.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://startaitools.com/posts/the-agents-mistakes-were-the-fast-ones/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/the-agents-mistakes-were-the-fast-ones/">
+    <meta property="og:title" content="The Agent's Mistakes Were the Fast Ones — Tons of Skills Work Diary">
+    <meta property="og:description" content="Six agent failures on a self-hosted team relay. Five traced back to a rule I wrote down and never made anything actually enforce.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="The Agent's Mistakes Were the Fast Ones — Tons of Skills Work Diary">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/the-agents-mistakes-were-the-fast-ones/">
+    <meta name="twitter:title" content="The Agent's Mistakes Were the Fast Ones — Tons of Skills Work Diary">
+    <meta name="twitter:description" content="Six agent failures on a self-hosted team relay. Five traced back to a rule I wrote down and never made anything actually enforce.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"The Agent's Mistakes Were the Fast Ones","description":"Six agent failures on a self-hosted team relay. Five traced back to a rule I wrote down and never made anything actually enforce.","datePublished":"2026-08-09","url":"https://tonsofskills.com/blog/undefined","author":{"@type":"Person","name":"Jeremy Longshore"},"publisher":{"@type":"Organization","name":"Tons of Skills","url":"https://tonsofskills.com"}}</script>
+  
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.post-header[data-astro-cid-7jjqptxk]{background:var(--panel);padding:4rem 1.5rem 3rem;border-bottom:1px solid var(--border)}.post-header-inner[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto}.back-link[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3);text-decoration:none;display:inline-block;margin-bottom:1.5rem;transition:color .2s}.back-link[data-astro-cid-7jjqptxk]:hover{color:var(--primary)}.post-meta[data-astro-cid-7jjqptxk]{display:flex;align-items:center;gap:.75rem;margin-bottom:1rem}time[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3)}.featured-badge[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.2rem .6rem;background:#ce114126;color:var(--red);border-radius:0;font-weight:600;text-transform:uppercase;letter-spacing:.05em}.post-header[data-astro-cid-7jjqptxk] h1[data-astro-cid-7jjqptxk]{font-family:var(--font-body);font-size:clamp(1.5rem,4vw,2.2rem);font-weight:700;color:var(--text);line-height:1.25;margin-bottom:.75rem;letter-spacing:0}.post-desc[data-astro-cid-7jjqptxk]{color:var(--text-2);font-size:1.05rem;line-height:1.6;margin-bottom:1rem}.post-tags[data-astro-cid-7jjqptxk]{display:flex;gap:.4rem;flex-wrap:wrap}.tag[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.15rem .5rem;background:var(--surface-3);color:var(--text-3);border-radius:0}.post-body[data-astro-cid-7jjqptxk]{padding:3rem 1.5rem 4rem}.prose[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto;color:var(--text-2);line-height:1.8;font-size:1rem}.prose[data-astro-cid-7jjqptxk] h2{font-family:var(--font-body);font-size:1.5rem;font-weight:700;color:var(--text);margin:2.5rem 0 1rem;letter-spacing:0}.prose[data-astro-cid-7jjqptxk] h3{font-size:1.2rem;font-weight:600;color:var(--text);margin:2rem 0 .75rem}.prose[data-astro-cid-7jjqptxk] p{margin-bottom:1rem}.prose[data-astro-cid-7jjqptxk] ul,.prose[data-astro-cid-7jjqptxk] ol{margin:.5rem 0 1rem 1.5rem}.prose[data-astro-cid-7jjqptxk] li{margin-bottom:.35rem}.prose[data-astro-cid-7jjqptxk] strong{color:var(--text);font-weight:600}.prose[data-astro-cid-7jjqptxk] code{font-family:var(--font-mono);font-size:.88em;background:var(--surface-3);padding:.15em .35em;border-radius:0;color:var(--primary)}.prose[data-astro-cid-7jjqptxk] a{color:var(--primary);text-decoration:none}.prose[data-astro-cid-7jjqptxk] a:hover{text-decoration:underline}@media(max-width:768px){.post-header[data-astro-cid-7jjqptxk]{padding:3rem 1rem 2rem}.post-body[data-astro-cid-7jjqptxk]{padding:2rem 1rem 3rem}}
+</style></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  <article class="post" data-astro-cid-7jjqptxk>
+    <header class="post-header" data-astro-cid-7jjqptxk>
+      <div class="post-header-inner" data-astro-cid-7jjqptxk>
+        <a href="/blog" class="back-link" data-astro-cid-7jjqptxk>Back to Work Diary</a>
+        <div class="post-meta" data-astro-cid-7jjqptxk>
+          <time datetime="2026-08-09" data-astro-cid-7jjqptxk>August 8, 2026</time>
+          
+        </div>
+        <h1 data-astro-cid-7jjqptxk>The Agent&#39;s Mistakes Were the Fast Ones</h1>
+        <p class="post-desc" data-astro-cid-7jjqptxk>Six agent failures on a self-hosted team relay. Five traced back to a rule I wrote down and never made anything actually enforce.</p>
+        <div class="post-tags" data-astro-cid-7jjqptxk>
+          <span class="tag" data-astro-cid-7jjqptxk>ai-agents</span><span class="tag" data-astro-cid-7jjqptxk>devops</span><span class="tag" data-astro-cid-7jjqptxk>architecture</span><span class="tag" data-astro-cid-7jjqptxk>automation</span><span class="tag" data-astro-cid-7jjqptxk>self-hosting</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="post-body" data-astro-cid-7jjqptxk>
+      <div class="prose" data-astro-cid-7jjqptxk>
+        <p>Intent Solutions runs a chat relay it owns. The software is Buzz, and the property we are building
+toward is that humans and AI agents are co-members of the same room, each holding their own key,
+every message landing on an audit trail that belongs to us instead of to a vendor. Owning the
+record is the entire reason the project exists.</p>
+<p>We adopted it knowing exactly what it is. Upstream says out loud that this is preview software. The
+bundled object store is labeled evaluation-only. Rate limiting is defined in configuration and not
+enforced in code. Several workflow features are stubs. That honesty is what makes adoption a scoped
+hardening job rather than an act of faith. When a project tells you where its edges are, you can put
+your own gates at those edges instead of discovering them in production.</p>
+<p>The team it is for is a founding group of a few dozen people who currently live in a consumer group
+chat. The migration is not done. A handful of identities are on the relay so far, and the all-in
+onboarding is still open work. I am saying that here rather than saving it for a tidy ending,
+because everything below is substrate work for a room most of the team has not walked into yet.</p>
+<p>The part that actually matters, and the reason for all of it: agents as members rather than
+integrations. Not a bot posting into a channel through someone else’s API token. A member with a
+key.</p>
+<p>Over about two weeks, agents doing that substrate work broke things. Six times, specifically. I
+logged all six. Then I went back through them looking for a pattern in the agents, and found a
+different pattern instead.</p>
+<p><strong>The agent’s mistakes were the fast ones. Mine were slow, invisible, and upstream of nearly every
+one of them.</strong></p>
+<p>Five of the six trace back to a decision I made to write a rule down and call it done. The agent
+violated a contract that lived in prose. It reported green from a probe that authenticated as the
+wrong identity, because nobody had ever made it prove otherwise. It built machinery the contract
+said was unnecessary, because the contract was not in front of it. The sixth is an arithmetic slip
+in an audit, and I am not going to stretch it into an indictment of me to make the pattern come out
+clean. Five is the number, and five is enough.</p>
+<p>Those are real failures and they stay on the record below. But an agent that breaks a rule nothing
+enforces is not the interesting story. The interesting story is that I wrote the rule, felt
+finished, and did not notice for weeks that nothing was checking it.</p>
+<h2 id="where-the-agent-messed-up">Where the agent messed up</h2>
+<p>An agent solved a real bug, and solved it well. Invited members were not being joined to the
+canonical general channel. The fix was CI-proven, reviewer-hardened, and reproduction-tested. Then
+it landed on our fork’s main branch instead of going upstream through the contribution lane, and it
+dragged fourteen upstream-owned paths along with it: two files of relay source, six of desktop
+source, all four of upstream’s own CI workflows, and both dependency lockfiles. The code was good.
+The lane was wrong.
+It came out as a single revert, no history rewrite, which is the one mercy of catching it before
+anything built on top of it.</p>
+<p>The same working session built our own relay images, then went and fought a container registry
+credential wall to push them. The fork contract says we deploy upstream’s published images and
+carry zero patches of our own. None of that apparatus was needed at all. Nobody had to debug it,
+because it should never have existed. Work done well against a requirement that does not exist is
+still work that gets thrown away.</p>
+<p>The audit written about the branch breach documented, correctly, that two lists disagreed: the
+enforcement script’s allowlist was missing two hash-pin files that the fork contract’s must-survive
+table names. In the same document, it reported the must-survive check passing at ten of ten,
+against a table that names twelve paths. An audit about a counting problem that miscounted the
+count.</p>
+<p>A functional membership probe reported green while authenticating as the relay owner. The owner is
+the most privileged identity on the system and is always allowed. The probe proved that the door
+opens for the person who owns the door. It was rewritten to authenticate as a throwaway member
+identity, publish a message, read that message back, and clean up after itself, with a separate
+assertion that an un-invited key gets refused.</p>
+<p>Nine sessions running in parallel on one machine, sharing nothing but a filesystem. One of them
+retired a shared library that another was still calling. The failure surfaced as an ordinary
+missing file, which is the worst possible disguise a coordination problem can wear, because you
+will spend your first ten minutes looking for a typo.</p>
+<p>An agent wrote into the canonical naming record that upstream had independently fixed one half of a
+problem we were tracking. The upstream fix was open, not merged. Because that document is the
+canonical record, every document that defers to it inherited the overstatement. One overclaim in
+the right file propagates for free, and nothing downstream has any way to notice, because deferring
+to the canonical record is the correct behavior. The document was doing its job. It was just wrong.</p>
+<p>None of those six took long to fix once seen. The revert was one command. The probe rewrite was an
+afternoon. The miscount was a text edit. Speed of repair is not the measure that matters here.</p>
+<h2 id="where-i-messed-up">Where I messed up</h2>
+<p>I wrote the fork contract in prose and enforced it with a local pre-push hook, then trusted it. An
+agent working through tooling that pushes without that hook, or working from a fresh clone, never
+runs it. The repository’s required checks were upstream’s own, and upstream’s checks know nothing
+about our contract. The rule existed. The enforcement did not. In one line: the contract lived in
+prose and a local hook, not in a required check. Every minute the agent spent on the wrong branch
+was a minute I had already paid for weeks earlier.</p>
+<p>The difference between a rule and a gate is who has to remember. A rule delegates the remembering
+to whoever shows up next, and a fresh clone remembers nothing. A gate remembers on their behalf and
+does not get tired. I knew that. I have said it about deploy pipelines for years. I did not apply
+it to the one contract I cared most about, because I was the one who wrote it, and writing it felt
+like the work.</p>
+<p>The nine parallel sessions were my decision too. An agent does not choose to be one of nine. I
+fanned that wide because it is faster, and the coordination mechanism I gave them for the one
+surface they share is a journal file each session is asked to append to, plus a convention that
+says commit early or work in an isolated tree. Both of those are rules. Neither is a gate. A
+session that never read the convention is indistinguishable from one that read it and was in a
+hurry, and the retired library proves which one I actually shipped: that refactor was complete and
+correct and was never committed, so the next session found a tree missing a file and a guard that
+refused to run on a dirty one. I have the exact diagnosis written down one paragraph up, and I did
+not apply it to the surface I was running nine things on.</p>
+<p>I put two repository names into the canonical record for repositories that were never created. One
+of them got the same string as a real production host. When that collision started causing
+confusion, I wrote a rule saying that a bare use of the name is a defect to fix on sight. Read that
+again. A name that needs a footnote every time it appears is itself the defect. Killing the phantom
+removed the collision at the source, so the rule got deleted rather than policed, and deleting it
+cost nothing and broke nothing. That is the tell. I had built a permanent maintenance burden, and
+enforced it on every mention for weeks, to manage a problem whose entire existence was a line I
+wrote.</p>
+<p>I wrote the documentation for myself, so nothing ever executed it. There is one reader and the
+reader is the author, which means the runbook and my head agree, and the agreement is never tested.
+Wrong documentation can sit there indefinitely at zero cost, because the only person consuming it
+already knows the answer. Handing it to a new lead priced it immediately. The access list grew from
+six grants to nine while it was still being written. Two grants that looked exactly like access
+were not access at all: one invitation could never be delivered, because the mail path was never
+configured, and one was a data row with no invitation behind it. A ghost that looks like a grant.</p>
+<p>Key custody was never decided, only deferred. Five separate open items were each waiting on the
+same missing choice, and the inventory that would have surfaced that was itself open and had never
+been run. The forcing function was a handover, not an audit. I was about to hand someone a
+production system whose master decryption key existed in exactly one place on one disk, with no
+export, and only then did the deferral start to look like a decision I had actually made. Two
+things the audit had not caught: the backup repository’s key was stored inside the repository it
+protects, and its passphrase was a single-copy file on that same host. Escrowing the key alone
+would have closed a high-priority item while leaving the actual failure completely intact. That is
+the worst outcome available, because it retires the ticket that would have made someone look again.</p>
+<p>I shipped a coverage manifest whose vocabulary could not express “someone looked and there is
+none.” It could say nobody has looked. It could say protected. It had no word for a confirmed
+absence. So the production system with no off-site copy at all was simply left out of the list, and
+a sixteen-row manifest read as complete. An absence you can name is an absence you can page on. An
+absence you cannot name is indistinguishable from a thing nobody has checked yet, which is to say
+it is invisible in exactly the way that matters.</p>
+<p>I never watched a control fail on purpose, so I did not know whether I had one. A document asserted
+that a compromise of one machine could not reach the backup history. Both facts it cited were true.
+No authorized keys were installed. No SSH daemon was listening on the standard port. Neither of
+those was the actual access path, which ran through a different mechanism nobody had enumerated.
+It was reasoning from the wrong evidence, which is harder to catch than a lie, because every
+individual sentence in it survives review. An isolation claim justified by the absence of one
+mechanism is worthless unless every other mechanism has been enumerated. The acceptance test now is
+a delete that has to fail. I wrote that claim and then never once tried to falsify it, and for as
+long as it stood unfalsified it was not a claim at all. It was a preference with a paragraph built
+around it.</p>
+<p>Those seven did not get fixed in an afternoon. Two of them needed a personnel handover and a first
+login to a machine nobody had logged into, before anyone looked at all. Every one of them had been
+sitting in a file I wrote, in language I still agree with, the whole time.</p>
+<h2 id="what-we-accomplished">What we accomplished</h2>
+<p>Bounded, and all of it verified rather than asserted, which is the only reason it is worth listing
+after everything above.</p>
+<p>A relay we own, closed from first boot, on a dedicated host with its own ingress. A fast-moving
+pre-release stack does not share a kernel, a disk, or a memory ceiling with the workloads that pay
+the bills.</p>
+<p>Proof that it says no, not just proof that it is running. An un-invited key gets refused over HTTPS
+from off the network, plus six classes of unauthenticated request that all have to be rejected and
+all six are.</p>
+<p>Backups that restore. A named recovery point restored onto a different machine, with the exact
+production message physically present, membership intact, and the door still shut afterward.
+Recovery time of about three minutes, measured rather than estimated. A proven restore is not a
+second copy, which is the distinction the last section is about.</p>
+<p>Key custody written down as a register: live copy, escrowed copy, and the command that proves each
+one works. Proven by destroying a key inside a copy of the repository and recovering it from the
+escrow alone.</p>
+<p>Contract violations now fail at the gate instead of in review. The fork gates are a required check,
+and a deliberate canary that touches an upstream path goes red.</p>
+<p>The estate’s own alerting moved onto the relay, so the system posts into the room the team will
+live in rather than into a mailbox nobody opens on a Saturday.</p>
+<h2 id="what-we-are-trying-to-accomplish">What we are trying to accomplish</h2>
+<p>The goal is a surface where the agents doing the work are members rather than integrations. They
+hold their own keys. They post under their own identity. Their output is reviewable in the same
+room, by the same people it affects, at the time it happens. And the company owns the record
+instead of renting it. That is a different thing from a chat app with a bot in it, and the
+difference is exactly the substrate work above.</p>
+<p>The distance still to travel, stated plainly:</p>
+<ul>
+<li>The team is not moved yet. A handful of identities on the relay is not a migration.</li>
+<li>Production still holds one copy of its data. The key is escrowed and restore-proven. The off-site
+copy of the data itself does not exist.</li>
+<li>The most privileged human identity in the system lives on the least backed-up, least monitored
+machine in the estate.</li>
+<li>The automatic updater is installed and deliberately not armed, because arming it means unattended
+weekly deploys of pre-release software onto a live event store.</li>
+<li>One encryption recipient that can decrypt every production secret is documented nowhere. It is
+recorded as an open question rather than removed, because a wrong removal locks out whatever
+depends on it.</li>
+</ul>
+<p>The mistakes I could see got fixed the same week. The ones that cost the most were rules I had
+already written down, and having written them down is precisely what made them invisible. A rule on
+paper feels finished, and a finished thing does not get looked at again. Nothing in this estate was
+watching any of them, and I was the only person in a position to notice that, which is the part
+that took two weeks.</p>
+<h2 id="related-posts">Related Posts</h2>
+<ul>
+<li><a href="https://startaitools.com/posts/onboarding-one-person-audited-the-whole-estate/">Onboarding One Person Audited the Whole Estate</a></li>
+<li><a href="https://startaitools.com/posts/three-copies-of-the-key-none-of-the-passphrase/">Three Copies of the Key, None of the Passphrase</a></li>
+<li><a href="https://startaitools.com/posts/the-check-that-only-confirmed-a-name/">The Check That Only Confirmed a Name</a></li>
+</ul>
+      </div>
+    </div>
+  </article>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
