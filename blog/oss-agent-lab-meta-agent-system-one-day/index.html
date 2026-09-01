@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Building a Meta-Agent System From Scratch in One Day — Tons of Skills Work Diary</title>
+    <meta name="description" content="From first commit to a 9-specialist multi-agent system with capability scoring, session memory, and a meta-agent orchestrator. All in one day.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://startaitools.com/posts/oss-agent-lab-meta-agent-system-one-day/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/oss-agent-lab-meta-agent-system-one-day/">
+    <meta property="og:title" content="Building a Meta-Agent System From Scratch in One Day — Tons of Skills Work Diary">
+    <meta property="og:description" content="From first commit to a 9-specialist multi-agent system with capability scoring, session memory, and a meta-agent orchestrator. All in one day.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="Building a Meta-Agent System From Scratch in One Day — Tons of Skills Work Diary">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/oss-agent-lab-meta-agent-system-one-day/">
+    <meta name="twitter:title" content="Building a Meta-Agent System From Scratch in One Day — Tons of Skills Work Diary">
+    <meta name="twitter:description" content="From first commit to a 9-specialist multi-agent system with capability scoring, session memory, and a meta-agent orchestrator. All in one day.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"Building a Meta-Agent System From Scratch in One Day","description":"From first commit to a 9-specialist multi-agent system with capability scoring, session memory, and a meta-agent orchestrator. All in one day.","datePublished":"2026-03-15","url":"https://tonsofskills.com/blog/undefined","author":{"@type":"Person","name":"Jeremy Longshore"},"publisher":{"@type":"Organization","name":"Tons of Skills","url":"https://tonsofskills.com"}}</script>
+  
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.post-header[data-astro-cid-7jjqptxk]{background:var(--panel);padding:4rem 1.5rem 3rem;border-bottom:1px solid var(--border)}.post-header-inner[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto}.back-link[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3);text-decoration:none;display:inline-block;margin-bottom:1.5rem;transition:color .2s}.back-link[data-astro-cid-7jjqptxk]:hover{color:var(--primary)}.post-meta[data-astro-cid-7jjqptxk]{display:flex;align-items:center;gap:.75rem;margin-bottom:1rem}time[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3)}.featured-badge[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.2rem .6rem;background:#ce114126;color:var(--red);border-radius:0;font-weight:600;text-transform:uppercase;letter-spacing:.05em}.post-header[data-astro-cid-7jjqptxk] h1[data-astro-cid-7jjqptxk]{font-family:var(--font-body);font-size:clamp(1.5rem,4vw,2.2rem);font-weight:700;color:var(--text);line-height:1.25;margin-bottom:.75rem;letter-spacing:0}.post-desc[data-astro-cid-7jjqptxk]{color:var(--text-2);font-size:1.05rem;line-height:1.6;margin-bottom:1rem}.post-tags[data-astro-cid-7jjqptxk]{display:flex;gap:.4rem;flex-wrap:wrap}.tag[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.15rem .5rem;background:var(--surface-3);color:var(--text-3);border-radius:0}.post-body[data-astro-cid-7jjqptxk]{padding:3rem 1.5rem 4rem}.prose[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto;color:var(--text-2);line-height:1.8;font-size:1rem}.prose[data-astro-cid-7jjqptxk] h2{font-family:var(--font-body);font-size:1.5rem;font-weight:700;color:var(--text);margin:2.5rem 0 1rem;letter-spacing:0}.prose[data-astro-cid-7jjqptxk] h3{font-size:1.2rem;font-weight:600;color:var(--text);margin:2rem 0 .75rem}.prose[data-astro-cid-7jjqptxk] p{margin-bottom:1rem}.prose[data-astro-cid-7jjqptxk] ul,.prose[data-astro-cid-7jjqptxk] ol{margin:.5rem 0 1rem 1.5rem}.prose[data-astro-cid-7jjqptxk] li{margin-bottom:.35rem}.prose[data-astro-cid-7jjqptxk] strong{color:var(--text);font-weight:600}.prose[data-astro-cid-7jjqptxk] code{font-family:var(--font-mono);font-size:.88em;background:var(--surface-3);padding:.15em .35em;border-radius:0;color:var(--primary)}.prose[data-astro-cid-7jjqptxk] a{color:var(--primary);text-decoration:none}.prose[data-astro-cid-7jjqptxk] a:hover{text-decoration:underline}@media(max-width:768px){.post-header[data-astro-cid-7jjqptxk]{padding:3rem 1rem 2rem}.post-body[data-astro-cid-7jjqptxk]{padding:2rem 1rem 3rem}}
+</style></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  <article class="post" data-astro-cid-7jjqptxk>
+    <header class="post-header" data-astro-cid-7jjqptxk>
+      <div class="post-header-inner" data-astro-cid-7jjqptxk>
+        <a href="/blog" class="back-link" data-astro-cid-7jjqptxk>Back to Work Diary</a>
+        <div class="post-meta" data-astro-cid-7jjqptxk>
+          <time datetime="2026-03-15" data-astro-cid-7jjqptxk>March 14, 2026</time>
+          
+        </div>
+        <h1 data-astro-cid-7jjqptxk>Building a Meta-Agent System From Scratch in One Day</h1>
+        <p class="post-desc" data-astro-cid-7jjqptxk>From first commit to a 9-specialist multi-agent system with capability scoring, session memory, and a meta-agent orchestrator. All in one day.</p>
+        <div class="post-tags" data-astro-cid-7jjqptxk>
+          <span class="tag" data-astro-cid-7jjqptxk>ai-agents</span><span class="tag" data-astro-cid-7jjqptxk>python</span><span class="tag" data-astro-cid-7jjqptxk>architecture</span><span class="tag" data-astro-cid-7jjqptxk>testing</span><span class="tag" data-astro-cid-7jjqptxk>automation</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="post-body" data-astro-cid-7jjqptxk>
+      <div class="prose" data-astro-cid-7jjqptxk>
+        <p>What if the agent routing your requests was itself an agent? Not a switch statement with an LLM wrapper. An actual agent that evaluates other agents, scores their capabilities, remembers what worked, and routes based on evidence.</p>
+<p>That’s what <a href="https://github.com/jeremylongshore/oss-agent-lab">oss-agent-lab</a> shipped in a single day. Six phases. Nine specialists. A meta-agent that orchestrates the entire team. Here’s how it came together.</p>
+<h2 id="phase-1-specs-before-code">Phase 1: Specs Before Code</h2>
+<p>Nine specification documents before a single line of application code. Base package structure, contracts, CLI skeleton, specialist template.</p>
+<p>This isn’t ceremony. When you’re building a multi-agent system, the contracts between agents <em>are</em> the architecture. Get them wrong and you refactor every specialist when the routing interface changes. Get them right and each phase stacks cleanly.</p>
+<p>Every agent implements the same contract:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#F97583">class</span><span style="color:#B392F0"> BaseSpecialist</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">ABC</span><span style="color:#E1E4E8">):</span></span>
+<span class="line"><span style="color:#9ECBFF">    """Contract every specialist must satisfy."""</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">    @abstractmethod</span></span>
+<span class="line"><span style="color:#F97583">    def</span><span style="color:#B392F0"> capabilities</span><span style="color:#E1E4E8">(self) -> list[Capability]:</span></span>
+<span class="line"><span style="color:#9ECBFF">        """Declare what this specialist can do."""</span></span>
+<span class="line"><span style="color:#79B8FF">        ...</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">    @abstractmethod</span></span>
+<span class="line"><span style="color:#F97583">    async</span><span style="color:#F97583"> def</span><span style="color:#B392F0"> execute</span><span style="color:#E1E4E8">(self, intent: ClassifiedIntent, context: SessionContext) -> SpecialistResult:</span></span>
+<span class="line"><span style="color:#9ECBFF">        """Handle a routed request."""</span></span>
+<span class="line"><span style="color:#79B8FF">        ...</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">    @</span><span style="color:#79B8FF">property</span></span>
+<span class="line"><span style="color:#B392F0">    @abstractmethod</span></span>
+<span class="line"><span style="color:#F97583">    def</span><span style="color:#B392F0"> name</span><span style="color:#E1E4E8">(self) -> </span><span style="color:#79B8FF">str</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#9ECBFF">        """Unique identifier for registry lookup."""</span></span>
+<span class="line"><span style="color:#79B8FF">        ...</span></span></code></pre>
+<p>Three methods. That’s the entire plugin surface. Declare capabilities, execute against a classified intent, done. No inheritance trees. No framework magic.</p>
+<h2 id="phase-2-the-conductor">Phase 2: The Conductor</h2>
+<p>The <code>ConductorAgent</code> is the brain. It takes raw user input, classifies the intent using Claude’s SDK, and hands it to the router.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#F97583">class</span><span style="color:#B392F0"> ConductorAgent</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#9ECBFF">    """Classifies user intent and orchestrates routing."""</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">    def</span><span style="color:#79B8FF"> __init__</span><span style="color:#E1E4E8">(self, registry: SpecialistRegistry, router: RouterAgent, memory: SessionMemory):</span></span>
+<span class="line"><span style="color:#79B8FF">        self</span><span style="color:#E1E4E8">.registry </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> registry</span></span>
+<span class="line"><span style="color:#79B8FF">        self</span><span style="color:#E1E4E8">.router </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> router</span></span>
+<span class="line"><span style="color:#79B8FF">        self</span><span style="color:#E1E4E8">.memory </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> memory</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">    async</span><span style="color:#F97583"> def</span><span style="color:#B392F0"> handle</span><span style="color:#E1E4E8">(self, user_input: </span><span style="color:#79B8FF">str</span><span style="color:#E1E4E8">, session_id: </span><span style="color:#79B8FF">str</span><span style="color:#E1E4E8">) -> OrchestratedResult:</span></span>
+<span class="line"><span style="color:#6A737D">        # 1. Recall relevant context from prior turns</span></span>
+<span class="line"><span style="color:#E1E4E8">        context </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> self</span><span style="color:#E1E4E8">.memory.recall(session_id, </span><span style="color:#FFAB70">keywords</span><span style="color:#F97583">=</span><span style="color:#E1E4E8">extract_keywords(user_input))</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">        # 2. Classify intent via Claude SDK</span></span>
+<span class="line"><span style="color:#E1E4E8">        intent </span><span style="color:#F97583">=</span><span style="color:#F97583"> await</span><span style="color:#79B8FF"> self</span><span style="color:#E1E4E8">.classify_intent(user_input, context)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">        # 3. Route to the best specialist</span></span>
+<span class="line"><span style="color:#E1E4E8">        result </span><span style="color:#F97583">=</span><span style="color:#F97583"> await</span><span style="color:#79B8FF"> self</span><span style="color:#E1E4E8">.router.route(intent, context)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">        # 4. Persist this turn's context for future recall</span></span>
+<span class="line"><span style="color:#79B8FF">        self</span><span style="color:#E1E4E8">.memory.store(session_id, intent, result)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">        return</span><span style="color:#E1E4E8"> result</span></span></code></pre>
+<p>Four steps. Recall, classify, route, store. The <code>SessionMemory</code> uses keyword-based recall — not vector search, not embeddings. Keywords from user input match against stored turn summaries. Simple, fast, debuggable.</p>
+<p>The <code>SpecialistRegistry</code> is a flat dictionary with validation. No dependency injection framework. No service locator pattern. Call <code>register()</code>, declare capabilities, and the router finds you. Add a new specialist and the system discovers it on the next request.</p>
+<h2 id="phase-3-4-nine-specialists">Phase 3-4: Nine Specialists</h2>
+<p>First three: <code>autoresearch</code>, <code>swarm_predict</code>, <code>deer_flow</code>. Then six more in a single push. Nine specialists total, each handling a different domain.</p>
+<p>The key insight: specialists don’t know about each other. They don’t import each other. The <code>RouterAgent</code> handles all coordination by comparing capability scores against the classified intent.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#F97583">class</span><span style="color:#B392F0"> RouterAgent</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#9ECBFF">    """Routes classified intents to specialists based on capability scores."""</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">    async</span><span style="color:#F97583"> def</span><span style="color:#B392F0"> route</span><span style="color:#E1E4E8">(self, intent: ClassifiedIntent, context: SessionContext) -> OrchestratedResult:</span></span>
+<span class="line"><span style="color:#E1E4E8">        candidates </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> self</span><span style="color:#E1E4E8">.registry.capabilities()</span></span>
+<span class="line"><span style="color:#E1E4E8">        scored </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> self</span><span style="color:#E1E4E8">.scoring_engine.score(candidates, intent, context)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">        if</span><span style="color:#F97583"> not</span><span style="color:#E1E4E8"> scored:</span></span>
+<span class="line"><span style="color:#F97583">            return</span><span style="color:#E1E4E8"> OrchestratedResult.unresolvable(intent)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">        best </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> scored[</span><span style="color:#79B8FF">0</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"><span style="color:#E1E4E8">        specialist </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> self</span><span style="color:#E1E4E8">.registry.get(best.specialist)</span></span>
+<span class="line"><span style="color:#F97583">        return</span><span style="color:#F97583"> await</span><span style="color:#E1E4E8"> specialist.execute(intent, context)</span></span></code></pre>
+<p>The scoring isn’t a simple keyword match. It’s multi-source.</p>
+<h2 id="phase-5-capability-scoring-engine">Phase 5: Capability Scoring Engine</h2>
+<p>This is where it gets interesting. Three scoring sources, weighted and combined:</p>
+<p><strong>Temporal scoring.</strong> Recent successes get a boost. A specialist that handled a similar intent 5 minutes ago scores higher than one that handled it yesterday. Natural “hot path” behavior without explicit caching.</p>
+<p><strong>User feedback scoring.</strong> Ratings feed back into capability scores. A specialist that consistently gets thumbs-down on a particular intent type sees its score decay. No manual tuning — the system self-corrects.</p>
+<p><strong>Domain relevance scoring.</strong> Static scores declared in each specialist’s capability contract. The baseline that temporal and feedback signals modify.</p>
+<p>The three combine with configurable weights: 40% domain relevance, 35% temporal, 25% user feedback. Tunable per deployment.</p>
+<h2 id="phase-6-the-meta-agent">Phase 6: The Meta-Agent</h2>
+<p>Here’s the recursive part. The meta-agent is itself a specialist registered in the same registry. But instead of handling a single domain, it orchestrates multi-step workflows across the entire specialist team.</p>
+<p>When the intent classifier detects a compound request — “research X, then predict Y based on the research” — the conductor routes to the meta-agent. The meta-agent decomposes the compound intent into sub-intents, routes each through the same conductor pipeline, and assembles the results.</p>
+<p>It’s agents all the way down. Same routing infrastructure as any other request. The meta-agent just happens to produce requests instead of consuming them. The output generator formats results for the final consumer — CLI, API, whatever sits on top.</p>
+<h2 id="the-ci-story">The CI Story</h2>
+<p>This isn’t a prototype. mypy strict mode, ruff, unit tests for every component, and E2E orchestration tests covering the full pipeline from user input to specialist output.</p>
+<p>The E2E tests prove the contracts work end-to-end:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#F97583">async</span><span style="color:#F97583"> def</span><span style="color:#B392F0"> test_full_orchestration</span><span style="color:#E1E4E8">():</span></span>
+<span class="line"><span style="color:#E1E4E8">    registry </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> SpecialistRegistry()</span></span>
+<span class="line"><span style="color:#E1E4E8">    registry.register(MockResearchSpecialist())</span></span>
+<span class="line"><span style="color:#E1E4E8">    registry.register(MockPredictSpecialist())</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">    conductor </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> ConductorAgent(</span><span style="color:#FFAB70">registry</span><span style="color:#F97583">=</span><span style="color:#E1E4E8">registry, </span><span style="color:#FFAB70">router</span><span style="color:#F97583">=</span><span style="color:#E1E4E8">RouterAgent(registry), </span><span style="color:#FFAB70">memory</span><span style="color:#F97583">=</span><span style="color:#E1E4E8">SessionMemory())</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">    result </span><span style="color:#F97583">=</span><span style="color:#F97583"> await</span><span style="color:#E1E4E8"> conductor.handle(</span><span style="color:#9ECBFF">"research recent trends in LLM agents"</span><span style="color:#E1E4E8">, </span><span style="color:#FFAB70">session_id</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">"test-1"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">    assert</span><span style="color:#E1E4E8"> result.specialist </span><span style="color:#F97583">==</span><span style="color:#9ECBFF"> "autoresearch"</span></span>
+<span class="line"><span style="color:#F97583">    assert</span><span style="color:#E1E4E8"> result.status </span><span style="color:#F97583">==</span><span style="color:#9ECBFF"> "success"</span></span></code></pre>
+<p>If the contract between conductor, router, registry, and specialist breaks, this test catches it. No mocks hiding the integration boundary.</p>
+<h2 id="also-claude-code-plugins-detail-pages">Also: claude-code-plugins Detail Pages</h2>
+<p>Parallel track. The <a href="https://github.com/jeremylongshore/claude-code-plugins">claude-code-plugins</a> registry shipped enhanced detail pages with README section extraction, markdown-to-HTML rendering for skill content, redesigned contributor cards, and a Killer Skill hero spotlight with email signup. Four PRs.</p>
+<h2 id="from-empty-repo-to-multi-agent-system">From Empty Repo to Multi-Agent System</h2>
+<p>Six phases in one day is possible because of two things. First: contracts came first. The specialist template, the capability declaration, the intent classification schema — these don’t change across phases. Stable core, everything else plugs in.</p>
+<p>Second: agents that don’t know about each other are easy to build in parallel. No circular dependencies. No coordination overhead. The meta-agent uses the same public API as any external consumer.</p>
+<p>The result is an open-source lab where you can evaluate any agent framework by wrapping it in a specialist contract, registering it, and letting the scoring engine figure out when to use it. Not another agent framework. A system for <em>comparing</em> agent frameworks.</p>
+<hr>
+<p><em>Related posts:</em></p>
+<ul>
+<li><a href="/blog/deterministic-dxf-comparison-engine-one-day-build/">Building a Deterministic DXF Comparison Engine in One Day</a> — another greenfield system with layered architecture shipped in a single session</li>
+<li><a href="/blog/from-tool-to-platform-intentcad-five-epics-one-day/">From Tool to Platform: IntentCAD Ships Five EPICs in One Day</a> — the same contract-driven routing pattern applied to CAD operations</li>
+<li><a href="/blog/zero-to-ci-full-stack-dashboard-one-session/">Zero to CI: Full-Stack Dashboard in One Session</a> — opinionated stack choices and specs-first methodology in a different domain</li>
+</ul>
+      </div>
+    </div>
+  </article>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
