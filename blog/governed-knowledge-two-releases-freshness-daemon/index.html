@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Governed Knowledge: Two Major Releases, a Freshness Daemon, and Export Gating — Tons of Skills Work Diary</title>
+    <meta name="description" content="qmd-team-intent-kb ships v0.2.0 and v0.3.0 in one day — freshness-aware search with exponential decay, an edge daemon that auto-deprecates stale memories, security hardening, and export gating. Plus claude-code-plugins v4.20.0.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://startaitools.com/posts/governed-knowledge-two-releases-freshness-daemon/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/governed-knowledge-two-releases-freshness-daemon/">
+    <meta property="og:title" content="Governed Knowledge: Two Major Releases, a Freshness Daemon, and Export Gating — Tons of Skills Work Diary">
+    <meta property="og:description" content="qmd-team-intent-kb ships v0.2.0 and v0.3.0 in one day — freshness-aware search with exponential decay, an edge daemon that auto-deprecates stale memories, security hardening, and export gating. Plus claude-code-plugins v4.20.0.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="Governed Knowledge: Two Major Releases, a Freshness Daemon, and Export Gating — Tons of Skills Work Diary">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/governed-knowledge-two-releases-freshness-daemon/">
+    <meta name="twitter:title" content="Governed Knowledge: Two Major Releases, a Freshness Daemon, and Export Gating — Tons of Skills Work Diary">
+    <meta name="twitter:description" content="qmd-team-intent-kb ships v0.2.0 and v0.3.0 in one day — freshness-aware search with exponential decay, an edge daemon that auto-deprecates stale memories, security hardening, and export gating. Plus claude-code-plugins v4.20.0.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"Governed Knowledge: Two Major Releases, a Freshness Daemon, and Export Gating","description":"qmd-team-intent-kb ships v0.2.0 and v0.3.0 in one day — freshness-aware search with exponential decay, an edge daemon that auto-deprecates stale memories, security hardening, and export gating. Plus claude-code-plugins v4.20.0.","datePublished":"2026-03-19","url":"https://tonsofskills.com/blog/undefined","author":{"@type":"Person","name":"Jeremy Longshore"},"publisher":{"@type":"Organization","name":"Tons of Skills","url":"https://tonsofskills.com"}}</script>
+  
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.post-header[data-astro-cid-7jjqptxk]{background:var(--panel);padding:4rem 1.5rem 3rem;border-bottom:1px solid var(--border)}.post-header-inner[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto}.back-link[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3);text-decoration:none;display:inline-block;margin-bottom:1.5rem;transition:color .2s}.back-link[data-astro-cid-7jjqptxk]:hover{color:var(--primary)}.post-meta[data-astro-cid-7jjqptxk]{display:flex;align-items:center;gap:.75rem;margin-bottom:1rem}time[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3)}.featured-badge[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.2rem .6rem;background:#ce114126;color:var(--red);border-radius:0;font-weight:600;text-transform:uppercase;letter-spacing:.05em}.post-header[data-astro-cid-7jjqptxk] h1[data-astro-cid-7jjqptxk]{font-family:var(--font-body);font-size:clamp(1.5rem,4vw,2.2rem);font-weight:700;color:var(--text);line-height:1.25;margin-bottom:.75rem;letter-spacing:0}.post-desc[data-astro-cid-7jjqptxk]{color:var(--text-2);font-size:1.05rem;line-height:1.6;margin-bottom:1rem}.post-tags[data-astro-cid-7jjqptxk]{display:flex;gap:.4rem;flex-wrap:wrap}.tag[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.15rem .5rem;background:var(--surface-3);color:var(--text-3);border-radius:0}.post-body[data-astro-cid-7jjqptxk]{padding:3rem 1.5rem 4rem}.prose[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto;color:var(--text-2);line-height:1.8;font-size:1rem}.prose[data-astro-cid-7jjqptxk] h2{font-family:var(--font-body);font-size:1.5rem;font-weight:700;color:var(--text);margin:2.5rem 0 1rem;letter-spacing:0}.prose[data-astro-cid-7jjqptxk] h3{font-size:1.2rem;font-weight:600;color:var(--text);margin:2rem 0 .75rem}.prose[data-astro-cid-7jjqptxk] p{margin-bottom:1rem}.prose[data-astro-cid-7jjqptxk] ul,.prose[data-astro-cid-7jjqptxk] ol{margin:.5rem 0 1rem 1.5rem}.prose[data-astro-cid-7jjqptxk] li{margin-bottom:.35rem}.prose[data-astro-cid-7jjqptxk] strong{color:var(--text);font-weight:600}.prose[data-astro-cid-7jjqptxk] code{font-family:var(--font-mono);font-size:.88em;background:var(--surface-3);padding:.15em .35em;border-radius:0;color:var(--primary)}.prose[data-astro-cid-7jjqptxk] a{color:var(--primary);text-decoration:none}.prose[data-astro-cid-7jjqptxk] a:hover{text-decoration:underline}@media(max-width:768px){.post-header[data-astro-cid-7jjqptxk]{padding:3rem 1rem 2rem}.post-body[data-astro-cid-7jjqptxk]{padding:2rem 1rem 3rem}}
+</style></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  <article class="post" data-astro-cid-7jjqptxk>
+    <header class="post-header" data-astro-cid-7jjqptxk>
+      <div class="post-header-inner" data-astro-cid-7jjqptxk>
+        <a href="/blog" class="back-link" data-astro-cid-7jjqptxk>Back to Work Diary</a>
+        <div class="post-meta" data-astro-cid-7jjqptxk>
+          <time datetime="2026-03-19" data-astro-cid-7jjqptxk>March 18, 2026</time>
+          
+        </div>
+        <h1 data-astro-cid-7jjqptxk>Governed Knowledge: Two Major Releases, a Freshness Daemon, and Export Gating</h1>
+        <p class="post-desc" data-astro-cid-7jjqptxk>qmd-team-intent-kb ships v0.2.0 and v0.3.0 in one day — freshness-aware search with exponential decay, an edge daemon that auto-deprecates stale memories, security hardening, and export gating. Plus claude-code-plugins v4.20.0.</p>
+        <div class="post-tags" data-astro-cid-7jjqptxk>
+          <span class="tag" data-astro-cid-7jjqptxk>typescript</span><span class="tag" data-astro-cid-7jjqptxk>architecture</span><span class="tag" data-astro-cid-7jjqptxk>release-engineering</span><span class="tag" data-astro-cid-7jjqptxk>ai-agents</span><span class="tag" data-astro-cid-7jjqptxk>claude-code</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="post-body" data-astro-cid-7jjqptxk>
+      <div class="prose" data-astro-cid-7jjqptxk>
+        <p>Yesterday we built the knowledge base from zero to API. Today we shipped it twice.</p>
+<p><code>qmd-team-intent-kb</code> went from v0.1.0 to v0.3.0 in a single day. Eighteen commits. Two tagged releases. The first release (v0.2.0) was dependency hygiene — upgrading everything before the real work. The second (v0.3.0) was the real release: freshness-aware search, an edge daemon for automatic stale-memory deprecation, security hardening, content classification, and export gating.</p>
+<p>Twenty commits across two repos. Here’s what actually shipped and why it matters.</p>
+<h2 id="freshness-aware-search">Freshness-Aware Search</h2>
+<p>The search endpoint landed as <code>POST /api/search</code>. Standard text search was already in the store layer via SQL <code>LIKE</code> queries. What v0.3.0 added was freshness-aware reranking — results that are technically relevant but six months old get penalized relative to results from last week.</p>
+<p>The scoring uses exponential decay:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#F97583">function</span><span style="color:#B392F0"> freshnessScore</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">updatedAt</span><span style="color:#F97583">:</span><span style="color:#B392F0"> Date</span><span style="color:#E1E4E8">, </span><span style="color:#FFAB70">now</span><span style="color:#F97583">:</span><span style="color:#B392F0"> Date</span><span style="color:#E1E4E8">)</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> number</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> daysOld</span><span style="color:#F97583"> =</span><span style="color:#B392F0"> daysBetween</span><span style="color:#E1E4E8">(updatedAt, now);</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> halfLife</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> 90</span><span style="color:#E1E4E8">; </span><span style="color:#6A737D">// days</span></span>
+<span class="line"><span style="color:#F97583">  return</span><span style="color:#E1E4E8"> Math.</span><span style="color:#B392F0">exp</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">-</span><span style="color:#79B8FF">0.693</span><span style="color:#F97583"> *</span><span style="color:#E1E4E8"> daysOld </span><span style="color:#F97583">/</span><span style="color:#E1E4E8"> halfLife);</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>An article updated today scores 1.0. At 90 days it scores 0.5. At 180 days, 0.25. The half-life is configurable per category — operational runbooks decay faster than architectural decision records, because a stale runbook is dangerous and a stale ADR is just history.</p>
+<p>Category-aware reranking sits on top of this. The policy engine already knew about article categories. The search reranker now asks: given this query, which categories should be boosted? A query containing “incident” or “outage” boosts runbooks. A query containing “why” or “decision” boosts ADRs. Simple heuristics, but they shift the results from “technically matching” to “actually useful.”</p>
+<p>The relevance scoring rule in the policy engine also got graduated signals — content length, source authority, and category all feed into the final score with weighted contributions instead of binary flags.</p>
+<h2 id="the-edge-daemon">The Edge Daemon</h2>
+<p>This is the piece I’m most interested in long-term. The edge daemon is a local process that watches a spool directory, curates incoming memories, and syncs them to the central index.</p>
+<p>Three responsibilities:</p>
+<p><strong>Spool watch.</strong> New memories arrive as files in a local directory. The daemon picks them up, validates structure, and queues them for curation. This decouples memory creation from memory storage — you can write memories offline and they sync when connectivity returns.</p>
+<p><strong>Curation.</strong> Each incoming memory gets classified, tagged, and scored before entering the index. The daemon applies the same policy engine rules that the API uses, but locally. No network round-trip for classification.</p>
+<p><strong>Staleness sweep.</strong> This is the auto-deprecation loop. The daemon periodically scans all indexed memories and runs freshness scoring against them. Memories that fall below the staleness threshold get automatically marked deprecated:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#F97583">interface</span><span style="color:#B392F0"> StalenessConfig</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#FFAB70">  sweepIntervalMinutes</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> number</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#FFAB70">  thresholds</span><span style="color:#F97583">:</span><span style="color:#B392F0"> Record</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">MemoryCategory</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">number</span><span style="color:#E1E4E8">>;  </span><span style="color:#6A737D">// days</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">// Default thresholds</span></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> STALENESS_DEFAULTS</span><span style="color:#F97583">:</span><span style="color:#B392F0"> StalenessConfig</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  sweepIntervalMinutes: </span><span style="color:#79B8FF">60</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  thresholds: {</span></span>
+<span class="line"><span style="color:#9ECBFF">    "operational"</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">30</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">    "architectural"</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">180</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">    "onboarding"</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">90</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">    "troubleshooting"</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">60</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  },</span></span>
+<span class="line"><span style="color:#E1E4E8">};</span></span></code></pre>
+<p>Operational memories go stale in 30 days. Architectural decisions get 180. The daemon doesn’t delete anything — it marks memories as deprecated so they still appear in search results but with a clear staleness indicator. A human can promote a deprecated memory back to active if the content is still valid.</p>
+<p>This is the governance loop that most knowledge systems lack. They depend on humans noticing that something is outdated. The daemon makes staleness visible and automatic.</p>
+<h2 id="security-hardening-and-export-gating">Security Hardening and Export Gating</h2>
+<p>Phase 8 was security. Content classification assigns sensitivity levels to memories — public, internal, confidential, restricted. The classification happens at write time and the label sticks with the memory through its lifecycle.</p>
+<p>Export gating builds on classification. When you export memories (to git, to another system, to a report), the export pipeline checks sensitivity labels against the requesting context. A git export to a public repository strips confidential and restricted memories. An internal team export includes everything up to confidential. Restricted memories only export to explicitly authorized targets.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#F97583">type</span><span style="color:#B392F0"> SensitivityLevel</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "public"</span><span style="color:#F97583"> |</span><span style="color:#9ECBFF"> "internal"</span><span style="color:#F97583"> |</span><span style="color:#9ECBFF"> "confidential"</span><span style="color:#F97583"> |</span><span style="color:#9ECBFF"> "restricted"</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">interface</span><span style="color:#B392F0"> ExportContext</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#FFAB70">  target</span><span style="color:#F97583">:</span><span style="color:#9ECBFF"> "git-public"</span><span style="color:#F97583"> |</span><span style="color:#9ECBFF"> "git-internal"</span><span style="color:#F97583"> |</span><span style="color:#9ECBFF"> "report"</span><span style="color:#F97583"> |</span><span style="color:#9ECBFF"> "api"</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#FFAB70">  requestor</span><span style="color:#F97583">:</span><span style="color:#B392F0"> Actor</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#FFAB70">  maxSensitivity</span><span style="color:#F97583">:</span><span style="color:#B392F0"> SensitivityLevel</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">function</span><span style="color:#B392F0"> canExport</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">memory</span><span style="color:#F97583">:</span><span style="color:#B392F0"> Memory</span><span style="color:#E1E4E8">, </span><span style="color:#FFAB70">ctx</span><span style="color:#F97583">:</span><span style="color:#B392F0"> ExportContext</span><span style="color:#E1E4E8">)</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> boolean</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> levels</span><span style="color:#F97583">:</span><span style="color:#B392F0"> SensitivityLevel</span><span style="color:#E1E4E8">[] </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> [</span><span style="color:#9ECBFF">"public"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"internal"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"confidential"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"restricted"</span><span style="color:#E1E4E8">];</span></span>
+<span class="line"><span style="color:#F97583">  return</span><span style="color:#E1E4E8"> levels.</span><span style="color:#B392F0">indexOf</span><span style="color:#E1E4E8">(memory.sensitivity) </span><span style="color:#F97583">&#x3C;=</span><span style="color:#E1E4E8"> levels.</span><span style="color:#B392F0">indexOf</span><span style="color:#E1E4E8">(ctx.maxSensitivity);</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>Simple ordinal comparison. But without it, every export is a potential data leak. The gating is enforced at the export layer, not at the UI layer. You can’t build a custom integration that bypasses it because the function sits between the store and the output.</p>
+<h2 id="release-readiness-phase-9">Release Readiness (Phase 9)</h2>
+<p>Phase 9 was packaging and developer operability. This is the phase people skip and regret. It covers:</p>
+<ul>
+<li>Package manifests with correct entry points and type exports</li>
+<li>README with actual setup instructions (not aspirational ones)</li>
+<li>A <code>bd doctor</code>-compatible health check</li>
+<li>CI passing on every commit, not just the last one</li>
+</ul>
+<p>The two releases landed cleanly because Phase 9 was an explicit phase, not an afterthought. v0.2.0 tagged after dependency upgrades. v0.3.0 tagged after all feature phases passed CI. No “let’s just tag it and see if it works.”</p>
+<h2 id="meanwhile-claude-code-plugins-v4200">Meanwhile: claude-code-plugins v4.20.0</h2>
+<p>On the other side of the workspace, <code>claude-code-plugins</code> shipped v4.20.0 with two things worth mentioning.</p>
+<p>The <code>pr-to-spec</code> MCP plugin converts pull request diffs into structured specifications. You point it at a PR, it reads the diff, and it outputs a spec document describing what changed and why. Useful for teams that need to maintain specs but don’t want to write them by hand after every PR merge.</p>
+<p>The same release included eight SaaS pack rewrites. These are curated collections of skills organized by SaaS platform — think “everything you need for working with Stripe” or “all the Jira skills in one pack.” The rewrites brought them up to current quality standards with proper error handling and input validation.</p>
+<h2 id="the-two-release-pattern">The Two-Release Pattern</h2>
+<p>Shipping v0.2.0 and v0.3.0 on the same day isn’t reckless. It’s deliberate. v0.2.0 was a dependency-only release — upgrading packages, fixing CI, ensuring the foundation was solid. Tagging it separately means if v0.3.0 introduces a regression, you can roll back to v0.2.0 and still have all your dependency upgrades.</p>
+<p>It also means v0.3.0’s diff is clean. Every change in the v0.3.0 tag is feature work. No dependency noise mixed in. When you’re debugging a freshness scoring bug three months from now, <code>git log v0.2.0..v0.3.0</code> shows only the commits that matter.</p>
+<p>This is basic release hygiene, but most projects bundle everything into one tag and lose the ability to isolate changes later.</p>
+<h2 id="the-commit-graph">The Commit Graph</h2>
+<p>Eighteen commits in qmd-team-intent-kb. Two in claude-code-plugins. The breakdown:</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Phase</th><th>Commits</th><th>What Shipped</th></tr></thead><tbody><tr><td>Dependencies</td><td>3</td><td>Upgrades, CI fixes, v0.2.0 tag</td></tr><tr><td>Search API</td><td>2</td><td>POST /api/search, SQL text search</td></tr><tr><td>Freshness</td><td>2</td><td>Exponential decay, category reranking</td></tr><tr><td>Edge Daemon</td><td>2</td><td>Spool watch, curation, staleness sweep</td></tr><tr><td>Policy Engine</td><td>2</td><td>Graduated relevance scoring</td></tr><tr><td>Security</td><td>3</td><td>Content classification, export gating</td></tr><tr><td>Release</td><td>4</td><td>Phase 9 packaging, v0.3.0 tag</td></tr></tbody></table>
+<p>Every phase has its own commits. Every commit builds on a passing CI run from the previous one. The edge daemon doesn’t land on a broken build from the search API phase.</p>
+<h2 id="whats-next">What’s Next</h2>
+<p>The edge daemon opens up offline-first workflows. A developer’s local machine accumulates memories throughout the day — code review notes, debugging insights, architectural observations — and they sync to the team index when ready. The staleness sweep keeps the index from growing unbounded.</p>
+<p>The freshness scoring needs real-world calibration. The 90-day half-life is a guess. After a month of actual usage, the decay curves will need tuning based on which categories actually go stale at what rate.</p>
+<p>Export gating needs integration tests against real git targets. The unit tests prove the ordinal comparison works. They don’t prove that a CI pipeline correctly strips confidential memories from a public export.</p>
+<hr>
+<h3 id="related-posts">Related Posts</h3>
+<ul>
+<li><a href="/blog/knowledge-base-zero-to-api-lifecycle-state-machine/">Knowledge Base from Zero to API: Lifecycle State Machines and Policy Engines</a> — The day before: building the foundation that today’s releases built on</li>
+<li><a href="/blog/building-post-compaction-recovery-beads/">Building Post-Compaction Recovery with Beads</a> — Another system where memory governance and staleness matter</li>
+<li><a href="/blog/external-plugin-sync-keeping-community-plugins-fresh/">External Plugin Sync: Keeping Community Plugins Fresh</a> — The freshness problem applied to plugin marketplaces instead of knowledge bases</li>
+</ul>
+      </div>
+    </div>
+  </article>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
