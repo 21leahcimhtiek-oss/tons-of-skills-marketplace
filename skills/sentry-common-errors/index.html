@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>sentry-common-errors - Agent Skill</title>
+    <meta name="description" content="Troubleshoot common Sentry integration issues and fixes. Use when encountering Sentry errors, missing events, source map failures, rate limits, or configuration problems. Trigger: &quot;sentry not working&quot;, &quot;sentry errors missing&quot;, &quot;fix sentry&quot;, &quot;sentry troubleshoot&quot;, &quot;sentry 429&quot;, &quot;source maps not resolving&quot;, &quot;sentry events not showing&quot;, &quot;sentry flush&quot;, &quot;sentry CORS&quot;.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://tonsofskills.com/tons-of-skills-marketplace/skills/sentry-common-errors/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/sentry-common-errors/">
+    <meta property="og:title" content="sentry-common-errors - Agent Skill">
+    <meta property="og:description" content="Troubleshoot common Sentry integration issues and fixes. Use when encountering Sentry errors, missing events, source map failures, rate limits, or configuration problems. Trigger: &quot;sentry not working&quot;, &quot;sentry errors missing&quot;, &quot;fix sentry&quot;, &quot;sentry troubleshoot&quot;, &quot;sentry 429&quot;, &quot;source maps not resolving&quot;, &quot;sentry events not showing&quot;, &quot;sentry flush&quot;, &quot;sentry CORS&quot;.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="sentry-common-errors - Agent Skill">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/sentry-common-errors/">
+    <meta name="twitter:title" content="sentry-common-errors - Agent Skill">
+    <meta name="twitter:description" content="Troubleshoot common Sentry integration issues and fixes. Use when encountering Sentry errors, missing events, source map failures, rate limits, or configuration problems. Trigger: &quot;sentry not working&quot;, &quot;sentry errors missing&quot;, &quot;fix sentry&quot;, &quot;sentry troubleshoot&quot;, &quot;sentry 429&quot;, &quot;source maps not resolving&quot;, &quot;sentry events not showing&quot;, &quot;sentry flush&quot;, &quot;sentry CORS&quot;.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"sentry-common-errors","description":"Troubleshoot common Sentry integration issues and fixes. Use when encountering Sentry errors, missing events, source map failures, rate limits, or configuration problems. Trigger: \"sentry not working\", \"sentry errors missing\", \"fix sentry\", \"sentry troubleshoot\", \"sentry 429\", \"source maps not resolving\", \"sentry events not showing\", \"sentry flush\", \"sentry CORS\".","version":"1.51.0","author":{"@type":"Person","name":"Jeremy Longshore"},"license":"MIT","programmingLanguage":"Claude Code Agent Skill","isPartOf":{"@type":"SoftwareApplication","name":"sentry-pack","applicationCategory":"unknown"}}</script>
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.breadcrumbs[data-astro-cid-ilhxcym7]{margin-bottom:var(--space-5)}.breadcrumbs__list[data-astro-cid-ilhxcym7]{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;list-style:none;padding:0;margin:0;font-family:var(--font-mono);font-size:var(--text-sm, .8rem)}.breadcrumbs__item[data-astro-cid-ilhxcym7]{display:flex;align-items:center;gap:.375rem}.breadcrumbs__link[data-astro-cid-ilhxcym7]{color:var(--text-3);text-decoration:none;transition:color var(--duration-fast, .2s) var(--ease-out)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:hover{color:var(--primary)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:0}.breadcrumbs__sep[data-astro-cid-ilhxcym7]{color:var(--text-3);user-select:none;font-size:.7em;line-height:1}.breadcrumbs__current[data-astro-cid-ilhxcym7]{color:var(--text-2)}.detail-cta[data-astro-cid-qcigfm7x]{background:var(--surface-3, var(--brand-light-gray));border-top:1px solid var(--border, var(--brand-light-gray));border-radius:var(--radius-lg);padding:2rem 1.5rem;margin-top:2rem;text-align:center}.detail-cta__headline[data-astro-cid-qcigfm7x]{font-family:var(--font-display);font-weight:700;font-size:1.35rem;color:var(--text, var(--brand-dark));margin-bottom:1.25rem}.detail-cta__actions[data-astro-cid-qcigfm7x]{display:flex;justify-content:center;gap:.75rem;flex-wrap:wrap}.detail-cta__primary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:var(--primary);color:#0a0a0c;border:none;border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;cursor:pointer;transition:background var(--duration-fast) var(--ease-out),transform var(--duration-fast) var(--ease-out)}.detail-cta__primary[data-astro-cid-qcigfm7x]:hover{background:var(--primary-dark, var(--primary-dark));transform:translateY(-1px)}.detail-cta__primary[data-astro-cid-qcigfm7x].copied{background:var(--positive, var(--brand-green))}.detail-cta__secondary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:transparent;color:var(--text, var(--brand-dark));border:1px solid var(--border, var(--brand-mid-gray));border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;text-decoration:none;transition:border-color var(--duration-fast) var(--ease-out),color var(--duration-fast) var(--ease-out)}.detail-cta__secondary[data-astro-cid-qcigfm7x]:hover{border-color:var(--primary);color:var(--primary)}@media(max-width:480px){.detail-cta__actions[data-astro-cid-qcigfm7x]{flex-direction:column;align-items:stretch}.detail-cta__primary[data-astro-cid-qcigfm7x],.detail-cta__secondary[data-astro-cid-qcigfm7x]{justify-content:center}}
+</style>
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/_slug_@_@astro.wF9emvVq.css"></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  
+  
+
+  <div class="skill-detail" data-astro-cid-jrlgpo3w>
+    <!-- 1. Breadcrumbs -->
+    <nav aria-label="Breadcrumb" class="breadcrumbs" data-astro-cid-ilhxcym7>
+  <ol class="breadcrumbs__list" itemscope itemtype="https://schema.org/BreadcrumbList" data-astro-cid-ilhxcym7>
+    <li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Home</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="1">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/skills/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Skills</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="2">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          <span class="breadcrumbs__current" aria-current="page" itemprop="name" data-astro-cid-ilhxcym7>
+              sentry-common-errors
+            </span>
+          <meta itemprop="position" content="3">
+        </li>
+  </ol>
+</nav>
+
+    <!-- 2. Header (enhanced) -->
+    <header class="skill-header" data-astro-cid-jrlgpo3w>
+      <h1 data-astro-cid-jrlgpo3w>sentry-common-errors</h1>
+      <p class="skill-description" data-astro-cid-jrlgpo3w>Troubleshoot common Sentry integration issues and fixes. Use when encountering Sentry errors, missing events, source map failures, rate limits, or configuration problems. Trigger: &quot;sentry not working&quot;, &quot;sentry errors missing&quot;, &quot;fix sentry&quot;, &quot;sentry troubleshoot&quot;, &quot;sentry 429&quot;, &quot;source maps not resolving&quot;, &quot;sentry events not showing&quot;, &quot;sentry flush&quot;, &quot;sentry CORS&quot;.</p>
+
+      <div class="skill-metadata" data-astro-cid-jrlgpo3w>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>v1.51.0</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>Jeremy Longshore</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>MIT</span>
+        </div>
+      </div>
+
+      
+    </header>
+
+    <!-- 4. Allowed Tools -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Allowed Tools</h2>
+      <div class="tools-grid" data-astro-cid-jrlgpo3w>
+        <span class="tool-badge" data-astro-cid-jrlgpo3w>Read</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Grep</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(npm:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(node:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(curl:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(npx:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(sentry-cli:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(python3:*)</span>
+      </div>
+      
+    </section>
+
+    <!-- 5. Provided by Plugin -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Provided by Plugin</h2>
+      <div class="plugin-info" data-astro-cid-jrlgpo3w>
+        <div class="plugin-details" data-astro-cid-jrlgpo3w>
+          <h3 data-astro-cid-jrlgpo3w>
+            <a href="/plugins/sentry-pack/" data-astro-cid-jrlgpo3w>sentry-pack</a>
+          </h3>
+          <p data-astro-cid-jrlgpo3w>Claude Code skill pack for Sentry (30 skills)</p>
+          <div class="plugin-meta" data-astro-cid-jrlgpo3w>
+            <span data-astro-cid-jrlgpo3w>unknown</span>
+            <span data-astro-cid-jrlgpo3w>v1.51.0</span>
+          </div>
+        </div>
+        <a href="/plugins/sentry-pack/" class="btn-primary" data-astro-cid-jrlgpo3w>View Plugin</a>
+      </div>
+    </section>
+
+    <!-- 6. Installation -->
+    <section class="section-box dark" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Installation</h2>
+      <p class="install-note" style="color: var(--brand-light-gray); margin-bottom: 0.75rem;" data-astro-cid-jrlgpo3w>This skill is included in the sentry-pack plugin:</p>
+      <pre class="install-command" data-copy="/plugin install sentry-pack@claude-code-plugins-plus" data-astro-cid-jrlgpo3w><code data-astro-cid-jrlgpo3w>/plugin install sentry-pack@claude-code-plugins-plus</code></pre>
+      <p class="install-note" data-astro-cid-jrlgpo3w>Click to copy</p>
+    </section>
+
+    <!-- 7. Skill Content (Markdown) -->
+    <section class="skill-content-section" data-astro-cid-jrlgpo3w>
+      <h2 data-astro-cid-jrlgpo3w>Instructions</h2>
+      <div class="skill-content" data-astro-cid-jrlgpo3w>
+        <div data-astro-cid-jrlgpo3w><h1>Sentry Common Errors</h1>
+<h2>Overview</h2>
+<p>Diagnose and fix the most frequently encountered Sentry SDK integration issues across Node.js, browser, and Python environments. Covers DSN validation, missing events, source map failures, rate limiting, SDK initialization ordering, serverless flush patterns, CORS configuration, and environment tagging.</p>
+<h2>Prerequisites</h2>
+<ul>
+<li>Sentry SDK installed (<code>@sentry/node</code> v8+, <code>@sentry/browser</code> v8+, or <code>sentry-sdk</code> for Python)</li>
+<li>Access to Sentry dashboard with project admin or member role</li>
+<li>Application logs available for inspection</li>
+<li><code>sentry-cli</code> installed for source map and release operations</li>
+</ul>
+<h2>Instructions</h2>
+<h3>Step 1 — Detect the installed SDK and current configuration</h3>
+<p>!<code>npm list @sentry/node @sentry/browser @sentry/react @sentry/nextjs 2&gt;/dev/null | head -10 || echo &quot;No Node.js Sentry SDK found&quot;</code></p>
+<p>!<code>python3 -c &quot;import sentry_sdk; print(f&#39;sentry-sdk {sentry_sdk.VERSION}&#39;)&quot; 2&gt;/dev/null || echo &quot;No Python sentry-sdk found&quot;</code></p>
+<p>!<code>command -v sentry-cli &gt;/dev/null &amp;&amp; sentry-cli --version || echo &quot;sentry-cli not installed&quot;</code></p>
+<p>Grep the project for Sentry initialization to identify the current configuration:</p>
+<pre data-lang="bash"><code>
+grep -rn &quot;Sentry.init\|sentry_sdk.init&quot; --include=&quot;*.ts&quot; --include=&quot;*.js&quot; --include=&quot;*.mjs&quot; --include=&quot;*.py&quot; . 2&gt;/dev/null | head -20
+</code></pre>
+<h3>Step 2 — DSN not set or invalid DSN format</h3>
+<p>The DSN (Data Source Name) tells the SDK where to send events. Format: <code>https://&lt;public-key&gt;@&lt;org&gt;.ingest.sentry.io/&lt;project-id&gt;</code></p>
+<p><strong>Symptoms:</strong> No events arrive. SDK silently does nothing. <code>debug: true</code> shows &quot;No DSN provided.&quot;</p>
+<pre data-lang="typescript"><code>
+// WRONG — DSN is undefined because env var is missing or misspelled
+Sentry.init({
+  dsn: process.env.SENTRI_DSN, // Typo in env var name
+});
+
+// CORRECT — validate DSN is present before init
+const dsn = process.env.SENTRY_DSN;
+if (!dsn) {
+  console.error(&#39;SENTRY_DSN environment variable is not set&#39;);
+  process.exit(1);
+}
+Sentry.init({
+  dsn: dsn.trim(),
+  debug: true, // Enable during troubleshooting
+});
+</code></pre>
+<p><strong>Python equivalent:</strong></p>
+<pre data-lang="python"><code>
+import os, sentry_sdk
+
+dsn = os.environ.get(&quot;SENTRY_DSN&quot;)
+if not dsn:
+    raise RuntimeError(&quot;SENTRY_DSN not set&quot;)
+
+sentry_sdk.init(dsn=dsn.strip(), debug=True)
+</code></pre>
+<h3>Step 3 — Events not appearing in dashboard</h3>
+<p><strong>Symptoms:</strong> <code>Sentry.captureException()</code> runs without errors, but nothing shows up in the Sentry web UI.</p>
+<p><strong>Root causes and fixes:</strong></p>
+<ol>
+<li><strong><code>beforeSend</code> accidentally returning null:</strong></li>
+</ol>
+<pre data-lang="typescript"><code>
+// WRONG — missing return drops all non-exception events
+beforeSend(event) {
+  if (event.exception) {
+    event.tags = { ...event.tags, has_exception: &#39;true&#39; };
+    return event;
+  }
+  // Implicit return undefined = event DROPPED
+}
+
+// CORRECT — always return event unless you explicitly want to filter
+beforeSend(event) {
+  if (event.message?.includes(&#39;ResizeObserver loop&#39;)) {
+    return null; // Intentionally drop
+  }
+  if (event.exception) {
+    event.tags = { ...event.tags, has_exception: &#39;true&#39; };
+  }
+  return event; // ALWAYS return at the end
+}
+</code></pre>
+<ol>
+<li><strong><code>sampleRate</code> set to 0:</strong></li>
+</ol>
+<pre data-lang="typescript"><code>
+// WRONG
+Sentry.init({ sampleRate: 0, tracesSampleRate: 0 }); // Nothing is sent
+
+// CORRECT
+Sentry.init({ sampleRate: 1.0, tracesSampleRate: 0.1 });
+</code></pre>
+<ol>
+<li><strong>Missing <code>await Sentry.flush()</code> in serverless / CLI contexts:</strong></li>
+</ol>
+<pre data-lang="typescript"><code>
+// WRONG — Lambda/CLI process exits before SDK sends the event
+export const handler = async (event) =&gt; {
+  try {
+    return await processRequest(event);
+  } catch (error) {
+    Sentry.captureException(error);
+    throw error; // Process exits, event never sent!
+  }
+};
+
+// CORRECT — flush before returning
+export const handler = async (event) =&gt; {
+  try {
+    return await processRequest(event);
+  } catch (error) {
+    Sentry.captureException(error);
+    await Sentry.flush(2000); // Wait up to 2s for event to send
+    throw error;
+  }
+};
+</code></pre>
+<p><strong>Python (AWS Lambda):</strong></p>
+<pre data-lang="python"><code>
+def handler(event, context):
+    try:
+        return process_request(event)
+    except Exception as e:
+        sentry_sdk.capture_exception(e)
+        sentry_sdk.flush(timeout=2)  # CRITICAL for Lambda
+        raise
+</code></pre>
+<ol>
+<li><strong>SDK initialized after error occurs:</strong></li>
+</ol>
+<pre data-lang="typescript"><code>
+// WRONG — error happens before Sentry.init()
+import express from &#39;express&#39;;
+app.get(&#39;/&#39;, () =&gt; { throw new Error(&#39;boom&#39;); }); // Sentry not ready
+
+import * as Sentry from &#39;@sentry/node&#39;;
+Sentry.init({ dsn: &#39;...&#39; }); // Too late
+
+// CORRECT — Sentry FIRST
+import * as Sentry from &#39;@sentry/node&#39;;
+Sentry.init({ dsn: &#39;...&#39; });
+import express from &#39;express&#39;;
+</code></pre>
+<p><strong>Diagnostic checklist for missing events:</strong></p>
+<pre data-lang="bash"><code>
+# 1. Verify DSN is present
+echo &quot;DSN set: ${SENTRY_DSN:+yes}&quot;
+
+# 2. Enable debug mode and send test event
+node -e &quot;
+const Sentry = require(&#39;@sentry/node&#39;);
+Sentry.init({ dsn: process.env.SENTRY_DSN, debug: true });
+const id = Sentry.captureMessage(&#39;Test from CLI&#39;, &#39;info&#39;);
+console.log(&#39;Event ID:&#39;, id);
+Sentry.flush(5000).then(() =&gt; console.log(&#39;Flush complete&#39;));
+&quot;
+
+# 3. Check Sentry service status
+curl -s https://status.sentry.io/api/v2/status.json | python3 -c &quot;
+import sys, json; d = json.load(sys.stdin)
+print(f\&quot;Status: {d[&#39;status&#39;][&#39;description&#39;]}\&quot;)
+&quot; 2&gt;/dev/null || echo &quot;Could not reach status.sentry.io&quot;
+</code></pre>
+<h3>Step 4 — Source maps not resolving</h3>
+<p><strong>Symptoms:</strong> Stack traces in Sentry show minified variable names and wrong line numbers.</p>
+<p><strong>Root cause 1 — Release version mismatch:</strong> The <code>release</code> in <code>Sentry.init()</code> must exactly match the release name used during <code>sentry-cli</code> upload.</p>
+<pre data-lang="typescript"><code>
+Sentry.init({ dsn: process.env.SENTRY_DSN, release: &#39;my-app@1.2.3&#39; });
+</code></pre>
+<pre data-lang="bash"><code>
+# During build/deploy — same version string
+export VERSION=&quot;my-app@1.2.3&quot;
+sentry-cli releases new &quot;$VERSION&quot;
+sentry-cli releases files &quot;$VERSION&quot; upload-sourcemaps ./dist \
+  --url-prefix &#39;~/static/js&#39;   # Must match how browser loads the files
+sentry-cli releases finalize &quot;$VERSION&quot;
+</code></pre>
+<p><strong>Root cause 2 — URL prefix mismatch:</strong></p>
+<pre data-lang="bash"><code>
+# Diagnose with the explain command
+sentry-cli sourcemaps explain --org &quot;$SENTRY_ORG&quot; --project &quot;$SENTRY_PROJECT&quot; EVENT_ID
+# List uploaded artifacts to verify
+sentry-cli releases files &quot;$VERSION&quot; list
+</code></pre>
+<p><strong>Root cause 3 — Source maps uploaded after error occurred:</strong> Sentry does not retroactively apply source maps. Upload before the release goes live.</p>
+<p><strong>Root cause 4 — Build tool not generating source maps:</strong></p>
+<pre data-lang="javascript"><code>
+// webpack: devtool: &#39;source-map&#39;
+// vite: build: { sourcemap: true }
+</code></pre>
+<h3>Step 5 — 429 rate limit errors</h3>
+<p><strong>Symptoms:</strong> Sentry returns HTTP 429. Events are dropped.</p>
+<pre data-lang="typescript"><code>
+Sentry.init({
+  dsn: process.env.SENTRY_DSN,
+  sampleRate: 0.25,              // Send 25% of errors
+  tracesSampleRate: 0.01,        // 1% of transactions
+  maxBreadcrumbs: 20,            // Reduce from default 100
+  ignoreErrors: [
+    &#39;ResizeObserver loop limit exceeded&#39;,
+    &#39;Non-Error promise rejection captured&#39;,
+    /Loading chunk \d+ failed/,
+    /Failed to fetch/,
+  ],
+  beforeSend(event) {
+    const frames = event.exception?.values?.[0]?.stacktrace?.frames || [];
+    if (frames.some(f =&gt; f.filename?.includes(&#39;extension://&#39;))) return null;
+    return event;
+  },
+});
+</code></pre>
+<p><strong>Check quota:</strong> Settings &gt; Projects &gt; [Project] &gt; Client Keys &gt; Configure &gt; Rate Limiting.</p>
+<h3>Step 6 — SDK version conflicts</h3>
+<p><strong>Symptoms:</strong> <code>TypeError: Sentry.X is not a function</code>, duplicate events, or missing integrations.</p>
+<pre data-lang="bash"><code>
+# All @sentry/* packages must share the same major version
+npm list | grep @sentry 2&gt;/dev/null
+# Fix: npm install @sentry/node@latest @sentry/browser@latest
+</code></pre>
+<p><strong>SDK v8 breaking change:</strong> <code>@sentry/tracing</code> is removed. Tracing is built into the core:</p>
+<pre data-lang="typescript"><code>
+import * as Sentry from &#39;@sentry/node&#39;;
+Sentry.init({ dsn: &#39;...&#39;, tracesSampleRate: 0.1 }); // No @sentry/tracing needed
+</code></pre>
+<h3>Step 7 — Wrong environment tag</h3>
+<pre data-lang="typescript"><code>
+// WRONG — hardcoded, same value in dev and prod
+Sentry.init({ environment: &#39;production&#39; });
+
+// CORRECT — derive from runtime
+Sentry.init({ dsn: process.env.SENTRY_DSN, environment: process.env.NODE_ENV || &#39;development&#39; });
+</code></pre>
+<h3>Step 8 — CORS issues with browser SDK</h3>
+<p>The standard SDK sends to <code>https://&lt;org&gt;.ingest.sentry.io</code> which has permissive CORS. If you see CORS errors:</p>
+<ol>
+<li><strong>CSP blocking</strong> — add <code>connect-src &#39;self&#39; https://*.ingest.sentry.io</code> to your CSP</li>
+<li><strong>Tunnel misconfiguration</strong> — your tunnel endpoint must proxy and return CORS headers</li>
+<li><strong>Ad blockers</strong> — use the <code>tunnel</code> option to route through your domain</li>
+</ol>
+<pre data-lang="typescript"><code>
+Sentry.init({ dsn: process.env.SENTRY_DSN, tunnel: &#39;/api/sentry-tunnel&#39; });
+</code></pre>
+<h3>Step 9 — Node.js process exits before events are sent</h3>
+<p>The SDK batches events asynchronously. Short-lived processes must flush before exit.</p>
+<pre data-lang="typescript"><code>
+async function main() {
+  try { await doWork(); }
+  catch (error) { Sentry.captureException(error); }
+  finally { await Sentry.flush(5000); } // CRITICAL
+}
+
+// Graceful shutdown for servers
+process.on(&#39;SIGTERM&#39;, async () =&gt; {
+  await Sentry.flush(5000);
+  server.close(() =&gt; process.exit(0));
+});
+</code></pre>
+<h3>Step 10 — Express &quot;not instrumented&quot; warning</h3>
+<p>Sentry must initialize before importing Express so it can monkey-patch HTTP modules:</p>
+<pre data-lang="typescript"><code>
+// instrument.mjs — imported first
+import * as Sentry from &#39;@sentry/node&#39;;
+Sentry.init({ dsn: process.env.SENTRY_DSN, tracesSampleRate: 0.1 });
+
+// app.mjs
+import &#39;./instrument.mjs&#39;; // FIRST
+import express from &#39;express&#39;;
+const app = express();
+Sentry.setupExpressErrorHandler(app); // After all routes
+</code></pre>
+<p>Or use <code>node --import ./instrument.mjs app.mjs</code>.</p>
+<h2>Output</h2>
+<ul>
+<li>Root cause identified from the diagnostic steps above</li>
+<li>Configuration fix applied and verified with a test event</li>
+<li><code>debug: true</code> output confirming SDK initialization and event delivery</li>
+<li>Test event visible in Sentry dashboard (search by Event ID)</li>
+<li><code>debug: true</code> removed after issue is resolved</li>
+</ul>
+<h2>Error Handling</h2>
+<table><thead><tr>
+<th>Error / Symptom</th>
+<th>Cause</th>
+<th>Solution</th>
+</tr></thead><tbody>
+<tr>
+<td><code>Invalid Sentry Dsn</code></td>
+<td>Malformed or empty DSN string</td>
+<td>Re-copy DSN from Project Settings &gt; Client Keys. Verify format: <code>https://&lt;key&gt;@&lt;org&gt;.ingest.sentry.io/&lt;id&gt;</code></td>
+</tr>
+<tr>
+<td>No events in dashboard</td>
+<td><code>beforeSend</code> returns <code>undefined</code> on some code paths</td>
+<td>Add explicit <code>return event</code> as the last line of <code>beforeSend</code>. Use <code>return null</code> only for intentional filtering</td>
+</tr>
+<tr>
+<td>No events in dashboard</td>
+<td><code>sampleRate</code> set to <code>0</code></td>
+<td>Set <code>sampleRate: 1.0</code> (default) for errors. Use fractional values only for <code>tracesSampleRate</code></td>
+</tr>
+<tr>
+<td>No events in serverless/CLI</td>
+<td>Process exits before SDK flushes its queue</td>
+<td>Add <code>await Sentry.flush(2000)</code> before <code>process.exit()</code>, Lambda return, or CLI exit</td>
+</tr>
+<tr>
+<td>Minified stack traces</td>
+<td>Source map release version does not match <code>Sentry.init({ release })</code></td>
+<td>Ensure <code>release</code> string is identical in both <code>Sentry.init()</code> and <code>sentry-cli releases</code> upload</td>
+</tr>
+<tr>
+<td>Minified stack traces</td>
+<td><code>--url-prefix</code> does not match browser JS URL path</td>
+<td>Run <code>sentry-cli sourcemaps explain EVENT_ID</code> to diagnose the prefix</td>
+</tr>
+<tr>
+<td><code>429 Too Many Requests</code></td>
+<td>Project or org quota exceeded</td>
+<td>Lower <code>sampleRate</code>/<code>tracesSampleRate</code>, add <code>ignoreErrors</code>, set server-side rate limits</td>
+</tr>
+<tr>
+<td><code>TypeError: Sentry.X is not a function</code></td>
+<td>Mixed SDK major versions (v7 + v8)</td>
+<td>Run <code>npm list @sentry/core</code> to find duplicates. Upgrade all <code>@sentry/*</code> to same major</td>
+</tr>
+<tr>
+<td>Express not instrumented</td>
+<td><code>Sentry.init()</code> called after <code>import express</code></td>
+<td>Move init to <code>instrument.mjs</code> and import first, or use <code>node --import</code></td>
+</tr>
+<tr>
+<td>Wrong environment in events</td>
+<td><code>environment</code> hardcoded or not set</td>
+<td>Set <code>environment: process.env.NODE_ENV</code> in <code>Sentry.init()</code></td>
+</tr>
+<tr>
+<td>CORS errors in browser</td>
+<td>CSP blocking <code>*.ingest.sentry.io</code> or tunnel missing headers</td>
+<td>Add <code>connect-src https://*.ingest.sentry.io</code> to CSP, or fix tunnel CORS</td>
+</tr>
+<tr>
+<td>Duplicate events</td>
+<td>Error captured at multiple layers</td>
+<td>Capture at ONE level only — catch block OR error middleware, not both</td>
+</tr>
+<tr>
+<td>Missing stack traces</td>
+<td><code>Sentry.captureException(&#39;string&#39;)</code> instead of Error</td>
+<td>Always pass <code>new Error(&#39;message&#39;)</code> — strings have no stack trace</td>
+</tr>
+<tr>
+<td>ESM <code>ERR_REQUIRE_ESM</code></td>
+<td>Node.js version below 18.19 for ESM support</td>
+<td>Upgrade to Node.js 18.19+ or 20.6+. Use <code>--import</code> flag</td>
+</tr>
+</tbody></table>
+<h2>Examples</h2>
+<p><strong>Example 1: Debug missing events in a Next.js app</strong> Request: &quot;Sentry captureException runs but nothing shows in the dashboard&quot; Steps: Enable <code>debug: true</code> in <code>Sentry.init()</code>. Console showed &quot;No DSN provided.&quot; The <code>NEXT_PUBLIC_SENTRY_DSN</code> env var was not set in <code>.env.production</code>. Added the variable, redeployed, confirmed events arrive within seconds.</p>
+<p><strong>Example 2: Fix source maps in a Vite + React app</strong> Request: &quot;Stack traces in Sentry are all minified&quot; Steps: Ran <code>sentry-cli sourcemaps explain EVENT_ID</code> which reported &quot;source map not found for URL ~/assets/index-abc123.js&quot;. The <code>--url-prefix</code> was <code>~/dist</code> but Vite serves from <code>~/assets</code>. Fixed to <code>--url-prefix &#39;~/assets&#39;</code> and re-uploaded. Stack traces now resolve correctly.</p>
+<p><strong>Example 3: Lambda events disappearing</strong> Request: &quot;Sentry.captureException works locally but not in AWS Lambda&quot; Steps: Added <code>await Sentry.flush(2000)</code> before the Lambda handler returns. Events now arrive consistently. Wrapped handler with <code>Sentry.wrapHandler()</code> for automatic scope management.</p>
+<h2>Resources</h2>
+<ul>
+<li><a href="https://docs.sentry.io/platforms/javascript/troubleshooting/">JavaScript Troubleshooting Guide</a></li>
+<li><a href="https://docs.sentry.io/platforms/javascript/sourcemaps/troubleshooting_js/">Source Maps Troubleshooting</a></li>
+<li><a href="https://docs.sentry.io/platforms/python/troubleshooting/">Python Troubleshooting</a></li>
+<li><a href="https://docs.sentry.io/platforms/javascript/configuration/filtering/">Filtering &amp; Sampling Events</a></li>
+<li><a href="https://docs.sentry.io/cli/releases/#upload-source-maps">sentry-cli Source Maps Upload</a></li>
+<li><a href="https://status.sentry.io">Sentry Service Status</a></li>
+<li><a href="https://docs.sentry.io/platforms/javascript/migration/v7-to-v8/">SDK Migration Guide v7 to v8</a></li>
+</ul>
+<h2>Next Steps</h2>
+<ul>
+<li>After fixing, send a test event with <code>Sentry.captureMessage(&#39;verify-fix&#39;, &#39;info&#39;)</code> and confirm it appears</li>
+<li>Disable <code>debug: true</code> before deploying to production</li>
+<li>Consider setting up <a href="https://docs.sentry.io/product/alerts/">Sentry alerts</a> to catch future issues early</li>
+<li>Review the <code>sentry-rate-limits</code> skill if you hit 429 errors frequently</li>
+<li>Review the <code>sentry-release-management</code> skill for source map upload automation</li>
+</ul></div>
+      </div>
+    </section>
+
+    <!-- 8. Bottom CTA -->
+    <section class="detail-cta" data-astro-cid-qcigfm7x>
+  <h2 class="detail-cta__headline" data-astro-cid-qcigfm7x>Ready to use sentry-pack?</h2>
+  <div class="detail-cta__actions" data-astro-cid-qcigfm7x>
+    <button class="detail-cta__primary" data-copy-install="/plugin install sentry-pack@claude-code-plugins-plus" data-astro-cid-qcigfm7x>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" data-astro-cid-qcigfm7x>
+        <rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" stroke-width="1.5" data-astro-cid-qcigfm7x></rect>
+        <path d="M3 11V3a1 1 0 011-1h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" data-astro-cid-qcigfm7x></path>
+      </svg>
+      <span class="detail-cta__btn-text" data-astro-cid-qcigfm7x>Copy Install Command</span>
+    </button>
+    
+  </div>
+</section>
+
+<script type="module">document.querySelectorAll("[data-copy-install]").forEach(t=>{t.addEventListener("click",async()=>{const a=t.dataset.copyInstall||"";await navigator.clipboard.writeText(a);const e=t.querySelector(".detail-cta__btn-text");if(e){const o=e.textContent;e.textContent="Copied!",t.classList.add("copied"),window.trackEvent&&window.trackEvent("install_copied",{plugin_name:a.split(" ").pop()||"",source:"detail_cta"}),setTimeout(()=>{e.textContent=o,t.classList.remove("copied")},2e3)}})});</script>
+
+    <!-- 9. Related Skills (6, with tool pills) -->
+    <section class="related-skills-section" data-astro-cid-jrlgpo3w>
+        <h2 class="related-skills-heading" data-astro-cid-jrlgpo3w>Related Skills</h2>
+        <div class="related-skills-grid" data-astro-cid-jrlgpo3w>
+          <a href="/skills/abridge-ci-integration/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-ci-integration</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Configure CI/CD pipeline for Abridge clinical AI integrations with GitHub Actions.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-common-errors/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-common-errors</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Diagnose and fix common Abridge clinical AI integration errors.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-a/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-a</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge ambient clinical documentation capture-to-note pipeline.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-b/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-b</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge patient-facing documentation and after-visit summary generation.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-cost-tuning/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-cost-tuning</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Optimize Abridge clinical AI costs through tier selection, session management, and usage monitoring for healthcare organizations.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-debug-bundle/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-debug-bundle</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Collect Abridge debug evidence for support tickets and troubleshooting.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a>
+        </div>
+      </section>
+
+  </div>
+
+  
+  <script>
+    document.querySelectorAll('.install-command').forEach(el => {
+      el.addEventListener('click', function() {
+        const text = this.dataset.copy || this.textContent;
+        navigator.clipboard.writeText(text).then(() => {
+          const originalText = this.textContent;
+          this.textContent = 'Copied to clipboard!';
+          this.style.color = 'var(--brand-green)';
+          setTimeout(() => {
+            this.textContent = originalText;
+            this.style.color = '';
+          }, 2000);
+        });
+      });
+    });
+  </script>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>langchain-observability - Agent Skill</title>
+    <meta name="description" content="Wire LangSmith tracing and custom metric callbacks into a LangChain 1.0 chain or LangGraph 1.0 agent correctly — env-var spelling, subgraph propagation, per-tenant dimensions, cost and latency counters. Use when setting up observability on a new service, debugging blank traces in LangSmith, or adding per-tenant cost breakdowns. Trigger with &quot;langchain observability&quot;, &quot;langsmith tracing&quot;, &quot;langchain callbacks&quot;, &quot;langchain metrics&quot;.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://tonsofskills.com/tons-of-skills-marketplace/skills/langchain-observability/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/langchain-observability/">
+    <meta property="og:title" content="langchain-observability - Agent Skill">
+    <meta property="og:description" content="Wire LangSmith tracing and custom metric callbacks into a LangChain 1.0 chain or LangGraph 1.0 agent correctly — env-var spelling, subgraph propagation, per-tenant dimensions, cost and latency counters. Use when setting up observability on a new service, debugging blank traces in LangSmith, or adding per-tenant cost breakdowns. Trigger with &quot;langchain observability&quot;, &quot;langsmith tracing&quot;, &quot;langchain callbacks&quot;, &quot;langchain metrics&quot;.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="langchain-observability - Agent Skill">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/langchain-observability/">
+    <meta name="twitter:title" content="langchain-observability - Agent Skill">
+    <meta name="twitter:description" content="Wire LangSmith tracing and custom metric callbacks into a LangChain 1.0 chain or LangGraph 1.0 agent correctly — env-var spelling, subgraph propagation, per-tenant dimensions, cost and latency counters. Use when setting up observability on a new service, debugging blank traces in LangSmith, or adding per-tenant cost breakdowns. Trigger with &quot;langchain observability&quot;, &quot;langsmith tracing&quot;, &quot;langchain callbacks&quot;, &quot;langchain metrics&quot;.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"langchain-observability","description":"Wire LangSmith tracing and custom metric callbacks into a LangChain 1.0 chain or LangGraph 1.0 agent correctly — env-var spelling, subgraph propagation, per-tenant dimensions, cost and latency counters. Use when setting up observability on a new service, debugging blank traces in LangSmith, or adding per-tenant cost breakdowns. Trigger with \"langchain observability\", \"langsmith tracing\", \"langchain callbacks\", \"langchain metrics\".","version":"2.5.0","author":{"@type":"Person","name":"Jeremy Longshore"},"license":"MIT","programmingLanguage":"Claude Code Agent Skill","isPartOf":{"@type":"SoftwareApplication","name":"langchain-py-pack","applicationCategory":"unknown"}}</script>
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.breadcrumbs[data-astro-cid-ilhxcym7]{margin-bottom:var(--space-5)}.breadcrumbs__list[data-astro-cid-ilhxcym7]{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;list-style:none;padding:0;margin:0;font-family:var(--font-mono);font-size:var(--text-sm, .8rem)}.breadcrumbs__item[data-astro-cid-ilhxcym7]{display:flex;align-items:center;gap:.375rem}.breadcrumbs__link[data-astro-cid-ilhxcym7]{color:var(--text-3);text-decoration:none;transition:color var(--duration-fast, .2s) var(--ease-out)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:hover{color:var(--primary)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:0}.breadcrumbs__sep[data-astro-cid-ilhxcym7]{color:var(--text-3);user-select:none;font-size:.7em;line-height:1}.breadcrumbs__current[data-astro-cid-ilhxcym7]{color:var(--text-2)}.detail-cta[data-astro-cid-qcigfm7x]{background:var(--surface-3, var(--brand-light-gray));border-top:1px solid var(--border, var(--brand-light-gray));border-radius:var(--radius-lg);padding:2rem 1.5rem;margin-top:2rem;text-align:center}.detail-cta__headline[data-astro-cid-qcigfm7x]{font-family:var(--font-display);font-weight:700;font-size:1.35rem;color:var(--text, var(--brand-dark));margin-bottom:1.25rem}.detail-cta__actions[data-astro-cid-qcigfm7x]{display:flex;justify-content:center;gap:.75rem;flex-wrap:wrap}.detail-cta__primary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:var(--primary);color:#0a0a0c;border:none;border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;cursor:pointer;transition:background var(--duration-fast) var(--ease-out),transform var(--duration-fast) var(--ease-out)}.detail-cta__primary[data-astro-cid-qcigfm7x]:hover{background:var(--primary-dark, var(--primary-dark));transform:translateY(-1px)}.detail-cta__primary[data-astro-cid-qcigfm7x].copied{background:var(--positive, var(--brand-green))}.detail-cta__secondary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:transparent;color:var(--text, var(--brand-dark));border:1px solid var(--border, var(--brand-mid-gray));border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;text-decoration:none;transition:border-color var(--duration-fast) var(--ease-out),color var(--duration-fast) var(--ease-out)}.detail-cta__secondary[data-astro-cid-qcigfm7x]:hover{border-color:var(--primary);color:var(--primary)}@media(max-width:480px){.detail-cta__actions[data-astro-cid-qcigfm7x]{flex-direction:column;align-items:stretch}.detail-cta__primary[data-astro-cid-qcigfm7x],.detail-cta__secondary[data-astro-cid-qcigfm7x]{justify-content:center}}
+</style>
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/_slug_@_@astro.wF9emvVq.css"></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  
+  
+
+  <div class="skill-detail" data-astro-cid-jrlgpo3w>
+    <!-- 1. Breadcrumbs -->
+    <nav aria-label="Breadcrumb" class="breadcrumbs" data-astro-cid-ilhxcym7>
+  <ol class="breadcrumbs__list" itemscope itemtype="https://schema.org/BreadcrumbList" data-astro-cid-ilhxcym7>
+    <li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Home</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="1">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/skills/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Skills</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="2">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          <span class="breadcrumbs__current" aria-current="page" itemprop="name" data-astro-cid-ilhxcym7>
+              langchain-observability
+            </span>
+          <meta itemprop="position" content="3">
+        </li>
+  </ol>
+</nav>
+
+    <!-- 2. Header (enhanced) -->
+    <header class="skill-header" data-astro-cid-jrlgpo3w>
+      <h1 data-astro-cid-jrlgpo3w>langchain-observability</h1>
+      <p class="skill-description" data-astro-cid-jrlgpo3w>Wire LangSmith tracing and custom metric callbacks into a LangChain 1.0 chain or LangGraph 1.0 agent correctly — env-var spelling, subgraph propagation, per-tenant dimensions, cost and latency counters. Use when setting up observability on a new service, debugging blank traces in LangSmith, or adding per-tenant cost breakdowns. Trigger with &quot;langchain observability&quot;, &quot;langsmith tracing&quot;, &quot;langchain callbacks&quot;, &quot;langchain metrics&quot;.</p>
+
+      <div class="skill-metadata" data-astro-cid-jrlgpo3w>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>v2.5.0</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>Jeremy Longshore</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>MIT</span>
+        </div>
+      </div>
+
+      
+    </header>
+
+    <!-- 4. Allowed Tools -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Allowed Tools</h2>
+      <div class="tools-grid" data-astro-cid-jrlgpo3w>
+        <span class="tool-badge" data-astro-cid-jrlgpo3w>Read</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Write</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Edit</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(python:*)</span>
+      </div>
+      
+    </section>
+
+    <!-- 5. Provided by Plugin -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Provided by Plugin</h2>
+      <div class="plugin-info" data-astro-cid-jrlgpo3w>
+        <div class="plugin-details" data-astro-cid-jrlgpo3w>
+          <h3 data-astro-cid-jrlgpo3w>
+            <a href="/plugins/langchain-py-pack/" data-astro-cid-jrlgpo3w>langchain-py-pack</a>
+          </h3>
+          <p data-astro-cid-jrlgpo3w>Claude Code skill pack for LangChain 1.0 + LangGraph 1.0 (Python) - 34 skills covering chains, agents, RAG, middleware, checkpointing, HITL, streaming, and production patterns</p>
+          <div class="plugin-meta" data-astro-cid-jrlgpo3w>
+            <span data-astro-cid-jrlgpo3w>unknown</span>
+            <span data-astro-cid-jrlgpo3w>v2.5.0</span>
+          </div>
+        </div>
+        <a href="/plugins/langchain-py-pack/" class="btn-primary" data-astro-cid-jrlgpo3w>View Plugin</a>
+      </div>
+    </section>
+
+    <!-- 6. Installation -->
+    <section class="section-box dark" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Installation</h2>
+      <p class="install-note" style="color: var(--brand-light-gray); margin-bottom: 0.75rem;" data-astro-cid-jrlgpo3w>This skill is included in the langchain-py-pack plugin:</p>
+      <pre class="install-command" data-copy="/plugin install langchain-py-pack@claude-code-plugins-plus" data-astro-cid-jrlgpo3w><code data-astro-cid-jrlgpo3w>/plugin install langchain-py-pack@claude-code-plugins-plus</code></pre>
+      <p class="install-note" data-astro-cid-jrlgpo3w>Click to copy</p>
+    </section>
+
+    <!-- 7. Skill Content (Markdown) -->
+    <section class="skill-content-section" data-astro-cid-jrlgpo3w>
+      <h2 data-astro-cid-jrlgpo3w>Instructions</h2>
+      <div class="skill-content" data-astro-cid-jrlgpo3w>
+        <div data-astro-cid-jrlgpo3w><h1>LangChain Observability (Python)</h1>
+<h2>Overview</h2>
+<p>Engineer sets <code>LANGCHAIN_TRACING_V2=true</code> and <code>LANGCHAIN_API_KEY=...</code> from the 0.2 docs, restarts the service, and sees zero traces in LangSmith — no errors, no warnings. That is P26: in LangChain 1.0 the canonical env vars are <code>LANGSMITH_TRACING</code> and <code>LANGSMITH_API_KEY</code>. The <code>LANGCHAIN_*</code> names are soft-deprecated and fail silently on any chain that goes through 1.0 middleware or <code>create_react_agent</code>. One-line fix:</p>
+<pre data-lang="bash"><code>
+export LANGSMITH_TRACING=true
+export LANGSMITH_API_KEY=lsv2_...
+export LANGSMITH_PROJECT=my-service-prod
+</code></pre>
+<p>Next failure mode: a custom <code>BaseCallbackHandler</code> attached via <code>chain.with_config(callbacks=[meter])</code> fires on the parent but is silent on LangGraph subgraphs and <code>create_react_agent</code> tool calls — token counts under-report by 30-70% vs the provider dashboard. That is P28: LangGraph creates a child runtime per subgraph, and bound callbacks do not propagate. Pass callbacks at invocation time instead:</p>
+<pre data-lang="python"><code>
+await chain.ainvoke(inputs, config={&quot;callbacks&quot;: [meter], &quot;configurable&quot;: {&quot;tenant_id&quot;: t}})
+</code></pre>
+<p>This skill walks through canonical LangSmith setup, a metric-callback template with tenant dimensions, invocation-time propagation, <code>RunnableConfig</code> trace tagging, and a decision tree for LangSmith-only vs OTEL-native (defer to <code>langchain-otel-observability</code> / L33 for OTEL-heavy). Pin: <code>langchain-core 1.0.x</code>, <code>langgraph 1.0.x</code>, <code>langsmith</code> current. LangSmith tracing adds &lt;5ms per-span overhead; metric callbacks add &lt;1ms per fire. Pain-catalog anchors: P26, P28, P04 (cache-token aggregation), P25 (retry double-counting).</p>
+<h2>Prerequisites</h2>
+<ul>
+<li>Python 3.10+</li>
+<li><code>langchain-core &gt;= 1.0, &lt; 2.0</code>, <code>langgraph &gt;= 1.0, &lt; 2.0</code></li>
+<li><code>langsmith</code> (bundled with <code>langchain</code>; upgrade to current for 1.0 env-var support)</li>
+<li>A LangSmith API key (<code>lsv2_...</code>) — free tier at https://smith.langchain.com</li>
+<li>Optional metric sinks: <code>prometheus_client</code>, <code>statsd</code>, or <code>datadog</code> Python packages</li>
+</ul>
+<h2>Instructions</h2>
+<h3>Step 1 — Enable LangSmith with the canonical 1.0 env vars</h3>
+<p><code>LANGSMITH_TRACING=true</code> is the switch. <code>LANGSMITH_API_KEY</code> authenticates. <code>LANGSMITH_PROJECT</code> groups traces by environment — use one project per <code>service-env</code> pair (<code>myapp-prod</code>, <code>myapp-staging</code>), not one per service.</p>
+<pre data-lang="bash"><code>
+# .env (loaded via python-dotenv or secret manager)
+LANGSMITH_TRACING=true
+LANGSMITH_API_KEY=lsv2_pt_...
+LANGSMITH_PROJECT=my-service-prod
+
+# Legacy fallback names (still work, soft-deprecated — do not use in new code):
+# LANGCHAIN_TRACING_V2=true
+# LANGCHAIN_API_KEY=lsv2_pt_...
+# LANGCHAIN_PROJECT=my-service-prod
+</code></pre>
+<p>Verify in a REPL that the client sees the key before relying on it in production:</p>
+<pre data-lang="python"><code>
+from langsmith import Client
+c = Client()                       # reads LANGSMITH_API_KEY and LANGSMITH_ENDPOINT
+print(c.list_projects(limit=1))   # raises LangSmithAuthError if key is wrong
+</code></pre>
+<p>Do NOT set both <code>LANGCHAIN_TRACING_V2</code> and <code>LANGSMITH_TRACING</code> — mixed settings have caused stale project routing in 1.0.x. See P26.</p>
+<p>For selective sampling in high-traffic services, set <code>LANGSMITH_SAMPLING_RATE=0.1</code> (10% of runs). Full detail in <a href="references/langsmith-setup.md">LangSmith Setup</a>.</p>
+<h3>Step 2 — Write a metric callback for per-request observability</h3>
+<p>Subclass <code>BaseCallbackHandler</code>. Record <code>token_in</code>, <code>token_out</code>, <code>latency_ms</code>, <code>tool_calls</code>, and <code>error</code>, tagged with a <code>tenant_id</code> dimension for downstream grouping.</p>
+<pre data-lang="python"><code>
+import time
+from langchain_core.callbacks import BaseCallbackHandler
+from langchain_core.outputs import LLMResult
+
+class MetricCallback(BaseCallbackHandler):
+    &quot;&quot;&quot;Per-LLM-call metrics tagged with tenant_id. Overhead &lt;1ms per event.&quot;&quot;&quot;
+
+    def __init__(self, tenant_id: str, sink) -&gt; None:
+        self.tenant_id = tenant_id
+        self.sink = sink
+        self._starts: dict[str, float] = {}
+
+    def on_llm_start(self, serialized, prompts, *, run_id, **kwargs) -&gt; None:
+        self._starts[str(run_id)] = time.perf_counter()
+
+    def on_llm_end(self, response: LLMResult, *, run_id, **kwargs) -&gt; None:
+        t0 = self._starts.pop(str(run_id), time.perf_counter())
+        elapsed_ms = (time.perf_counter() - t0) * 1000   # wall-clock latency
+        tags = {&quot;tenant_id&quot;: self.tenant_id}
+        for gen in response.generations:
+            for g in gen:
+                meta = getattr(g.message, &quot;usage_metadata&quot;, None) or {}
+                self.sink.incr(&quot;llm.token_in&quot;,   meta.get(&quot;input_tokens&quot;, 0),  tags)
+                self.sink.incr(&quot;llm.token_out&quot;,  meta.get(&quot;output_tokens&quot;, 0), tags)
+                # P04 — aggregate Anthropic cache reads across calls
+                cache = meta.get(&quot;input_token_details&quot;, {}).get(&quot;cache_read&quot;, 0)
+                self.sink.incr(&quot;llm.cache_read&quot;, cache, tags)
+        self.sink.hist(&quot;llm.latency_ms&quot;, elapsed_ms, tags)
+
+    def on_llm_error(self, error, *, run_id, **kwargs) -&gt; None:
+        self._starts.pop(str(run_id), None)
+        self.sink.incr(&quot;llm.error&quot;, 1, {&quot;tenant_id&quot;: self.tenant_id,
+                                         &quot;error_type&quot;: type(error).__name__})
+
+    def on_tool_end(self, output, *, run_id, **kwargs) -&gt; None:
+        self.sink.incr(&quot;llm.tool_calls&quot;, 1, {&quot;tenant_id&quot;: self.tenant_id})
+</code></pre>
+<p>A thin <code>sink</code> protocol (<code>incr</code>, <code>hist</code>) swaps between Prometheus, StatsD, or Datadog. Alternative sinks (LangSmith-only, OTEL) do not need this callback at all — see Step 5. Full sink adapters and P25 retry dedupe in <a href="references/custom-metrics-callback.md">Custom Metrics Callback</a>.</p>
+<h3>Step 3 — Pass callbacks via <code>config[&quot;callbacks&quot;]</code> at invocation (P28)</h3>
+<p>This is the single most common observability bug in LangGraph 1.0 services. Binding callbacks at definition time does not propagate into subgraphs or <code>create_react_agent</code> tool nodes — those create child runtimes with their own callback scope.</p>
+<pre data-lang="python"><code>
+# WRONG — fires on parent runnable only; silent on subgraphs (P28)
+agent_bound = agent.with_config(callbacks=[MetricCallback(tenant_id, sink)])
+result = await agent_bound.ainvoke(inputs)
+
+# RIGHT — propagates to every runnable, subgraph, and tool call
+meter = MetricCallback(tenant_id, sink)
+result = await agent.ainvoke(
+    inputs,
+    config={
+        &quot;callbacks&quot;: [meter],
+        &quot;configurable&quot;: {&quot;thread_id&quot;: session_id, &quot;tenant_id&quot;: tenant_id},
+        &quot;tags&quot;: [&quot;prod&quot;, f&quot;tenant:{tenant_id}&quot;],
+        &quot;metadata&quot;: {&quot;request_id&quot;: req_id, &quot;tier&quot;: &quot;enterprise&quot;},
+    },
+)
+</code></pre>
+<p>Construct the callback <em>inside</em> the request handler so it captures a fresh <code>tenant_id</code> per request — and in that pattern, invocation-time config is the only way callbacks reach subgraphs. See <a href="references/trace-metadata-and-tagging.md">Trace Metadata and Tagging</a> for the full <code>RunnableConfig</code> shape.</p>
+<h3>Step 4 — Tag and annotate traces via <code>RunnableConfig</code></h3>
+<p>LangSmith indexes two per-request fields: <code>tags</code> (flat list, filterable) and <code>metadata</code> (key-value, searchable). Fix conventions early — LangSmith has no rename tool.</p>
+<pre data-lang="python"><code>
+config = {
+    &quot;callbacks&quot;: [meter],
+    &quot;tags&quot;: [
+        &quot;env:prod&quot;,                # environment
+        f&quot;tenant:{tenant_id}&quot;,     # tenant
+        f&quot;tier:{tenant_tier}&quot;,     # plan tier
+        f&quot;feature:{feature_flag}&quot;, # A/B experiment arm
+    ],
+    &quot;metadata&quot;: {
+        &quot;request_id&quot;: req_id,
+        &quot;user_id&quot;: user_id,
+        &quot;session_id&quot;: session_id,
+        &quot;app_version&quot;: os.environ[&quot;APP_VERSION&quot;],
+    },
+    &quot;run_name&quot;: &quot;agent_main&quot;,      # LangSmith UI label; overrides chain class name
+}
+</code></pre>
+<p>Hierarchical tag conventions (<code>env:prod</code>, <code>tenant:acme</code>, <code>tier:enterprise</code>) make LangSmith filters work. Free-form tags (<code>&quot;important&quot;</code>, <code>&quot;check-me&quot;</code>) do not. See <a href="references/trace-metadata-and-tagging.md">Trace Metadata and Tagging</a>.</p>
+<h3>Step 5 — Pick a sink and the stack shape</h3>
+<p>The callback handler is the integration point. Options, in decreasing order of fit:</p>
+<ul>
+<li><strong>LangSmith only</strong> — zero additional overhead; tracing already covers latency and token accounting. Fine for solo dev, small teams, and LLM-native ops.</li>
+<li><strong>Prometheus (pull)</strong> — best fit for Kubernetes + existing Prom stack. Export via <code>prometheus_client</code> HTTP endpoint. Watch tenant label cardinality.</li>
+<li><strong>StatsD / Datadog (push)</strong> — UDP fire-and-forget; sub-1ms overhead. Safe on high-throughput async services. Use <code>datadog.dogstatsd</code> for tag support.</li>
+<li><strong>OTEL native</strong> — multi-service distributed tracing. Defer to <code>langchain-otel-observability</code> (L33); do not reimplement here.</li>
+</ul>
+<p>Decision tree:</p>
+<pre><code>
+Existing OTEL stack (Collector, Tempo, Jaeger)?
+├── YES → OTEL-native (L33). LangSmith optional for prompt inspection.
+└── NO  → LLM-specific features (prompt inspection, evals, queues) enough?
+         ├── YES → LangSmith only. Add MetricCallback only for tenant cost.
+         └── NO  → Hybrid: LangSmith for prompts + Prometheus/Datadog for SLOs.
+                   See references/hybrid-langsmith-otel.md for split-point rules.
+</code></pre>
+<p>Mixing paths without a plan creates double-emission and conflicting trace IDs. See <a href="references/custom-metrics-callback.md">Custom Metrics Callback</a> for Prometheus / StatsD / Datadog sink implementations, plus dedupe for P25 retry double-counts; see <a href="references/hybrid-langsmith-otel.md">Hybrid LangSmith + OTEL</a> for the split-point contract.</p>
+<h3>Step 6 — Feed runs back into evals</h3>
+<p>Real traffic is the best eval set. Route a sampled subset of production runs into a LangSmith annotation queue for human review; the queue feeds <code>Dataset</code> objects replayable against candidate models.</p>
+<pre data-lang="python"><code>
+from langsmith import Client
+Client().create_annotation_queue(
+    name=&quot;prod-regressions&quot;,
+    description=&quot;1% sample, weekly review&quot;,
+)
+# Add metadata={&quot;eval_candidate&quot;: &quot;true&quot;} on 1% of runs — LangSmith UI has
+# a rule to route into the queue by metadata filter.
+</code></pre>
+<p>Keep annotation queues under 500 runs/week (reviewers saturate past that). See <a href="references/langsmith-setup.md">LangSmith Setup</a> for the queue and dataset flow.</p>
+<h2>Output</h2>
+<ul>
+<li>LangSmith tracing on via <code>LANGSMITH_TRACING</code> / <code>LANGSMITH_API_KEY</code> / <code>LANGSMITH_PROJECT</code> with a <code>langsmith.Client()</code> smoke-check</li>
+<li><code>MetricCallback(BaseCallbackHandler)</code> emitting <code>token_in</code>, <code>token_out</code>, <code>cache_read</code>, <code>latency_ms</code>, <code>tool_calls</code>, <code>error</code> tagged with <code>tenant_id</code></li>
+<li>All chain invocations pass <code>config={&quot;callbacks&quot;: [...], ...}</code> at invoke time so metrics propagate to subgraphs and agent tools</li>
+<li><code>RunnableConfig</code> carries hierarchical tags (<code>env:*</code>, <code>tenant:*</code>, <code>tier:*</code>) and structured <code>metadata</code> (<code>request_id</code>, <code>user_id</code>, <code>session_id</code>)</li>
+<li>One metric sink wired (Prometheus, StatsD, Datadog, or LangSmith-only)</li>
+<li>Explicit choice recorded for LangSmith / OTEL / hybrid / custom</li>
+</ul>
+<h2>Error Handling</h2>
+<table><thead><tr>
+<th>Error</th>
+<th>Cause</th>
+<th>Fix</th>
+</tr></thead><tbody>
+<tr>
+<td>No traces in LangSmith, no errors</td>
+<td>Used <code>LANGCHAIN_TRACING_V2</code> spelling on 1.0 middleware path (P26)</td>
+<td>Switch to <code>LANGSMITH_TRACING=true</code> and <code>LANGSMITH_API_KEY</code></td>
+</tr>
+<tr>
+<td><code>langsmith.utils.LangSmithAuthError: Unauthorized</code></td>
+<td>Key is valid but points to a deleted workspace, or copied with trailing whitespace</td>
+<td>Regenerate at smith.langchain.com, check <code>repr(os.environ[&#39;LANGSMITH_API_KEY&#39;])</code> for <code>\n</code></td>
+</tr>
+<tr>
+<td>Callback fires on parent only, silent on subgraphs</td>
+<td>Bound via <code>.with_config(callbacks=[...])</code> — does not propagate (P28)</td>
+<td>Pass via <code>config[&quot;callbacks&quot;]</code> at <code>invoke()</code> / <code>ainvoke()</code></td>
+</tr>
+<tr>
+<td>Token counts under by 30-70% vs provider dashboard</td>
+<td>Combination of P28 (subgraph silence) and P25 (retry double-count not deduped)</td>
+<td>Fix P28 first; for P25 add <code>request_id</code> dedupe key in sink</td>
+</tr>
+<tr>
+<td>Trace duration shows 0ms on streamed calls</td>
+<td><code>on_llm_end</code> fires after stream closes but handler records before — timing race</td>
+<td>Use <code>time.perf_counter()</code> captured in <code>on_llm_start</code>, not <code>on_chat_model_start</code></td>
+</tr>
+<tr>
+<td>Prometheus cardinality explosion</td>
+<td><code>tenant_id</code> label has high cardinality (&gt;10k tenants)</td>
+<td>Bucket tenants into tiers for metrics; keep full <code>tenant_id</code> in LangSmith metadata only</td>
+</tr>
+<tr>
+<td>LangSmith UI shows runs under <code>default</code> project, not the configured one</td>
+<td><code>LANGSMITH_PROJECT</code> env var not set at process start</td>
+<td>Set before import; <code>LANGSMITH_PROJECT</code> is read once at <code>Client()</code> init</td>
+</tr>
+<tr>
+<td><code>AttributeError: &#39;NoneType&#39; object has no attribute &#39;get&#39;</code> in <code>on_llm_end</code></td>
+<td><code>usage_metadata</code> is <code>None</code> on intermediate streaming chunks</td>
+<td>Guard with <code>if meta := getattr(g.message, &#39;usage_metadata&#39;, None):</code></td>
+</tr>
+</tbody></table>
+<h2>Examples</h2>
+<h3>Multi-tenant SaaS: per-tenant cost dashboard</h3>
+<p>A production SaaS has 200 tenants on a shared LangGraph agent. Finance wants weekly cost reports per tenant. The <code>MetricCallback</code> records <code>token_in</code>, <code>token_out</code>, and <code>cache_read</code> tagged with <code>tenant_id</code>; Prometheus scrapes the <code>/metrics</code> endpoint; Grafana aggregates <code>sum by (tenant_id) (rate(llm_token_out_total[1w])) * 0.0000015</code> for Sonnet output cost. The invocation-time <code>config[&quot;callbacks&quot;]</code> propagation is load-bearing here — without it, subgraph tool calls (the bulk of token spend) go uncounted. See <a href="references/custom-metrics-callback.md">Custom Metrics Callback</a> for the full Prometheus integration.</p>
+<h3>Debugging missing traces in staging</h3>
+<p>A team deploys a new LangGraph service to staging. No traces show up in LangSmith. Checking: (1) <code>LANGSMITH_TRACING</code> spelled correctly — yes; (2) API key valid — <code>langsmith.Client().list_projects(limit=1)</code> returns ok; (3) project name matches — <code>LANGSMITH_PROJECT=myservice-staging</code>. Traces appear in the <code>default</code> project, not <code>myservice-staging</code>. Root cause: the env var was set in the runtime env-file but the process was started before the env-file was sourced. <code>Client()</code> read <code>LANGSMITH_PROJECT</code> at import time. Fix: restart the process cleanly. See <a href="references/langsmith-setup.md">LangSmith Setup</a> for the process-order checklist.</p>
+<h3>Feeding prod traffic to an eval dataset</h3>
+<p>A team wants to validate a Claude 4.6 → Claude 4.7 upgrade against recent prod runs. They add <code>metadata={&quot;eval_candidate&quot;: &quot;pre-upgrade&quot;}</code> to 1% of runs for one week, create a LangSmith dataset from the tagged runs, then replay against the new model and diff outputs. The sampling rule lives in LangSmith UI, filtered by <code>metadata.eval_candidate</code>. See <a href="references/langsmith-setup.md">LangSmith Setup</a> for the annotation-queue and dataset-creation flow.</p>
+<h2>Resources</h2>
+<ul>
+<li><a href="https://docs.smith.langchain.com/observability/concepts">LangSmith Observability concepts</a></li>
+<li><a href="https://docs.smith.langchain.com/how_to_guides/setup/configure_project">LangSmith env variable reference</a></li>
+<li><a href="https://python.langchain.com/docs/concepts/callbacks/">LangChain callbacks (1.0)</a></li>
+<li><a href="https://python.langchain.com/api_reference/core/callbacks/langchain_core.callbacks.base.BaseCallbackHandler.html"><code>BaseCallbackHandler</code> API</a></li>
+<li><a href="https://python.langchain.com/api_reference/core/runnables/langchain_core.runnables.config.RunnableConfig.html"><code>RunnableConfig</code> API</a></li>
+<li>For OTEL-native instrumentation: <code>langchain-otel-observability</code> (L33) in this pack</li>
+<li>Pack pain catalog: <code>docs/pain-catalog.md</code> (entries P04, P25, P26, P28)</li>
+</ul></div>
+      </div>
+    </section>
+
+    <!-- 8. Bottom CTA -->
+    <section class="detail-cta" data-astro-cid-qcigfm7x>
+  <h2 class="detail-cta__headline" data-astro-cid-qcigfm7x>Ready to use langchain-py-pack?</h2>
+  <div class="detail-cta__actions" data-astro-cid-qcigfm7x>
+    <button class="detail-cta__primary" data-copy-install="/plugin install langchain-py-pack@claude-code-plugins-plus" data-astro-cid-qcigfm7x>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" data-astro-cid-qcigfm7x>
+        <rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" stroke-width="1.5" data-astro-cid-qcigfm7x></rect>
+        <path d="M3 11V3a1 1 0 011-1h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" data-astro-cid-qcigfm7x></path>
+      </svg>
+      <span class="detail-cta__btn-text" data-astro-cid-qcigfm7x>Copy Install Command</span>
+    </button>
+    
+  </div>
+</section>
+
+<script type="module">document.querySelectorAll("[data-copy-install]").forEach(t=>{t.addEventListener("click",async()=>{const a=t.dataset.copyInstall||"";await navigator.clipboard.writeText(a);const e=t.querySelector(".detail-cta__btn-text");if(e){const o=e.textContent;e.textContent="Copied!",t.classList.add("copied"),window.trackEvent&&window.trackEvent("install_copied",{plugin_name:a.split(" ").pop()||"",source:"detail_cta"}),setTimeout(()=>{e.textContent=o,t.classList.remove("copied")},2e3)}})});</script>
+
+    <!-- 9. Related Skills (6, with tool pills) -->
+    <section class="related-skills-section" data-astro-cid-jrlgpo3w>
+        <h2 class="related-skills-heading" data-astro-cid-jrlgpo3w>Related Skills</h2>
+        <div class="related-skills-grid" data-astro-cid-jrlgpo3w>
+          <a href="/skills/abridge-ci-integration/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-ci-integration</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Configure CI/CD pipeline for Abridge clinical AI integrations with GitHub Actions.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-common-errors/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-common-errors</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Diagnose and fix common Abridge clinical AI integration errors.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-a/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-a</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge ambient clinical documentation capture-to-note pipeline.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-b/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-b</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge patient-facing documentation and after-visit summary generation.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-cost-tuning/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-cost-tuning</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Optimize Abridge clinical AI costs through tier selection, session management, and usage monitoring for healthcare organizations.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-debug-bundle/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-debug-bundle</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Collect Abridge debug evidence for support tickets and troubleshooting.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a>
+        </div>
+      </section>
+
+  </div>
+
+  
+  <script>
+    document.querySelectorAll('.install-command').forEach(el => {
+      el.addEventListener('click', function() {
+        const text = this.dataset.copy || this.textContent;
+        navigator.clipboard.writeText(text).then(() => {
+          const originalText = this.textContent;
+          this.textContent = 'Copied to clipboard!';
+          this.style.color = 'var(--brand-green)';
+          setTimeout(() => {
+            this.textContent = originalText;
+            this.style.color = '';
+          }, 2000);
+        });
+      });
+    });
+  </script>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

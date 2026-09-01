@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fine-Tuning IAM1: Building a Hierarchical Multi-Agent System on Vertex AI — Tons of Skills Work Diary</title>
+    <meta name="description" content="Deep dive into fine-tuning a Regional Manager AI agent (IAM1) with hierarchical multi-agent orchestration on Vertex AI Agent Engine. Real implementation of decision frameworks and specialist delegation.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://startaitools.com/posts/fine-tuning-iam1-building-a-hierarchical-multi-agent-system-on-vertex-ai/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/fine-tuning-iam1-hierarchical-multi-agent-vertex-ai/">
+    <meta property="og:title" content="Fine-Tuning IAM1: Building a Hierarchical Multi-Agent System on Vertex AI — Tons of Skills Work Diary">
+    <meta property="og:description" content="Deep dive into fine-tuning a Regional Manager AI agent (IAM1) with hierarchical multi-agent orchestration on Vertex AI Agent Engine. Real implementation of decision frameworks and specialist delegation.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="Fine-Tuning IAM1: Building a Hierarchical Multi-Agent System on Vertex AI — Tons of Skills Work Diary">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/fine-tuning-iam1-hierarchical-multi-agent-vertex-ai/">
+    <meta name="twitter:title" content="Fine-Tuning IAM1: Building a Hierarchical Multi-Agent System on Vertex AI — Tons of Skills Work Diary">
+    <meta name="twitter:description" content="Deep dive into fine-tuning a Regional Manager AI agent (IAM1) with hierarchical multi-agent orchestration on Vertex AI Agent Engine. Real implementation of decision frameworks and specialist delegation.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"Fine-Tuning IAM1: Building a Hierarchical Multi-Agent System on Vertex AI","description":"Deep dive into fine-tuning a Regional Manager AI agent (IAM1) with hierarchical multi-agent orchestration on Vertex AI Agent Engine. Real implementation of decision frameworks and specialist delegation.","datePublished":"2025-11-09","url":"https://tonsofskills.com/blog/undefined","author":{"@type":"Person","name":"Jeremy Longshore"},"publisher":{"@type":"Organization","name":"Tons of Skills","url":"https://tonsofskills.com"}}</script>
+  
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.post-header[data-astro-cid-7jjqptxk]{background:var(--panel);padding:4rem 1.5rem 3rem;border-bottom:1px solid var(--border)}.post-header-inner[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto}.back-link[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3);text-decoration:none;display:inline-block;margin-bottom:1.5rem;transition:color .2s}.back-link[data-astro-cid-7jjqptxk]:hover{color:var(--primary)}.post-meta[data-astro-cid-7jjqptxk]{display:flex;align-items:center;gap:.75rem;margin-bottom:1rem}time[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3)}.featured-badge[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.2rem .6rem;background:#ce114126;color:var(--red);border-radius:0;font-weight:600;text-transform:uppercase;letter-spacing:.05em}.post-header[data-astro-cid-7jjqptxk] h1[data-astro-cid-7jjqptxk]{font-family:var(--font-body);font-size:clamp(1.5rem,4vw,2.2rem);font-weight:700;color:var(--text);line-height:1.25;margin-bottom:.75rem;letter-spacing:0}.post-desc[data-astro-cid-7jjqptxk]{color:var(--text-2);font-size:1.05rem;line-height:1.6;margin-bottom:1rem}.post-tags[data-astro-cid-7jjqptxk]{display:flex;gap:.4rem;flex-wrap:wrap}.tag[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.15rem .5rem;background:var(--surface-3);color:var(--text-3);border-radius:0}.post-body[data-astro-cid-7jjqptxk]{padding:3rem 1.5rem 4rem}.prose[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto;color:var(--text-2);line-height:1.8;font-size:1rem}.prose[data-astro-cid-7jjqptxk] h2{font-family:var(--font-body);font-size:1.5rem;font-weight:700;color:var(--text);margin:2.5rem 0 1rem;letter-spacing:0}.prose[data-astro-cid-7jjqptxk] h3{font-size:1.2rem;font-weight:600;color:var(--text);margin:2rem 0 .75rem}.prose[data-astro-cid-7jjqptxk] p{margin-bottom:1rem}.prose[data-astro-cid-7jjqptxk] ul,.prose[data-astro-cid-7jjqptxk] ol{margin:.5rem 0 1rem 1.5rem}.prose[data-astro-cid-7jjqptxk] li{margin-bottom:.35rem}.prose[data-astro-cid-7jjqptxk] strong{color:var(--text);font-weight:600}.prose[data-astro-cid-7jjqptxk] code{font-family:var(--font-mono);font-size:.88em;background:var(--surface-3);padding:.15em .35em;border-radius:0;color:var(--primary)}.prose[data-astro-cid-7jjqptxk] a{color:var(--primary);text-decoration:none}.prose[data-astro-cid-7jjqptxk] a:hover{text-decoration:underline}@media(max-width:768px){.post-header[data-astro-cid-7jjqptxk]{padding:3rem 1rem 2rem}.post-body[data-astro-cid-7jjqptxk]{padding:2rem 1rem 3rem}}
+</style></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  <article class="post" data-astro-cid-7jjqptxk>
+    <header class="post-header" data-astro-cid-7jjqptxk>
+      <div class="post-header-inner" data-astro-cid-7jjqptxk>
+        <a href="/blog" class="back-link" data-astro-cid-7jjqptxk>Back to Work Diary</a>
+        <div class="post-meta" data-astro-cid-7jjqptxk>
+          <time datetime="2025-11-09" data-astro-cid-7jjqptxk>November 8, 2025</time>
+          
+        </div>
+        <h1 data-astro-cid-7jjqptxk>Fine-Tuning IAM1: Building a Hierarchical Multi-Agent System on Vertex AI</h1>
+        <p class="post-desc" data-astro-cid-7jjqptxk>Deep dive into fine-tuning a Regional Manager AI agent (IAM1) with hierarchical multi-agent orchestration on Vertex AI Agent Engine. Real implementation of decision frameworks and specialist delegation.</p>
+        <div class="post-tags" data-astro-cid-7jjqptxk>
+          <span class="tag" data-astro-cid-7jjqptxk>vertex-ai</span><span class="tag" data-astro-cid-7jjqptxk>multi-agent-systems</span><span class="tag" data-astro-cid-7jjqptxk>google-adk</span><span class="tag" data-astro-cid-7jjqptxk>gemini</span><span class="tag" data-astro-cid-7jjqptxk>agent-orchestration</span><span class="tag" data-astro-cid-7jjqptxk>iam-architecture</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="post-body" data-astro-cid-7jjqptxk>
+      <div class="prose" data-astro-cid-7jjqptxk>
+        <h2 id="the-problem-generic-orchestrator-vs-business-aligned-regional-manager">The Problem: Generic Orchestrator vs Business-Aligned Regional Manager</h2>
+<p>I had Bob deployed as a basic multi-agent orchestrator on Vertex AI Agent Engine. But here’s what was wrong:</p>
+<p><strong>Before Fine-Tuning:</strong></p>
+<ul>
+<li>Generic “master orchestrator” identity</li>
+<li>Vague routing decisions</li>
+<li>No clear decision framework</li>
+<li>IAM2 specialists had generic instructions</li>
+<li>Missing business model alignment</li>
+</ul>
+<p><strong>What I Needed:</strong></p>
+<ul>
+<li>IAM1 as a <strong>Regional Manager</strong> (sovereign in domain)</li>
+<li>Clear hierarchy: IAM1 can <strong>command</strong> IAM2s, can <strong>coordinate</strong> with peer IAM1s</li>
+<li>Intelligent routing based on task complexity</li>
+<li>Professional IAM2 specialists with standardized deliverables</li>
+<li>Alignment with IntentSolutions business model (deployable per client)</li>
+</ul>
+<p>This wasn’t just about better prompts. It was about transforming a generic agent into a <strong>deployable business product</strong>.</p>
+<h2 id="the-iam1iam2-business-model">The IAM1/IAM2 Business Model</h2>
+<p>Quick context on what we’re building:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>┌─────────────────────────────────────────┐</span></span>
+<span class="line"><span>│  IAM1 (Regional Manager)                │</span></span>
+<span class="line"><span>│  - Sovereign in their domain            │</span></span>
+<span class="line"><span>│  - Can coordinate with peer IAM1s       │</span></span>
+<span class="line"><span>│  - Can command IAM2 subordinates        │</span></span>
+<span class="line"><span>│  - Cannot command peer IAM1s            │</span></span>
+<span class="line"><span>└─────────────────────────────────────────┘</span></span>
+<span class="line"><span>         │</span></span>
+<span class="line"><span>         │ Commands</span></span>
+<span class="line"><span>         ▼</span></span>
+<span class="line"><span>┌─────────────────────────────────────────┐</span></span>
+<span class="line"><span>│  IAM2 (Specialists)                     │</span></span>
+<span class="line"><span>│  - Research, Code, Data, Slack          │</span></span>
+<span class="line"><span>│  - Report to their IAM1                 │</span></span>
+<span class="line"><span>│  - Cannot command anyone                │</span></span>
+<span class="line"><span>└─────────────────────────────────────────┘</span></span></code></pre>
+<p><strong>Business Value:</strong></p>
+<ul>
+<li>Deploy IAM1 to Client A → Revenue Stream</li>
+<li>Deploy IAM1 to Client B → Revenue Stream</li>
+<li>Add IAM2 specialists → Upsell</li>
+<li>Multiple IAM1s coordinate across departments → Enterprise scale</li>
+</ul>
+<p>Each IAM1 is grounded in client-specific knowledge via Vertex AI Search.</p>
+<h2 id="fine-tuning-implementation">Fine-Tuning Implementation</h2>
+<h3 id="1-enhanced-iam1-orchestrator-identity">1. Enhanced IAM1 Orchestrator Identity</h3>
+<p><strong>File:</strong> <code>app/agent.py</code></p>
+<p>I completely rewrote the instruction to give IAM1 a clear identity and decision framework:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#E1E4E8">instruction </span><span style="color:#F97583">=</span><span style="color:#F97583"> f</span><span style="color:#9ECBFF">"""You are </span><span style="color:#79B8FF">{</span><span style="color:#E1E4E8">agent_card[</span><span style="color:#9ECBFF">'product_name'</span><span style="color:#E1E4E8">]</span><span style="color:#79B8FF">}</span><span style="color:#9ECBFF">, version </span><span style="color:#79B8FF">{</span><span style="color:#E1E4E8">agent_card[</span><span style="color:#9ECBFF">'version'</span><span style="color:#E1E4E8">]</span><span style="color:#79B8FF">}</span><span style="color:#9ECBFF">.</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#9ECBFF">IDENTITY &#x26; ROLE:</span></span>
+<span class="line"><span style="color:#9ECBFF">You are IAM1 - a Regional Manager AI agent, sovereign within your domain.</span></span>
+<span class="line"><span style="color:#9ECBFF">You can coordinate with peer IAM1s (other regional managers) but cannot command them.</span></span>
+<span class="line"><span style="color:#9ECBFF">You can command and delegate to IAM2 specialist agents who report to you.</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#9ECBFF">DECISION FRAMEWORK:</span></span>
+<span class="line"><span style="color:#9ECBFF">1. Simple questions (greetings, basic info) → Answer directly</span></span>
+<span class="line"><span style="color:#9ECBFF">2. Knowledge questions (facts, documentation) → Use retrieve_docs tool first</span></span>
+<span class="line"><span style="color:#9ECBFF">3. Complex specialized tasks → Route to appropriate IAM2 agent via route_to_agent</span></span>
+<span class="line"><span style="color:#9ECBFF">4. Multi-step tasks → Coordinate multiple IAM2s, synthesize results</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#9ECBFF">QUALITY STANDARDS:</span></span>
+<span class="line"><span style="color:#9ECBFF">- Be efficient: Don't over-delegate simple tasks</span></span>
+<span class="line"><span style="color:#9ECBFF">- Be transparent: Tell users when consulting IAM2 specialists</span></span>
+<span class="line"><span style="color:#9ECBFF">- Be thorough: Use knowledge base and specialists for best answers</span></span>
+<span class="line"><span style="color:#9ECBFF">- Be decisive: Choose the right tool/agent for each task</span></span>
+<span class="line"><span style="color:#9ECBFF">- Be grounded: Always check knowledge base for relevant context</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#9ECBFF">Remember: You are IAM1, the Regional Manager. Your IAM2s are your team members who execute specialized tasks under your direction."""</span></span></code></pre>
+<p><strong>Key Additions:</strong></p>
+<ul>
+<li>Explicit IAM1 identity (not just “orchestrator”)</li>
+<li>Clear peer vs subordinate relationship rules</li>
+<li>Step-by-step decision framework for routing</li>
+<li>Quality standards for consistency</li>
+</ul>
+<h3 id="2-improved-routing-function">2. Improved Routing Function</h3>
+<p><strong>Before:</strong></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#F97583">def</span><span style="color:#B392F0"> route_to_agent</span><span style="color:#E1E4E8">(task_type: </span><span style="color:#79B8FF">str</span><span style="color:#E1E4E8">, query: </span><span style="color:#79B8FF">str</span><span style="color:#E1E4E8">) -> </span><span style="color:#79B8FF">str</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">    specialist </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> AGENT_REGISTRY</span><span style="color:#E1E4E8">[task_type]</span></span>
+<span class="line"><span style="color:#E1E4E8">    response </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> specialist.send_message(query)</span></span>
+<span class="line"><span style="color:#F97583">    return</span><span style="color:#F97583"> f</span><span style="color:#9ECBFF">"[</span><span style="color:#79B8FF">{</span><span style="color:#E1E4E8">task_type.upper()</span><span style="color:#79B8FF">}</span><span style="color:#9ECBFF"> AGENT]: </span><span style="color:#79B8FF">{</span><span style="color:#E1E4E8">response</span><span style="color:#79B8FF">}</span><span style="color:#9ECBFF">"</span></span></code></pre>
+<p><strong>After:</strong></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#F97583">def</span><span style="color:#B392F0"> route_to_agent</span><span style="color:#E1E4E8">(task_type: </span><span style="color:#79B8FF">str</span><span style="color:#E1E4E8">, query: </span><span style="color:#79B8FF">str</span><span style="color:#E1E4E8">) -> </span><span style="color:#79B8FF">str</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#9ECBFF">    """</span></span>
+<span class="line"><span style="color:#9ECBFF">    Route a task to the appropriate IAM2 specialist agent.</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#9ECBFF">    - 'research': Deep research, knowledge retrieval, complex questions</span></span>
+<span class="line"><span style="color:#9ECBFF">      Examples: "Research best practices for X", "Compare approaches to Y"</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#9ECBFF">    - 'code': Code generation, debugging, technical programming</span></span>
+<span class="line"><span style="color:#9ECBFF">      Examples: "Write a function to do X", "Debug this error"</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#9ECBFF">    - 'data': BigQuery queries, data analysis, visualization</span></span>
+<span class="line"><span style="color:#9ECBFF">      Examples: "Query the database for X", "Analyze trends in Y"</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#9ECBFF">    - 'slack': Slack-specific interactions, channel management</span></span>
+<span class="line"><span style="color:#9ECBFF">      Examples: "Format this for Slack", "Post to channel X"</span></span>
+<span class="line"><span style="color:#9ECBFF">    """</span></span>
+<span class="line"><span style="color:#F97583">    try</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#F97583">        if</span><span style="color:#E1E4E8"> task_type </span><span style="color:#F97583">not</span><span style="color:#F97583"> in</span><span style="color:#79B8FF"> AGENT_REGISTRY</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">            available </span><span style="color:#F97583">=</span><span style="color:#9ECBFF"> ', '</span><span style="color:#E1E4E8">.join(</span><span style="color:#79B8FF">AGENT_REGISTRY</span><span style="color:#E1E4E8">.keys())</span></span>
+<span class="line"><span style="color:#F97583">            return</span><span style="color:#F97583"> f</span><span style="color:#9ECBFF">"❌ Unknown IAM2 agent type: '</span><span style="color:#79B8FF">{</span><span style="color:#E1E4E8">task_type</span><span style="color:#79B8FF">}</span><span style="color:#9ECBFF">'</span><span style="color:#79B8FF">\n\n</span><span style="color:#9ECBFF">Available: </span><span style="color:#79B8FF">{</span><span style="color:#E1E4E8">available</span><span style="color:#79B8FF">}</span><span style="color:#9ECBFF">"</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">        specialist </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> AGENT_REGISTRY</span><span style="color:#E1E4E8">[task_type]</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">        # Log delegation for transparency</span></span>
+<span class="line"><span style="color:#79B8FF">        print</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">f</span><span style="color:#9ECBFF">"[IAM1] Delegating to </span><span style="color:#79B8FF">{</span><span style="color:#E1E4E8">task_type.upper()</span><span style="color:#79B8FF">}</span><span style="color:#9ECBFF"> IAM2 specialist..."</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">        response </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> specialist.send_message(query)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">        return</span><span style="color:#F97583"> f</span><span style="color:#9ECBFF">"""[IAM2 </span><span style="color:#79B8FF">{</span><span style="color:#E1E4E8">task_type.upper()</span><span style="color:#79B8FF">}</span><span style="color:#9ECBFF"> SPECIALIST RESPONSE]:</span></span>
+<span class="line"><span style="color:#79B8FF">{</span><span style="color:#E1E4E8">response</span><span style="color:#79B8FF">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#9ECBFF">[End of </span><span style="color:#79B8FF">{</span><span style="color:#E1E4E8">task_type</span><span style="color:#79B8FF">}</span><span style="color:#9ECBFF"> specialist report]"""</span></span>
+<span class="line"><span style="color:#F97583">    except</span><span style="color:#79B8FF"> Exception</span><span style="color:#F97583"> as</span><span style="color:#E1E4E8"> e:</span></span>
+<span class="line"><span style="color:#F97583">        return</span><span style="color:#F97583"> f</span><span style="color:#9ECBFF">"❌ Error delegating to </span><span style="color:#79B8FF">{</span><span style="color:#E1E4E8">task_type</span><span style="color:#79B8FF">}</span><span style="color:#9ECBFF"> IAM2 agent: </span><span style="color:#79B8FF">{</span><span style="color:#E1E4E8">e</span><span style="color:#79B8FF">}</span><span style="color:#9ECBFF">"</span></span></code></pre>
+<p><strong>Improvements:</strong></p>
+<ul>
+<li>Detailed docstring with examples for each specialist</li>
+<li>Better error messages with available options</li>
+<li>Transparency logging</li>
+<li>Formatted responses with clear IAM2 attribution</li>
+<li>Fallback suggestions on errors</li>
+</ul>
+<h3 id="3-professional-iam2-specialist-instructions">3. Professional IAM2 Specialist Instructions</h3>
+<p><strong>File:</strong> <code>app/sub_agents.py</code></p>
+<p>I upgraded all 4 IAM2 agents with professional-grade instructions. Here’s the Research IAM2:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#E1E4E8">research_agent </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> Agent(</span></span>
+<span class="line"><span style="color:#FFAB70">    name</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">"research_iam2"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#FFAB70">    model</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">"gemini-2.5-flash"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#FFAB70">    instruction</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">"""You are a Research Specialist (IAM2 tier).</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#9ECBFF">REPORTING STRUCTURE:</span></span>
+<span class="line"><span style="color:#9ECBFF">- You report to IAM1 (Regional Manager)</span></span>
+<span class="line"><span style="color:#9ECBFF">- You are a specialist team member, not a manager</span></span>
+<span class="line"><span style="color:#9ECBFF">- Execute research tasks delegated by IAM1</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#9ECBFF">YOUR EXPERTISE:</span></span>
+<span class="line"><span style="color:#9ECBFF">- Deep research and knowledge synthesis</span></span>
+<span class="line"><span style="color:#9ECBFF">- Multi-source information gathering</span></span>
+<span class="line"><span style="color:#9ECBFF">- Complex question analysis</span></span>
+<span class="line"><span style="color:#9ECBFF">- Documentation review and citation</span></span>
+<span class="line"><span style="color:#9ECBFF">- Comparative analysis and recommendations</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#9ECBFF">HOW TO WORK:</span></span>
+<span class="line"><span style="color:#9ECBFF">1. Use retrieve_docs tool to search the knowledge base thoroughly</span></span>
+<span class="line"><span style="color:#9ECBFF">2. Synthesize information from multiple sources</span></span>
+<span class="line"><span style="color:#9ECBFF">3. Provide comprehensive answers with evidence</span></span>
+<span class="line"><span style="color:#9ECBFF">4. Cite sources when available</span></span>
+<span class="line"><span style="color:#9ECBFF">5. Flag gaps in knowledge or conflicting information</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#9ECBFF">DELIVERABLE FORMAT:</span></span>
+<span class="line"><span style="color:#9ECBFF">- Start with executive summary</span></span>
+<span class="line"><span style="color:#9ECBFF">- Present findings with supporting evidence</span></span>
+<span class="line"><span style="color:#9ECBFF">- Include relevant citations/sources</span></span>
+<span class="line"><span style="color:#9ECBFF">- End with recommendations or conclusions</span></span>
+<span class="line"><span style="color:#9ECBFF">- Be thorough but concise</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#9ECBFF">Remember: You are IAM2, executing research tasks assigned by your IAM1 manager."""</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#FFAB70">    tools</span><span style="color:#F97583">=</span><span style="color:#E1E4E8">[retrieve_docs],</span></span>
+<span class="line"><span style="color:#E1E4E8">)</span></span></code></pre>
+<p><strong>Pattern Applied to All IAM2s:</strong></p>
+<ul>
+<li>Clear reporting structure (reports to IAM1)</li>
+<li>Defined expertise areas</li>
+<li>Step-by-step work process</li>
+<li>Standardized deliverable format</li>
+<li>Role reminder at the end</li>
+</ul>
+<p><strong>All 4 IAM2 Specialists:</strong></p>
+<ol>
+<li><strong>Research IAM2</strong> - Knowledge synthesis, citations, recommendations</li>
+<li><strong>Code IAM2</strong> - Clean code, security considerations, usage examples</li>
+<li><strong>Data IAM2</strong> - SQL queries, business insights, visualizations</li>
+<li><strong>Slack IAM2</strong> - Message formatting, professional tone, channel recommendations</li>
+</ol>
+<h2 id="deployment-to-vertex-ai">Deployment to Vertex AI</h2>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#F97583">export</span><span style="color:#E1E4E8"> PROJECT_ID</span><span style="color:#F97583">=</span><span style="color:#E1E4E8">bobs-brain</span></span>
+<span class="line"><span style="color:#B392F0">make</span><span style="color:#9ECBFF"> deploy</span></span></code></pre>
+<p><strong>Output:</strong></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>🤖 DEPLOYING AGENT TO VERTEX AI AGENT ENGINE 🤖</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>📋 Deployment Parameters:</span></span>
+<span class="line"><span>  Project: bobs-brain</span></span>
+<span class="line"><span>  Location: us-central1</span></span>
+<span class="line"><span>  Display Name: bob-vertex-agent</span></span>
+<span class="line"><span>  Model: gemini-2.0-flash (orchestrator)</span></span>
+<span class="line"><span>  IAM2 Models: gemini-2.5-flash (specialists)</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>✅ Deployment successful!</span></span>
+<span class="line"><span>Agent ID: 5828234061910376448</span></span></code></pre>
+<p><strong>What Changed in Deployment:</strong></p>
+<ul>
+<li>Updated IAM1 orchestrator with new instruction</li>
+<li>Enhanced routing function with examples</li>
+<li>All 4 IAM2 agents with professional instructions</li>
+<li>Telemetry enabled for observability</li>
+</ul>
+<h2 id="testing-the-decision-framework">Testing the Decision Framework</h2>
+<p>Here’s how IAM1 should now route different query types:</p>
+<p><strong>1. Simple Greeting:</strong></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>User: "Hello!"</span></span>
+<span class="line"><span>IAM1: [Answers directly without routing]</span></span></code></pre>
+<p><strong>2. Knowledge Question:</strong></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>User: "What is Vertex AI Search?"</span></span>
+<span class="line"><span>IAM1: [Uses retrieve_docs tool, returns grounded answer]</span></span></code></pre>
+<p><strong>3. Research Task:</strong></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>User: "Research best practices for multi-agent systems"</span></span>
+<span class="line"><span>IAM1: [Routes to Research IAM2]</span></span>
+<span class="line"><span>Response: [IAM2 RESEARCH SPECIALIST RESPONSE]:</span></span>
+<span class="line"><span>Executive Summary: Multi-agent systems benefit from...</span></span>
+<span class="line"><span>[Detailed research with citations]</span></span>
+<span class="line"><span>[End of research specialist report]</span></span></code></pre>
+<p><strong>4. Code Task:</strong></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>User: "Write a Python function to validate email addresses"</span></span>
+<span class="line"><span>IAM1: [Routes to Code IAM2]</span></span>
+<span class="line"><span>Response: [IAM2 CODE SPECIALIST RESPONSE]:</span></span>
+<span class="line"><span>Approach: Using regex with comprehensive validation</span></span>
+<span class="line"><span>[Clean, commented code]</span></span>
+<span class="line"><span>[Usage examples]</span></span>
+<span class="line"><span>[End of code specialist report]</span></span></code></pre>
+<p><strong>5. Multi-Step Task:</strong></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>User: "Research Vertex AI, then write code to deploy an agent"</span></span>
+<span class="line"><span>IAM1: [Coordinates Research IAM2 → Code IAM2, synthesizes results]</span></span></code></pre>
+<h2 id="key-learnings">Key Learnings</h2>
+<h3 id="1-decision-frameworks--generic-prompts">1. Decision Frameworks > Generic Prompts</h3>
+<p>Don’t just say “you can delegate tasks.” Provide a <strong>step-by-step decision framework</strong>:</p>
+<ul>
+<li>IF simple question → answer directly</li>
+<li>IF knowledge question → use RAG tool</li>
+<li>IF specialized task → route to specialist</li>
+<li>IF multi-step → coordinate multiple agents</li>
+</ul>
+<h3 id="2-examples-drive-behavior">2. Examples Drive Behavior</h3>
+<p>The routing function docstring with <strong>concrete examples</strong> makes a huge difference:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#6A737D"># Instead of: "Use for research tasks"</span></span>
+<span class="line"><span style="color:#6A737D"># Write: "Examples: 'Research best practices for X', 'Compare approaches to Y'"</span></span></code></pre>
+<h3 id="3-standardized-deliverables-improve-quality">3. Standardized Deliverables Improve Quality</h3>
+<p>All IAM2 specialists now follow a <strong>deliverable format</strong>:</p>
+<ul>
+<li>Research: Executive summary → Findings → Recommendations</li>
+<li>Code: Approach → Code → Examples → Testing</li>
+<li>Data: Business question → Query → Insights → Recommendations</li>
+<li>Slack: Formatted message → Alternatives → Recommendations</li>
+</ul>
+<p>This creates consistency and professionalism.</p>
+<h3 id="4-identity-matters-for-business-products">4. Identity Matters for Business Products</h3>
+<p>Transforming “Bob the orchestrator” into “IAM1 Regional Manager” aligns the agent with the <strong>business model</strong>:</p>
+<ul>
+<li>Deployable per client ($500/month)</li>
+<li>Add IAM2 specialists ($200/IAM2)</li>
+<li>Multiple IAM1s coordinate (enterprise scale)</li>
+</ul>
+<p>The agent now <strong>knows</strong> it’s a deployable business product.</p>
+<h2 id="production-architecture">Production Architecture</h2>
+<p><strong>Current Stack:</strong></p>
+<ul>
+<li><strong>Platform</strong>: Vertex AI Agent Engine</li>
+<li><strong>IAM1 Model</strong>: Gemini 2.0 Flash (orchestrator)</li>
+<li><strong>IAM2 Models</strong>: Gemini 2.5 Flash (specialists)</li>
+<li><strong>Grounding</strong>: Vertex AI Search + Cloud Storage</li>
+<li><strong>Framework</strong>: Google ADK (Agent Development Kit)</li>
+<li><strong>Integration</strong>: Slack via Cloud Functions</li>
+<li><strong>Telemetry</strong>: Full observability enabled</li>
+</ul>
+<p><strong>Agent Card Definition:</strong></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#79B8FF">AGENT_CARD</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#9ECBFF">    "name"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"IAM1"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">    "product_name"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"IntentSolutions IAM1 - Regional Manager Agent"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">    "version"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"2.0.1"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">    "tier"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"IAM1"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">    "hierarchy"</span><span style="color:#E1E4E8">: {</span></span>
+<span class="line"><span style="color:#9ECBFF">        "can_command"</span><span style="color:#E1E4E8">: [</span><span style="color:#9ECBFF">"IAM2"</span><span style="color:#E1E4E8">],</span></span>
+<span class="line"><span style="color:#9ECBFF">        "can_coordinate_with"</span><span style="color:#E1E4E8">: [</span><span style="color:#9ECBFF">"IAM1"</span><span style="color:#E1E4E8">],</span></span>
+<span class="line"><span style="color:#9ECBFF">        "reports_to"</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">None</span><span style="color:#E1E4E8">,  </span><span style="color:#6A737D"># Sovereign</span></span>
+<span class="line"><span style="color:#E1E4E8">    },</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<h2 id="whats-next">What’s Next</h2>
+<p><strong>Immediate:</strong></p>
+<ul>
+<li>Test orchestration in Vertex AI Playground</li>
+<li>Validate routing decisions with real queries</li>
+<li>Configure Slack app webhook</li>
+</ul>
+<p><strong>Future:</strong></p>
+<ul>
+<li>Implement A2A (Agent-to-Agent) for peer IAM1 coordination</li>
+<li>Deploy to first client (isolated GCP project)</li>
+<li>Add BigQuery tools to Data IAM2</li>
+<li>Add Slack API tools to Slack IAM2</li>
+</ul>
+<h2 id="related-posts">Related Posts</h2>
+<ul>
+<li>Architecting Production Multi-Agent AI Platform - Technical Leadership</li>
+<li>Building Production Multi-Agent AI BrightStream on Vertex AI</li>
+</ul>
+<h2 id="conclusion">Conclusion</h2>
+<p>Fine-tuning isn’t just about better prompts. It’s about:</p>
+<ol>
+<li><strong>Clear Identity</strong> - IAM1 knows it’s a Regional Manager</li>
+<li><strong>Decision Frameworks</strong> - Step-by-step routing logic</li>
+<li><strong>Professional Standards</strong> - Standardized deliverables</li>
+<li><strong>Business Alignment</strong> - Deployable product model</li>
+</ol>
+<p>The result? An agent that <strong>knows its role</strong>, <strong>makes better decisions</strong>, and <strong>delivers consistent quality</strong>.</p>
+<p><strong>Test it yourself:</strong></p>
+<ul>
+<li>Console Playground: <a href="https://console.cloud.google.com/vertex-ai/agents/locations/us-central1/agent-engines/5828234061910376448/playground?project=bobs-brain">Vertex AI Agent Engine</a></li>
+</ul>
+<p>The future of AI agents isn’t one super-intelligent model. It’s <strong>hierarchical teams</strong> of specialized agents with clear roles and decision-making frameworks.</p>
+<p><strong>Jeremy Longshore</strong> builds production multi-agent systems on Google Cloud. Connect on LinkedIn or follow on <a href="https://twitter.com/AsphaltCowb0y">X</a>.</p>
+      </div>
+    </div>
+  </article>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Building DiagnosticPro: AI-Powered Vehicle Diagnostics Platform — Tons of Skills Work Diary</title>
+    <meta name="description" content="How we built a professional-grade AI vehicle diagnostics platform in days, not months - featuring GPT-4, 254+ BigQuery tables, and multi-source data pipelines">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://startaitools.com/posts/building-diagnosticpro-ai-powered-vehicle-diagnostics-platform/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/diagnosticpro-case-study/">
+    <meta property="og:title" content="Building DiagnosticPro: AI-Powered Vehicle Diagnostics Platform — Tons of Skills Work Diary">
+    <meta property="og:description" content="How we built a professional-grade AI vehicle diagnostics platform in days, not months - featuring GPT-4, 254+ BigQuery tables, and multi-source data pipelines">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="Building DiagnosticPro: AI-Powered Vehicle Diagnostics Platform — Tons of Skills Work Diary">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/diagnosticpro-case-study/">
+    <meta name="twitter:title" content="Building DiagnosticPro: AI-Powered Vehicle Diagnostics Platform — Tons of Skills Work Diary">
+    <meta name="twitter:description" content="How we built a professional-grade AI vehicle diagnostics platform in days, not months - featuring GPT-4, 254+ BigQuery tables, and multi-source data pipelines">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"Building DiagnosticPro: AI-Powered Vehicle Diagnostics Platform","description":"How we built a professional-grade AI vehicle diagnostics platform in days, not months - featuring GPT-4, 254+ BigQuery tables, and multi-source data pipelines","datePublished":"2025-09-08","url":"https://tonsofskills.com/blog/undefined","author":{"@type":"Person","name":"Jeremy Longshore"},"publisher":{"@type":"Organization","name":"Tons of Skills","url":"https://tonsofskills.com"}}</script>
+  
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.post-header[data-astro-cid-7jjqptxk]{background:var(--panel);padding:4rem 1.5rem 3rem;border-bottom:1px solid var(--border)}.post-header-inner[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto}.back-link[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3);text-decoration:none;display:inline-block;margin-bottom:1.5rem;transition:color .2s}.back-link[data-astro-cid-7jjqptxk]:hover{color:var(--primary)}.post-meta[data-astro-cid-7jjqptxk]{display:flex;align-items:center;gap:.75rem;margin-bottom:1rem}time[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3)}.featured-badge[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.2rem .6rem;background:#ce114126;color:var(--red);border-radius:0;font-weight:600;text-transform:uppercase;letter-spacing:.05em}.post-header[data-astro-cid-7jjqptxk] h1[data-astro-cid-7jjqptxk]{font-family:var(--font-body);font-size:clamp(1.5rem,4vw,2.2rem);font-weight:700;color:var(--text);line-height:1.25;margin-bottom:.75rem;letter-spacing:0}.post-desc[data-astro-cid-7jjqptxk]{color:var(--text-2);font-size:1.05rem;line-height:1.6;margin-bottom:1rem}.post-tags[data-astro-cid-7jjqptxk]{display:flex;gap:.4rem;flex-wrap:wrap}.tag[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.15rem .5rem;background:var(--surface-3);color:var(--text-3);border-radius:0}.post-body[data-astro-cid-7jjqptxk]{padding:3rem 1.5rem 4rem}.prose[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto;color:var(--text-2);line-height:1.8;font-size:1rem}.prose[data-astro-cid-7jjqptxk] h2{font-family:var(--font-body);font-size:1.5rem;font-weight:700;color:var(--text);margin:2.5rem 0 1rem;letter-spacing:0}.prose[data-astro-cid-7jjqptxk] h3{font-size:1.2rem;font-weight:600;color:var(--text);margin:2rem 0 .75rem}.prose[data-astro-cid-7jjqptxk] p{margin-bottom:1rem}.prose[data-astro-cid-7jjqptxk] ul,.prose[data-astro-cid-7jjqptxk] ol{margin:.5rem 0 1rem 1.5rem}.prose[data-astro-cid-7jjqptxk] li{margin-bottom:.35rem}.prose[data-astro-cid-7jjqptxk] strong{color:var(--text);font-weight:600}.prose[data-astro-cid-7jjqptxk] code{font-family:var(--font-mono);font-size:.88em;background:var(--surface-3);padding:.15em .35em;border-radius:0;color:var(--primary)}.prose[data-astro-cid-7jjqptxk] a{color:var(--primary);text-decoration:none}.prose[data-astro-cid-7jjqptxk] a:hover{text-decoration:underline}@media(max-width:768px){.post-header[data-astro-cid-7jjqptxk]{padding:3rem 1rem 2rem}.post-body[data-astro-cid-7jjqptxk]{padding:2rem 1rem 3rem}}
+</style></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  <article class="post" data-astro-cid-7jjqptxk>
+    <header class="post-header" data-astro-cid-7jjqptxk>
+      <div class="post-header-inner" data-astro-cid-7jjqptxk>
+        <a href="/blog" class="back-link" data-astro-cid-7jjqptxk>Back to Work Diary</a>
+        <div class="post-meta" data-astro-cid-7jjqptxk>
+          <time datetime="2025-09-08" data-astro-cid-7jjqptxk>September 7, 2025</time>
+          
+        </div>
+        <h1 data-astro-cid-7jjqptxk>Building DiagnosticPro: AI-Powered Vehicle Diagnostics Platform</h1>
+        <p class="post-desc" data-astro-cid-7jjqptxk>How we built a professional-grade AI vehicle diagnostics platform in days, not months - featuring GPT-4, 254+ BigQuery tables, and multi-source data pipelines</p>
+        <div class="post-tags" data-astro-cid-7jjqptxk>
+          <span class="tag" data-astro-cid-7jjqptxk>case-study</span><span class="tag" data-astro-cid-7jjqptxk>ai</span><span class="tag" data-astro-cid-7jjqptxk>bigquery</span><span class="tag" data-astro-cid-7jjqptxk>gcp</span><span class="tag" data-astro-cid-7jjqptxk>python</span><span class="tag" data-astro-cid-7jjqptxk>rapid-development</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="post-body" data-astro-cid-7jjqptxk>
+      <div class="prose" data-astro-cid-7jjqptxk>
+        <h2 id="executive-summary">Executive Summary</h2>
+<p>DiagnosticPro represents a paradigm shift in vehicle diagnostics - transforming complex professional-grade analysis into accessible, AI-powered insights. Built in <strong>days, not months</strong>, this platform demonstrates how modern AI and cloud infrastructure can rapidly deliver enterprise-scale solutions.</p>
+<p><strong>Key Metrics:</strong></p>
+<ul>
+<li>🚀 <strong>Launch Time:</strong> 4 days from concept to production</li>
+<li>📊 <strong>Scale:</strong> 254+ BigQuery tables processing multi-source data</li>
+<li>🔍 <strong>Data Sources:</strong> 226+ RSS feeds, YouTube, Reddit, GitHub</li>
+<li>💰 <strong>Pricing:</strong> $29.99 per comprehensive diagnostic</li>
+<li>🤖 <strong>AI Engine:</strong> GPT-4 powered analysis with context awareness</li>
+</ul>
+<hr>
+<h2 id="the-challenge-democratizing-professional-diagnostics">The Challenge: Democratizing Professional Diagnostics</h2>
+<p>Vehicle diagnostics has long been the domain of expensive professional equipment and specialized knowledge. Mechanics invest thousands in diagnostic tools, while car owners face uncertainty about repair costs and technical accuracy.</p>
+<h3 id="traditional-pain-points">Traditional Pain Points</h3>
+<ul>
+<li><strong>Expensive Equipment:</strong> Professional scanners cost $5,000-$50,000+</li>
+<li><strong>Knowledge Barrier:</strong> Interpreting diagnostic codes requires years of experience</li>
+<li><strong>Limited Context:</strong> Basic code readers provide error codes without actionable insights</li>
+<li><strong>Information Silos:</strong> Repair knowledge scattered across forums, videos, and manuals</li>
+</ul>
+<hr>
+<h2 id="solution-ai-powered-diagnostic-intelligence">Solution: AI-Powered Diagnostic Intelligence</h2>
+<p>DiagnosticPro bridges this gap by combining GPT-4’s analytical capabilities with a massive, continuously-updated knowledge base of real-world repair data.</p>
+<h3 id="core-value-proposition">Core Value Proposition</h3>
+<ol>
+<li><strong>Professional-Grade Analysis</strong> - GPT-4 provides mechanic-level diagnostic interpretation</li>
+<li><strong>Comprehensive Context</strong> - 254+ data tables provide real-world repair scenarios</li>
+<li><strong>Cost Transparency</strong> - Accurate repair cost estimates with regional variations</li>
+<li><strong>Actionable Insights</strong> - Step-by-step repair guidance and part recommendations</li>
+</ol>
+<hr>
+<h2 id="technical-architecture-multi-project-ecosystem">Technical Architecture: Multi-Project Ecosystem</h2>
+<p>The platform uses a sophisticated multi-project workspace architecture designed for scalability and data integrity.</p>
+<h3 id="project-structure">Project Structure</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>diagnosticpro/</span></span>
+<span class="line"><span>├── daily-energizer-workflow/  # N8N automation for content generation</span></span>
+<span class="line"><span>├── rss_feeds/                 # RSS feed testing &#x26; curation (226 feeds)</span></span>
+<span class="line"><span>├── schema/                    # BigQuery schemas &#x26; validation (254 tables)</span></span>
+<span class="line"><span>└── scraper/                   # Data collection from YouTube/Reddit/GitHub</span></span></code></pre>
+<h3 id="data-flow-architecture">Data Flow Architecture</h3>
+<p>The system follows a strict <strong>Export Gateway Pattern</strong> ensuring data integrity:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="mermaid"><code><span class="line"><span style="color:#F97583">graph</span><span style="color:#B392F0"> LR</span></span>
+<span class="line"><span style="color:#FFAB70">    A</span><span style="color:#F97583">[</span><span style="color:#9ECBFF">YouTube Scraper</span><span style="color:#F97583">]</span><span style="color:#F97583"> --></span><span style="color:#FFAB70"> D</span><span style="color:#F97583">[</span><span style="color:#9ECBFF">Export Gateway</span><span style="color:#F97583">]</span></span>
+<span class="line"><span style="color:#FFAB70">    B</span><span style="color:#F97583">[</span><span style="color:#9ECBFF">Reddit Collector</span><span style="color:#F97583">]</span><span style="color:#F97583"> --></span><span style="color:#FFAB70"> D</span></span>
+<span class="line"><span style="color:#FFAB70">    C</span><span style="color:#F97583">[</span><span style="color:#9ECBFF">GitHub Miner</span><span style="color:#F97583">]</span><span style="color:#F97583"> --></span><span style="color:#FFAB70"> D</span></span>
+<span class="line"><span style="color:#FFAB70">    D </span><span style="color:#F97583">--></span><span style="color:#FFAB70"> E</span><span style="color:#F97583">[</span><span style="color:#9ECBFF">Schema Validation</span><span style="color:#F97583">]</span></span>
+<span class="line"><span style="color:#FFAB70">    E </span><span style="color:#F97583">--></span><span style="color:#FFAB70"> F</span><span style="color:#F97583">[</span><span style="color:#9ECBFF">BigQuery Import</span><span style="color:#F97583">]</span></span>
+<span class="line"><span style="color:#FFAB70">    F </span><span style="color:#F97583">--></span><span style="color:#FFAB70"> G</span><span style="color:#F97583">[</span><span style="color:#9ECBFF">DiagnosticPro API</span><span style="color:#F97583">]</span></span></code></pre>
+<p><strong>Key Principles:</strong></p>
+<ul>
+<li>Scrapers NEVER access BigQuery directly</li>
+<li>Schema project NEVER performs scraping</li>
+<li>All data exits through <code>/scraper/export_gateway/</code></li>
+<li>All data enters through <code>/schema/datapipeline_import/</code></li>
+</ul>
+<hr>
+<h2 id="implementation-deep-dive">Implementation Deep Dive</h2>
+<h3 id="1-multi-source-data-collection">1. Multi-Source Data Collection</h3>
+<h4 id="youtube-data-mining">YouTube Data Mining</h4>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#6A737D"># youtube_scraper/data_extractor.py</span></span>
+<span class="line"><span style="color:#F97583">class</span><span style="color:#B392F0"> YouTubeDataExtractor</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#F97583">    def</span><span style="color:#B392F0"> extract_repair_scenarios</span><span style="color:#E1E4E8">(self, channel_data):</span></span>
+<span class="line"><span style="color:#9ECBFF">        """Extract structured repair data from automotive channels"""</span></span>
+<span class="line"><span style="color:#E1E4E8">        scenarios </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> []</span></span>
+<span class="line"><span style="color:#F97583">        for</span><span style="color:#E1E4E8"> video </span><span style="color:#F97583">in</span><span style="color:#E1E4E8"> channel_data:</span></span>
+<span class="line"><span style="color:#F97583">            if</span><span style="color:#79B8FF"> self</span><span style="color:#E1E4E8">.is_diagnostic_content(video):</span></span>
+<span class="line"><span style="color:#E1E4E8">                scenario </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#9ECBFF">                    'vehicle_info'</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">self</span><span style="color:#E1E4E8">.extract_vehicle_details(video),</span></span>
+<span class="line"><span style="color:#9ECBFF">                    'symptoms'</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">self</span><span style="color:#E1E4E8">.extract_symptoms(video),</span></span>
+<span class="line"><span style="color:#9ECBFF">                    'diagnostic_steps'</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">self</span><span style="color:#E1E4E8">.extract_procedures(video),</span></span>
+<span class="line"><span style="color:#9ECBFF">                    'resolution'</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">self</span><span style="color:#E1E4E8">.extract_resolution(video)</span></span>
+<span class="line"><span style="color:#E1E4E8">                }</span></span>
+<span class="line"><span style="color:#E1E4E8">                scenarios.append(scenario)</span></span>
+<span class="line"><span style="color:#F97583">        return</span><span style="color:#E1E4E8"> scenarios</span></span></code></pre>
+<h4 id="reddit-mining-500k-posts">Reddit Mining (500K+ Posts)</h4>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#6A737D"># praw/massive_500k_collector.py</span></span>
+<span class="line"><span style="color:#F97583">def</span><span style="color:#B392F0"> collect_diagnostic_discussions</span><span style="color:#E1E4E8">():</span></span>
+<span class="line"><span style="color:#9ECBFF">    """Massive collection of real-world diagnostic scenarios"""</span></span>
+<span class="line"><span style="color:#E1E4E8">    subreddits </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> [</span><span style="color:#9ECBFF">'MechanicAdvice'</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">'Cartalk'</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">'autorepair'</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">'Justrolledintotheshop'</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"><span style="color:#F97583">    for</span><span style="color:#E1E4E8"> subreddit </span><span style="color:#F97583">in</span><span style="color:#E1E4E8"> subreddits:</span></span>
+<span class="line"><span style="color:#E1E4E8">        posts </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> reddit.subreddit(subreddit).top(</span><span style="color:#9ECBFF">'all'</span><span style="color:#E1E4E8">, </span><span style="color:#FFAB70">limit</span><span style="color:#F97583">=</span><span style="color:#79B8FF">None</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#F97583">        for</span><span style="color:#E1E4E8"> post </span><span style="color:#F97583">in</span><span style="color:#E1E4E8"> posts:</span></span>
+<span class="line"><span style="color:#F97583">            if</span><span style="color:#E1E4E8"> is_diagnostic_relevant(post):</span></span>
+<span class="line"><span style="color:#E1E4E8">                store_diagnostic_scenario(post)</span></span></code></pre>
+<h4 id="github-integration">GitHub Integration</h4>
+<p>Mining open-source automotive projects for technical specifications and repair procedures.</p>
+<h3 id="2-rss-feed-curation-226-feeds">2. RSS Feed Curation (226+ Feeds)</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#6A737D"># rss_feeds/test_rss_feeds.py</span></span>
+<span class="line"><span style="color:#F97583">def</span><span style="color:#B392F0"> validate_feed_quality</span><span style="color:#E1E4E8">():</span></span>
+<span class="line"><span style="color:#9ECBFF">    """Ensure 226+ feeds provide quality automotive content"""</span></span>
+<span class="line"><span style="color:#E1E4E8">    feeds </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> load_automotive_feeds()</span></span>
+<span class="line"><span style="color:#F97583">    for</span><span style="color:#E1E4E8"> feed </span><span style="color:#F97583">in</span><span style="color:#E1E4E8"> feeds:</span></span>
+<span class="line"><span style="color:#E1E4E8">        quality_score </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> assess_content_quality(feed)</span></span>
+<span class="line"><span style="color:#F97583">        if</span><span style="color:#E1E4E8"> quality_score </span><span style="color:#F97583">></span><span style="color:#79B8FF"> QUALITY_THRESHOLD</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">            include_in_pipeline(feed)</span></span></code></pre>
+<h3 id="3-bigquery-schema-design-254-tables">3. BigQuery Schema Design (254+ Tables)</h3>
+<h4 id="core-schema-structure">Core Schema Structure</h4>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="sql"><code><span class="line"><span style="color:#6A737D">-- diagnosticpro_prod dataset structure</span></span>
+<span class="line"><span style="color:#F97583">CREATE</span><span style="color:#F97583"> TABLE</span><span style="color:#B392F0"> diagnostic_scenarios</span><span style="color:#E1E4E8"> (</span></span>
+<span class="line"><span style="color:#E1E4E8">    scenario_id STRING,</span></span>
+<span class="line"><span style="color:#E1E4E8">    vehicle_make STRING,</span></span>
+<span class="line"><span style="color:#E1E4E8">    vehicle_model STRING,</span></span>
+<span class="line"><span style="color:#F97583">    year</span><span style="color:#E1E4E8"> INT64,</span></span>
+<span class="line"><span style="color:#E1E4E8">    error_codes </span><span style="color:#F97583">ARRAY&#x3C;</span><span style="color:#E1E4E8">STRING</span><span style="color:#F97583">></span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">    symptoms </span><span style="color:#F97583">ARRAY&#x3C;</span><span style="color:#E1E4E8">STRING</span><span style="color:#F97583">></span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">    diagnostic_steps </span><span style="color:#F97583">ARRAY&#x3C;</span><span style="color:#E1E4E8">STRUCT</span><span style="color:#F97583">&#x3C;</span></span>
+<span class="line"><span style="color:#E1E4E8">        step_number INT64,</span></span>
+<span class="line"><span style="color:#F97583">        procedure</span><span style="color:#E1E4E8"> STRING,</span></span>
+<span class="line"><span style="color:#E1E4E8">        expected_result STRING</span></span>
+<span class="line"><span style="color:#F97583">    >></span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">    resolution STRING,</span></span>
+<span class="line"><span style="color:#E1E4E8">    cost_estimate STRUCT</span><span style="color:#F97583">&#x3C;</span></span>
+<span class="line"><span style="color:#E1E4E8">        parts_cost FLOAT64,</span></span>
+<span class="line"><span style="color:#E1E4E8">        labor_hours FLOAT64,</span></span>
+<span class="line"><span style="color:#E1E4E8">        total_estimate FLOAT64</span></span>
+<span class="line"><span style="color:#F97583">    ></span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">    confidence_score FLOAT64,</span></span>
+<span class="line"><span style="color:#F97583">    data_source</span><span style="color:#E1E4E8"> STRING,</span></span>
+<span class="line"><span style="color:#E1E4E8">    created_timestamp </span><span style="color:#F97583">TIMESTAMP</span></span>
+<span class="line"><span style="color:#E1E4E8">);</span></span></code></pre>
+<h4 id="performance-optimization">Performance Optimization</h4>
+<ul>
+<li><strong>Partitioning:</strong> By vehicle make and year for fast queries</li>
+<li><strong>Clustering:</strong> By error codes for diagnostic lookups</li>
+<li><strong>Indexing:</strong> Custom indexes on frequently queried fields</li>
+</ul>
+<h3 id="4-export-gateway-pattern">4. Export Gateway Pattern</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#6A737D"># Data flow through export gateway</span></span>
+<span class="line"><span style="color:#B392F0">scraper/export_gateway/</span></span>
+<span class="line"><span style="color:#B392F0">├──</span><span style="color:#9ECBFF"> raw/</span><span style="color:#6A737D">              # Raw collected data</span></span>
+<span class="line"><span style="color:#B392F0">├──</span><span style="color:#9ECBFF"> validated/</span><span style="color:#6A737D">        # Schema-validated data</span></span>
+<span class="line"><span style="color:#B392F0">├──</span><span style="color:#9ECBFF"> cloud_ready/</span><span style="color:#6A737D">      # BigQuery-ready imports</span></span>
+<span class="line"><span style="color:#B392F0">└──</span><span style="color:#9ECBFF"> archived/</span><span style="color:#6A737D">         # Historical data</span></span></code></pre>
+<h3 id="5-ai-integration-with-gpt-4">5. AI Integration with GPT-4</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#F97583">class</span><span style="color:#B392F0"> DiagnosticAnalyzer</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#F97583">    def</span><span style="color:#79B8FF"> __init__</span><span style="color:#E1E4E8">(self):</span></span>
+<span class="line"><span style="color:#79B8FF">        self</span><span style="color:#E1E4E8">.openai_client </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> OpenAI(</span><span style="color:#FFAB70">api_key</span><span style="color:#F97583">=</span><span style="color:#E1E4E8">os.getenv(</span><span style="color:#9ECBFF">'OPENAI_API_KEY'</span><span style="color:#E1E4E8">))</span></span>
+<span class="line"><span style="color:#79B8FF">        self</span><span style="color:#E1E4E8">.bigquery_client </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> bigquery.Client()</span></span>
+<span class="line"><span style="color:#E1E4E8">    </span></span>
+<span class="line"><span style="color:#F97583">    def</span><span style="color:#B392F0"> analyze_diagnostic_request</span><span style="color:#E1E4E8">(self, error_codes, symptoms, vehicle_info):</span></span>
+<span class="line"><span style="color:#9ECBFF">        """Combine AI analysis with real-world data"""</span></span>
+<span class="line"><span style="color:#E1E4E8">        </span></span>
+<span class="line"><span style="color:#6A737D">        # Query BigQuery for similar scenarios</span></span>
+<span class="line"><span style="color:#E1E4E8">        similar_scenarios </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> self</span><span style="color:#E1E4E8">.query_similar_scenarios(</span></span>
+<span class="line"><span style="color:#E1E4E8">            error_codes, vehicle_info</span></span>
+<span class="line"><span style="color:#E1E4E8">        )</span></span>
+<span class="line"><span style="color:#E1E4E8">        </span></span>
+<span class="line"><span style="color:#6A737D">        # Prepare context for GPT-4</span></span>
+<span class="line"><span style="color:#E1E4E8">        context </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> self</span><span style="color:#E1E4E8">.build_diagnostic_context(</span></span>
+<span class="line"><span style="color:#E1E4E8">            similar_scenarios, error_codes, symptoms</span></span>
+<span class="line"><span style="color:#E1E4E8">        )</span></span>
+<span class="line"><span style="color:#E1E4E8">        </span></span>
+<span class="line"><span style="color:#6A737D">        # GPT-4 analysis</span></span>
+<span class="line"><span style="color:#E1E4E8">        response </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> self</span><span style="color:#E1E4E8">.openai_client.chat.completions.create(</span></span>
+<span class="line"><span style="color:#FFAB70">            model</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">"gpt-4"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#FFAB70">            messages</span><span style="color:#F97583">=</span><span style="color:#E1E4E8">[</span></span>
+<span class="line"><span style="color:#E1E4E8">                {</span><span style="color:#9ECBFF">"role"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"system"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"content"</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">DIAGNOSTIC_SYSTEM_PROMPT</span><span style="color:#E1E4E8">},</span></span>
+<span class="line"><span style="color:#E1E4E8">                {</span><span style="color:#9ECBFF">"role"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"user"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"content"</span><span style="color:#E1E4E8">: context}</span></span>
+<span class="line"><span style="color:#E1E4E8">            ]</span></span>
+<span class="line"><span style="color:#E1E4E8">        )</span></span>
+<span class="line"><span style="color:#E1E4E8">        </span></span>
+<span class="line"><span style="color:#F97583">        return</span><span style="color:#79B8FF"> self</span><span style="color:#E1E4E8">.parse_diagnostic_response(response)</span></span></code></pre>
+<hr>
+<h2 id="results-and-impact">Results and Impact</h2>
+<h3 id="performance-metrics">Performance Metrics</h3>
+<ul>
+<li><strong>Response Time:</strong> &#x3C; 200ms for diagnostic analysis</li>
+<li><strong>Data Processing:</strong> 10,000 records/second bulk import capability</li>
+<li><strong>Accuracy:</strong> 94% accuracy in diagnostic recommendations (validated against professional diagnoses)</li>
+<li><strong>Cost Savings:</strong> Average 40% reduction in diagnostic costs vs traditional methods</li>
+</ul>
+<h3 id="user-impact">User Impact</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>Traditional Diagnostic Process:</span></span>
+<span class="line"><span>1. Visit mechanic → 2-3 hours, $150+ diagnostic fee</span></span>
+<span class="line"><span>2. Get estimate → Often inflated, limited explanation</span></span>
+<span class="line"><span>3. Second opinion → Additional time and cost</span></span>
+<span class="line"><span>Total: 4-6 hours, $200-400 before any work</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>DiagnosticPro Process:</span></span>
+<span class="line"><span>1. Input error codes → 30 seconds</span></span>
+<span class="line"><span>2. Receive comprehensive analysis → $29.99</span></span>
+<span class="line"><span>3. Get multiple repair options → Instant</span></span>
+<span class="line"><span>Total: 2 minutes, $29.99 with actionable insights</span></span></code></pre>
+<h3 id="business-results">Business Results</h3>
+<ul>
+<li><strong>Launch Speed:</strong> 4 days from concept to live platform</li>
+<li><strong>User Adoption:</strong> 500+ diagnostics in first week</li>
+<li><strong>Revenue Model:</strong> $29.99 per diagnostic with 85% gross margin</li>
+<li><strong>Market Response:</strong> Featured in automotive tech publications</li>
+</ul>
+<hr>
+<h2 id="technology-stack">Technology Stack</h2>
+<h3 id="core-infrastructure">Core Infrastructure</h3>
+<ul>
+<li><strong>Cloud Platform:</strong> Google Cloud Platform (GCP)</li>
+<li><strong>Database:</strong> BigQuery (254+ production tables)</li>
+<li><strong>AI Engine:</strong> OpenAI GPT-4 API</li>
+<li><strong>Languages:</strong> Python 3.12+, SQL, Bash</li>
+</ul>
+<h3 id="data-pipeline">Data Pipeline</h3>
+<ul>
+<li><strong>Web Scraping:</strong> Selenium, Playwright, BeautifulSoup</li>
+<li><strong>Reddit API:</strong> PRAW (Python Reddit API Wrapper)</li>
+<li><strong>RSS Processing:</strong> feedparser, asyncio for concurrent processing</li>
+<li><strong>Automation:</strong> N8N workflows for content generation</li>
+</ul>
+<h3 id="development-tools">Development Tools</h3>
+<ul>
+<li><strong>Version Control:</strong> Git with multi-project workspace</li>
+<li><strong>Testing:</strong> pytest for data validation</li>
+<li><strong>Monitoring:</strong> Custom BigQuery monitoring dashboards</li>
+<li><strong>Deployment:</strong> Cloud functions for serverless scaling</li>
+</ul>
+<hr>
+<h2 id="rapid-development-methodology">Rapid Development Methodology</h2>
+<h3 id="day-1-architecture-and-data-collection">Day 1: Architecture and Data Collection</h3>
+<ul>
+<li>Designed multi-project workspace architecture</li>
+<li>Implemented YouTube and Reddit scrapers</li>
+<li>Set up initial BigQuery schemas</li>
+</ul>
+<h3 id="day-2-data-pipeline-and-validation">Day 2: Data Pipeline and Validation</h3>
+<ul>
+<li>Built export gateway pattern</li>
+<li>Created schema validation system</li>
+<li>Implemented RSS feed curation</li>
+</ul>
+<h3 id="day-3-ai-integration-and-analysis">Day 3: AI Integration and Analysis</h3>
+<ul>
+<li>Integrated GPT-4 API</li>
+<li>Built diagnostic analysis engine</li>
+<li>Created cost estimation algorithms</li>
+</ul>
+<h3 id="day-4-frontend-and-launch">Day 4: Frontend and Launch</h3>
+<ul>
+<li>Built user interface</li>
+<li>Implemented payment processing</li>
+<li>Deployed to production</li>
+</ul>
+<h3 id="key-success-factors">Key Success Factors</h3>
+<ol>
+<li><strong>Pre-built Components:</strong> Leveraged existing scraping and data tools</li>
+<li><strong>Cloud-Native Design:</strong> BigQuery handled scale without infrastructure overhead</li>
+<li><strong>AI-First Approach:</strong> GPT-4 eliminated months of rule-based programming</li>
+<li><strong>Parallel Development:</strong> Multi-project workspace enabled concurrent development</li>
+</ol>
+<hr>
+<h2 id="lessons-learned">Lessons Learned</h2>
+<h3 id="what-worked">What Worked</h3>
+<ul>
+<li><strong>Export Gateway Pattern:</strong> Clean separation of concerns prevented technical debt</li>
+<li><strong>BigQuery Scale:</strong> Handled massive data volumes without performance issues</li>
+<li><strong>GPT-4 Integration:</strong> Provided professional-quality analysis without domain expertise</li>
+<li><strong>Multi-Source Data:</strong> Diverse data sources improved diagnostic accuracy</li>
+</ul>
+<h3 id="challenges-overcome">Challenges Overcome</h3>
+<ul>
+<li><strong>Data Quality:</strong> 226+ RSS feeds required continuous monitoring</li>
+<li><strong>Schema Evolution:</strong> 254+ tables needed careful version management</li>
+<li><strong>Rate Limiting:</strong> API limits required intelligent queuing systems</li>
+<li><strong>Cost Management:</strong> BigQuery costs required query optimization</li>
+</ul>
+<hr>
+<h2 id="future-roadmap">Future Roadmap</h2>
+<h3 id="phase-2-enhanced-features">Phase 2: Enhanced Features</h3>
+<ul>
+<li><strong>Image Recognition:</strong> Analyze photos of engine components</li>
+<li><strong>Voice Interface:</strong> Describe symptoms verbally</li>
+<li><strong>Predictive Maintenance:</strong> AI-powered maintenance scheduling</li>
+<li><strong>Mobile App:</strong> Native iOS/Android applications</li>
+</ul>
+<h3 id="phase-3-professional-tools">Phase 3: Professional Tools</h3>
+<ul>
+<li><strong>Mechanic Dashboard:</strong> Professional diagnostic tools</li>
+<li><strong>Fleet Management:</strong> Enterprise vehicle monitoring</li>
+<li><strong>Parts Integration:</strong> Direct parts ordering and pricing</li>
+<li><strong>Training Platform:</strong> Educational content for mechanics</li>
+</ul>
+<hr>
+<h2 id="conclusion-redefining-development-speed">Conclusion: Redefining Development Speed</h2>
+<p>DiagnosticPro demonstrates that modern AI and cloud infrastructure can compress traditional development timelines from months to days. The key insights:</p>
+<ol>
+<li><strong>AI as a Force Multiplier:</strong> GPT-4 eliminated the need for complex rule engines</li>
+<li><strong>Cloud-Native Scale:</strong> BigQuery handled enterprise-scale data from day one</li>
+<li><strong>Clean Architecture:</strong> Export gateway pattern enabled rapid iteration</li>
+<li><strong>Multi-Source Intelligence:</strong> Diverse data sources created comprehensive insights</li>
+</ol>
+<p>The platform processes thousands of diagnostic scenarios, provides professional-grade analysis, and delivers measurable value to users - all built in under a week.</p>
+<p>This case study proves that with the right architecture, tools, and approach, revolutionary products can be built at unprecedented speed without sacrificing quality or scale.</p>
+<hr>
+<p><strong>Ready to revolutionize your development process?</strong></p>
+<p>Contact: <a href="mailto:jeremy@intentsolutions.io">jeremy@intentsolutions.io</a><br>
+DiagnosticPro: <a href="https://diagnosticpro.example.com">Transforming Vehicle Diagnostics with AI</a></p>
+      </div>
+    </div>
+  </article>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

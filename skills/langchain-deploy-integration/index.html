@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>langchain-deploy-integration - Agent Skill</title>
+    <meta name="description" content="Deploy a LangChain 1.0 / LangGraph 1.0 app to Cloud Run, Vercel, or LangServe correctly — with timeouts sized for chain length, cold-start mitigation, SSE anti-buffering headers, and Secret Manager over .env. Use when prepping a first production deploy, debugging a stream that hangs behind a proxy, or diagnosing p99 latency spikes. Trigger with &quot;langchain deploy&quot;, &quot;langchain cloud run&quot;, &quot;langchain vercel python&quot;, &quot;langchain langserve&quot;, or &quot;langchain docker&quot;.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://tonsofskills.com/tons-of-skills-marketplace/skills/langchain-deploy-integration/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/langchain-deploy-integration/">
+    <meta property="og:title" content="langchain-deploy-integration - Agent Skill">
+    <meta property="og:description" content="Deploy a LangChain 1.0 / LangGraph 1.0 app to Cloud Run, Vercel, or LangServe correctly — with timeouts sized for chain length, cold-start mitigation, SSE anti-buffering headers, and Secret Manager over .env. Use when prepping a first production deploy, debugging a stream that hangs behind a proxy, or diagnosing p99 latency spikes. Trigger with &quot;langchain deploy&quot;, &quot;langchain cloud run&quot;, &quot;langchain vercel python&quot;, &quot;langchain langserve&quot;, or &quot;langchain docker&quot;.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="langchain-deploy-integration - Agent Skill">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/langchain-deploy-integration/">
+    <meta name="twitter:title" content="langchain-deploy-integration - Agent Skill">
+    <meta name="twitter:description" content="Deploy a LangChain 1.0 / LangGraph 1.0 app to Cloud Run, Vercel, or LangServe correctly — with timeouts sized for chain length, cold-start mitigation, SSE anti-buffering headers, and Secret Manager over .env. Use when prepping a first production deploy, debugging a stream that hangs behind a proxy, or diagnosing p99 latency spikes. Trigger with &quot;langchain deploy&quot;, &quot;langchain cloud run&quot;, &quot;langchain vercel python&quot;, &quot;langchain langserve&quot;, or &quot;langchain docker&quot;.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"langchain-deploy-integration","description":"Deploy a LangChain 1.0 / LangGraph 1.0 app to Cloud Run, Vercel, or LangServe correctly — with timeouts sized for chain length, cold-start mitigation, SSE anti-buffering headers, and Secret Manager over .env. Use when prepping a first production deploy, debugging a stream that hangs behind a proxy, or diagnosing p99 latency spikes. Trigger with \"langchain deploy\", \"langchain cloud run\", \"langchain vercel python\", \"langchain langserve\", or \"langchain docker\".","version":"2.5.0","author":{"@type":"Person","name":"Jeremy Longshore"},"license":"MIT","programmingLanguage":"Claude Code Agent Skill","isPartOf":{"@type":"SoftwareApplication","name":"langchain-py-pack","applicationCategory":"unknown"}}</script>
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.breadcrumbs[data-astro-cid-ilhxcym7]{margin-bottom:var(--space-5)}.breadcrumbs__list[data-astro-cid-ilhxcym7]{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;list-style:none;padding:0;margin:0;font-family:var(--font-mono);font-size:var(--text-sm, .8rem)}.breadcrumbs__item[data-astro-cid-ilhxcym7]{display:flex;align-items:center;gap:.375rem}.breadcrumbs__link[data-astro-cid-ilhxcym7]{color:var(--text-3);text-decoration:none;transition:color var(--duration-fast, .2s) var(--ease-out)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:hover{color:var(--primary)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:0}.breadcrumbs__sep[data-astro-cid-ilhxcym7]{color:var(--text-3);user-select:none;font-size:.7em;line-height:1}.breadcrumbs__current[data-astro-cid-ilhxcym7]{color:var(--text-2)}.detail-cta[data-astro-cid-qcigfm7x]{background:var(--surface-3, var(--brand-light-gray));border-top:1px solid var(--border, var(--brand-light-gray));border-radius:var(--radius-lg);padding:2rem 1.5rem;margin-top:2rem;text-align:center}.detail-cta__headline[data-astro-cid-qcigfm7x]{font-family:var(--font-display);font-weight:700;font-size:1.35rem;color:var(--text, var(--brand-dark));margin-bottom:1.25rem}.detail-cta__actions[data-astro-cid-qcigfm7x]{display:flex;justify-content:center;gap:.75rem;flex-wrap:wrap}.detail-cta__primary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:var(--primary);color:#0a0a0c;border:none;border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;cursor:pointer;transition:background var(--duration-fast) var(--ease-out),transform var(--duration-fast) var(--ease-out)}.detail-cta__primary[data-astro-cid-qcigfm7x]:hover{background:var(--primary-dark, var(--primary-dark));transform:translateY(-1px)}.detail-cta__primary[data-astro-cid-qcigfm7x].copied{background:var(--positive, var(--brand-green))}.detail-cta__secondary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:transparent;color:var(--text, var(--brand-dark));border:1px solid var(--border, var(--brand-mid-gray));border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;text-decoration:none;transition:border-color var(--duration-fast) var(--ease-out),color var(--duration-fast) var(--ease-out)}.detail-cta__secondary[data-astro-cid-qcigfm7x]:hover{border-color:var(--primary);color:var(--primary)}@media(max-width:480px){.detail-cta__actions[data-astro-cid-qcigfm7x]{flex-direction:column;align-items:stretch}.detail-cta__primary[data-astro-cid-qcigfm7x],.detail-cta__secondary[data-astro-cid-qcigfm7x]{justify-content:center}}
+</style>
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/_slug_@_@astro.wF9emvVq.css"></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  
+  
+
+  <div class="skill-detail" data-astro-cid-jrlgpo3w>
+    <!-- 1. Breadcrumbs -->
+    <nav aria-label="Breadcrumb" class="breadcrumbs" data-astro-cid-ilhxcym7>
+  <ol class="breadcrumbs__list" itemscope itemtype="https://schema.org/BreadcrumbList" data-astro-cid-ilhxcym7>
+    <li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Home</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="1">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/skills/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Skills</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="2">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          <span class="breadcrumbs__current" aria-current="page" itemprop="name" data-astro-cid-ilhxcym7>
+              langchain-deploy-integration
+            </span>
+          <meta itemprop="position" content="3">
+        </li>
+  </ol>
+</nav>
+
+    <!-- 2. Header (enhanced) -->
+    <header class="skill-header" data-astro-cid-jrlgpo3w>
+      <h1 data-astro-cid-jrlgpo3w>langchain-deploy-integration</h1>
+      <p class="skill-description" data-astro-cid-jrlgpo3w>Deploy a LangChain 1.0 / LangGraph 1.0 app to Cloud Run, Vercel, or LangServe correctly — with timeouts sized for chain length, cold-start mitigation, SSE anti-buffering headers, and Secret Manager over .env. Use when prepping a first production deploy, debugging a stream that hangs behind a proxy, or diagnosing p99 latency spikes. Trigger with &quot;langchain deploy&quot;, &quot;langchain cloud run&quot;, &quot;langchain vercel python&quot;, &quot;langchain langserve&quot;, or &quot;langchain docker&quot;.</p>
+
+      <div class="skill-metadata" data-astro-cid-jrlgpo3w>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>v2.5.0</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>Jeremy Longshore</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>MIT</span>
+        </div>
+      </div>
+
+      
+    </header>
+
+    <!-- 4. Allowed Tools -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Allowed Tools</h2>
+      <div class="tools-grid" data-astro-cid-jrlgpo3w>
+        <span class="tool-badge" data-astro-cid-jrlgpo3w>Read</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Write</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Edit</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(docker:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(gcloud:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(vercel:*)</span>
+      </div>
+      
+    </section>
+
+    <!-- 5. Provided by Plugin -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Provided by Plugin</h2>
+      <div class="plugin-info" data-astro-cid-jrlgpo3w>
+        <div class="plugin-details" data-astro-cid-jrlgpo3w>
+          <h3 data-astro-cid-jrlgpo3w>
+            <a href="/plugins/langchain-py-pack/" data-astro-cid-jrlgpo3w>langchain-py-pack</a>
+          </h3>
+          <p data-astro-cid-jrlgpo3w>Claude Code skill pack for LangChain 1.0 + LangGraph 1.0 (Python) - 34 skills covering chains, agents, RAG, middleware, checkpointing, HITL, streaming, and production patterns</p>
+          <div class="plugin-meta" data-astro-cid-jrlgpo3w>
+            <span data-astro-cid-jrlgpo3w>unknown</span>
+            <span data-astro-cid-jrlgpo3w>v2.5.0</span>
+          </div>
+        </div>
+        <a href="/plugins/langchain-py-pack/" class="btn-primary" data-astro-cid-jrlgpo3w>View Plugin</a>
+      </div>
+    </section>
+
+    <!-- 6. Installation -->
+    <section class="section-box dark" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Installation</h2>
+      <p class="install-note" style="color: var(--brand-light-gray); margin-bottom: 0.75rem;" data-astro-cid-jrlgpo3w>This skill is included in the langchain-py-pack plugin:</p>
+      <pre class="install-command" data-copy="/plugin install langchain-py-pack@claude-code-plugins-plus" data-astro-cid-jrlgpo3w><code data-astro-cid-jrlgpo3w>/plugin install langchain-py-pack@claude-code-plugins-plus</code></pre>
+      <p class="install-note" data-astro-cid-jrlgpo3w>Click to copy</p>
+    </section>
+
+    <!-- 7. Skill Content (Markdown) -->
+    <section class="skill-content-section" data-astro-cid-jrlgpo3w>
+      <h2 data-astro-cid-jrlgpo3w>Instructions</h2>
+      <div class="skill-content" data-astro-cid-jrlgpo3w>
+        <div data-astro-cid-jrlgpo3w><h1>LangChain Deploy Integration (Python)</h1>
+<h2>Overview</h2>
+<p>An engineer ships a working LangGraph agent to Vercel. Every non-trivial request returns <code>FUNCTION_INVOCATION_TIMEOUT</code>. The Python runtime on Vercel defaults to a <strong>10-second</strong> cap (P35) — a three-tool agent with one RAG round easily runs 20-40s. Local dev never exposed the wall because <code>uvicorn</code> on a laptop has no timeout. Two fixes apply together and each is load-bearing:</p>
+<pre data-lang="json"><code>
+// vercel.json — the baseline cap bump (Pro plan max is 60s, Enterprise 900s)
+{ &quot;functions&quot;: { &quot;api/chat.py&quot;: { &quot;maxDuration&quot;: 60 } } }
+</code></pre>
+<pre data-lang="python"><code>
+# app/api/chat.py — stream the response so partial output arrives before the cap
+from fastapi.responses import StreamingResponse
+
+@app.post(&quot;/api/chat&quot;)
+async def chat(req: ChatRequest):
+    async def gen():
+        async for chunk in chain.astream(req.input):
+            yield f&quot;data: {chunk.model_dump_json()}\n\n&quot;
+    return StreamingResponse(gen(), media_type=&quot;text/event-stream&quot;,
+                             headers={&quot;X-Accel-Buffering&quot;: &quot;no&quot;})
+</code></pre>
+<p>The <code>maxDuration: 60</code> raises the Vercel-imposed wall; streaming reduces time-to-first-byte to under a second so the user sees progress even on a 40-second completion. Once the Vercel cap is fixed, the next three walls are: Cloud Run cold starts (<strong>5-15s</strong> p99 on Python + LangChain — P36), <code>.env</code> secrets leaking via <code>docker exec &lt;pod&gt; env</code> (P37), and SSE streams hanging because Nginx / Cloud Run buffer the final chunk (P46).</p>
+<p>This skill walks through a production-grade multi-stage Dockerfile, Cloud Run flags for cold-start mitigation, Vercel <code>maxDuration</code> + streaming, LangServe route mounting with FastAPI lifespan, SSE anti-buffering headers, and Secret Manager via <code>pydantic.SecretStr</code>. Pin: <code>langchain-core 1.0.x</code>, <code>langgraph 1.0.x</code>, <code>langserve 1.0.x</code>. Pain-catalog anchors: <strong>P35</strong> (Vercel 10s default), <strong>P36</strong> (Cloud Run cold start), <strong>P37</strong> (<code>.env</code> leaks), <strong>P46</strong> (SSE buffering).</p>
+<h2>Prerequisites</h2>
+<ul>
+<li>Python 3.11+ (3.12 preferred for <code>uvicorn</code> startup speed)</li>
+<li><code>langchain-core &gt;= 1.0, &lt; 2.0</code>, <code>langgraph &gt;= 1.0, &lt; 2.0</code>, <code>langserve &gt;= 1.0, &lt; 2.0</code></li>
+<li><code>fastapi &gt;= 0.110</code>, <code>uvicorn[standard] &gt;= 0.27</code></li>
+<li>Target platform: <code>gcloud</code> CLI (Cloud Run), <code>vercel</code> CLI (Vercel), or <code>docker</code> (generic)</li>
+<li>For Cloud Run: a GCP project with Secret Manager API enabled</li>
+<li>For Vercel: a project with <code>@vercel/python</code> runtime configured</li>
+</ul>
+<h2>Instructions</h2>
+<h3>Step 1 — Multi-stage Dockerfile with slim runtime and <code>uvicorn</code></h3>
+<p>A multi-stage build keeps the runtime image under 400MB, which cuts Cloud Run cold starts by 2-3 seconds. Use <code>python:3.12-slim</code> as the final stage (not <code>python:3.12</code> — that base adds ~900MB for dev tooling that never runs in prod).</p>
+<pre data-lang="dockerfile"><code>
+# syntax=docker/dockerfile:1.7
+FROM python:3.12-slim AS builder
+WORKDIR /build
+RUN pip install --no-cache-dir uv
+COPY pyproject.toml uv.lock ./
+RUN uv export --format requirements-txt --no-hashes &gt; requirements.txt \
+ &amp;&amp; pip wheel --wheel-dir=/wheels -r requirements.txt
+
+FROM python:3.12-slim AS runtime
+RUN useradd -m -u 10001 app
+WORKDIR /app
+COPY --from=builder /wheels /wheels
+RUN pip install --no-cache-dir --no-index --find-links=/wheels /wheels/* \
+ &amp;&amp; rm -rf /wheels
+COPY --chown=app:app app/ ./app/
+USER app
+EXPOSE 8080
+ENV PORT=8080 PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
+CMD [&quot;sh&quot;, &quot;-c&quot;, &quot;uvicorn app.main:app --host 0.0.0.0 --port ${PORT} --workers 1&quot;]
+</code></pre>
+<p>Single worker is correct — Cloud Run handles horizontal scale; in-process multi-worker just duplicates LangChain client memory. See <a href="references/dockerfile-and-secrets.md">Dockerfile and Secrets</a> for the distroless variant and the <code>.dockerignore</code> hardening for <code>.env</code> files.</p>
+<h3>Step 2 — Deploy to Cloud Run with cold-start mitigation</h3>
+<p>Python + LangChain + <code>tiktoken</code> + one embedding model imports take 5-15 seconds (P36). At <code>--min-instances=0</code>, every scale-from-zero request eats that as user-facing latency. Paying for one always-on instance is usually cheaper than the lost requests.</p>
+<pre data-lang="bash"><code>
+gcloud run deploy langchain-api \
+  --source=. \
+  --region=us-central1 \
+  --min-instances=1 \
+  --max-instances=20 \
+  --cpu=2 --memory=2Gi \
+  --cpu-boost \
+  --no-cpu-throttling \
+  --timeout=3600 \
+  --concurrency=80 \
+  --set-secrets=ANTHROPIC_API_KEY=anthropic-key:latest,OPENAI_API_KEY=openai-key:latest \
+  --service-account=langchain-api@PROJECT.iam.gserviceaccount.com
+# --timeout=3600 is the Cloud Run per-request maximum (1 hour) — needed
+# because multi-tool LangGraph agents routinely run 1-5 minutes end-to-end.
+</code></pre>
+<p>The load-bearing flags: <code>--min-instances=1</code> kills cold-start p99 (one always-warm replica costs ~$15/mo and dominates p99 improvement); <code>--cpu-boost</code> doubles CPU for the first 10 seconds; <code>--no-cpu-throttling</code> (CPU-always-allocated billing) keeps <code>astream</code> running between keepalive pings so long LangGraph runs do not stall at tool boundaries; <code>--concurrency=80</code> matches typical I/O-bound workloads (drop to 10 if embedding large docs in-process).</p>
+<p>See <a href="references/cloud-run-deploy.md">Cloud Run Deploy</a> for VPC egress, file secret mounts, revision traffic splitting, and the full cost model.</p>
+<h3>Step 3 — Vercel Python: <code>maxDuration: 60</code> + streaming to beat the cap</h3>
+<p>On Vercel Hobby the max is <strong>10s</strong> by default (P35); Pro is <strong>60s</strong>, Enterprise <strong>900s</strong>. Always set <code>maxDuration</code> explicitly — the default is a trap.</p>
+<pre data-lang="json"><code>
+// vercel.json
+{
+  &quot;functions&quot;: {
+    &quot;api/chat.py&quot;: { &quot;maxDuration&quot;: 60, &quot;memory&quot;: 1024 }
+  }
+}
+</code></pre>
+<p>Streaming is not just a UX fix — it is the mitigation for bursts that still exceed <code>maxDuration</code>. Time-to-first-byte under a second keeps the proxy considering the request alive; partial content renders on the client; when the cap finally triggers, the user has already seen most of the answer. The Vercel entrypoint pattern mirrors the Overview snippet above — pair with the SSE headers from Step 5.</p>
+<p>Edge Runtime is <strong>not</strong> an option here — <code>@vercel/edge</code> is JavaScript-only. Anything that imports <code>langchain</code> must run on <code>@vercel/python</code> (serverless, Node-free Python container). See <a href="references/vercel-python-deploy.md">Vercel Python Deploy</a> for env vars vs Vercel Secrets, cold-start profiling, and the serverless vs fluid-compute tradeoff.</p>
+<h3>Step 4 — LangServe: <code>add_routes</code> + FastAPI lifespan for pool cleanup</h3>
+<p>LangServe ships typed HTTP routes over any <code>Runnable</code>. The <code>playground</code> path is invaluable in dev but <strong>must be disabled in production</strong> — it leaks chain topology to anyone who can hit the URL. Mount behind a FastAPI <code>lifespan</code> that closes <code>asyncpg</code> / <code>httpx</code> / Redis pools on revision retirement; <code>on_shutdown</code> fires too late on Cloud Run and connections leak across revisions.</p>
+<pre data-lang="python"><code>
+# app/main.py
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
+from langserve import add_routes
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    app.state.chain = build_chain()
+    yield
+    await db_pool.close()
+
+app = FastAPI(lifespan=lifespan)
+add_routes(app, build_chain(), path=&quot;/chat&quot;,
+           enable_feedback_endpoint=False,
+           playground_type=&quot;chat&quot; if __debug__ else None)  # None = off in prod
+</code></pre>
+<p>See <a href="references/langserve-patterns.md">LangServe Patterns</a> for typed input/output schemas, auth middleware, and coexisting with raw FastAPI handlers.</p>
+<h3>Step 5 — SSE anti-buffering: survive Nginx, Cloud Run, Cloudflare</h3>
+<p>Nginx, Cloud Run&#39;s load balancer, and Cloudflare all buffer responses by default. On SSE, buffering means the client never sees the final <code>end</code> event and <code>LangGraph.astream</code> hangs forever (P46). Two headers plus one response flush fix it:</p>
+<pre data-lang="python"><code>
+from fastapi.responses import StreamingResponse
+
+def sse_headers() -&gt; dict:
+    return {
+        &quot;Content-Type&quot;: &quot;text/event-stream&quot;,
+        &quot;Cache-Control&quot;: &quot;no-cache, no-transform&quot;,
+        &quot;X-Accel-Buffering&quot;: &quot;no&quot;,          # disables Nginx buffering
+        &quot;Connection&quot;: &quot;keep-alive&quot;,
+    }
+
+@app.post(&quot;/api/chat/stream&quot;)
+async def stream(payload: dict):
+    async def gen():
+        async for event in graph.astream_events(payload, version=&quot;v2&quot;):
+            yield f&quot;data: {event[&#39;data&#39;]}\n\n&quot;.encode(&quot;utf-8&quot;)
+        yield b&quot;event: end\ndata: [DONE]\n\n&quot;
+    return StreamingResponse(gen(), headers=sse_headers())
+</code></pre>
+<p>Cross-reference: this is the same anti-buffering pattern used by <code>langchain-langgraph-streaming</code> (L29) — that skill covers the <code>astream_events</code> event shapes and client reconnection; this skill covers the proxy surface. If you see the stream work locally but hang in prod, the header is missing on the upstream response, not the client.</p>
+<h3>Step 6 — Secret Manager over <code>.env</code> with <code>pydantic.SecretStr</code></h3>
+<p><code>python-dotenv</code> populates <code>os.environ</code>. Anyone with container access runs <code>docker exec &lt;pod&gt; env</code> and reads every API key in plain text (P37). Mount secrets from Secret Manager on Cloud Run, Vercel Secrets on Vercel; wrap in <code>pydantic.SecretStr</code> so <code>repr()</code>, logs, and tracebacks print <code>**********</code> instead of the value.</p>
+<pre data-lang="python"><code>
+from pydantic import SecretStr
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=None, extra=&quot;ignore&quot;)
+    anthropic_api_key: SecretStr
+    openai_api_key: SecretStr
+
+settings = Settings()  # reads real env vars only; never .env in prod
+</code></pre>
+<p>Cloud Run: <code>--set-secrets=VAR=secret-name:latest</code> (Step 2). Vercel: <code>vercel env add ANTHROPIC_API_KEY production</code>. Never commit <code>.env</code>; add <code>.env*</code> to <code>.dockerignore</code> so it does not enter the build context.</p>
+<p>Cross-reference: this skill sets the deployment boundary. <code>langchain-security-basics</code> (P18) covers key-rotation cadence, PII log redaction, and the broader threat model — get the boundary right here, then layer on P18.</p>
+<h2>Output</h2>
+<ul>
+<li>Multi-stage Dockerfile, runtime image under 400MB, non-root user, <code>uvicorn</code> entrypoint</li>
+<li>Cloud Run deployment with <code>--min-instances=1 --cpu-boost --no-cpu-throttling --timeout=3600 --concurrency=80</code></li>
+<li><code>vercel.json</code> with <code>maxDuration: 60</code> plus streaming response for requests that may exceed the cap</li>
+<li>LangServe <code>add_routes(app, chain, path=&quot;/chat&quot;)</code> behind a FastAPI <code>lifespan</code> that closes resource pools on revision retirement</li>
+<li>SSE responses with <code>X-Accel-Buffering: no</code> and <code>Cache-Control: no-cache</code> so proxies do not buffer the final <code>end</code> event</li>
+<li>Runtime secrets sourced from Secret Manager / Vercel Secrets and wrapped in <code>pydantic.SecretStr</code>; no <code>.env</code> in the image</li>
+</ul>
+<h2>Platform Decision Table</h2>
+<table><thead><tr>
+<th>Platform</th>
+<th>Max timeout</th>
+<th>Cold start (p99)</th>
+<th>SSE default</th>
+<th>Cost baseline (1 agent, 1M req/mo)</th>
+<th>Pick when</th>
+</tr></thead><tbody>
+<tr>
+<td><strong>Cloud Run</strong></td>
+<td>3600s</td>
+<td>5-15s (mitigable with min-instances)</td>
+<td>Buffers without header override</td>
+<td>~$40-80/mo + min-instance</td>
+<td>Long agents, heavy imports, VPC egress, GCP-native</td>
+</tr>
+<tr>
+<td><strong>Vercel Python</strong></td>
+<td>10s Hobby / 60s Pro / 900s Enterprise</td>
+<td>2-5s (warmed)</td>
+<td>No buffering when streaming response</td>
+<td>~$20/mo Pro plan flat</td>
+<td>Fast iteration, Next.js frontend colocation, short agents</td>
+</tr>
+<tr>
+<td><strong>Fly.io</strong></td>
+<td>No hard cap (per-request soft)</td>
+<td>1-3s (always-on VM)</td>
+<td>No default buffer</td>
+<td>~$30/mo for shared-cpu-1x + 1GB</td>
+<td>Need persistent state, low cold start, non-serverless model</td>
+</tr>
+<tr>
+<td><strong>Railway</strong></td>
+<td>30 min default</td>
+<td>2-4s</td>
+<td>No default buffer</td>
+<td>~$25/mo on Hobby replica</td>
+<td>Prototype to production on one platform, Postgres bundled</td>
+</tr>
+<tr>
+<td><strong>Self-hosted (k8s + Nginx)</strong></td>
+<td>Ingress-controlled</td>
+<td>0s (warm pod)</td>
+<td>Buffers — requires <code>proxy_buffering off</code></td>
+<td>Variable, fixed infra cost</td>
+<td>Compliance constraints, existing k8s, egress control</td>
+</tr>
+</tbody></table>
+<p>Cloud Run is the default for most LangChain production deployments — the 3600s timeout is the only mainstream serverless option long enough for multi-tool agents, and Secret Manager integration is native.</p>
+<h2>Error Handling</h2>
+<table><thead><tr>
+<th>Error</th>
+<th>Cause</th>
+<th>Fix</th>
+</tr></thead><tbody>
+<tr>
+<td><code>FUNCTION_INVOCATION_TIMEOUT</code> (Vercel)</td>
+<td>10s Python default on Hobby, 60s on Pro (P35)</td>
+<td>Set <code>maxDuration: 60</code> in <code>vercel.json</code>; stream the response</td>
+</tr>
+<tr>
+<td><code>504 Gateway Timeout</code> from Cloud Run</td>
+<td>Missing <code>--timeout=3600</code>; default is 300s</td>
+<td>Redeploy with <code>--timeout=3600 --concurrency=80</code></td>
+</tr>
+<tr>
+<td>p99 latency 10x p95</td>
+<td>Cold start from Python + LangChain imports (P36)</td>
+<td><code>--min-instances=1 --cpu-boost</code>, defer <code>tiktoken</code> import to request time</td>
+</tr>
+<tr>
+<td>Client hangs forever on SSE stream</td>
+<td>Proxy buffering the final <code>end</code> event (P46)</td>
+<td>Add <code>X-Accel-Buffering: no</code> and <code>Cache-Control: no-cache</code> headers</td>
+</tr>
+<tr>
+<td><code>docker exec &lt;pod&gt; env</code> shows API keys</td>
+<td><code>python-dotenv</code> leaked <code>.env</code> into <code>os.environ</code> (P37)</td>
+<td>Delete <code>.env</code> from image, use Secret Manager + <code>pydantic.SecretStr</code></td>
+</tr>
+<tr>
+<td><code>RuntimeError: Event loop is closed</code> on shutdown</td>
+<td><code>asyncpg</code> / <code>httpx</code> pool not closed before revision retirement</td>
+<td>Move pool lifecycle into FastAPI <code>lifespan</code> context manager</td>
+</tr>
+<tr>
+<td>Stream works locally, stalls on Cloud Run</td>
+<td>CPU throttling between keepalive pings</td>
+<td>Deploy with <code>--no-cpu-throttling</code> (CPU-always-allocated)</td>
+</tr>
+<tr>
+<td><code>ModuleNotFoundError</code> in Vercel build</td>
+<td><code>requirements.txt</code> not generated from <code>pyproject.toml</code></td>
+<td>Add build step: <code>uv export --format requirements-txt &gt; requirements.txt</code></td>
+</tr>
+</tbody></table>
+<h2>Examples</h2>
+<h3>A: Cloud Run with min-instances, secret mounts, VPC egress</h3>
+<p>One always-warm replica, two secrets from Secret Manager, egress routed through a VPC connector for private Postgres. See <a href="references/cloud-run-deploy.md">Cloud Run Deploy</a> for the full flag set, revision traffic splitting, and the cost model.</p>
+<h3>B: Vercel with streaming and maxDuration</h3>
+<p><code>vercel.json</code> with <code>maxDuration: 60</code> plus the FastAPI streaming entrypoint from Step 3. The combination gives a 40-second completion a 60-second wall and &lt;1s time-to-first-byte. See <a href="references/vercel-python-deploy.md">Vercel Python Deploy</a> for Edge Runtime limits and the Vercel Secrets vs env var split.</p>
+<h3>C: LangServe behind FastAPI with lifespan</h3>
+<p>Single <code>add_routes</code> call mounting <code>/chat</code> and <code>/chat/stream</code> with a shared connection pool closed via <code>lifespan</code>. Playground disabled in prod via the <code>__debug__</code> check. See <a href="references/langserve-patterns.md">LangServe Patterns</a> for typed schemas, auth middleware, and raw-handler coexistence.</p>
+<h2>Resources</h2>
+<ul>
+<li>Cloud Run: Configuring services</li>
+<li><a href="https://cloud.google.com/run/docs/configuring/cpu-allocation">Cloud Run: Always-on CPU (no CPU throttling)</a></li>
+<li><a href="https://vercel.com/docs/functions/runtimes/python">Vercel: Python runtime</a></li>
+<li><a href="https://vercel.com/docs/functions/configuring-functions/duration">Vercel: <code>maxDuration</code> and streaming</a></li>
+<li><a href="https://python.langchain.com/docs/langserve/">LangServe: Getting started</a></li>
+<li><a href="https://fastapi.tiangolo.com/advanced/events/">FastAPI: Lifespan events</a></li>
+<li><a href="https://docs.pydantic.dev/latest/api/types/#pydantic.types.SecretStr">Pydantic: <code>SecretStr</code></a></li>
+<li>Pack pain catalog: <code>docs/pain-catalog.md</code> (entries P35, P36, P37, P46)</li>
+<li>Related skills: <code>langchain-langgraph-streaming</code> (L29), <code>langchain-security-basics</code> (P18)</li>
+</ul></div>
+      </div>
+    </section>
+
+    <!-- 8. Bottom CTA -->
+    <section class="detail-cta" data-astro-cid-qcigfm7x>
+  <h2 class="detail-cta__headline" data-astro-cid-qcigfm7x>Ready to use langchain-py-pack?</h2>
+  <div class="detail-cta__actions" data-astro-cid-qcigfm7x>
+    <button class="detail-cta__primary" data-copy-install="/plugin install langchain-py-pack@claude-code-plugins-plus" data-astro-cid-qcigfm7x>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" data-astro-cid-qcigfm7x>
+        <rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" stroke-width="1.5" data-astro-cid-qcigfm7x></rect>
+        <path d="M3 11V3a1 1 0 011-1h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" data-astro-cid-qcigfm7x></path>
+      </svg>
+      <span class="detail-cta__btn-text" data-astro-cid-qcigfm7x>Copy Install Command</span>
+    </button>
+    
+  </div>
+</section>
+
+<script type="module">document.querySelectorAll("[data-copy-install]").forEach(t=>{t.addEventListener("click",async()=>{const a=t.dataset.copyInstall||"";await navigator.clipboard.writeText(a);const e=t.querySelector(".detail-cta__btn-text");if(e){const o=e.textContent;e.textContent="Copied!",t.classList.add("copied"),window.trackEvent&&window.trackEvent("install_copied",{plugin_name:a.split(" ").pop()||"",source:"detail_cta"}),setTimeout(()=>{e.textContent=o,t.classList.remove("copied")},2e3)}})});</script>
+
+    <!-- 9. Related Skills (6, with tool pills) -->
+    <section class="related-skills-section" data-astro-cid-jrlgpo3w>
+        <h2 class="related-skills-heading" data-astro-cid-jrlgpo3w>Related Skills</h2>
+        <div class="related-skills-grid" data-astro-cid-jrlgpo3w>
+          <a href="/skills/abridge-ci-integration/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-ci-integration</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Configure CI/CD pipeline for Abridge clinical AI integrations with GitHub Actions.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-common-errors/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-common-errors</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Diagnose and fix common Abridge clinical AI integration errors.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-a/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-a</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge ambient clinical documentation capture-to-note pipeline.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-b/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-b</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge patient-facing documentation and after-visit summary generation.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-cost-tuning/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-cost-tuning</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Optimize Abridge clinical AI costs through tier selection, session management, and usage monitoring for healthcare organizations.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-debug-bundle/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-debug-bundle</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Collect Abridge debug evidence for support tickets and troubleshooting.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a>
+        </div>
+      </section>
+
+  </div>
+
+  
+  <script>
+    document.querySelectorAll('.install-command').forEach(el => {
+      el.addEventListener('click', function() {
+        const text = this.dataset.copy || this.textContent;
+        navigator.clipboard.writeText(text).then(() => {
+          const originalText = this.textContent;
+          this.textContent = 'Copied to clipboard!';
+          this.style.color = 'var(--brand-green)';
+          setTimeout(() => {
+            this.textContent = originalText;
+            this.style.color = '';
+          }, 2000);
+        });
+      });
+    });
+  </script>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>hubspot-bulk-migration - Agent Skill</title>
+    <meta name="description" content="Bulk-migrate CRM data into HubSpot from Salesforce, Pipedrive, or Copper — or export off HubSpot — with field mapping, ID continuity, association re-linking, dedup safety, rate-limit budgeting, and rollback mitigation across 100K+ record datasets. Use when migrating any source CRM to HubSpot, recovering from a failed import with duplicate or unlinked records, or exporting out of HubSpot before switching platforms. Trigger with &quot;hubspot bulk migration&quot;, &quot;salesforce to hubspot&quot;, &quot;pipedrive to hubspot&quot;, &quot;copper to hubspot&quot;, &quot;migrate off hubspot&quot;, &quot;hubspot import dedup&quot;, &quot;hubspot association relink&quot;, &quot;hubspot field mapping&quot;, &quot;hubspot id continuity&quot;.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://tonsofskills.com/tons-of-skills-marketplace/skills/hubspot-bulk-migration/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/hubspot-bulk-migration/">
+    <meta property="og:title" content="hubspot-bulk-migration - Agent Skill">
+    <meta property="og:description" content="Bulk-migrate CRM data into HubSpot from Salesforce, Pipedrive, or Copper — or export off HubSpot — with field mapping, ID continuity, association re-linking, dedup safety, rate-limit budgeting, and rollback mitigation across 100K+ record datasets. Use when migrating any source CRM to HubSpot, recovering from a failed import with duplicate or unlinked records, or exporting out of HubSpot before switching platforms. Trigger with &quot;hubspot bulk migration&quot;, &quot;salesforce to hubspot&quot;, &quot;pipedrive to hubspot&quot;, &quot;copper to hubspot&quot;, &quot;migrate off hubspot&quot;, &quot;hubspot import dedup&quot;, &quot;hubspot association relink&quot;, &quot;hubspot field mapping&quot;, &quot;hubspot id continuity&quot;.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="hubspot-bulk-migration - Agent Skill">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/hubspot-bulk-migration/">
+    <meta name="twitter:title" content="hubspot-bulk-migration - Agent Skill">
+    <meta name="twitter:description" content="Bulk-migrate CRM data into HubSpot from Salesforce, Pipedrive, or Copper — or export off HubSpot — with field mapping, ID continuity, association re-linking, dedup safety, rate-limit budgeting, and rollback mitigation across 100K+ record datasets. Use when migrating any source CRM to HubSpot, recovering from a failed import with duplicate or unlinked records, or exporting out of HubSpot before switching platforms. Trigger with &quot;hubspot bulk migration&quot;, &quot;salesforce to hubspot&quot;, &quot;pipedrive to hubspot&quot;, &quot;copper to hubspot&quot;, &quot;migrate off hubspot&quot;, &quot;hubspot import dedup&quot;, &quot;hubspot association relink&quot;, &quot;hubspot field mapping&quot;, &quot;hubspot id continuity&quot;.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"hubspot-bulk-migration","description":"Bulk-migrate CRM data into HubSpot from Salesforce, Pipedrive, or Copper — or export off HubSpot — with field mapping, ID continuity, association re-linking, dedup safety, rate-limit budgeting, and rollback mitigation across 100K+ record datasets. Use when migrating any source CRM to HubSpot, recovering from a failed import with duplicate or unlinked records, or exporting out of HubSpot before switching platforms. Trigger with \"hubspot bulk migration\", \"salesforce to hubspot\", \"pipedrive to hubspot\", \"copper to hubspot\", \"migrate off hubspot\", \"hubspot import dedup\", \"hubspot association relink\", \"hubspot field mapping\", \"hubspot id continuity\".","version":"2.9.0","author":{"@type":"Person","name":"Jeremy Longshore"},"license":"MIT","programmingLanguage":"Claude Code Agent Skill","isPartOf":{"@type":"SoftwareApplication","name":"hubspot-pack","applicationCategory":"unknown"}}</script>
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.breadcrumbs[data-astro-cid-ilhxcym7]{margin-bottom:var(--space-5)}.breadcrumbs__list[data-astro-cid-ilhxcym7]{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;list-style:none;padding:0;margin:0;font-family:var(--font-mono);font-size:var(--text-sm, .8rem)}.breadcrumbs__item[data-astro-cid-ilhxcym7]{display:flex;align-items:center;gap:.375rem}.breadcrumbs__link[data-astro-cid-ilhxcym7]{color:var(--text-3);text-decoration:none;transition:color var(--duration-fast, .2s) var(--ease-out)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:hover{color:var(--primary)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:0}.breadcrumbs__sep[data-astro-cid-ilhxcym7]{color:var(--text-3);user-select:none;font-size:.7em;line-height:1}.breadcrumbs__current[data-astro-cid-ilhxcym7]{color:var(--text-2)}.detail-cta[data-astro-cid-qcigfm7x]{background:var(--surface-3, var(--brand-light-gray));border-top:1px solid var(--border, var(--brand-light-gray));border-radius:var(--radius-lg);padding:2rem 1.5rem;margin-top:2rem;text-align:center}.detail-cta__headline[data-astro-cid-qcigfm7x]{font-family:var(--font-display);font-weight:700;font-size:1.35rem;color:var(--text, var(--brand-dark));margin-bottom:1.25rem}.detail-cta__actions[data-astro-cid-qcigfm7x]{display:flex;justify-content:center;gap:.75rem;flex-wrap:wrap}.detail-cta__primary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:var(--primary);color:#0a0a0c;border:none;border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;cursor:pointer;transition:background var(--duration-fast) var(--ease-out),transform var(--duration-fast) var(--ease-out)}.detail-cta__primary[data-astro-cid-qcigfm7x]:hover{background:var(--primary-dark, var(--primary-dark));transform:translateY(-1px)}.detail-cta__primary[data-astro-cid-qcigfm7x].copied{background:var(--positive, var(--brand-green))}.detail-cta__secondary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:transparent;color:var(--text, var(--brand-dark));border:1px solid var(--border, var(--brand-mid-gray));border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;text-decoration:none;transition:border-color var(--duration-fast) var(--ease-out),color var(--duration-fast) var(--ease-out)}.detail-cta__secondary[data-astro-cid-qcigfm7x]:hover{border-color:var(--primary);color:var(--primary)}@media(max-width:480px){.detail-cta__actions[data-astro-cid-qcigfm7x]{flex-direction:column;align-items:stretch}.detail-cta__primary[data-astro-cid-qcigfm7x],.detail-cta__secondary[data-astro-cid-qcigfm7x]{justify-content:center}}
+</style>
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/_slug_@_@astro.wF9emvVq.css"></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  
+  
+
+  <div class="skill-detail" data-astro-cid-jrlgpo3w>
+    <!-- 1. Breadcrumbs -->
+    <nav aria-label="Breadcrumb" class="breadcrumbs" data-astro-cid-ilhxcym7>
+  <ol class="breadcrumbs__list" itemscope itemtype="https://schema.org/BreadcrumbList" data-astro-cid-ilhxcym7>
+    <li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Home</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="1">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/skills/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Skills</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="2">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          <span class="breadcrumbs__current" aria-current="page" itemprop="name" data-astro-cid-ilhxcym7>
+              hubspot-bulk-migration
+            </span>
+          <meta itemprop="position" content="3">
+        </li>
+  </ol>
+</nav>
+
+    <!-- 2. Header (enhanced) -->
+    <header class="skill-header" data-astro-cid-jrlgpo3w>
+      <h1 data-astro-cid-jrlgpo3w>hubspot-bulk-migration</h1>
+      <p class="skill-description" data-astro-cid-jrlgpo3w>Bulk-migrate CRM data into HubSpot from Salesforce, Pipedrive, or Copper — or export off HubSpot — with field mapping, ID continuity, association re-linking, dedup safety, rate-limit budgeting, and rollback mitigation across 100K+ record datasets. Use when migrating any source CRM to HubSpot, recovering from a failed import with duplicate or unlinked records, or exporting out of HubSpot before switching platforms. Trigger with &quot;hubspot bulk migration&quot;, &quot;salesforce to hubspot&quot;, &quot;pipedrive to hubspot&quot;, &quot;copper to hubspot&quot;, &quot;migrate off hubspot&quot;, &quot;hubspot import dedup&quot;, &quot;hubspot association relink&quot;, &quot;hubspot field mapping&quot;, &quot;hubspot id continuity&quot;.</p>
+
+      <div class="skill-metadata" data-astro-cid-jrlgpo3w>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>v2.9.0</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>Jeremy Longshore</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>MIT</span>
+        </div>
+      </div>
+
+      
+    </header>
+
+    <!-- 4. Allowed Tools -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Allowed Tools</h2>
+      <div class="tools-grid" data-astro-cid-jrlgpo3w>
+        <span class="tool-badge" data-astro-cid-jrlgpo3w>Read</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(curl:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(jq:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(python3:*)</span>
+      </div>
+      
+    </section>
+
+    <!-- 5. Provided by Plugin -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Provided by Plugin</h2>
+      <div class="plugin-info" data-astro-cid-jrlgpo3w>
+        <div class="plugin-details" data-astro-cid-jrlgpo3w>
+          <h3 data-astro-cid-jrlgpo3w>
+            <a href="/plugins/hubspot-pack/" data-astro-cid-jrlgpo3w>hubspot-pack</a>
+          </h3>
+          <p data-astro-cid-jrlgpo3w>Claude Code skill pack for HubSpot (10 production-engineer skills)</p>
+          <div class="plugin-meta" data-astro-cid-jrlgpo3w>
+            <span data-astro-cid-jrlgpo3w>unknown</span>
+            <span data-astro-cid-jrlgpo3w>v2.9.0</span>
+          </div>
+        </div>
+        <a href="/plugins/hubspot-pack/" class="btn-primary" data-astro-cid-jrlgpo3w>View Plugin</a>
+      </div>
+    </section>
+
+    <!-- 6. Installation -->
+    <section class="section-box dark" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Installation</h2>
+      <p class="install-note" style="color: var(--brand-light-gray); margin-bottom: 0.75rem;" data-astro-cid-jrlgpo3w>This skill is included in the hubspot-pack plugin:</p>
+      <pre class="install-command" data-copy="/plugin install hubspot-pack@claude-code-plugins-plus" data-astro-cid-jrlgpo3w><code data-astro-cid-jrlgpo3w>/plugin install hubspot-pack@claude-code-plugins-plus</code></pre>
+      <p class="install-note" data-astro-cid-jrlgpo3w>Click to copy</p>
+    </section>
+
+    <!-- 7. Skill Content (Markdown) -->
+    <section class="skill-content-section" data-astro-cid-jrlgpo3w>
+      <h2 data-astro-cid-jrlgpo3w>Instructions</h2>
+      <div class="skill-content" data-astro-cid-jrlgpo3w>
+        <div data-astro-cid-jrlgpo3w><h1>HubSpot Bulk Migration</h1>
+<h2>Overview</h2>
+<p>Move CRM data into HubSpot from Salesforce, Pipedrive, or Copper — or extract it back out — without losing cross-system IDs, breaking associations, or flooding the portal with duplicates. This is not a data-mapping worksheet. It is the code, sequencing, and guardrails your migration runs at 2am against 150K records when the daily API quota is finite, HubSpot has no bulk-delete API, and a bad import leaves permanent junk that requires a support ticket to remove.</p>
+<p>The six production failures this skill addresses:</p>
+<ol>
+<li><strong>ID continuity loss</strong> — source CRM IDs are not preserved in HubSpot. Fix: create a custom <code>source_crm_id</code> property on every object type before the first record lands, and write the source ID into it during import.</li>
+<li><strong>Association re-creation failure</strong> — contacts, companies, and deals in the source are associated; batch-importing them independently creates records without associations unless a second pass re-links them after all IDs are known. Fix: import in order (companies → contacts → deals), then re-link in three association passes.</li>
+<li><strong>Import dedup missing existing records</strong> — HubSpot&#39;s batch upsert deduplicates contacts by email, but only when email matches exactly. Missing or differently-formatted emails create duplicates. Fix: normalize email to lowercase + trimmed before every import; use <code>batch/upsert</code> not <code>batch/create</code> for contacts.</li>
+<li><strong>Field type mismatch</strong> — source date fields in <code>M/D/Y</code> format fail HubSpot&#39;s ISO 8601 validation; multi-picklist values not in HubSpot&#39;s allowed enumeration are silently dropped. Fix: run a pre-migration dry-run that validates every field against HubSpot&#39;s property schema before writing a single record.</li>
+<li><strong>Rate limit exhaustion</strong> — 100K contacts at 100/batch equals 1,000 API calls; association re-linking doubles that. Combined with retries, a naive migration burns the 500K daily quota before finishing. Fix: budget calls per run, sleep between burst windows, and use the CSV import API for volumes above 10K.</li>
+<li><strong>Rollback impossibility</strong> — HubSpot has no bulk-delete API. Fix: maintain a local <code>source_id → hubspot_id</code> mapping file throughout the migration so <code>batch/archive</code> calls are programmable.</li>
+</ol>
+<p><strong>Auth:</strong> set <code>HUBSPOT_ACCESS_TOKEN</code> environment variable to a private app token with CRM write scopes. For token caching, rotation, and multi-portal routing see the <code>hubspot-auth</code> skill in this pack.</p>
+<h2>Prerequisites</h2>
+<ul>
+<li>HubSpot private app token with scopes: <code>crm.objects.contacts.write</code>, <code>crm.objects.companies.write</code>, <code>crm.objects.deals.write</code>, <code>crm.associations.write</code>, <code>crm.schemas.contacts.write</code></li>
+<li>Python 3.10+ (<code>pip install requests</code>)</li>
+<li>Source CRM data exported to CSV or available via API</li>
+<li><code>HUBSPOT_ACCESS_TOKEN</code> set in environment</li>
+</ul>
+<h2>Instructions</h2>
+<h3>Step 1: Create custom properties for ID continuity</h3>
+<p>Before importing a single record, create a custom property on every object type to store the source CRM&#39;s record ID. Treat <code>409 CONFLICT</code> as success — property creation is idempotent.</p>
+<pre data-lang="python"><code>
+import os, requests
+
+TOKEN = os.environ[&quot;HUBSPOT_ACCESS_TOKEN&quot;]
+BASE  = &quot;https://api.hubapi.com&quot;
+HDRS  = {&quot;Authorization&quot;: f&quot;Bearer {TOKEN}&quot;, &quot;Content-Type&quot;: &quot;application/json&quot;}
+
+def create_source_id_property(object_type: str, source_crm: str) -&gt; None:
+    prop_name = f&quot;{source_crm}_id&quot;
+    payload = {
+        &quot;name&quot;: prop_name,
+        &quot;label&quot;: f&quot;{source_crm.title()} ID&quot;,
+        &quot;type&quot;: &quot;string&quot;,
+        &quot;fieldType&quot;: &quot;text&quot;,
+        &quot;groupName&quot;: f&quot;{object_type}information&quot;,
+        &quot;description&quot;: f&quot;Original {source_crm.title()} record ID. Do not modify.&quot;,
+    }
+    resp = requests.post(f&quot;{BASE}/crm/v3/properties/{object_type}&quot;, headers=HDRS, json=payload)
+    if resp.status_code not in (200, 201, 409):
+        resp.raise_for_status()
+
+for obj in [&quot;contacts&quot;, &quot;companies&quot;, &quot;deals&quot;]:
+    create_source_id_property(obj, &quot;salesforce&quot;)  # or &quot;pipedrive&quot;, &quot;copper&quot;
+</code></pre>
+<h3>Step 2: Validate field types (dry-run before any writes)</h3>
+<p>Pull HubSpot&#39;s property schema and validate every field in your source CSV before touching the API. Catches date format mismatches and invalid enum values upfront.</p>
+<pre data-lang="python"><code>
+import csv, json, re
+from datetime import datetime
+
+def get_property_schema(object_type: str) -&gt; dict:
+    resp = requests.get(f&quot;{BASE}/crm/v3/properties/{object_type}&quot;, headers=HDRS)
+    resp.raise_for_status()
+    return {p[&quot;name&quot;]: p for p in resp.json()[&quot;results&quot;]}
+
+def validate_record(record: dict, schema: dict) -&gt; list[str]:
+    errors = []
+    for field, value in record.items():
+        if not value or field not in schema:
+            continue
+        prop = schema[field]
+        if prop.get(&quot;type&quot;) == &quot;date&quot;:
+            try:
+                datetime.strptime(str(value), &quot;%Y-%m-%d&quot;)
+            except ValueError:
+                errors.append(f&quot;{field}=&#39;{value}&#39; must be YYYY-MM-DD&quot;)
+        if prop.get(&quot;type&quot;) == &quot;enumeration&quot;:
+            allowed = {o[&quot;value&quot;] for o in prop.get(&quot;options&quot;, [])}
+            if allowed and str(value) not in allowed:
+                errors.append(f&quot;{field}=&#39;{value}&#39; not in allowed values: {sorted(allowed)}&quot;)
+    return errors
+</code></pre>
+<p>Full dry-run driver and field-by-field transform helpers in <a href="references/implementation-guide.md">implementation-guide.md</a>.</p>
+<h3>Step 3: Rate-budgeted batch import — contacts first, companies second, deals third</h3>
+<p>Import in dependency order. Track the <code>source_id → hubspot_id</code> mapping per batch. Save the map to disk after every batch — a mid-run crash leaves a complete map for the records that did land.</p>
+<pre data-lang="python"><code>
+import time, json
+
+def batch_import(records, object_type, source_id_field, batch_size=100):
+    &quot;&quot;&quot;Import records and return {source_id: hubspot_id} mapping.&quot;&quot;&quot;
+    endpoint = &quot;upsert&quot; if object_type == &quot;contacts&quot; else &quot;create&quot;
+    url = f&quot;{BASE}/crm/v3/objects/{object_type}/batch/{endpoint}&quot;
+    id_map, errors = {}, []
+    batches = [records[i:i+batch_size] for i in range(0, len(records), batch_size)]
+
+    for n, batch in enumerate(batches, 1):
+        if endpoint == &quot;upsert&quot;:
+            payload = {&quot;inputs&quot;: [{&quot;idProperty&quot;: &quot;email&quot;, &quot;id&quot;: r.get(&quot;email&quot;,&quot;&quot;), &quot;properties&quot;: r} for r in batch]}
+        else:
+            payload = {&quot;inputs&quot;: [{&quot;properties&quot;: r} for r in batch]}
+
+        resp = requests.post(url, headers=HDRS, json=payload)
+        daily_left = int(resp.headers.get(&quot;X-HubSpot-RateLimit-Daily-Remaining&quot;, 500_000))
+        if resp.status_code == 429:
+            time.sleep(int(resp.headers.get(&quot;Retry-After&quot;, 10)))
+            resp = requests.post(url, headers=HDRS, json=payload)
+        if resp.status_code not in (200, 201, 207):
+            errors.append({&quot;batch&quot;: n, &quot;status&quot;: resp.status_code})
+            continue
+        # Daily quota guard — 500K is the Professional/Enterprise daily limit
+        if daily_left &lt; 10_000:
+            raise RuntimeError(f&quot;Daily quota critical: {daily_left} remaining. Resume tomorrow.&quot;)
+        for result_item, orig in zip(resp.json().get(&quot;results&quot;, []), batch):
+            src_id = orig.get(source_id_field, &quot;&quot;)
+            hs_id  = result_item.get(&quot;id&quot;, &quot;&quot;)
+            if src_id and hs_id:
+                id_map[src_id] = hs_id
+        print(f&quot;  Batch {n}/{len(batches)}: {len(batch)} records, daily_left={daily_left}&quot;)
+        time.sleep(0.12)   # stay below 90 req/10s burst ceiling
+
+    return id_map, errors
+
+def save_id_map(id_map: dict, path: str) -&gt; None:
+    existing = {}
+    try:
+        with open(path) as f: existing = json.load(f)
+    except FileNotFoundError: pass
+    existing.update(id_map)
+    with open(path, &quot;w&quot;) as f: json.dump(existing, f, indent=2)
+</code></pre>
+<h3>Step 4: Re-link associations (two-pass — after all objects are imported)</h3>
+<pre data-lang="python"><code>
+def relink_associations(source_assocs, from_id_map, to_id_map,
+                         from_type, to_type, type_id, batch_size=100):
+    &quot;&quot;&quot;Re-create associations using v4 API. Returns {linked, skipped, errors}.&quot;&quot;&quot;
+    url = f&quot;{BASE}/crm/v4/associations/{from_type}/{to_type}/batch/create&quot;
+    linked = skipped = 0
+    errors = []
+    batches = [source_assocs[i:i+batch_size] for i in range(0, len(source_assocs), batch_size)]
+    for batch in batches:
+        inputs = []
+        for a in batch:
+            fhs = from_id_map.get(a[&quot;from_source_id&quot;])
+            ths = to_id_map.get(a[&quot;to_source_id&quot;])
+            if not fhs or not ths:
+                skipped += 1; continue
+            inputs.append({&quot;from&quot;: {&quot;id&quot;: fhs}, &quot;to&quot;: {&quot;id&quot;: ths},
+                            &quot;types&quot;: [{&quot;associationCategory&quot;: &quot;HUBSPOT_DEFINED&quot;, &quot;associationTypeId&quot;: type_id}]})
+        if not inputs: continue
+        resp = requests.post(url, headers=HDRS, json={&quot;inputs&quot;: inputs})
+        if resp.status_code == 429:
+            time.sleep(int(resp.headers.get(&quot;Retry-After&quot;, 10)))
+            resp = requests.post(url, headers=HDRS, json={&quot;inputs&quot;: inputs})
+        if resp.status_code not in (200, 201, 207):
+            errors.append({&quot;status&quot;: resp.status_code, &quot;body&quot;: resp.text[:200]})
+        else:
+            linked += len(inputs)
+        time.sleep(0.12)
+    return {&quot;linked&quot;: linked, &quot;skipped&quot;: skipped, &quot;errors&quot;: errors}
+
+# Standard association type IDs — full table in API_REFERENCE.md
+CONTACT_TO_COMPANY, DEAL_TO_CONTACT, DEAL_TO_COMPANY = 1, 3, 5
+</code></pre>
+<h3>Step 5: Rollback using ID map</h3>
+<pre data-lang="python"><code>
+def rollback_migration(id_map_path: str, object_type: str, dry_run: bool = True) -&gt; dict:
+    &quot;&quot;&quot;Archive all records created during migration. Always dry_run=True first.&quot;&quot;&quot;
+    with open(id_map_path) as f:
+        id_map = json.load(f)
+    hubspot_ids = list(id_map.values())
+    archived, errors = 0, []
+    for i in range(0, len(hubspot_ids), 100):
+        batch = hubspot_ids[i:i+100]
+        if dry_run:
+            print(f&quot;Would archive: {batch[:3]}...&quot;)
+            archived += len(batch); continue
+        resp = requests.post(f&quot;{BASE}/crm/v3/objects/{object_type}/batch/archive&quot;,
+                             headers=HDRS, json={&quot;inputs&quot;: [{&quot;id&quot;: hid} for hid in batch]})
+        if resp.status_code == 204:
+            archived += len(batch)
+        else:
+            errors.append({&quot;status&quot;: resp.status_code})
+        time.sleep(0.12)
+    return {&quot;archived&quot;: archived, &quot;errors&quot;: errors, &quot;dry_run&quot;: dry_run}
+</code></pre>
+<h2>Error Handling</h2>
+<table><thead><tr>
+<th>HTTP Status</th>
+<th>Error</th>
+<th>Root Cause</th>
+<th>Action</th>
+</tr></thead><tbody>
+<tr>
+<td><code>400</code></td>
+<td><code>INVALID_PROPERTY_NAME</code></td>
+<td>Field name not in HubSpot schema</td>
+<td>Run dry-run; remap source fields to valid HubSpot property names</td>
+</tr>
+<tr>
+<td><code>400</code></td>
+<td><code>INVALID_ENUMERATION_PROPERTY_VALUE</code></td>
+<td>Picklist value not in allowed options</td>
+<td>Pull <code>GET /crm/v3/properties</code> and remap; drop unmappable values</td>
+</tr>
+<tr>
+<td><code>400</code></td>
+<td><code>INVALID_DATE</code></td>
+<td>Date not in <code>YYYY-MM-DD</code> or epoch ms</td>
+<td>Run <code>convert_date()</code> helper (see implementation-guide.md) before import</td>
+</tr>
+<tr>
+<td><code>400</code></td>
+<td><code>REQUIRED_PROPERTY_MISSING</code></td>
+<td>Upsert <code>idProperty</code> value is empty</td>
+<td>Normalize email; route no-email contacts to separate <code>batch/create</code> call</td>
+</tr>
+<tr>
+<td><code>207</code></td>
+<td>Partial batch success</td>
+<td>Some records succeeded, some failed</td>
+<td>Parse both <code>results[]</code> and <code>errors[]</code>; re-queue failed records</td>
+</tr>
+<tr>
+<td><code>409</code></td>
+<td><code>DUPLICATE_PROPERTY</code></td>
+<td>Custom property already exists</td>
+<td>Treat as success — property creation is idempotent</td>
+</tr>
+<tr>
+<td><code>429</code></td>
+<td><code>RATE_LIMIT</code></td>
+<td>Burst (100/10s) or daily (500K) quota</td>
+<td>Respect <code>Retry-After</code>; switch to CSV import API for daily budget relief</td>
+</tr>
+<tr>
+<td><code>500</code></td>
+<td>HubSpot internal error</td>
+<td>Transient portal error</td>
+<td>Retry up to 3 times with 2× backoff, 30s cap</td>
+</tr>
+<tr>
+<td><code>503</code></td>
+<td><code>SERVICE_UNAVAILABLE</code></td>
+<td>HubSpot maintenance</td>
+<td>Back off 60s and retry; check status.hubspot.com</td>
+</tr>
+</tbody></table>
+<h2>Examples</h2>
+<h3>Full Salesforce → HubSpot migration</h3>
+<pre data-lang="python"><code>
+# 1. Create ID properties
+for obj in [&quot;contacts&quot;, &quot;companies&quot;, &quot;deals&quot;]:
+    create_source_id_property(obj, &quot;salesforce&quot;)
+
+# 2. Import companies first
+import csv
+company_rows = [{&quot;salesforce_id&quot;: r[&quot;Id&quot;], &quot;name&quot;: r[&quot;Name&quot;],
+                  &quot;domain&quot;: r.get(&quot;Website&quot;,&quot;&quot;).replace(&quot;https://&quot;,&quot;&quot;).rstrip(&quot;/&quot;)}
+                for r in csv.DictReader(open(&quot;sf_accounts.csv&quot;))]
+company_map, _ = batch_import(company_rows, &quot;companies&quot;, &quot;salesforce_id&quot;)
+save_id_map(company_map, &quot;company_id_map.json&quot;)
+
+# 3. Import contacts (upsert by email for dedup)
+contact_rows = [{&quot;salesforce_id&quot;: r[&quot;Id&quot;],
+                  &quot;email&quot;: r.get(&quot;Email&quot;,&quot;&quot;).strip().lower(),
+                  &quot;firstname&quot;: r.get(&quot;FirstName&quot;,&quot;&quot;), &quot;lastname&quot;: r.get(&quot;LastName&quot;,&quot;&quot;)}
+                for r in csv.DictReader(open(&quot;sf_contacts.csv&quot;))]
+contact_map, _ = batch_import(contact_rows, &quot;contacts&quot;, &quot;salesforce_id&quot;)
+save_id_map(contact_map, &quot;contact_id_map.json&quot;)
+
+# 4. Re-link contact → company
+source_assocs = [{&quot;from_source_id&quot;: r[&quot;Id&quot;], &quot;to_source_id&quot;: r[&quot;AccountId&quot;]}
+                 for r in csv.DictReader(open(&quot;sf_contacts.csv&quot;)) if r.get(&quot;AccountId&quot;)]
+print(relink_associations(source_assocs, contact_map, company_map,
+                           &quot;contacts&quot;, &quot;companies&quot;, CONTACT_TO_COMPANY))
+</code></pre>
+<h3>Verify source IDs landed</h3>
+<pre data-lang="bash"><code>
+curl -s &quot;https://api.hubapi.com/crm/v3/objects/contacts?properties=email,salesforce_id&amp;limit=5&quot; \
+  -H &quot;Authorization: Bearer $HUBSPOT_ACCESS_TOKEN&quot; | \
+  jq &#39;.results[] | {id, email: .properties.email, sf_id: .properties.salesforce_id}&#39;
+</code></pre>
+<h3>Rollback (dry run first, always)</h3>
+<pre data-lang="python"><code>
+print(rollback_migration(&quot;contact_id_map.json&quot;, &quot;contacts&quot;, dry_run=True))
+# Confirm output, then:
+# rollback_migration(&quot;contact_id_map.json&quot;, &quot;contacts&quot;, dry_run=False)
+</code></pre>
+<h2>Output</h2>
+<ul>
+<li>Custom source-CRM ID properties (<code>salesforce_id</code>, <code>pipedrive_id</code>, or <code>copper_id</code>) created on contacts, companies, and deals before first write</li>
+<li>Pre-migration validation report with 0 errors before any API calls</li>
+<li><code>source_id → hubspot_id</code> mapping files written per-batch for rollback coverage</li>
+<li>Records imported in dependency order: companies → contacts → deals</li>
+<li>Associations re-linked via v4 API in three post-import passes</li>
+<li>Contacts deduped by normalized email via upsert</li>
+<li>Rollback script scoped to migration ID maps</li>
+</ul>
+<h2>Resources</h2>
+<ul>
+<li><a href="https://developers.hubspot.com/docs/reference/api/crm/objects/contacts">HubSpot CRM Objects API</a></li>
+<li><a href="https://developers.hubspot.com/docs/reference/api/crm/associations">HubSpot Associations v4 API</a></li>
+<li><a href="https://developers.hubspot.com/docs/reference/api/crm/imports">HubSpot CSV Import API</a></li>
+<li><a href="https://developers.hubspot.com/docs/reference/api/crm/properties">HubSpot Properties API</a></li>
+<li><a href="https://developers.hubspot.com/docs/guides/apps/api-usage/usage-details">HubSpot Rate Limits</a></li>
+<li><a href="references/API_REFERENCE.md">API_REFERENCE.md</a> — batch create/upsert shapes, CSV import API, association batch create, property validation rules, rate limit headers</li>
+<li><a href="references/implementation-guide.md">implementation-guide.md</a> — field mapping matrix (Salesforce/Pipedrive/Copper), date conversion helpers, association pipeline details, dry-run workflow, rollback strategy, export-off-HubSpot sequence</li>
+</ul></div>
+      </div>
+    </section>
+
+    <!-- 8. Bottom CTA -->
+    <section class="detail-cta" data-astro-cid-qcigfm7x>
+  <h2 class="detail-cta__headline" data-astro-cid-qcigfm7x>Ready to use hubspot-pack?</h2>
+  <div class="detail-cta__actions" data-astro-cid-qcigfm7x>
+    <button class="detail-cta__primary" data-copy-install="/plugin install hubspot-pack@claude-code-plugins-plus" data-astro-cid-qcigfm7x>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" data-astro-cid-qcigfm7x>
+        <rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" stroke-width="1.5" data-astro-cid-qcigfm7x></rect>
+        <path d="M3 11V3a1 1 0 011-1h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" data-astro-cid-qcigfm7x></path>
+      </svg>
+      <span class="detail-cta__btn-text" data-astro-cid-qcigfm7x>Copy Install Command</span>
+    </button>
+    
+  </div>
+</section>
+
+<script type="module">document.querySelectorAll("[data-copy-install]").forEach(t=>{t.addEventListener("click",async()=>{const a=t.dataset.copyInstall||"";await navigator.clipboard.writeText(a);const e=t.querySelector(".detail-cta__btn-text");if(e){const o=e.textContent;e.textContent="Copied!",t.classList.add("copied"),window.trackEvent&&window.trackEvent("install_copied",{plugin_name:a.split(" ").pop()||"",source:"detail_cta"}),setTimeout(()=>{e.textContent=o,t.classList.remove("copied")},2e3)}})});</script>
+
+    <!-- 9. Related Skills (6, with tool pills) -->
+    <section class="related-skills-section" data-astro-cid-jrlgpo3w>
+        <h2 class="related-skills-heading" data-astro-cid-jrlgpo3w>Related Skills</h2>
+        <div class="related-skills-grid" data-astro-cid-jrlgpo3w>
+          <a href="/skills/abridge-ci-integration/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-ci-integration</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Configure CI/CD pipeline for Abridge clinical AI integrations with GitHub Actions.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-common-errors/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-common-errors</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Diagnose and fix common Abridge clinical AI integration errors.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-a/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-a</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge ambient clinical documentation capture-to-note pipeline.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-b/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-b</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge patient-facing documentation and after-visit summary generation.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-cost-tuning/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-cost-tuning</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Optimize Abridge clinical AI costs through tier selection, session management, and usage monitoring for healthcare organizations.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-debug-bundle/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-debug-bundle</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Collect Abridge debug evidence for support tickets and troubleshooting.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a>
+        </div>
+      </section>
+
+  </div>
+
+  
+  <script>
+    document.querySelectorAll('.install-command').forEach(el => {
+      el.addEventListener('click', function() {
+        const text = this.dataset.copy || this.textContent;
+        navigator.clipboard.writeText(text).then(() => {
+          const originalText = this.textContent;
+          this.textContent = 'Copied to clipboard!';
+          this.style.color = 'var(--brand-green)';
+          setTimeout(() => {
+            this.textContent = originalText;
+            this.style.color = '';
+          }, 2000);
+        });
+      });
+    });
+  </script>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

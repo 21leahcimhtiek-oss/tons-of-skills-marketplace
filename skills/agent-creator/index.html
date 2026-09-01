@@ -1,0 +1,983 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>agent-creator - Agent Skill</title>
+    <meta name="description" content="Create production-grade agent .md files aligned with the Anthropic 2026 spec (16-field schema). Also validates existing agents against the marketplace compliance rules. Use when building custom subagents, reviewing agent quality, or creating parallel agent architectures for orchestrator skills. Trigger with &quot;/agent-creator&quot;, &quot;create an agent&quot;, &quot;build a subagent&quot;, or &quot;validate my agent&quot;. Make sure to use this skill whenever creating agents/*.md files for plugins or standalone use.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://tonsofskills.com/tons-of-skills-marketplace/skills/agent-creator/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/agent-creator/">
+    <meta property="og:title" content="agent-creator - Agent Skill">
+    <meta property="og:description" content="Create production-grade agent .md files aligned with the Anthropic 2026 spec (16-field schema). Also validates existing agents against the marketplace compliance rules. Use when building custom subagents, reviewing agent quality, or creating parallel agent architectures for orchestrator skills. Trigger with &quot;/agent-creator&quot;, &quot;create an agent&quot;, &quot;build a subagent&quot;, or &quot;validate my agent&quot;. Make sure to use this skill whenever creating agents/*.md files for plugins or standalone use.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="agent-creator - Agent Skill">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/agent-creator/">
+    <meta name="twitter:title" content="agent-creator - Agent Skill">
+    <meta name="twitter:description" content="Create production-grade agent .md files aligned with the Anthropic 2026 spec (16-field schema). Also validates existing agents against the marketplace compliance rules. Use when building custom subagents, reviewing agent quality, or creating parallel agent architectures for orchestrator skills. Trigger with &quot;/agent-creator&quot;, &quot;create an agent&quot;, &quot;build a subagent&quot;, or &quot;validate my agent&quot;. Make sure to use this skill whenever creating agents/*.md files for plugins or standalone use.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"agent-creator","description":"Create production-grade agent .md files aligned with the Anthropic 2026 spec (16-field schema). Also validates existing agents against the marketplace compliance rules. Use when building custom subagents, reviewing agent quality, or creating parallel agent architectures for orchestrator skills. Trigger with \"/agent-creator\", \"create an agent\", \"build a subagent\", or \"validate my agent\". Make sure to use this skill whenever creating agents/*.md files for plugins or standalone use.","version":"5.20.0","author":{"@type":"Person","name":"Jeremy Longshore"},"license":"MIT","programmingLanguage":"Claude Code Agent Skill","isPartOf":{"@type":"SoftwareApplication","name":"skill-creator","applicationCategory":"unknown"}}</script>
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.breadcrumbs[data-astro-cid-ilhxcym7]{margin-bottom:var(--space-5)}.breadcrumbs__list[data-astro-cid-ilhxcym7]{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;list-style:none;padding:0;margin:0;font-family:var(--font-mono);font-size:var(--text-sm, .8rem)}.breadcrumbs__item[data-astro-cid-ilhxcym7]{display:flex;align-items:center;gap:.375rem}.breadcrumbs__link[data-astro-cid-ilhxcym7]{color:var(--text-3);text-decoration:none;transition:color var(--duration-fast, .2s) var(--ease-out)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:hover{color:var(--primary)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:0}.breadcrumbs__sep[data-astro-cid-ilhxcym7]{color:var(--text-3);user-select:none;font-size:.7em;line-height:1}.breadcrumbs__current[data-astro-cid-ilhxcym7]{color:var(--text-2)}.detail-cta[data-astro-cid-qcigfm7x]{background:var(--surface-3, var(--brand-light-gray));border-top:1px solid var(--border, var(--brand-light-gray));border-radius:var(--radius-lg);padding:2rem 1.5rem;margin-top:2rem;text-align:center}.detail-cta__headline[data-astro-cid-qcigfm7x]{font-family:var(--font-display);font-weight:700;font-size:1.35rem;color:var(--text, var(--brand-dark));margin-bottom:1.25rem}.detail-cta__actions[data-astro-cid-qcigfm7x]{display:flex;justify-content:center;gap:.75rem;flex-wrap:wrap}.detail-cta__primary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:var(--primary);color:#0a0a0c;border:none;border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;cursor:pointer;transition:background var(--duration-fast) var(--ease-out),transform var(--duration-fast) var(--ease-out)}.detail-cta__primary[data-astro-cid-qcigfm7x]:hover{background:var(--primary-dark, var(--primary-dark));transform:translateY(-1px)}.detail-cta__primary[data-astro-cid-qcigfm7x].copied{background:var(--positive, var(--brand-green))}.detail-cta__secondary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:transparent;color:var(--text, var(--brand-dark));border:1px solid var(--border, var(--brand-mid-gray));border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;text-decoration:none;transition:border-color var(--duration-fast) var(--ease-out),color var(--duration-fast) var(--ease-out)}.detail-cta__secondary[data-astro-cid-qcigfm7x]:hover{border-color:var(--primary);color:var(--primary)}@media(max-width:480px){.detail-cta__actions[data-astro-cid-qcigfm7x]{flex-direction:column;align-items:stretch}.detail-cta__primary[data-astro-cid-qcigfm7x],.detail-cta__secondary[data-astro-cid-qcigfm7x]{justify-content:center}}
+</style>
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/_slug_@_@astro.wF9emvVq.css"></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  
+  
+
+  <div class="skill-detail" data-astro-cid-jrlgpo3w>
+    <!-- 1. Breadcrumbs -->
+    <nav aria-label="Breadcrumb" class="breadcrumbs" data-astro-cid-ilhxcym7>
+  <ol class="breadcrumbs__list" itemscope itemtype="https://schema.org/BreadcrumbList" data-astro-cid-ilhxcym7>
+    <li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Home</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="1">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/skills/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Skills</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="2">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          <span class="breadcrumbs__current" aria-current="page" itemprop="name" data-astro-cid-ilhxcym7>
+              agent-creator
+            </span>
+          <meta itemprop="position" content="3">
+        </li>
+  </ol>
+</nav>
+
+    <!-- 2. Header (enhanced) -->
+    <header class="skill-header" data-astro-cid-jrlgpo3w>
+      <h1 data-astro-cid-jrlgpo3w>agent-creator</h1>
+      <p class="skill-description" data-astro-cid-jrlgpo3w>Create production-grade agent .md files aligned with the Anthropic 2026 spec (16-field schema). Also validates existing agents against the marketplace compliance rules. Use when building custom subagents, reviewing agent quality, or creating parallel agent architectures for orchestrator skills. Trigger with &quot;/agent-creator&quot;, &quot;create an agent&quot;, &quot;build a subagent&quot;, or &quot;validate my agent&quot;. Make sure to use this skill whenever creating agents/*.md files for plugins or standalone use.</p>
+
+      <div class="skill-metadata" data-astro-cid-jrlgpo3w>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>v5.20.0</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>Jeremy Longshore</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>MIT</span>
+        </div>
+      </div>
+
+      
+    </header>
+
+    <!-- 4. Allowed Tools -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Allowed Tools</h2>
+      <div class="tools-grid" data-astro-cid-jrlgpo3w>
+        <span class="tool-badge" data-astro-cid-jrlgpo3w>Read</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Write</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Edit</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Glob</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Grep</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(python:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>AskUserQuestion</span>
+      </div>
+      
+    </section>
+
+    <!-- 5. Provided by Plugin -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Provided by Plugin</h2>
+      <div class="plugin-info" data-astro-cid-jrlgpo3w>
+        <div class="plugin-details" data-astro-cid-jrlgpo3w>
+          <h3 data-astro-cid-jrlgpo3w>
+            <a href="/plugins/skill-creator/" data-astro-cid-jrlgpo3w>skill-creator</a>
+          </h3>
+          <p data-astro-cid-jrlgpo3w>Create and validate production-grade agent skills with 100-point marketplace grading</p>
+          <div class="plugin-meta" data-astro-cid-jrlgpo3w>
+            <span data-astro-cid-jrlgpo3w>unknown</span>
+            <span data-astro-cid-jrlgpo3w>v5.20.0</span>
+          </div>
+        </div>
+        <a href="/plugins/skill-creator/" class="btn-primary" data-astro-cid-jrlgpo3w>View Plugin</a>
+      </div>
+    </section>
+
+    <!-- 6. Installation -->
+    <section class="section-box dark" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Installation</h2>
+      <p class="install-note" style="color: var(--brand-light-gray); margin-bottom: 0.75rem;" data-astro-cid-jrlgpo3w>This skill is included in the skill-creator plugin:</p>
+      <pre class="install-command" data-copy="/plugin install skill-creator@claude-code-plugins-plus" data-astro-cid-jrlgpo3w><code data-astro-cid-jrlgpo3w>/plugin install skill-creator@claude-code-plugins-plus</code></pre>
+      <p class="install-note" data-astro-cid-jrlgpo3w>Click to copy</p>
+    </section>
+
+    <!-- 7. Skill Content (Markdown) -->
+    <section class="skill-content-section" data-astro-cid-jrlgpo3w>
+      <h2 data-astro-cid-jrlgpo3w>Instructions</h2>
+      <div class="skill-content" data-astro-cid-jrlgpo3w>
+        <div data-astro-cid-jrlgpo3w><h1>Agent Creator</h1>
+<p>Creates spec-compliant agent .md files following the Anthropic 2026 16-field schema. Supports both creation of new agents and validation of existing ones.</p>
+<h2>Overview</h2>
+<p>Agent Creator fills the gap between ad-hoc agent files and production-grade agents that pass marketplace validation. It enforces the Anthropic agent schema (14 valid fields), prevents common mistakes (using <code>allowed-tools</code> instead of <code>disallowedTools</code>, adding invalid fields like <code>capabilities</code> or <code>expertise_level</code>), and produces agents with substantive body content that actually guides Claude&#39;s behavior.</p>
+<p>Key difference from skill-creator: <strong>agents support both <code>tools</code> (allowlist) AND <code>disallowedTools</code> (denylist)</strong>. Skills use <code>allowed-tools</code> (allowlist) and, since schema 3.7.0, an optional kebab-case <code>disallowed-tools</code> denylist — a parallel field, not a unification. Agents also support <code>effort</code>, <code>maxTurns</code>, <code>skills</code>, <code>memory</code>, <code>isolation</code>, <code>permissionMode</code>, <code>background</code>, <code>color</code>, and <code>initialPrompt</code> — fields that don&#39;t exist for skills. The agent body becomes the <strong>system prompt</strong> that drives the subagent — it does NOT receive the full Claude Code system prompt.</p>
+<p><strong>Field-naming warning:</strong> Agents use camelCase <code>disallowedTools:</code> (canonical sub-agents spec); skills use kebab-case <code>disallowed-tools:</code> (schema 3.7.0+). The validator rejects either mismatch — never copy-paste between agent and skill frontmatter without renaming.</p>
+<h2>Prerequisites</h2>
+<ul>
+<li>Claude Code CLI with agent support</li>
+<li>Target directory writable (<code>agents/</code> within a plugin or <code>~/.claude/agents/</code> for standalone)</li>
+<li>Familiarity with what the agent should specialize in</li>
+</ul>
+<h2>Instructions</h2>
+<h3>Mode Detection</h3>
+<p>Determine user intent from their prompt:</p>
+<ul>
+<li><strong>Create mode</strong>: &quot;create an agent&quot;, &quot;build a subagent&quot;, &quot;new agent&quot; -&gt; Step 1</li>
+<li><strong>Validate mode</strong>: &quot;validate agent&quot;, &quot;check agent&quot;, &quot;grade agent&quot; -&gt; Validation Workflow</li>
+</ul>
+<h3>Step 1: Understand Requirements</h3>
+<p>Ask the user with AskUserQuestion:</p>
+<p><strong>Agent Identity:</strong></p>
+<ul>
+<li>Name (kebab-case, 1-64 chars, e.g., <code>risk-assessor</code>, <code>clause-analyzer</code>)</li>
+<li>Specialty description (20-200 chars — shown in agent selection UI)</li>
+</ul>
+<p><strong>Execution Context:</strong></p>
+<ul>
+<li>Plugin agent (<code>plugins/*/agents/</code>) or standalone (<code>~/.claude/agents/</code>)?</li>
+<li>Will it be spawned by an orchestrator skill via <code>Task</code> tool?</li>
+<li>Does it need to preload specific skills? (<code>skills: [skill-name]</code>)</li>
+</ul>
+<p><strong>Behavioral Controls:</strong></p>
+<ul>
+<li>Model override? (<code>sonnet</code> for speed, <code>opus</code> for quality, <code>inherit</code> for default)</li>
+<li>Reasoning effort? (<code>low</code> for simple, <code>medium</code> default, <code>high</code> for complex analysis)</li>
+<li>Max iterations? (<code>maxTurns</code> — how many tool-use loops before stopping)</li>
+<li>Tools to deny? (<code>disallowedTools</code> — denylist approach, opposite of skills)</li>
+</ul>
+<p><strong>Plugin Restrictions (if plugin agent):</strong></p>
+<ul>
+<li><code>hooks</code> — NOT supported in plugin agents (use plugin-level hooks)</li>
+<li><code>mcpServers</code> — NOT supported in plugin agents</li>
+<li><code>permissionMode</code> — standalone only, NOT plugin agents</li>
+</ul>
+<h3>Step 2: Plan the Agent</h3>
+<p>Before writing, determine:</p>
+<p><strong>Agent Role Clarity:</strong> The agent body must make three things unambiguous:</p>
+<ol>
+<li><strong>What it IS responsible for</strong> — its specific domain/methodology</li>
+<li><strong>What it is NOT responsible for</strong> — boundaries with other agents</li>
+<li><strong>How it communicates results</strong> — output format and structure</li>
+</ol>
+<p><strong>Body Structure Pattern:</strong> All production agents should follow this body structure:</p>
+<table><thead><tr>
+<th>Section</th>
+<th>Purpose</th>
+<th>Required?</th>
+</tr></thead><tbody>
+<tr>
+<td><code># Title</code></td>
+<td>Agent name as heading</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>## Role</code></td>
+<td>2-3 sentence domain description with boundaries</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>## Inputs</code></td>
+<td>Parameters the agent receives when spawned</td>
+<td>Yes (if spawned by orchestrator)</td>
+</tr>
+<tr>
+<td><code>## Process</code></td>
+<td>Step-by-step methodology (numbered steps with ### headings)</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>## Output Format</code></td>
+<td>Structured output spec (JSON, markdown, or table)</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>## Guidelines</code></td>
+<td>Do/don&#39;t behavioral rules</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>## When Activated</code></td>
+<td>Trigger conditions (when spawned or auto-detected)</td>
+<td>Recommended</td>
+</tr>
+<tr>
+<td><code>## Communication Style</code></td>
+<td>Tone and formatting preferences</td>
+<td>Recommended</td>
+</tr>
+<tr>
+<td><code>## Success Criteria</code></td>
+<td>What good vs poor output looks like</td>
+<td>Recommended</td>
+</tr>
+<tr>
+<td><code>## Examples</code></td>
+<td>Concrete interaction examples</td>
+<td>For complex agents</td>
+</tr>
+</tbody></table>
+<p><strong>Output Structure Decision:</strong></p>
+<ul>
+<li>If the agent feeds into an orchestrator: use <strong>JSON output</strong> (machine-parseable)</li>
+<li>If the agent is user-facing: use <strong>markdown output</strong> (human-readable)</li>
+<li>If the agent produces both: JSON primary with markdown summary</li>
+</ul>
+<h3>Step 3: Write the Agent File</h3>
+<p>Generate the agent .md using the template from <code>${CLAUDE_SKILL_DIR}/../skill-creator/templates/agent-template.md</code>.</p>
+<p><strong>Frontmatter Rules (Anthropic 16-field schema):</strong></p>
+<p>See <a href="references/anthropic-agent-spec.md">Anthropic Agent Spec</a> for the full official reference.</p>
+<p>Required fields:</p>
+<pre data-lang="yaml"><code>
+name: {agent-name}         # Lowercase letters and hyphens, unique identifier
+description: &quot;{specialty}&quot;  # When Claude should delegate to this subagent
+</code></pre>
+<p>Optional fields (include only what&#39;s needed):</p>
+<pre data-lang="yaml"><code>
+tools: &quot;Read, Glob, Grep&quot;  # Allowlist — inherits all tools if omitted
+disallowedTools: &quot;Write&quot;   # Denylist — removed from inherited/specified list
+model: sonnet              # sonnet|haiku|opus|inherit|full model ID
+effort: medium             # low|medium|high|max (max = Opus 4.6 only)
+maxTurns: 15               # Max agentic turns before stopping
+skills: [skill-name]       # Skills to inject at startup (full content loaded)
+memory: project            # user|project|local — persistent cross-session
+background: false          # Always run as background task
+isolation: worktree        # Run in temporary git worktree
+color: blue                # Display: red|blue|green|yellow|purple|orange|pink|cyan
+initialPrompt: &quot;...&quot;       # Auto-submitted first turn (--agent mode only)
+permissionMode: default    # Standalone only, NOT plugin agents
+hooks: {}                  # Standalone only, NOT plugin agents
+mcpServers: {}             # Standalone only, NOT plugin agents
+</code></pre>
+<p><strong>Tool access:</strong></p>
+<ul>
+<li><code>tools</code> = allowlist (like skills&#39; <code>allowed-tools</code>)</li>
+<li><code>disallowedTools</code> = denylist (remove specific tools)</li>
+<li>If both set: disallowed applied first, then tools resolved</li>
+<li>If neither set: inherits all tools from parent conversation</li>
+<li>Naming: always emit camelCase <code>disallowedTools</code> on agents. Skills spell their denylist kebab-case (<code>disallowed-tools</code>, schema 3.7.0+) — the validator rejects camelCase on skills and kebab-case on agents, so never copy-paste between the two without renaming</li>
+</ul>
+<p><strong>Invalid fields (ERROR — never use these):</strong></p>
+<ul>
+<li><code>capabilities</code> — looks valid but flagged by validator</li>
+<li><code>expertise_level</code> — invented, not in Anthropic spec</li>
+<li><code>activation_priority</code> — invented, not in Anthropic spec</li>
+<li><code>activation_triggers</code>, <code>type</code>, <code>category</code> — not in spec</li>
+<li><code>allowed-tools</code> — that&#39;s the skill-only syntax; agents use <code>tools</code> or <code>disallowedTools</code></li>
+<li><code>disallowed-tools</code> (kebab-case) — skill-only spelling (schema 3.7.0+); agents use camelCase <code>disallowedTools</code></li>
+</ul>
+<p><strong>Body Content Guidelines:</strong></p>
+<ol>
+<li><strong>Role section must set boundaries.</strong> Don&#39;t just say what the agent does — say what it does NOT do. Example: &quot;You analyze contract clauses for risk. You do NOT provide legal advice or make recommendations — that is the recommendations agent&#39;s responsibility.&quot;</li>
+</ol>
+<ol>
+<li><strong>Process steps must be concrete.</strong> Each step should tell Claude exactly what to do, not vaguely gesture at an activity. Bad: &quot;Analyze the document.&quot; Good: &quot;Read the full contract. For each clause, extract: (a) the exact text, (b) the clause category from the taxonomy below, (c) a plain English summary in one sentence.&quot;</li>
+</ol>
+<ol>
+<li><strong>Output format must be machine-parseable if feeding an orchestrator.</strong> Use JSON with a concrete schema example. Include field descriptions so Claude knows what each field means.</li>
+</ol>
+<ol>
+<li><strong>Guidelines should include both DO and DON&#39;T rules.</strong> Example:</li>
+</ol>
+<ul>
+<li>DO: &quot;Be specific — quote exact clause text, don&#39;t paraphrase&quot;</li>
+<li>DON&#39;T: &quot;Don&#39;t make legal recommendations — only identify and score risks&quot;</li>
+</ul>
+<ol>
+<li><strong>Keep under 300 lines</strong> (agent body limit — prevents context bloat in subagent window). If the agent needs extensive reference material, create a companion skill with <code>references/</code> directory and preload it via the <code>skills</code> field.</li>
+</ol>
+<h3>Step 4: Validate the Agent</h3>
+<p>Run validation against the Anthropic 16-field schema:</p>
+<p><strong>Manual checklist:</strong></p>
+<table><thead><tr>
+<th>Check</th>
+<th>Rule</th>
+</tr></thead><tbody>
+<tr>
+<td><code>name</code> present</td>
+<td>1-64 chars, kebab-case</td>
+</tr>
+<tr>
+<td><code>description</code> present</td>
+<td>20-200 chars</td>
+</tr>
+<tr>
+<td>No invalid fields</td>
+<td>None of: capabilities, expertise_level, activation_priority, type, category</td>
+</tr>
+<tr>
+<td>No skill-only fields</td>
+<td>No <code>allowed-tools</code>, no kebab-case <code>disallowed-tools</code> (agents use <code>tools</code> / camelCase <code>disallowedTools</code>)</td>
+</tr>
+<tr>
+<td>Plugin restrictions</td>
+<td>No hooks/mcpServers/permissionMode if plugin agent</td>
+</tr>
+<tr>
+<td>Body has Role section</td>
+<td>Clear domain + boundaries</td>
+</tr>
+<tr>
+<td>Body has Process section</td>
+<td>Numbered steps</td>
+</tr>
+<tr>
+<td>Body has Output Format</td>
+<td>Concrete schema example</td>
+</tr>
+<tr>
+<td>Body has Guidelines</td>
+<td>Do/don&#39;t rules</td>
+</tr>
+<tr>
+<td>Body under 300 lines</td>
+<td>Offload to references if longer (prevents context bloat)</td>
+</tr>
+</tbody></table>
+<p><strong>Automated validation:</strong></p>
+<pre data-lang="bash"><code>
+python3 ${CLAUDE_SKILL_DIR}/../skill-creator/scripts/validate-skill.py --agents-only {plugin-dir}/
+</code></pre>
+<h3>Step 5: Test the Agent</h3>
+<p>Test the agent by spawning it via the <code>Task</code> tool or the <code>Agent</code> tool:</p>
+<ol>
+<li>Write a test prompt that exercises the agent&#39;s core capability</li>
+<li>Spawn the agent with that prompt</li>
+<li>Check: Does the output match the declared Output Format?</li>
+<li>Check: Does the agent stay within its declared Role boundaries?</li>
+<li>Check: Does it follow the Process steps?</li>
+<li>Iterate on the body content if the agent strays</li>
+</ol>
+<h3>Step 6: Report</h3>
+<p>Provide a summary:</p>
+<ul>
+<li>Agent name and file path</li>
+<li>Frontmatter field count (of 14 possible)</li>
+<li>Body line count</li>
+<li>Sections present</li>
+<li>Validation result (pass/fail with specific issues)</li>
+<li>Test result summary</li>
+</ul>
+<h2>Validation Workflow</h2>
+<p>When the user wants to validate an existing agent:</p>
+<ol>
+<li>Locate the agent .md file</li>
+<li>Parse YAML frontmatter</li>
+<li>Check against the 16-field Anthropic schema:</li>
+</ol>
+<ul>
+<li><code>name</code> present and valid (1-64 chars, kebab-case)?</li>
+<li><code>description</code> present and valid (20-200 chars)?</li>
+<li>Any invalid fields? (capabilities, expertise_level, activation_priority, etc.)</li>
+<li>Any skill-only fields? (<code>allowed-tools</code>, kebab-case <code>disallowed-tools</code>)</li>
+<li>Plugin restrictions respected?</li>
+</ul>
+<ol>
+<li>Check body content:</li>
+</ol>
+<ul>
+<li>Has <code>## Role</code> section?</li>
+<li>Has <code>## Process</code> section with numbered steps?</li>
+<li>Has <code>## Output Format</code> with concrete example?</li>
+<li>Has <code>## Guidelines</code>?</li>
+<li>Under 300 lines? (agent body limit)</li>
+</ul>
+<ol>
+<li>Report findings with severity (ERROR/WARNING/INFO)</li>
+<li>Suggest specific fixes for each issue</li>
+</ol>
+<h2>Output</h2>
+<ul>
+<li><strong>Create mode</strong>: A complete agent .md file with valid frontmatter and substantive body, plus a creation report with validation status.</li>
+<li><strong>Validate mode</strong>: A compliance report listing errors, warnings, and info items with specific fix recommendations for each.</li>
+</ul>
+<h2>Examples</h2>
+<h3>Subagent for Orchestrator Skill</h3>
+<p><strong>Input:</strong> &quot;Create a risk assessment agent that scores contract clauses&quot;</p>
+<p><strong>Output:</strong> <code>agents/risk-assessor.md</code> with frontmatter:</p>
+<pre data-lang="yaml"><code>
+name: risk-assessor
+description: &quot;Score contract clauses for legal and financial risk on a 1-10 scale&quot;
+model: sonnet
+effort: high
+maxTurns: 10
+</code></pre>
+<p>Body sections: Role (risk scoring specialist, does NOT make recommendations), Inputs (contract_text, contract_type, output_path), Process (4 steps: read, categorize, score, aggregate), Output Format (JSON with clause scores and risk matrix), Guidelines (be specific, cite clause text, use 4-factor scoring methodology).</p>
+<h3>Standalone User-Facing Agent</h3>
+<p><strong>Input:</strong> &quot;Create a code review agent&quot;</p>
+<p><strong>Output:</strong> <code>~/.claude/agents/code-reviewer.md</code> with frontmatter:</p>
+<pre data-lang="yaml"><code>
+name: code-reviewer
+description: &quot;Review code for bugs, performance issues, and security vulnerabilities&quot;
+effort: high
+</code></pre>
+<p>Body sections: Role (code quality specialist), Process (read code, check patterns, identify issues, suggest fixes), Output Format (markdown with severity-rated findings), Guidelines (cite line numbers, explain why not just what), Communication Style (direct, educational, actionable).</p>
+<h2>Error Handling</h2>
+<table><thead><tr>
+<th>Error</th>
+<th>Cause</th>
+<th>Resolution</th>
+</tr></thead><tbody>
+<tr>
+<td><code>allowed-tools</code> in agent</td>
+<td>Used skill-only field</td>
+<td>Replace with <code>tools</code> (allowlist) or <code>disallowedTools</code> (denylist), or remove</td>
+</tr>
+<tr>
+<td><code>disallowed-tools</code> (kebab-case) in agent</td>
+<td>Copy-pasted from skill frontmatter</td>
+<td>Rename to camelCase <code>disallowedTools</code> — the validator rejects the kebab-case spelling on agents</td>
+</tr>
+<tr>
+<td><code>capabilities</code> field</td>
+<td>Common mistake — looks valid but isn&#39;t in Anthropic spec</td>
+<td>Remove field entirely</td>
+</tr>
+<tr>
+<td><code>expertise_level</code> field</td>
+<td>Invented field from community templates</td>
+<td>Remove — express expertise in body content</td>
+</tr>
+<tr>
+<td>Description &gt; 200 chars</td>
+<td>Exceeds Anthropic limit</td>
+<td>Shorten to 20-200 char range</td>
+</tr>
+<tr>
+<td>Description &lt; 20 chars</td>
+<td>Below minimum</td>
+<td>Expand to describe agent&#39;s specific specialty</td>
+</tr>
+<tr>
+<td><code>permissionMode</code> in plugin agent</td>
+<td>Standalone-only field used in plugin context</td>
+<td>Remove — only valid in <code>~/.claude/agents/</code></td>
+</tr>
+<tr>
+<td><code>hooks</code> in plugin agent</td>
+<td>Plugin agents can&#39;t have hooks</td>
+<td>Move to plugin-level <code>hooks/hooks.json</code></td>
+</tr>
+<tr>
+<td>Body has no Process section</td>
+<td>Agent lacks step-by-step methodology</td>
+<td>Add numbered steps under <code>## Process</code></td>
+</tr>
+<tr>
+<td>Body over 300 lines</td>
+<td>Too long for agent context</td>
+<td>Extract reference material to companion skill</td>
+</tr>
+</tbody></table>
+<h2>Resources</h2>
+<ul>
+<li><a href="references/anthropic-agent-spec.md">Anthropic Agent Spec</a> — Official 16-field schema from code.claude.com/docs/en/sub-agents</li>
+<li>Agent template — Skeleton with placeholders</li>
+<li>Frontmatter spec — Field reference (internal)</li>
+<li>Source of truth — Canonical spec</li>
+<li>Validation rules — Agent validation section</li>
+</ul></div>
+      </div>
+    </section>
+
+    <!-- 8. Bottom CTA -->
+    <section class="detail-cta" data-astro-cid-qcigfm7x>
+  <h2 class="detail-cta__headline" data-astro-cid-qcigfm7x>Ready to use skill-creator?</h2>
+  <div class="detail-cta__actions" data-astro-cid-qcigfm7x>
+    <button class="detail-cta__primary" data-copy-install="/plugin install skill-creator@claude-code-plugins-plus" data-astro-cid-qcigfm7x>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" data-astro-cid-qcigfm7x>
+        <rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" stroke-width="1.5" data-astro-cid-qcigfm7x></rect>
+        <path d="M3 11V3a1 1 0 011-1h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" data-astro-cid-qcigfm7x></path>
+      </svg>
+      <span class="detail-cta__btn-text" data-astro-cid-qcigfm7x>Copy Install Command</span>
+    </button>
+    
+  </div>
+</section>
+
+<script type="module">document.querySelectorAll("[data-copy-install]").forEach(t=>{t.addEventListener("click",async()=>{const a=t.dataset.copyInstall||"";await navigator.clipboard.writeText(a);const e=t.querySelector(".detail-cta__btn-text");if(e){const o=e.textContent;e.textContent="Copied!",t.classList.add("copied"),window.trackEvent&&window.trackEvent("install_copied",{plugin_name:a.split(" ").pop()||"",source:"detail_cta"}),setTimeout(()=>{e.textContent=o,t.classList.remove("copied")},2e3)}})});</script>
+
+    <!-- 9. Related Skills (6, with tool pills) -->
+    <section class="related-skills-section" data-astro-cid-jrlgpo3w>
+        <h2 class="related-skills-heading" data-astro-cid-jrlgpo3w>Related Skills</h2>
+        <div class="related-skills-grid" data-astro-cid-jrlgpo3w>
+          <a href="/skills/abridge-ci-integration/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-ci-integration</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Configure CI/CD pipeline for Abridge clinical AI integrations with GitHub Actions.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-common-errors/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-common-errors</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Diagnose and fix common Abridge clinical AI integration errors.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-a/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-a</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge ambient clinical documentation capture-to-note pipeline.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-b/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-b</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge patient-facing documentation and after-visit summary generation.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-cost-tuning/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-cost-tuning</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Optimize Abridge clinical AI costs through tier selection, session management, and usage monitoring for healthcare organizations.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-debug-bundle/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-debug-bundle</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Collect Abridge debug evidence for support tickets and troubleshooting.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a>
+        </div>
+      </section>
+
+  </div>
+
+  
+  <script>
+    document.querySelectorAll('.install-command').forEach(el => {
+      el.addEventListener('click', function() {
+        const text = this.dataset.copy || this.textContent;
+        navigator.clipboard.writeText(text).then(() => {
+          const originalText = this.textContent;
+          this.textContent = 'Copied to clipboard!';
+          this.style.color = 'var(--brand-green)';
+          setTimeout(() => {
+            this.textContent = originalText;
+            this.style.color = '';
+          }, 2000);
+        });
+      });
+    });
+  </script>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

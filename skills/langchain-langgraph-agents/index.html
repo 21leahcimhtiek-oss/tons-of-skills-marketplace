@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>langchain-langgraph-agents - Agent Skill</title>
+    <meta name="description" content="Build a correct LangGraph 1.0 ReAct agent with create_react_agent — typed tools, error propagation, recursion caps, and stop conditions that actually stop. Use when writing a first tool-calling agent, migrating from AgentExecutor or initialize_agent, or diagnosing an agent that loops on vague prompts. Trigger with &quot;langgraph agent&quot;, &quot;create_react_agent&quot;, &quot;langgraph tool calling&quot;, &quot;AgentExecutor migration&quot;, or &quot;agent loop cost&quot;.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://tonsofskills.com/tons-of-skills-marketplace/skills/langchain-langgraph-agents/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/langchain-langgraph-agents/">
+    <meta property="og:title" content="langchain-langgraph-agents - Agent Skill">
+    <meta property="og:description" content="Build a correct LangGraph 1.0 ReAct agent with create_react_agent — typed tools, error propagation, recursion caps, and stop conditions that actually stop. Use when writing a first tool-calling agent, migrating from AgentExecutor or initialize_agent, or diagnosing an agent that loops on vague prompts. Trigger with &quot;langgraph agent&quot;, &quot;create_react_agent&quot;, &quot;langgraph tool calling&quot;, &quot;AgentExecutor migration&quot;, or &quot;agent loop cost&quot;.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="langchain-langgraph-agents - Agent Skill">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/langchain-langgraph-agents/">
+    <meta name="twitter:title" content="langchain-langgraph-agents - Agent Skill">
+    <meta name="twitter:description" content="Build a correct LangGraph 1.0 ReAct agent with create_react_agent — typed tools, error propagation, recursion caps, and stop conditions that actually stop. Use when writing a first tool-calling agent, migrating from AgentExecutor or initialize_agent, or diagnosing an agent that loops on vague prompts. Trigger with &quot;langgraph agent&quot;, &quot;create_react_agent&quot;, &quot;langgraph tool calling&quot;, &quot;AgentExecutor migration&quot;, or &quot;agent loop cost&quot;.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"langchain-langgraph-agents","description":"Build a correct LangGraph 1.0 ReAct agent with create_react_agent — typed tools, error propagation, recursion caps, and stop conditions that actually stop. Use when writing a first tool-calling agent, migrating from AgentExecutor or initialize_agent, or diagnosing an agent that loops on vague prompts. Trigger with \"langgraph agent\", \"create_react_agent\", \"langgraph tool calling\", \"AgentExecutor migration\", or \"agent loop cost\".","version":"2.5.0","author":{"@type":"Person","name":"Jeremy Longshore"},"license":"MIT","programmingLanguage":"Claude Code Agent Skill","isPartOf":{"@type":"SoftwareApplication","name":"langchain-py-pack","applicationCategory":"unknown"}}</script>
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.breadcrumbs[data-astro-cid-ilhxcym7]{margin-bottom:var(--space-5)}.breadcrumbs__list[data-astro-cid-ilhxcym7]{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;list-style:none;padding:0;margin:0;font-family:var(--font-mono);font-size:var(--text-sm, .8rem)}.breadcrumbs__item[data-astro-cid-ilhxcym7]{display:flex;align-items:center;gap:.375rem}.breadcrumbs__link[data-astro-cid-ilhxcym7]{color:var(--text-3);text-decoration:none;transition:color var(--duration-fast, .2s) var(--ease-out)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:hover{color:var(--primary)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:0}.breadcrumbs__sep[data-astro-cid-ilhxcym7]{color:var(--text-3);user-select:none;font-size:.7em;line-height:1}.breadcrumbs__current[data-astro-cid-ilhxcym7]{color:var(--text-2)}.detail-cta[data-astro-cid-qcigfm7x]{background:var(--surface-3, var(--brand-light-gray));border-top:1px solid var(--border, var(--brand-light-gray));border-radius:var(--radius-lg);padding:2rem 1.5rem;margin-top:2rem;text-align:center}.detail-cta__headline[data-astro-cid-qcigfm7x]{font-family:var(--font-display);font-weight:700;font-size:1.35rem;color:var(--text, var(--brand-dark));margin-bottom:1.25rem}.detail-cta__actions[data-astro-cid-qcigfm7x]{display:flex;justify-content:center;gap:.75rem;flex-wrap:wrap}.detail-cta__primary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:var(--primary);color:#0a0a0c;border:none;border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;cursor:pointer;transition:background var(--duration-fast) var(--ease-out),transform var(--duration-fast) var(--ease-out)}.detail-cta__primary[data-astro-cid-qcigfm7x]:hover{background:var(--primary-dark, var(--primary-dark));transform:translateY(-1px)}.detail-cta__primary[data-astro-cid-qcigfm7x].copied{background:var(--positive, var(--brand-green))}.detail-cta__secondary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:transparent;color:var(--text, var(--brand-dark));border:1px solid var(--border, var(--brand-mid-gray));border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;text-decoration:none;transition:border-color var(--duration-fast) var(--ease-out),color var(--duration-fast) var(--ease-out)}.detail-cta__secondary[data-astro-cid-qcigfm7x]:hover{border-color:var(--primary);color:var(--primary)}@media(max-width:480px){.detail-cta__actions[data-astro-cid-qcigfm7x]{flex-direction:column;align-items:stretch}.detail-cta__primary[data-astro-cid-qcigfm7x],.detail-cta__secondary[data-astro-cid-qcigfm7x]{justify-content:center}}
+</style>
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/_slug_@_@astro.wF9emvVq.css"></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  
+  
+
+  <div class="skill-detail" data-astro-cid-jrlgpo3w>
+    <!-- 1. Breadcrumbs -->
+    <nav aria-label="Breadcrumb" class="breadcrumbs" data-astro-cid-ilhxcym7>
+  <ol class="breadcrumbs__list" itemscope itemtype="https://schema.org/BreadcrumbList" data-astro-cid-ilhxcym7>
+    <li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Home</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="1">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/skills/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Skills</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="2">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          <span class="breadcrumbs__current" aria-current="page" itemprop="name" data-astro-cid-ilhxcym7>
+              langchain-langgraph-agents
+            </span>
+          <meta itemprop="position" content="3">
+        </li>
+  </ol>
+</nav>
+
+    <!-- 2. Header (enhanced) -->
+    <header class="skill-header" data-astro-cid-jrlgpo3w>
+      <h1 data-astro-cid-jrlgpo3w>langchain-langgraph-agents</h1>
+      <p class="skill-description" data-astro-cid-jrlgpo3w>Build a correct LangGraph 1.0 ReAct agent with create_react_agent — typed tools, error propagation, recursion caps, and stop conditions that actually stop. Use when writing a first tool-calling agent, migrating from AgentExecutor or initialize_agent, or diagnosing an agent that loops on vague prompts. Trigger with &quot;langgraph agent&quot;, &quot;create_react_agent&quot;, &quot;langgraph tool calling&quot;, &quot;AgentExecutor migration&quot;, or &quot;agent loop cost&quot;.</p>
+
+      <div class="skill-metadata" data-astro-cid-jrlgpo3w>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>v2.5.0</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>Jeremy Longshore</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>MIT</span>
+        </div>
+      </div>
+
+      
+    </header>
+
+    <!-- 4. Allowed Tools -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Allowed Tools</h2>
+      <div class="tools-grid" data-astro-cid-jrlgpo3w>
+        <span class="tool-badge" data-astro-cid-jrlgpo3w>Read</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Write</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Edit</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(python:*)</span>
+      </div>
+      
+    </section>
+
+    <!-- 5. Provided by Plugin -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Provided by Plugin</h2>
+      <div class="plugin-info" data-astro-cid-jrlgpo3w>
+        <div class="plugin-details" data-astro-cid-jrlgpo3w>
+          <h3 data-astro-cid-jrlgpo3w>
+            <a href="/plugins/langchain-py-pack/" data-astro-cid-jrlgpo3w>langchain-py-pack</a>
+          </h3>
+          <p data-astro-cid-jrlgpo3w>Claude Code skill pack for LangChain 1.0 + LangGraph 1.0 (Python) - 34 skills covering chains, agents, RAG, middleware, checkpointing, HITL, streaming, and production patterns</p>
+          <div class="plugin-meta" data-astro-cid-jrlgpo3w>
+            <span data-astro-cid-jrlgpo3w>unknown</span>
+            <span data-astro-cid-jrlgpo3w>v2.5.0</span>
+          </div>
+        </div>
+        <a href="/plugins/langchain-py-pack/" class="btn-primary" data-astro-cid-jrlgpo3w>View Plugin</a>
+      </div>
+    </section>
+
+    <!-- 6. Installation -->
+    <section class="section-box dark" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Installation</h2>
+      <p class="install-note" style="color: var(--brand-light-gray); margin-bottom: 0.75rem;" data-astro-cid-jrlgpo3w>This skill is included in the langchain-py-pack plugin:</p>
+      <pre class="install-command" data-copy="/plugin install langchain-py-pack@claude-code-plugins-plus" data-astro-cid-jrlgpo3w><code data-astro-cid-jrlgpo3w>/plugin install langchain-py-pack@claude-code-plugins-plus</code></pre>
+      <p class="install-note" data-astro-cid-jrlgpo3w>Click to copy</p>
+    </section>
+
+    <!-- 7. Skill Content (Markdown) -->
+    <section class="skill-content-section" data-astro-cid-jrlgpo3w>
+      <h2 data-astro-cid-jrlgpo3w>Instructions</h2>
+      <div class="skill-content" data-astro-cid-jrlgpo3w>
+        <div data-astro-cid-jrlgpo3w><h1>LangChain LangGraph Agents (Python)</h1>
+<h2>Overview</h2>
+<p>Two failure modes hit every team writing their first LangGraph 1.0 ReAct agent:</p>
+<p><strong>Loop-to-cap on vague prompts (P10).</strong> <code>create_react_agent</code> defaults to <code>recursion_limit=25</code>. A prompt like &quot;help me with my account&quot; never converges — the model calls a retrieval tool, gets irrelevant results, calls another tool, and repeats until <code>GraphRecursionError: Recursion limit of 25 reached without hitting a stop condition</code> fires. Cost dashboards show the damage <em>after</em> the fact: $5-$15 per runaway loop on Sonnet with a 3-tool agent, assuming no tool is itself expensive.</p>
+<p><strong>Silent tool errors on legacy <code>AgentExecutor</code> (P09).</strong> The legacy executor defaults <code>handle_parsing_errors=True</code> and catches tool exceptions, feeding the error string back as the next observation. When the error serializes to empty (e.g., a <code>ValueError(&quot;&quot;)</code> or an HTTP 500 with no body), the loop continues with no signal. The agent says &quot;I couldn&#39;t find the answer&quot; — which was actually a silent crash three tool calls ago.</p>
+<p>This skill walks through defining typed tools with <code>@tool</code> + Pydantic; building an agent with <code>create_react_agent(model, tools, checkpointer=MemorySaver())</code>; invoking with <code>{&quot;messages&quot;: [...]}</code> and a thread-scoped config; setting <code>recursion_limit</code> per expected agent depth (5-10 interactive, 20-30 planner); adding middleware for a per-session token budget; and raise-by-default error propagation. Pin: <code>langgraph &gt;= 1.0, &lt; 2.0</code>, <code>langchain-core &gt;= 1.0, &lt; 2.0</code>. Pain-catalog anchors: P09, P10, P11, P32, P41, P42, P63.</p>
+<h2>Prerequisites</h2>
+<ul>
+<li>Python 3.10+</li>
+<li><code>langgraph &gt;= 1.0, &lt; 2.0</code> and <code>langchain-core &gt;= 1.0, &lt; 2.0</code></li>
+<li>At least one provider package: <code>pip install langchain-anthropic</code> or <code>langchain-openai</code></li>
+<li>Completed skill: <code>langchain-langgraph-basics</code> (L25) — you already know <code>StateGraph</code>, <code>MessagesState</code>, and checkpointers</li>
+<li>Provider API key: <code>ANTHROPIC_API_KEY</code> or <code>OPENAI_API_KEY</code></li>
+</ul>
+<h2>Instructions</h2>
+<h3>Step 1 — Define tools with typed schemas and short docstrings</h3>
+<pre data-lang="python"><code>
+from typing import Annotated
+from pydantic import BaseModel, Field
+from langchain_core.tools import tool
+
+class LookupAccountArgs(BaseModel):
+    account_id: str = Field(..., description=&quot;Account UUID. No email addresses.&quot;)
+
+@tool(&quot;lookup_account&quot;, args_schema=LookupAccountArgs)
+def lookup_account(account_id: str) -&gt; dict:
+    &quot;&quot;&quot;Fetch an account record by UUID. Returns status, plan, and owner email.&quot;&quot;&quot;
+    if not account_id:
+        raise ValueError(&quot;account_id is required&quot;)  # raised → agent sees real error
+    return {&quot;id&quot;: account_id, &quot;status&quot;: &quot;active&quot;, &quot;plan&quot;: &quot;pro&quot;, &quot;owner&quot;: &quot;a@b.co&quot;}
+</code></pre>
+<p>Two rules that catch teams off-guard:</p>
+<ol>
+<li><strong>Docstring is the tool description the provider sees.</strong> Keep it under <strong>1024 chars</strong> (P11). Anthropic truncates at ~1024; OpenAI&#39;s effective cap is softer but still bites on tool descriptions over ~2KB. Long docstrings with examples should move into a system prompt, not the tool description.</li>
+<li><strong>Raise real exceptions.</strong> Unlike the legacy <code>AgentExecutor</code>, LangGraph&#39;s <code>create_react_agent</code> does not silently swallow tool errors — the exception propagates and surfaces in your observability layer. See Step 6.</li>
+</ol>
+<p>For async tools, use <code>@tool</code> on an <code>async def</code> — LangGraph invokes it via <code>await</code>. For structured return types, annotate the return with a Pydantic model.</p>
+<p>See <a href="references/tool-definition-patterns.md">Tool Definition Patterns</a> for the <code>@tool</code> vs <code>tool()</code> decision, async tools, and the <code>args_schema</code> vs auto-inferred trade-off.</p>
+<h3>Step 2 — Build the agent with <code>create_react_agent</code></h3>
+<pre data-lang="python"><code>
+from langgraph.prebuilt import create_react_agent
+from langgraph.checkpoint.memory import MemorySaver
+from langchain_anthropic import ChatAnthropic
+
+model = ChatAnthropic(
+    model=&quot;claude-sonnet-4-6&quot;,
+    temperature=0,
+    timeout=30,
+    max_retries=2,
+)
+
+agent = create_react_agent(
+    model=model,
+    tools=[lookup_account],
+    checkpointer=MemorySaver(),  # required for stateful invocations
+)
+</code></pre>
+<p><code>create_react_agent</code> is the LangGraph 1.0 replacement for the removed <code>initialize_agent</code> factory (P41). Under the hood it builds a <code>StateGraph</code> with a <code>model</code> node and a <code>ToolNode</code>, plus a conditional edge that routes to <code>END</code> when the model emits no tool calls. The <code>checkpointer</code> persists state per-thread — required for multi-turn conversations and for resuming after interruption.</p>
+<h3>Step 3 — Invoke with a thread-scoped config</h3>
+<pre data-lang="python"><code>
+config = {&quot;configurable&quot;: {&quot;thread_id&quot;: &quot;user-42&quot;}}
+result = agent.invoke(
+    {&quot;messages&quot;: [{&quot;role&quot;: &quot;user&quot;, &quot;content&quot;: &quot;look up account uuid-abc&quot;}]},
+    config=config,
+)
+print(result[&quot;messages&quot;][-1].content)
+</code></pre>
+<p>Key contracts:</p>
+<ul>
+<li><strong>Input</strong> is <code>{&quot;messages&quot;: [...]}</code> — a list of message dicts or LangChain <code>HumanMessage</code> / <code>SystemMessage</code> objects. You append to this list across turns.</li>
+<li><strong><code>thread_id</code></strong> scopes the checkpointer. Reusing it resumes the conversation.</li>
+<li><strong>Output</strong> is the full updated state. <code>result[&quot;messages&quot;]</code> is the complete message list; the final assistant message is at index <code>-1</code>.</li>
+</ul>
+<h3>Step 4 — Set <code>recursion_limit</code> to your expected agent depth</h3>
+<p><code>create_react_agent</code> defaults to <code>recursion_limit=25</code>. In LangGraph one &quot;recursion step&quot; is one node visit, and each tool round-trip is two visits (model node + tool node), so 25 means ~12 tool calls. For most workloads this is too generous and hides bugs:</p>
+<table><thead><tr>
+<th>Agent kind</th>
+<th>Suggested <code>recursion_limit</code></th>
+<th>Rationale</th>
+</tr></thead><tbody>
+<tr>
+<td>Interactive chat with 1-3 tools</td>
+<td>5-10</td>
+<td>One tool call + one final answer is 3 visits. Cap low to expose loops.</td>
+</tr>
+<tr>
+<td>Task-completion (e.g., booking flow)</td>
+<td>10-15</td>
+<td>3-5 tool calls + final answer.</td>
+</tr>
+<tr>
+<td>Planner / research agent</td>
+<td>20-30</td>
+<td>Expect multiple retrieval + synthesis rounds.</td>
+</tr>
+<tr>
+<td>Multi-agent supervisor</td>
+<td>40+</td>
+<td>Coordinator + worker rounds. Budget tokens separately.</td>
+</tr>
+</tbody></table>
+<p>Apply it on invocation, not at construction time:</p>
+<pre data-lang="python"><code>
+result = agent.invoke(
+    {&quot;messages&quot;: [...]},
+    config={&quot;configurable&quot;: {&quot;thread_id&quot;: &quot;user-42&quot;}, &quot;recursion_limit&quot;: 10},
+)
+</code></pre>
+<p>When the limit fires, LangGraph raises <code>GraphRecursionError</code> — catch it and surface a user-facing message; do not retry without a cost guard.</p>
+<h3>Step 5 — Add a per-session token budget via middleware</h3>
+<p><code>recursion_limit</code> alone does not bound cost. A single tool call that returns a large document and triggers a long model response can cost more than 10 cheap tool calls. Cap tokens explicitly:</p>
+<pre data-lang="python"><code>
+from langchain_core.callbacks import BaseCallbackHandler
+
+class TokenBudget(BaseCallbackHandler):
+    def __init__(self, max_tokens: int = 50_000):
+        self.used = 0
+        self.max = max_tokens
+
+    def on_llm_end(self, response, **kwargs):
+        usage = getattr(response, &quot;llm_output&quot;, {}).get(&quot;token_usage&quot;, {}) or {}
+        self.used += usage.get(&quot;total_tokens&quot;, 0)
+        if self.used &gt; self.max:
+            raise RuntimeError(f&quot;Token budget exceeded: {self.used}/{self.max}&quot;)
+
+budget = TokenBudget(max_tokens=50_000)
+result = agent.invoke(
+    {&quot;messages&quot;: [...]},
+    config={
+        &quot;configurable&quot;: {&quot;thread_id&quot;: &quot;user-42&quot;},
+        &quot;recursion_limit&quot;: 10,
+        &quot;callbacks&quot;: [budget],
+    },
+)
+</code></pre>
+<p>A per-session budget of 50K tokens on Sonnet is roughly $0.25 — a safe cap for interactive agents. For background planners raise to 200K-500K. See <a href="references/loop-caps-and-budgets.md">Loop Caps and Budgets</a> for a repeated-tool-call early-stop node and a middleware pattern that terminates on the N-th identical call.</p>
+<h3>Step 6 — Propagate tool errors; do not silently swallow</h3>
+<p>LangGraph&#39;s default is to raise. Legacy <code>AgentExecutor(handle_parsing_errors=True)</code> swallowed everything. The new defaults are safer but different:</p>
+<pre data-lang="python"><code>
+# Tool raises → the exception propagates out of agent.invoke()
+try:
+    result = agent.invoke({&quot;messages&quot;: [{&quot;role&quot;: &quot;user&quot;, &quot;content&quot;: &quot;...&quot;}]}, config=config)
+except ValueError as e:
+    # Your tool&#39;s own ValueError — log + user-facing message
+    ...
+</code></pre>
+<p>When you <em>want</em> tolerant behavior (e.g., the tool is a flaky third-party API and you want the model to try a different approach), wrap the tool itself:</p>
+<pre data-lang="python"><code>
+from langchain_core.tools import tool
+
+@tool
+def search_kb(query: str) -&gt; str:
+    &quot;&quot;&quot;Search the internal knowledge base. Returns hits or a &#39;no results&#39; string.&quot;&quot;&quot;
+    try:
+        return _real_search(query)
+    except HTTPError as e:
+        return f&quot;search_kb unavailable: {e.response.status_code}. Try a different query.&quot;
+</code></pre>
+<p>The key insight: the <em>tool</em> decides to degrade gracefully by returning a string the model can reason about. The <em>agent</em> never silently drops an error. See <a href="references/error-propagation.md">Error Propagation</a> for a custom error-handler node that routes tool failures to a fallback tool.</p>
+<h3>Step 7 — Choose <code>create_react_agent</code> vs custom <code>StateGraph</code> vs legacy</h3>
+<table><thead><tr>
+<th>Decision</th>
+<th>Use</th>
+<th>Why</th>
+</tr></thead><tbody>
+<tr>
+<td>Single agent, tool-calling loop</td>
+<td><code>create_react_agent</code></td>
+<td>Correct defaults, provider-native tool calling, smallest code surface</td>
+</tr>
+<tr>
+<td>Multi-stage pipeline (plan → execute → review)</td>
+<td>Custom <code>StateGraph</code></td>
+<td>You need named nodes, explicit conditional edges, typed state</td>
+</tr>
+<tr>
+<td>Multi-agent supervisor</td>
+<td><code>create_supervisor</code> + workers built with <code>create_react_agent</code></td>
+<td>Built-in routing, per-worker checkpointing</td>
+</tr>
+<tr>
+<td>New code in 2026+</td>
+<td>Never use <code>AgentExecutor</code> or <code>initialize_agent</code></td>
+<td>Removed / deprecated in 1.0 (P41); shape changes in <code>intermediate_steps</code> (P42)</td>
+</tr>
+</tbody></table>
+<p>For a single forced-tool single-shot (e.g., &quot;always classify into one of these buckets&quot;), skip agents entirely: use <code>model.bind_tools([Schema], tool_choice={&quot;type&quot;: &quot;tool&quot;, &quot;name&quot;: &quot;Schema&quot;})</code>. But never loop a forced <code>tool_choice</code> (P63) — the model cannot emit <code>stop_reason=&quot;end_turn&quot;</code> under forced tool_choice, so the agent never terminates.</p>
+<h2>Output</h2>
+<ul>
+<li>Agent built with <code>create_react_agent(model, tools, checkpointer=MemorySaver())</code></li>
+<li>Tools defined with <code>@tool</code> + Pydantic <code>args_schema</code>, docstrings under 1024 chars</li>
+<li>Invocations pass <code>{&quot;configurable&quot;: {&quot;thread_id&quot;: ...}, &quot;recursion_limit&quot;: N}</code></li>
+<li><code>TokenBudget</code> callback enforces per-session cost ceiling</li>
+<li>Tool errors raise and surface in observability; graceful-degrade patterns are explicit (return-a-string, not silent-swallow)</li>
+<li>Decision table resolved: <code>create_react_agent</code> vs custom <code>StateGraph</code> vs supervisor vs legacy</li>
+</ul>
+<h2>Error Handling</h2>
+<table><thead><tr>
+<th>Error</th>
+<th>Cause</th>
+<th>Fix</th>
+</tr></thead><tbody>
+<tr>
+<td><code>GraphRecursionError: Recursion limit of 25 reached without hitting a stop condition</code></td>
+<td>Vague prompt never converges; default cap too high (P10)</td>
+<td>Lower <code>recursion_limit</code> to 5-10 interactive; add repeated-tool-call early-stop node</td>
+</tr>
+<tr>
+<td><code>ImportError: cannot import name &#39;initialize_agent&#39; from &#39;langchain.agents&#39;</code></td>
+<td>Legacy 0.2 agent factory removed (P41)</td>
+<td><code>from langgraph.prebuilt import create_react_agent</code></td>
+</tr>
+<tr>
+<td><code>AttributeError: &#39;ToolCall&#39; object has no attribute &#39;tool&#39;</code></td>
+<td>Old code accessing <code>step.tool</code> on new intermediate step shape (P42)</td>
+<td>Use <code>step.tool_name</code> (or <code>step[&quot;name&quot;]</code> on dict form); check <code>isinstance(step, ToolCall)</code></td>
+</tr>
+<tr>
+<td>Agent says &quot;couldn&#39;t find answer&quot; but tool actually raised</td>
+<td>Legacy <code>AgentExecutor</code> <code>handle_parsing_errors=True</code> silently swallowed exception (P09)</td>
+<td>Migrate to <code>create_react_agent</code>; errors raise by default</td>
+</tr>
+<tr>
+<td>Agent loops when <code>tool_choice={&quot;type&quot;: &quot;tool&quot;, &quot;name&quot;: &quot;X&quot;}</code> is set</td>
+<td>Forced tool_choice blocks <code>stop_reason=&quot;end_turn&quot;</code> (P63)</td>
+<td>Use <code>tool_choice=&quot;auto&quot;</code> for agent loops; reserve forced choice for one-shot calls</td>
+</tr>
+<tr>
+<td>Agent hallucinates a tool name like <code>exec</code> that is not in <code>tools=[...]</code></td>
+<td>Older free-text ReAct parser accepts any string (P32)</td>
+<td>Use <code>create_react_agent</code> — it relies on provider-native tool calling; the allowlist is wire-enforced</td>
+</tr>
+<tr>
+<td><code>RuntimeError: Token budget exceeded</code></td>
+<td>Your <code>TokenBudget</code> callback fired</td>
+<td>Working as intended; raise the cap or shorten the agent&#39;s scope</td>
+</tr>
+<tr>
+<td>Tool description truncated, model calls with wrong args</td>
+<td>Docstring exceeded 1024-char cap (P11)</td>
+<td>Shorten docstring; move examples into system prompt</td>
+</tr>
+</tbody></table>
+<h2>Examples</h2>
+<h3>Migrating a legacy <code>AgentExecutor</code> agent</h3>
+<p>Before (LangChain 0.2):</p>
+<pre data-lang="python"><code>
+from langchain.agents import initialize_agent, AgentType
+agent = initialize_agent(
+    tools, llm, agent=AgentType.OPENAI_FUNCTIONS,
+    handle_parsing_errors=True, return_intermediate_steps=True,
+)
+result = agent.invoke({&quot;input&quot;: &quot;...&quot;})
+for action, observation in result[&quot;intermediate_steps&quot;]:
+    print(action.tool, observation)  # .tool attribute
+</code></pre>
+<p>After (LangGraph 1.0):</p>
+<pre data-lang="python"><code>
+from langgraph.prebuilt import create_react_agent
+from langgraph.checkpoint.memory import MemorySaver
+agent = create_react_agent(llm, tools, checkpointer=MemorySaver())
+result = agent.invoke(
+    {&quot;messages&quot;: [{&quot;role&quot;: &quot;user&quot;, &quot;content&quot;: &quot;...&quot;}]},
+    config={&quot;configurable&quot;: {&quot;thread_id&quot;: &quot;t1&quot;}, &quot;recursion_limit&quot;: 10},
+)
+# intermediate steps are now ToolMessage entries in the messages list
+for m in result[&quot;messages&quot;]:
+    if m.type == &quot;tool&quot;:
+        print(m.name, m.content)  # .name, not .tool
+</code></pre>
+<p>See <a href="references/agent-executor-migration.md">AgentExecutor Migration</a> for the full before/after including <code>handle_parsing_errors</code>, <code>return_intermediate_steps</code>, and <code>max_iterations</code> translations.</p>
+<h3>Interactive agent with a strict cost cap</h3>
+<p>A customer-support agent with two tools, 10-step recursion cap, and a 30K token budget. See <a href="references/loop-caps-and-budgets.md">Loop Caps and Budgets</a> for the full example with a repeated-tool-call early-stop node.</p>
+<h2>Resources</h2>
+<ul>
+<li><a href="https://langchain-ai.github.io/langgraph/agents/overview/">LangGraph: Agents overview</a></li>
+<li><a href="https://langchain-ai.github.io/langgraph/reference/prebuilt/#langgraph.prebuilt.chat_agent_executor.create_react_agent"><code>create_react_agent</code> reference</a></li>
+<li><a href="https://langchain-ai.github.io/langgraph/how-tos/recursion-limit/">LangGraph: Recursion limits</a></li>
+<li><a href="https://langchain-ai.github.io/langgraph/how-tos/tool-calling/">LangGraph: Tool calling</a></li>
+<li><a href="https://python.langchain.com/docs/how_to/custom_tools/">LangChain: <code>@tool</code> decorator</a></li>
+<li><a href="https://blog.langchain.com/langchain-langgraph-1dot0/">LangChain 1.0 release notes</a></li>
+<li>Pack pain catalog: <code>docs/pain-catalog.md</code> (entries P09, P10, P11, P32, P41, P42, P63)</li>
+</ul></div>
+      </div>
+    </section>
+
+    <!-- 8. Bottom CTA -->
+    <section class="detail-cta" data-astro-cid-qcigfm7x>
+  <h2 class="detail-cta__headline" data-astro-cid-qcigfm7x>Ready to use langchain-py-pack?</h2>
+  <div class="detail-cta__actions" data-astro-cid-qcigfm7x>
+    <button class="detail-cta__primary" data-copy-install="/plugin install langchain-py-pack@claude-code-plugins-plus" data-astro-cid-qcigfm7x>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" data-astro-cid-qcigfm7x>
+        <rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" stroke-width="1.5" data-astro-cid-qcigfm7x></rect>
+        <path d="M3 11V3a1 1 0 011-1h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" data-astro-cid-qcigfm7x></path>
+      </svg>
+      <span class="detail-cta__btn-text" data-astro-cid-qcigfm7x>Copy Install Command</span>
+    </button>
+    
+  </div>
+</section>
+
+<script type="module">document.querySelectorAll("[data-copy-install]").forEach(t=>{t.addEventListener("click",async()=>{const a=t.dataset.copyInstall||"";await navigator.clipboard.writeText(a);const e=t.querySelector(".detail-cta__btn-text");if(e){const o=e.textContent;e.textContent="Copied!",t.classList.add("copied"),window.trackEvent&&window.trackEvent("install_copied",{plugin_name:a.split(" ").pop()||"",source:"detail_cta"}),setTimeout(()=>{e.textContent=o,t.classList.remove("copied")},2e3)}})});</script>
+
+    <!-- 9. Related Skills (6, with tool pills) -->
+    <section class="related-skills-section" data-astro-cid-jrlgpo3w>
+        <h2 class="related-skills-heading" data-astro-cid-jrlgpo3w>Related Skills</h2>
+        <div class="related-skills-grid" data-astro-cid-jrlgpo3w>
+          <a href="/skills/abridge-ci-integration/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-ci-integration</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Configure CI/CD pipeline for Abridge clinical AI integrations with GitHub Actions.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-common-errors/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-common-errors</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Diagnose and fix common Abridge clinical AI integration errors.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-a/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-a</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge ambient clinical documentation capture-to-note pipeline.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-b/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-b</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge patient-facing documentation and after-visit summary generation.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-cost-tuning/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-cost-tuning</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Optimize Abridge clinical AI costs through tier selection, session management, and usage monitoring for healthcare organizations.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-debug-bundle/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-debug-bundle</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Collect Abridge debug evidence for support tickets and troubleshooting.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a>
+        </div>
+      </section>
+
+  </div>
+
+  
+  <script>
+    document.querySelectorAll('.install-command').forEach(el => {
+      el.addEventListener('click', function() {
+        const text = this.dataset.copy || this.textContent;
+        navigator.clipboard.writeText(text).then(() => {
+          const originalText = this.textContent;
+          this.textContent = 'Copied to clipboard!';
+          this.style.color = 'var(--brand-green)';
+          setTimeout(() => {
+            this.textContent = originalText;
+            this.style.color = '';
+          }, 2000);
+        });
+      });
+    });
+  </script>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

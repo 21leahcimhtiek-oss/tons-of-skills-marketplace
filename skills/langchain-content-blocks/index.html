@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>langchain-content-blocks - Agent Skill</title>
+    <meta name="description" content="Works correctly with LangChain 1.0's typed content blocks on AIMessage.content — text, tool_use, image, thinking, document — across Claude, GPT-4o, and Gemini, including multi-modal composition and tool-call iteration. Use when composing multi-modal messages, iterating tool_use blocks, handling Claude's thinking content, or unifying image inputs across providers. Trigger with &quot;langchain content blocks&quot;, &quot;AIMessage.content&quot;, &quot;tool_use block&quot;, &quot;claude image input&quot;, &quot;langchain multimodal&quot;, &quot;thinking block replay&quot;, &quot;claude citations&quot;.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://tonsofskills.com/tons-of-skills-marketplace/skills/langchain-content-blocks/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/langchain-content-blocks/">
+    <meta property="og:title" content="langchain-content-blocks - Agent Skill">
+    <meta property="og:description" content="Works correctly with LangChain 1.0's typed content blocks on AIMessage.content — text, tool_use, image, thinking, document — across Claude, GPT-4o, and Gemini, including multi-modal composition and tool-call iteration. Use when composing multi-modal messages, iterating tool_use blocks, handling Claude's thinking content, or unifying image inputs across providers. Trigger with &quot;langchain content blocks&quot;, &quot;AIMessage.content&quot;, &quot;tool_use block&quot;, &quot;claude image input&quot;, &quot;langchain multimodal&quot;, &quot;thinking block replay&quot;, &quot;claude citations&quot;.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="langchain-content-blocks - Agent Skill">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/langchain-content-blocks/">
+    <meta name="twitter:title" content="langchain-content-blocks - Agent Skill">
+    <meta name="twitter:description" content="Works correctly with LangChain 1.0's typed content blocks on AIMessage.content — text, tool_use, image, thinking, document — across Claude, GPT-4o, and Gemini, including multi-modal composition and tool-call iteration. Use when composing multi-modal messages, iterating tool_use blocks, handling Claude's thinking content, or unifying image inputs across providers. Trigger with &quot;langchain content blocks&quot;, &quot;AIMessage.content&quot;, &quot;tool_use block&quot;, &quot;claude image input&quot;, &quot;langchain multimodal&quot;, &quot;thinking block replay&quot;, &quot;claude citations&quot;.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"langchain-content-blocks","description":"Works correctly with LangChain 1.0's typed content blocks on AIMessage.content — text, tool_use, image, thinking, document — across Claude, GPT-4o, and Gemini, including multi-modal composition and tool-call iteration. Use when composing multi-modal messages, iterating tool_use blocks, handling Claude's thinking content, or unifying image inputs across providers. Trigger with \"langchain content blocks\", \"AIMessage.content\", \"tool_use block\", \"claude image input\", \"langchain multimodal\", \"thinking block replay\", \"claude citations\".","version":"2.5.0","author":{"@type":"Person","name":"Jeremy Longshore"},"license":"MIT","programmingLanguage":"Claude Code Agent Skill","isPartOf":{"@type":"SoftwareApplication","name":"langchain-py-pack","applicationCategory":"unknown"}}</script>
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.breadcrumbs[data-astro-cid-ilhxcym7]{margin-bottom:var(--space-5)}.breadcrumbs__list[data-astro-cid-ilhxcym7]{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;list-style:none;padding:0;margin:0;font-family:var(--font-mono);font-size:var(--text-sm, .8rem)}.breadcrumbs__item[data-astro-cid-ilhxcym7]{display:flex;align-items:center;gap:.375rem}.breadcrumbs__link[data-astro-cid-ilhxcym7]{color:var(--text-3);text-decoration:none;transition:color var(--duration-fast, .2s) var(--ease-out)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:hover{color:var(--primary)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:0}.breadcrumbs__sep[data-astro-cid-ilhxcym7]{color:var(--text-3);user-select:none;font-size:.7em;line-height:1}.breadcrumbs__current[data-astro-cid-ilhxcym7]{color:var(--text-2)}.detail-cta[data-astro-cid-qcigfm7x]{background:var(--surface-3, var(--brand-light-gray));border-top:1px solid var(--border, var(--brand-light-gray));border-radius:var(--radius-lg);padding:2rem 1.5rem;margin-top:2rem;text-align:center}.detail-cta__headline[data-astro-cid-qcigfm7x]{font-family:var(--font-display);font-weight:700;font-size:1.35rem;color:var(--text, var(--brand-dark));margin-bottom:1.25rem}.detail-cta__actions[data-astro-cid-qcigfm7x]{display:flex;justify-content:center;gap:.75rem;flex-wrap:wrap}.detail-cta__primary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:var(--primary);color:#0a0a0c;border:none;border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;cursor:pointer;transition:background var(--duration-fast) var(--ease-out),transform var(--duration-fast) var(--ease-out)}.detail-cta__primary[data-astro-cid-qcigfm7x]:hover{background:var(--primary-dark, var(--primary-dark));transform:translateY(-1px)}.detail-cta__primary[data-astro-cid-qcigfm7x].copied{background:var(--positive, var(--brand-green))}.detail-cta__secondary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:transparent;color:var(--text, var(--brand-dark));border:1px solid var(--border, var(--brand-mid-gray));border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;text-decoration:none;transition:border-color var(--duration-fast) var(--ease-out),color var(--duration-fast) var(--ease-out)}.detail-cta__secondary[data-astro-cid-qcigfm7x]:hover{border-color:var(--primary);color:var(--primary)}@media(max-width:480px){.detail-cta__actions[data-astro-cid-qcigfm7x]{flex-direction:column;align-items:stretch}.detail-cta__primary[data-astro-cid-qcigfm7x],.detail-cta__secondary[data-astro-cid-qcigfm7x]{justify-content:center}}
+</style>
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/_slug_@_@astro.wF9emvVq.css"></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  
+  
+
+  <div class="skill-detail" data-astro-cid-jrlgpo3w>
+    <!-- 1. Breadcrumbs -->
+    <nav aria-label="Breadcrumb" class="breadcrumbs" data-astro-cid-ilhxcym7>
+  <ol class="breadcrumbs__list" itemscope itemtype="https://schema.org/BreadcrumbList" data-astro-cid-ilhxcym7>
+    <li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Home</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="1">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/skills/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Skills</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="2">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          <span class="breadcrumbs__current" aria-current="page" itemprop="name" data-astro-cid-ilhxcym7>
+              langchain-content-blocks
+            </span>
+          <meta itemprop="position" content="3">
+        </li>
+  </ol>
+</nav>
+
+    <!-- 2. Header (enhanced) -->
+    <header class="skill-header" data-astro-cid-jrlgpo3w>
+      <h1 data-astro-cid-jrlgpo3w>langchain-content-blocks</h1>
+      <p class="skill-description" data-astro-cid-jrlgpo3w>Works correctly with LangChain 1.0&#39;s typed content blocks on AIMessage.content — text, tool_use, image, thinking, document — across Claude, GPT-4o, and Gemini, including multi-modal composition and tool-call iteration. Use when composing multi-modal messages, iterating tool_use blocks, handling Claude&#39;s thinking content, or unifying image inputs across providers. Trigger with &quot;langchain content blocks&quot;, &quot;AIMessage.content&quot;, &quot;tool_use block&quot;, &quot;claude image input&quot;, &quot;langchain multimodal&quot;, &quot;thinking block replay&quot;, &quot;claude citations&quot;.</p>
+
+      <div class="skill-metadata" data-astro-cid-jrlgpo3w>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>v2.5.0</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>Jeremy Longshore</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>MIT</span>
+        </div>
+      </div>
+
+      
+    </header>
+
+    <!-- 4. Allowed Tools -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Allowed Tools</h2>
+      <div class="tools-grid" data-astro-cid-jrlgpo3w>
+        <span class="tool-badge" data-astro-cid-jrlgpo3w>Read</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Write</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Edit</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(python:*)</span>
+      </div>
+      
+    </section>
+
+    <!-- 5. Provided by Plugin -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Provided by Plugin</h2>
+      <div class="plugin-info" data-astro-cid-jrlgpo3w>
+        <div class="plugin-details" data-astro-cid-jrlgpo3w>
+          <h3 data-astro-cid-jrlgpo3w>
+            <a href="/plugins/langchain-py-pack/" data-astro-cid-jrlgpo3w>langchain-py-pack</a>
+          </h3>
+          <p data-astro-cid-jrlgpo3w>Claude Code skill pack for LangChain 1.0 + LangGraph 1.0 (Python) - 34 skills covering chains, agents, RAG, middleware, checkpointing, HITL, streaming, and production patterns</p>
+          <div class="plugin-meta" data-astro-cid-jrlgpo3w>
+            <span data-astro-cid-jrlgpo3w>unknown</span>
+            <span data-astro-cid-jrlgpo3w>v2.5.0</span>
+          </div>
+        </div>
+        <a href="/plugins/langchain-py-pack/" class="btn-primary" data-astro-cid-jrlgpo3w>View Plugin</a>
+      </div>
+    </section>
+
+    <!-- 6. Installation -->
+    <section class="section-box dark" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Installation</h2>
+      <p class="install-note" style="color: var(--brand-light-gray); margin-bottom: 0.75rem;" data-astro-cid-jrlgpo3w>This skill is included in the langchain-py-pack plugin:</p>
+      <pre class="install-command" data-copy="/plugin install langchain-py-pack@claude-code-plugins-plus" data-astro-cid-jrlgpo3w><code data-astro-cid-jrlgpo3w>/plugin install langchain-py-pack@claude-code-plugins-plus</code></pre>
+      <p class="install-note" data-astro-cid-jrlgpo3w>Click to copy</p>
+    </section>
+
+    <!-- 7. Skill Content (Markdown) -->
+    <section class="skill-content-section" data-astro-cid-jrlgpo3w>
+      <h2 data-astro-cid-jrlgpo3w>Instructions</h2>
+      <div class="skill-content" data-astro-cid-jrlgpo3w>
+        <div data-astro-cid-jrlgpo3w><h1>LangChain Content Blocks (Python)</h1>
+<h2>Overview</h2>
+<p>On Claude, <code>AIMessage.content</code> is <code>list[dict]</code> even for pure text — so any code from an OpenAI-first tutorial that calls <code>message.content.lower()</code> or <code>message.content.split()</code> crashes with <code>AttributeError: &#39;list&#39; object has no attribute &#39;lower&#39;</code> on the first production Claude call (P02). Multi-modal code that works on GPT-4o breaks on Claude because pre-1.0 image-block shapes differed across providers (P64). Multi-turn Claude replay with extended thinking fails with <code>anthropic.BadRequestError: missing signature</code> when prior <code>thinking</code> blocks are stripped. Forced <code>tool_choice</code> prevents <code>stop_reason=&quot;end_turn&quot;</code> and loops forever (P63).</p>
+<p>This is the deep-dive companion to <code>langchain-model-inference</code>. That skill&#39;s <code>references/content-blocks.md</code> covers the <code>str</code> vs <code>list[dict]</code> divergence and a safe text extractor. <strong>This skill goes further</strong>:</p>
+<ul>
+<li><code>tool_use</code> block iteration mechanics — IDs, args as dict vs JSON string, streaming deltas</li>
+<li><code>thinking</code> blocks — signature, redaction, multi-turn replay semantics</li>
+<li><code>document</code> blocks — Claude citations API, source types, citation extraction</li>
+<li>Multi-modal composition — universal 1.0 <code>image</code> shape, per-provider adapter behavior</li>
+<li>Per-provider size limits (Anthropic 5 MB/image up to 20 images, OpenAI 20 MB/image, Gemini 20 MB/request)</li>
+</ul>
+<p>Pin: <code>langchain-core 1.0.x</code>, <code>langchain-anthropic &gt;= 1.0</code>, <code>langchain-openai &gt;= 1.0</code>, <code>anthropic &gt;= 0.40</code>. Pain-catalog anchors: P02, P58, P63, P64.</p>
+<h2>Prerequisites</h2>
+<ul>
+<li>Python 3.10+</li>
+<li><code>langchain-core &gt;= 1.0, &lt; 2.0</code></li>
+<li>At least one provider package: <code>pip install langchain-anthropic langchain-openai</code></li>
+<li>For extended thinking: <code>langchain-anthropic &gt;= 1.0</code> and Claude Sonnet 4+ / Opus 4+</li>
+<li>For citations: <code>anthropic &gt;= 0.40</code> and Claude Sonnet 4+</li>
+<li>Familiarity with <code>langchain-model-inference</code> (reads <code>references/content-blocks.md</code> first)</li>
+</ul>
+<h2>Instructions</h2>
+<h3>Step 1 — Learn the block-type taxonomy</h3>
+<p>LangChain 1.0 defines six typed content blocks on <code>AIMessage.content</code> (and on chunks during streaming):</p>
+<table><thead><tr>
+<th>Block type</th>
+<th>Produced by</th>
+<th>Notes</th>
+</tr></thead><tbody>
+<tr>
+<td><code>text</code></td>
+<td>All providers</td>
+<td>On Claude, always wrapped as <code>[{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;...&quot;}]</code></td>
+</tr>
+<tr>
+<td><code>tool_use</code></td>
+<td>Claude, GPT-4o, Gemini</td>
+<td>Always round-trip via <code>msg.tool_calls</code>, not hand-parsed</td>
+</tr>
+<tr>
+<td><code>tool_result</code></td>
+<td>You (via <code>ToolMessage</code>)</td>
+<td>One per <code>tool_use</code>; <code>tool_call_id</code> must match byte-for-byte</td>
+</tr>
+<tr>
+<td><code>image</code></td>
+<td>Claude vision, GPT-4o, Gemini</td>
+<td>Universal 1.0 shape; adapter handles wire format per provider</td>
+</tr>
+<tr>
+<td><code>thinking</code></td>
+<td>Claude extended thinking only</td>
+<td>Must preserve <code>signature</code> for replay</td>
+</tr>
+<tr>
+<td><code>document</code></td>
+<td>Claude citations API (Sonnet 4+)</td>
+<td>Input-side only; citations attach to output <code>text</code> blocks</td>
+</tr>
+</tbody></table>
+<p>See <a href="references/block-type-matrix.md">Block-Type Matrix</a> for the full table with streaming behavior and per-type gotchas.</p>
+<h3>Step 2 — Iterate mixed content safely</h3>
+<p>For most code, use the helpers:</p>
+<pre data-lang="python"><code>
+text = msg.text()                    # concatenated text across all text blocks
+tool_calls = msg.tool_calls          # normalized list[ToolCall]
+usage = msg.usage_metadata           # input_tokens, output_tokens, cache_*
+</code></pre>
+<p>Hand-roll block iteration only when you need to (a) preserve order, (b) extract <code>thinking</code> blocks for replay, or (c) read <code>citations</code> metadata from <code>text</code> blocks. Order-preserving iteration:</p>
+<pre data-lang="python"><code>
+from langchain_core.messages import AIMessage
+
+def iter_blocks(msg: AIMessage):
+    if isinstance(msg.content, str):
+        yield &quot;text&quot;, {&quot;type&quot;: &quot;text&quot;, &quot;text&quot;: msg.content}
+        return
+    for block in msg.content:
+        if isinstance(block, dict):
+            yield block.get(&quot;type&quot;, &quot;unknown&quot;), block
+        else:
+            yield getattr(block, &quot;type&quot;, &quot;unknown&quot;), block
+</code></pre>
+<h3>Step 3 — Compose multi-modal messages with the universal <code>image</code> block</h3>
+<pre data-lang="python"><code>
+import base64
+from pathlib import Path
+from langchain_core.messages import HumanMessage
+
+def image_block(path: str) -&gt; dict:
+    data = base64.standard_b64encode(Path(path).read_bytes()).decode(&quot;ascii&quot;)
+    mime = {&quot;png&quot;: &quot;image/png&quot;, &quot;jpg&quot;: &quot;image/jpeg&quot;,
+            &quot;jpeg&quot;: &quot;image/jpeg&quot;, &quot;webp&quot;: &quot;image/webp&quot;}[
+        Path(path).suffix.lstrip(&quot;.&quot;).lower()]
+    return {
+        &quot;type&quot;: &quot;image&quot;,
+        &quot;source_type&quot;: &quot;base64&quot;,   # or &quot;url&quot;
+        &quot;data&quot;: data,
+        &quot;mime_type&quot;: mime,
+    }
+
+msg = HumanMessage(content=[
+    image_block(&quot;screenshot.png&quot;),                         # put image FIRST
+    {&quot;type&quot;: &quot;text&quot;, &quot;text&quot;: &quot;What is broken here?&quot;},      # instruction LAST
+])
+response = claude.invoke([msg])
+</code></pre>
+<p>Three invariants:</p>
+<ol>
+<li><code>content</code> <strong>must be <code>list[dict]</code></strong> when including non-text blocks.</li>
+<li>Put the image <em>before</em> the instruction — Claude attends most to trailing tokens.</li>
+<li>Respect provider limits (Anthropic: 5 MB/image, up to 20 images; OpenAI: 20 MB/image; Gemini: 20 MB/request total).</li>
+</ol>
+<p>LangChain&#39;s adapter translates the universal shape to each provider&#39;s wire format. See <a href="references/multimodal-composition.md">Multi-Modal Composition</a> for the full adapter table, MIME-type compatibility, and the <code>document</code>/citations pattern.</p>
+<h3>Step 4 — Iterate <code>tool_use</code> correctly across stream deltas</h3>
+<p>Canonical non-streaming:</p>
+<pre data-lang="python"><code>
+for tc in msg.tool_calls:
+    output = tools[tc[&quot;name&quot;]](**tc[&quot;args&quot;])
+    history.append(ToolMessage(content=str(output), tool_call_id=tc[&quot;id&quot;]))
+</code></pre>
+<p><code>tc[&quot;args&quot;]</code> is already a parsed <code>dict</code> — do not <code>json.loads</code> it. <code>tc[&quot;id&quot;]</code> is provider-shaped (<code>toolu_*</code> on Anthropic, <code>call_*</code> on OpenAI, 24+ chars) and must be copied verbatim to the <code>ToolMessage</code>.</p>
+<p>Streaming is different. <code>tool_use.input</code> arrives as partial JSON fragments across <code>on_chat_model_stream</code> events. Buffer with <code>tool_call_chunks</code>, parse once at <code>on_chat_model_end</code>:</p>
+<pre data-lang="python"><code>
+from collections import defaultdict
+import json
+
+partial = defaultdict(str)   # index -&gt; accumulated JSON fragment
+meta = {}                     # index -&gt; {name, id}
+
+async for event in model.astream_events({&quot;messages&quot;: [...]}, version=&quot;v2&quot;):
+    if event[&quot;event&quot;] != &quot;on_chat_model_stream&quot;:
+        continue
+    for tc_chunk in getattr(event[&quot;data&quot;][&quot;chunk&quot;], &quot;tool_call_chunks&quot;, []) or []:
+        idx = tc_chunk[&quot;index&quot;]
+        if tc_chunk.get(&quot;name&quot;):
+            meta[idx] = {&quot;name&quot;: tc_chunk[&quot;name&quot;], &quot;id&quot;: tc_chunk[&quot;id&quot;]}
+        if tc_chunk.get(&quot;args&quot;):
+            partial[idx] += tc_chunk[&quot;args&quot;]
+
+completed = [{**meta[i], &quot;args&quot;: json.loads(partial[i])} for i in meta]
+</code></pre>
+<p>See <a href="references/tool-use-iteration.md">Tool-Use Iteration</a> for multi-tool-per-turn handling, <code>ToolMessage</code> ordering, and the forced- <code>tool_choice</code> infinite-loop trap (P63).</p>
+<h3>Step 5 — Preserve Claude <code>thinking</code> blocks for replay</h3>
+<p>Claude extended thinking (Sonnet 4+, Opus 4+) returns <code>thinking</code> blocks carrying a cryptographic <code>signature</code>. The next turn must round-trip those blocks <strong>intact</strong> or Anthropic rejects the request:</p>
+<pre><code>
+anthropic.BadRequestError: messages.1.content.0: missing signature
+</code></pre>
+<p>The foot-gun: <code>msg.text()</code> strips thinking blocks. Never do:</p>
+<pre data-lang="python"><code>
+# WRONG — thinking blocks lost, replay fails
+history.append(AIMessage(content=ai_1.text()))
+</code></pre>
+<p>Correct — pass the <code>AIMessage</code> back verbatim:</p>
+<pre data-lang="python"><code>
+history.append(ai_1)   # preserves full content list + signatures
+</code></pre>
+<p>For persistence across sessions, serialize with <code>messages_to_dict(...)</code> (not custom JSON), which preserves block structure:</p>
+<pre data-lang="python"><code>
+import json
+from langchain_core.messages import messages_to_dict, messages_from_dict
+
+serialized = json.dumps(messages_to_dict([ai_1]))
+restored = messages_from_dict(json.loads(serialized))
+</code></pre>
+<p>See <a href="references/thinking-blocks.md">Thinking Blocks</a> for redaction handling, the budget-tokens rule, and the interaction with tool calls.</p>
+<h3>Step 6 — Provider-adapter checklist</h3>
+<p>Before sending any multi-modal or tool-using message:</p>
+<ol>
+<li>Is <code>content</code> a <code>list[dict]</code> when it contains non-text blocks?</li>
+<li>Are image blocks in the universal 1.0 shape (<code>source_type</code>, <code>data</code>, <code>mime_type</code>)?</li>
+<li>Is each image under the target provider&#39;s limit? (5 MB / 20 MB / 20 MB total.)</li>
+<li>If <code>tool_use</code> is involved, am I passing <code>msg.tool_calls</code> — not parsed <code>content</code>?</li>
+<li>If extended thinking is on, am I returning the full <code>AIMessage</code> — not <code>msg.text()</code>?</li>
+<li>System message at position 0 (P58) — not reordered by middleware?</li>
+</ol>
+<h2>Output</h2>
+<ul>
+<li>Block-type matrix applied to a specific response (which types present, which helper used)</li>
+<li>Safe iteration that preserves order, citations, and thinking signatures</li>
+<li>Multi-modal <code>HumanMessage</code> in the universal 1.0 <code>image</code> shape, portable across Claude/GPT-4o/Gemini</li>
+<li><code>tool_use</code> stream-delta accumulator that buffers partial <code>input</code> JSON and parses once at end</li>
+<li>Multi-turn Claude replay that keeps <code>thinking</code> blocks intact (no <code>missing signature</code> errors)</li>
+<li><code>document</code>/citations extractor that reads <code>citations</code> metadata from <code>text</code> blocks</li>
+</ul>
+<h2>Error Handling</h2>
+<table><thead><tr>
+<th>Error</th>
+<th>Cause</th>
+<th>Fix</th>
+</tr></thead><tbody>
+<tr>
+<td><code>AttributeError: &#39;list&#39; object has no attribute &#39;lower&#39;</code></td>
+<td>Treating <code>AIMessage.content</code> as <code>str</code> on Claude (P02)</td>
+<td>Use <code>msg.text()</code> or iterate blocks</td>
+</tr>
+<tr>
+<td><code>anthropic.BadRequestError: messages.N.content.M: missing signature</code></td>
+<td>Stripped <code>thinking</code> block on replay</td>
+<td>Pass <code>AIMessage</code> object back verbatim; never rebuild from <code>text()</code></td>
+</tr>
+<tr>
+<td><code>anthropic.BadRequestError: tool_use_id not found in corresponding tool_result</code></td>
+<td>Typo / case mismatch in <code>ToolMessage.tool_call_id</code></td>
+<td>Copy <code>tc[&quot;id&quot;]</code> verbatim</td>
+</tr>
+<tr>
+<td><code>anthropic.BadRequestError: tool_use ids were found without tool_result blocks</code></td>
+<td>Skipped a tool call</td>
+<td>Emit one <code>ToolMessage</code> per <code>tool_call</code> (use <code>status=&quot;error&quot;</code> on failure)</td>
+</tr>
+<tr>
+<td><code>anthropic.BadRequestError: image exceeds 5 MB limit</code></td>
+<td>Un-resized screenshot</td>
+<td>Pre-resize to &lt; 5 MB (1024x1024 JPEG 85 is ~500 KB)</td>
+</tr>
+<tr>
+<td><code>openai.BadRequestError: Invalid image data</code></td>
+<td>Hand-rolled <code>image_url</code> with wrong prefix</td>
+<td>Use the universal block; adapter emits the <code>data:image/...;base64,</code> prefix</td>
+</tr>
+<tr>
+<td>Infinite agent loop</td>
+<td>Forced <code>tool_choice</code> inside a loop (P63)</td>
+<td>Use <code>tool_choice=&quot;auto&quot;</code> for agents; forced-choice only for single-call extraction</td>
+</tr>
+<tr>
+<td><code>json.JSONDecodeError</code> inside stream loop</td>
+<td>Parsing partial <code>tool_use.input</code> fragment</td>
+<td>Buffer in a <code>defaultdict(str)</code>; parse once at <code>on_chat_model_end</code></td>
+</tr>
+<tr>
+<td>Citations silently missing</td>
+<td>Read via <code>msg.text()</code> which strips metadata</td>
+<td>Iterate <code>msg.content</code> and read <code>block[&quot;citations&quot;]</code> on text blocks</td>
+</tr>
+</tbody></table>
+<h2>Examples</h2>
+<h3>Single-shot multi-modal on Claude + GPT-4o with one message object</h3>
+<pre data-lang="python"><code>
+msg = HumanMessage(content=[
+    image_block(&quot;ui.png&quot;),
+    {&quot;type&quot;: &quot;text&quot;, &quot;text&quot;: &quot;Identify the broken UI element.&quot;},
+])
+# Same message works on both providers via adapter translation
+claude_resp = claude.invoke([msg])
+gpt4o_resp = gpt4o.invoke([msg])
+</code></pre>
+<h3>Multi-turn Claude replay with extended thinking</h3>
+<pre data-lang="python"><code>
+claude = ChatAnthropic(
+    model=&quot;claude-sonnet-4-6&quot;,
+    max_tokens=8192,
+    thinking={&quot;type&quot;: &quot;enabled&quot;, &quot;budget_tokens&quot;: 4096},
+)
+
+ai_1 = claude.invoke([HumanMessage(content=&quot;What is the capital of France?&quot;)])
+# ai_1.content == [{&quot;type&quot;:&quot;thinking&quot;,...,&quot;signature&quot;:&quot;...&quot;}, {&quot;type&quot;:&quot;text&quot;,...}]
+
+# Turn 2 — pass ai_1 VERBATIM
+ai_2 = claude.invoke([
+    HumanMessage(content=&quot;What is the capital of France?&quot;),
+    ai_1,                                                    # thinking preserved
+    HumanMessage(content=&quot;And the population?&quot;),
+])
+</code></pre>
+<p>See <a href="references/thinking-blocks.md">Thinking Blocks</a> for the full replay invariants and persistence pattern.</p>
+<h3>Extracting Claude citations from <code>document</code> input</h3>
+<pre data-lang="python"><code>
+doc_block = {
+    &quot;type&quot;: &quot;document&quot;,
+    &quot;source&quot;: {&quot;type&quot;: &quot;base64&quot;, &quot;media_type&quot;: &quot;application/pdf&quot;, &quot;data&quot;: pdf_b64},
+    &quot;title&quot;: &quot;Q3 Earnings Report&quot;,
+    &quot;citations&quot;: {&quot;enabled&quot;: True},
+}
+resp = claude.invoke([HumanMessage(content=[
+    doc_block,
+    {&quot;type&quot;: &quot;text&quot;, &quot;text&quot;: &quot;What drove revenue this quarter?&quot;},
+])])
+
+for block in resp.content:
+    if block.get(&quot;type&quot;) != &quot;text&quot;:
+        continue
+    print(block[&quot;text&quot;])
+    for c in block.get(&quot;citations&quot;, []):
+        print(f&quot;  -&gt; {c[&#39;document_title&#39;]}: {c[&#39;cited_text&#39;]!r}&quot;)
+</code></pre>
+<p><code>msg.text()</code> flattens this — you lose citations. See <a href="references/multimodal-composition.md">Multi-Modal Composition</a> for the full <code>document</code> block reference including supported source types.</p>
+<h3>Streaming <code>tool_use</code> with live argument rendering</h3>
+<p>See <a href="references/tool-use-iteration.md">Tool-Use Iteration</a> for the complete <code>tool_call_chunks</code> accumulator including multi-tool-per-turn handling and the <code>ToolMessage</code> ordering invariant.</p>
+<h2>Resources</h2>
+<ul>
+<li><a href="https://python.langchain.com/docs/concepts/messages/">LangChain messages concept</a></li>
+<li><a href="https://python.langchain.com/docs/concepts/multimodality/">LangChain multimodality</a></li>
+<li><a href="https://python.langchain.com/api_reference/core/messages/langchain_core.messages.ai.AIMessage.html"><code>AIMessage</code> API reference</a></li>
+<li><a href="https://docs.anthropic.com/en/api/messages-examples">Anthropic content blocks / messages API</a></li>
+<li><a href="https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking">Anthropic extended thinking</a></li>
+<li><a href="https://docs.anthropic.com/en/docs/build-with-claude/citations">Anthropic citations</a></li>
+<li><a href="https://platform.openai.com/docs/guides/vision">OpenAI vision</a></li>
+<li><a href="https://ai.google.dev/gemini-api/docs/vision">Gemini multimodal</a></li>
+<li>Companion skill: <code>langchain-model-inference</code> (read its <code>references/content-blocks.md</code> for the <code>str</code> vs <code>list[dict]</code> fundamentals)</li>
+<li>Pack pain catalog: <code>docs/pain-catalog.md</code> (entries P02, P58, P63, P64)</li>
+</ul></div>
+      </div>
+    </section>
+
+    <!-- 8. Bottom CTA -->
+    <section class="detail-cta" data-astro-cid-qcigfm7x>
+  <h2 class="detail-cta__headline" data-astro-cid-qcigfm7x>Ready to use langchain-py-pack?</h2>
+  <div class="detail-cta__actions" data-astro-cid-qcigfm7x>
+    <button class="detail-cta__primary" data-copy-install="/plugin install langchain-py-pack@claude-code-plugins-plus" data-astro-cid-qcigfm7x>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" data-astro-cid-qcigfm7x>
+        <rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" stroke-width="1.5" data-astro-cid-qcigfm7x></rect>
+        <path d="M3 11V3a1 1 0 011-1h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" data-astro-cid-qcigfm7x></path>
+      </svg>
+      <span class="detail-cta__btn-text" data-astro-cid-qcigfm7x>Copy Install Command</span>
+    </button>
+    
+  </div>
+</section>
+
+<script type="module">document.querySelectorAll("[data-copy-install]").forEach(t=>{t.addEventListener("click",async()=>{const a=t.dataset.copyInstall||"";await navigator.clipboard.writeText(a);const e=t.querySelector(".detail-cta__btn-text");if(e){const o=e.textContent;e.textContent="Copied!",t.classList.add("copied"),window.trackEvent&&window.trackEvent("install_copied",{plugin_name:a.split(" ").pop()||"",source:"detail_cta"}),setTimeout(()=>{e.textContent=o,t.classList.remove("copied")},2e3)}})});</script>
+
+    <!-- 9. Related Skills (6, with tool pills) -->
+    <section class="related-skills-section" data-astro-cid-jrlgpo3w>
+        <h2 class="related-skills-heading" data-astro-cid-jrlgpo3w>Related Skills</h2>
+        <div class="related-skills-grid" data-astro-cid-jrlgpo3w>
+          <a href="/skills/abridge-ci-integration/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-ci-integration</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Configure CI/CD pipeline for Abridge clinical AI integrations with GitHub Actions.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-common-errors/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-common-errors</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Diagnose and fix common Abridge clinical AI integration errors.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-a/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-a</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge ambient clinical documentation capture-to-note pipeline.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-b/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-b</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge patient-facing documentation and after-visit summary generation.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-cost-tuning/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-cost-tuning</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Optimize Abridge clinical AI costs through tier selection, session management, and usage monitoring for healthcare organizations.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-debug-bundle/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-debug-bundle</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Collect Abridge debug evidence for support tickets and troubleshooting.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a>
+        </div>
+      </section>
+
+  </div>
+
+  
+  <script>
+    document.querySelectorAll('.install-command').forEach(el => {
+      el.addEventListener('click', function() {
+        const text = this.dataset.copy || this.textContent;
+        navigator.clipboard.writeText(text).then(() => {
+          const originalText = this.textContent;
+          this.textContent = 'Copied to clipboard!';
+          this.style.color = 'var(--brand-green)';
+          setTimeout(() => {
+            this.textContent = originalText;
+            this.style.color = '';
+          }, 2000);
+        });
+      });
+    });
+  </script>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

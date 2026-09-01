@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Human-in-the-Loop Is a Delivery Guarantee, Not a UI Feature — Tons of Skills Work Diary</title>
+    <meta name="description" content="Human-in-the-loop agent delivery is exactly-once, fail-closed. Two repos shipped the same four-move discipline the same day — convergence, not coincidence.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://startaitools.com/posts/hitl-delivery-is-a-fail-closed-exactly-once-problem/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/hitl-delivery-is-a-fail-closed-exactly-once-problem/">
+    <meta property="og:title" content="Human-in-the-Loop Is a Delivery Guarantee, Not a UI Feature — Tons of Skills Work Diary">
+    <meta property="og:description" content="Human-in-the-loop agent delivery is exactly-once, fail-closed. Two repos shipped the same four-move discipline the same day — convergence, not coincidence.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="Human-in-the-Loop Is a Delivery Guarantee, Not a UI Feature — Tons of Skills Work Diary">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/hitl-delivery-is-a-fail-closed-exactly-once-problem/">
+    <meta name="twitter:title" content="Human-in-the-Loop Is a Delivery Guarantee, Not a UI Feature — Tons of Skills Work Diary">
+    <meta name="twitter:description" content="Human-in-the-loop agent delivery is exactly-once, fail-closed. Two repos shipped the same four-move discipline the same day — convergence, not coincidence.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"Human-in-the-Loop Is a Delivery Guarantee, Not a UI Feature","description":"Human-in-the-loop agent delivery is exactly-once, fail-closed. Two repos shipped the same four-move discipline the same day — convergence, not coincidence.","datePublished":"2026-06-07","url":"https://tonsofskills.com/blog/undefined","author":{"@type":"Person","name":"Jeremy Longshore"},"publisher":{"@type":"Organization","name":"Tons of Skills","url":"https://tonsofskills.com"}}</script>
+  
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.post-header[data-astro-cid-7jjqptxk]{background:var(--panel);padding:4rem 1.5rem 3rem;border-bottom:1px solid var(--border)}.post-header-inner[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto}.back-link[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3);text-decoration:none;display:inline-block;margin-bottom:1.5rem;transition:color .2s}.back-link[data-astro-cid-7jjqptxk]:hover{color:var(--primary)}.post-meta[data-astro-cid-7jjqptxk]{display:flex;align-items:center;gap:.75rem;margin-bottom:1rem}time[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3)}.featured-badge[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.2rem .6rem;background:#ce114126;color:var(--red);border-radius:0;font-weight:600;text-transform:uppercase;letter-spacing:.05em}.post-header[data-astro-cid-7jjqptxk] h1[data-astro-cid-7jjqptxk]{font-family:var(--font-body);font-size:clamp(1.5rem,4vw,2.2rem);font-weight:700;color:var(--text);line-height:1.25;margin-bottom:.75rem;letter-spacing:0}.post-desc[data-astro-cid-7jjqptxk]{color:var(--text-2);font-size:1.05rem;line-height:1.6;margin-bottom:1rem}.post-tags[data-astro-cid-7jjqptxk]{display:flex;gap:.4rem;flex-wrap:wrap}.tag[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.15rem .5rem;background:var(--surface-3);color:var(--text-3);border-radius:0}.post-body[data-astro-cid-7jjqptxk]{padding:3rem 1.5rem 4rem}.prose[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto;color:var(--text-2);line-height:1.8;font-size:1rem}.prose[data-astro-cid-7jjqptxk] h2{font-family:var(--font-body);font-size:1.5rem;font-weight:700;color:var(--text);margin:2.5rem 0 1rem;letter-spacing:0}.prose[data-astro-cid-7jjqptxk] h3{font-size:1.2rem;font-weight:600;color:var(--text);margin:2rem 0 .75rem}.prose[data-astro-cid-7jjqptxk] p{margin-bottom:1rem}.prose[data-astro-cid-7jjqptxk] ul,.prose[data-astro-cid-7jjqptxk] ol{margin:.5rem 0 1rem 1.5rem}.prose[data-astro-cid-7jjqptxk] li{margin-bottom:.35rem}.prose[data-astro-cid-7jjqptxk] strong{color:var(--text);font-weight:600}.prose[data-astro-cid-7jjqptxk] code{font-family:var(--font-mono);font-size:.88em;background:var(--surface-3);padding:.15em .35em;border-radius:0;color:var(--primary)}.prose[data-astro-cid-7jjqptxk] a{color:var(--primary);text-decoration:none}.prose[data-astro-cid-7jjqptxk] a:hover{text-decoration:underline}@media(max-width:768px){.post-header[data-astro-cid-7jjqptxk]{padding:3rem 1rem 2rem}.post-body[data-astro-cid-7jjqptxk]{padding:2rem 1rem 3rem}}
+</style></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  <article class="post" data-astro-cid-7jjqptxk>
+    <header class="post-header" data-astro-cid-7jjqptxk>
+      <div class="post-header-inner" data-astro-cid-7jjqptxk>
+        <a href="/blog" class="back-link" data-astro-cid-7jjqptxk>Back to Work Diary</a>
+        <div class="post-meta" data-astro-cid-7jjqptxk>
+          <time datetime="2026-06-07" data-astro-cid-7jjqptxk>June 6, 2026</time>
+          
+        </div>
+        <h1 data-astro-cid-7jjqptxk>Human-in-the-Loop Is a Delivery Guarantee, Not a UI Feature</h1>
+        <p class="post-desc" data-astro-cid-7jjqptxk>Human-in-the-loop agent delivery is exactly-once, fail-closed. Two repos shipped the same four-move discipline the same day — convergence, not coincidence.</p>
+        <div class="post-tags" data-astro-cid-7jjqptxk>
+          <span class="tag" data-astro-cid-7jjqptxk>ai-agents</span><span class="tag" data-astro-cid-7jjqptxk>typescript</span><span class="tag" data-astro-cid-7jjqptxk>architecture</span><span class="tag" data-astro-cid-7jjqptxk>slack</span><span class="tag" data-astro-cid-7jjqptxk>distributed-systems</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="post-body" data-astro-cid-7jjqptxk>
+      <div class="prose" data-astro-cid-7jjqptxk>
+        <p>Two repos. One missing guarantee.</p>
+<p>In <code>agent-governance-plane</code>, a human’s approval was cryptographically signed with Ed25519 and written to a tamper-evident journal. Solid. Except the only <code>InteractionSource</code> wired into the system was an in-memory test stub. A human could see an Allow/Deny prompt — but the click had no way home. The signed approval was a letter with no mailbox.</p>
+<p>In <code>claude-code-slack-channel</code>, an agent’s reply to a Slack thread was a synchronous tool call. If the process died between “decide to send” and “send,” the reply vanished. No turn-terminal flush, no retry, no record that an obligation ever existed. The user just waited.</p>
+<p>Different repos, different directions of travel — one inbound (receive a human’s decision), one outbound (deliver an agent’s reply). Same hole: the part where a human and an agent actually hand work to each other was the part nobody made durable.</p>
+<p>On 2026-06-07 both repos closed that hole. They shipped the <strong>same four-move discipline</strong>. And one repo’s spec was lifted, by name, from the other’s pattern. That is the part worth your attention.</p>
+<h2 id="the-reframe-this-is-distributed-systems-not-ui">The reframe: this is distributed systems, not UI</h2>
+<p>Human-in-the-loop gets filed under “product” — a button, a modal, a confirmation dialog. That framing is why it breaks in production. The moment a decision has to survive a crash, an ack-loss, or a dropped socket, you are no longer building UI. You are building a durable message system, and the well-known failure modes apply.</p>
+<p>The receiver and the reply path are both solving <strong>exactly-once delivery</strong>, <strong>message deduplication</strong>, and <strong>fail-closed defaults</strong>. Strip away Slack and the problem is identical to any outbox or any consumer that must not lose, must not duplicate, and must not silently double-act.</p>
+<p>Four moves fall out of that framing:</p>
+<ol>
+<li><strong>Record the obligation before the send.</strong> Crash-before-send must be safe — the obligation outlives the process.</li>
+<li><strong>Stamp an idempotency key into the message</strong> so a later scan can recognize “already delivered.”</li>
+<li><strong>Redeliver idempotently from a poller</strong> — a background drain that reconciles from disk, so ack-loss redelivery is a no-op.</li>
+<li><strong>Fail closed on no-decision.</strong> Timeout, dropped socket, no lease → deny and journal, or queue. Never crash, never silently double-act.</li>
+</ol>
+<p>Hold those four moves. They recur on both sides.</p>
+<h2 id="the-reply-outbox-ccscs-durable-delivery-pattern">The reply outbox: CCSC’s durable delivery pattern</h2>
+<p>CCSC has an inverted architecture, and the inversion is exactly why durability is hard: <strong>a reply is a synchronous tool call, not a turn-terminal event.</strong> There is no natural “end of turn” to flush at. That is what the <strong>outbox pattern</strong> is for: record the obligation durably <em>before</em> attempting the send, so a crash can’t lose it. The agent calls a reply tool mid-reasoning and expects delivery to just happen. So the durability machinery has to live behind the tool, invisible to the caller.</p>
+<p>The reply-delivery contract (ADR-002 addendum, “Option A: a safety-net behind the reply tool”) is deliberately narrow: <strong>single-message text replies only.</strong> One obligation equals one message, so the idempotency is exact. Chunked, file, and streaming replies stay best-effort and do not enqueue — zero double-send risk, durability deferred to later beads. Scope discipline is part of the design, not a shortcut.</p>
+<p>The machinery lives in <code>slack-delivery.ts</code> — a side-effect-free sibling module, deliberately <em>not</em> inline in <code>server.ts</code>, so it is testable without dragging in server module-load side effects. The center of it is <code>deliverReplyDurably</code>:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#6A737D">// Record the obligation BEFORE the send (move 1).</span></span>
+<span class="line"><span style="color:#6A737D">// Crash here is safe — the poller will find the pending obligation and drain it.</span></span>
+<span class="line"><span style="color:#F97583">async</span><span style="color:#F97583"> function</span><span style="color:#B392F0"> deliverReplyDurably</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">deps</span><span style="color:#F97583">:</span><span style="color:#B392F0"> IdempotentSendDeps</span><span style="color:#E1E4E8">, </span><span style="color:#FFAB70">reply</span><span style="color:#F97583">:</span><span style="color:#B392F0"> ReplyObligation</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> obligation</span><span style="color:#F97583"> =</span><span style="color:#F97583"> await</span><span style="color:#E1E4E8"> deps.</span><span style="color:#B392F0">recordPending</span><span style="color:#E1E4E8">(reply); </span><span style="color:#6A737D">// UUID id == idempotency key</span></span>
+<span class="line"><span style="color:#F97583">  try</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">    const</span><span style="color:#79B8FF"> ts</span><span style="color:#F97583"> =</span><span style="color:#F97583"> await</span><span style="color:#E1E4E8"> deps.</span><span style="color:#B392F0">send</span><span style="color:#E1E4E8">(obligation);           </span><span style="color:#6A737D">// one inline attempt</span></span>
+<span class="line"><span style="color:#F97583">    await</span><span style="color:#E1E4E8"> deps.</span><span style="color:#B392F0">markDelivered</span><span style="color:#E1E4E8">(obligation.id, ts);</span></span>
+<span class="line"><span style="color:#F97583">    return</span><span style="color:#E1E4E8"> { status: </span><span style="color:#9ECBFF">"delivered"</span><span style="color:#E1E4E8">, ts };</span></span>
+<span class="line"><span style="color:#E1E4E8">  } </span><span style="color:#F97583">catch</span><span style="color:#E1E4E8"> (err) {</span></span>
+<span class="line"><span style="color:#F97583">    if</span><span style="color:#E1E4E8"> (</span><span style="color:#B392F0">isTransient</span><span style="color:#E1E4E8">(err)) {</span></span>
+<span class="line"><span style="color:#6A737D">      // Queued — the poller redelivers idempotently. Tell the agent "queued"</span></span>
+<span class="line"><span style="color:#6A737D">      // so it does NOT retry and double-post (move 4: never double-act).</span></span>
+<span class="line"><span style="color:#F97583">      return</span><span style="color:#E1E4E8"> { status: </span><span style="color:#9ECBFF">"queued"</span><span style="color:#E1E4E8"> };</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#F97583">    await</span><span style="color:#E1E4E8"> deps.</span><span style="color:#B392F0">markDead</span><span style="color:#E1E4E8">(obligation.id, err);           </span><span style="color:#6A737D">// non-retryable → recorded dead</span></span>
+<span class="line"><span style="color:#F97583">    throw</span><span style="color:#E1E4E8"> err;</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>The obligation id is a fresh UUID per reply call, and that id <em>is</em> the idempotency key. So when the poller later redelivers the same obligation, it dedups against itself. That is move 2, and it lives in the message metadata:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#6A737D">// The single site that stamps delivery metadata onto the outbound message.</span></span>
+<span class="line"><span style="color:#F97583">async</span><span style="color:#F97583"> function</span><span style="color:#B392F0"> postReply</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">client</span><span style="color:#F97583">:</span><span style="color:#B392F0"> WebClient</span><span style="color:#E1E4E8">, </span><span style="color:#FFAB70">obligation</span><span style="color:#F97583">:</span><span style="color:#B392F0"> ReplyObligation</span><span style="color:#E1E4E8">, </span><span style="color:#FFAB70">key</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> string</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#F97583">  return</span><span style="color:#E1E4E8"> client.chat.</span><span style="color:#B392F0">postMessage</span><span style="color:#E1E4E8">({</span></span>
+<span class="line"><span style="color:#E1E4E8">    channel: obligation.channel,</span></span>
+<span class="line"><span style="color:#E1E4E8">    thread_ts: obligation.thread,</span></span>
+<span class="line"><span style="color:#E1E4E8">    text: obligation.text,</span></span>
+<span class="line"><span style="color:#E1E4E8">    metadata: {</span></span>
+<span class="line"><span style="color:#E1E4E8">      event_type: </span><span style="color:#79B8FF">DELIVERY_METADATA_EVENT_TYPE</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">      event_payload: { idempotency_key: key },</span></span>
+<span class="line"><span style="color:#E1E4E8">    },</span></span>
+<span class="line"><span style="color:#E1E4E8">  });</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>Move 3 is the scan. Before sending, or when redelivering, <code>findDelivered</code> walks the destination thread via <code>conversations.replies</code> with <code>include_all_metadata: true</code>, looking for a message <em>we</em> posted carrying our delivery <code>event_type</code> and a matching <code>idempotency_key</code>. A hit returns the existing <code>ts</code> — so an ack-loss redelivery becomes a no-op instead of a duplicate.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#6A737D">// A redelivery after ack-loss finds the prior post and returns its ts. No second message.</span></span>
+<span class="line"><span style="color:#F97583">async</span><span style="color:#F97583"> function</span><span style="color:#B392F0"> findDelivered</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">client</span><span style="color:#F97583">:</span><span style="color:#B392F0"> WebClient</span><span style="color:#E1E4E8">, </span><span style="color:#FFAB70">channel</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> string</span><span style="color:#E1E4E8">, </span><span style="color:#FFAB70">thread</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> string</span><span style="color:#E1E4E8">, </span><span style="color:#FFAB70">key</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> string</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> res</span><span style="color:#F97583"> =</span><span style="color:#F97583"> await</span><span style="color:#E1E4E8"> client.conversations.</span><span style="color:#B392F0">replies</span><span style="color:#E1E4E8">({</span></span>
+<span class="line"><span style="color:#E1E4E8">    channel, ts: thread, include_all_metadata: </span><span style="color:#79B8FF">true</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  });</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> hit</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> res.messages?.</span><span style="color:#B392F0">find</span><span style="color:#E1E4E8">(</span></span>
+<span class="line"><span style="color:#E1E4E8">    (</span><span style="color:#FFAB70">m</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> m.metadata?.event_type </span><span style="color:#F97583">===</span><span style="color:#79B8FF"> DELIVERY_METADATA_EVENT_TYPE</span></span>
+<span class="line"><span style="color:#F97583">        &#x26;&#x26;</span><span style="color:#E1E4E8"> m.metadata?.event_payload?.idempotency_key </span><span style="color:#F97583">===</span><span style="color:#E1E4E8"> key,</span></span>
+<span class="line"><span style="color:#E1E4E8">  );</span></span>
+<span class="line"><span style="color:#F97583">  return</span><span style="color:#E1E4E8"> hit?.ts </span><span style="color:#F97583">??</span><span style="color:#79B8FF"> null</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>The poller itself (PR #228) is a <code>deliveryTimer</code> tick calling <code>supervisor.drainOutbox()</code> on an interval — <code>SLACK_DELIVERY_POLL_MS</code>, default 15s, the timer <code>unref</code>’d so it never holds the process open. A <strong>boot-time drain</strong> recovers crash-pending obligations on startup, and the timer is cleared on shutdown before the supervisor drain, mirroring the existing idle-reaper exactly.</p>
+<p>Fail-closed also means degrading gracefully when the outbox itself is unavailable. <code>DurableUnavailableError</code> is thrown <em>before</em> any obligation is recorded — the outbox isn’t activated, or there’s no lease. The caller catches it and falls back to the prior direct send. Nothing is persisted, nothing needs redelivery, and there is zero regression versus the old path. Durability is additive; its absence degrades gracefully to what shipped before.</p>
+<h2 id="why-not-the-obvious-approach">Why not the obvious approach?</h2>
+<p><strong>Why not just retry inline?</strong> Because inline retry only survives failures the process is alive to handle. The crash-before-send window — record nothing, send nothing, die — is exactly the window inline retry can’t cover. The obligation has to exist on disk before the attempt, or there is nothing to retry from.</p>
+<p><strong>Why not best-effort fire-and-forget?</strong> Because “the reply usually arrives” is not a contract a human can build on. In a HITL loop the reply <em>is</em> the work product. Best-effort means the agent thinks it answered and the human is still waiting — the worst failure, because nobody knows it failed.</p>
+<p><strong>Why is fail-open the dangerous default for an approval gate?</strong> This is the load-bearing one. If a receiver times out and the system fails <em>open</em>, the gated action proceeds without a human decision. An approval gate has to act <em>exactly once</em> on a real human decision; failing open makes it act on <em>no</em> decision at all. The entire reason the gate exists is to stop unapproved actions; failing open deletes the gate precisely when it matters. For anything guarding an action, no-decision must mean <strong>deny</strong>, not <strong>proceed</strong>.</p>
+<h2 id="the-approval-receiver-agps-socket-mode-pattern">The approval receiver: AGP’s Socket Mode pattern</h2>
+<p>AGP comes at the same four moves from the inbound side. PR #66 builds the production receiver per spec <strong>033-AT-SPEC — which is explicitly “lifted from the CCSC pattern, completes the HITL round-trip.”</strong> This is the keystone. What transferred wasn’t code: CCSC delivers outbound and AGP receives inbound, so the two share not a single line. What transferred was the discipline — record the obligation, key it, reconcile it, fail closed — restated as a spec for an inbound approval channel. The convergence is not two teams independently reinventing a wheel; one read the other’s pattern and applied it to the mirror-image problem.</p>
+<p>The transport is Socket Mode: an <strong>outbound</strong> WebSocket from the control plane to Slack. No public ingress — which honors AGP’s “no public surface until defensible” P0 decision. You get durability <em>and</em> no inbound attack surface. That combination is the design point.</p>
+<p>Parsing is a pure function, so it is trivially testable and impossible to make stateful by accident:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#6A737D">// parseBlockAction — pure. block_actions payload → SlackInteraction, or null for noise.</span></span>
+<span class="line"><span style="color:#F97583">function</span><span style="color:#B392F0"> parseBlockAction</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">payload</span><span style="color:#F97583">:</span><span style="color:#B392F0"> SlackPayload</span><span style="color:#E1E4E8">)</span><span style="color:#F97583">:</span><span style="color:#B392F0"> SlackInteraction</span><span style="color:#F97583"> |</span><span style="color:#79B8FF"> null</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> action</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> payload.actions?.[</span><span style="color:#79B8FF">0</span><span style="color:#E1E4E8">];</span></span>
+<span class="line"><span style="color:#F97583">  if</span><span style="color:#E1E4E8"> (</span><span style="color:#F97583">!</span><span style="color:#E1E4E8">action </span><span style="color:#F97583">||</span><span style="color:#E1E4E8"> payload.type </span><span style="color:#F97583">!==</span><span style="color:#9ECBFF"> "block_actions"</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">return</span><span style="color:#79B8FF"> null</span><span style="color:#E1E4E8">; </span><span style="color:#6A737D">// ack-and-ignore</span></span>
+<span class="line"><span style="color:#F97583">  return</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">    nonce: action.value,</span></span>
+<span class="line"><span style="color:#E1E4E8">    approved: action.action_id </span><span style="color:#F97583">===</span><span style="color:#9ECBFF"> "approve"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">    userId: payload.user.id,</span></span>
+<span class="line"><span style="color:#E1E4E8">    isBot: </span><span style="color:#B392F0">Boolean</span><span style="color:#E1E4E8">(payload.user.is_bot),</span></span>
+<span class="line"><span style="color:#E1E4E8">  };</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>The receiver holds a <strong>pending-by-nonce promise Map</strong>, acks every envelope first (Slack drops you if you’re slow), then resolves the awaiting <code>awaitInteraction(nonce)</code> on a matching click. A <code>resolved</code> Set makes replay detection explicit — a click that arrives for an already-settled nonce is <em>reported as a replay</em>, never acted on a second time:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#F97583">class</span><span style="color:#B392F0"> SocketModeInteractionSource</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">  private</span><span style="color:#FFAB70"> pending</span><span style="color:#F97583"> =</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> Map</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#79B8FF">string</span><span style="color:#E1E4E8">, </span><span style="color:#B392F0">Deferred</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">Decision</span><span style="color:#E1E4E8">>>();</span></span>
+<span class="line"><span style="color:#F97583">  private</span><span style="color:#FFAB70"> resolved</span><span style="color:#F97583"> =</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> Set</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#79B8FF">string</span><span style="color:#E1E4E8">>();</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">  // Surface a stray/replayed click via onRejected — report it, never act on it.</span></span>
+<span class="line"><span style="color:#F97583">  private</span><span style="color:#B392F0"> reject</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">nonce</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> string</span><span style="color:#E1E4E8">, </span><span style="color:#FFAB70">reason</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> string</span><span style="color:#E1E4E8">) { </span><span style="color:#6A737D">/* onRejected({ nonce, reason }) */</span><span style="color:#E1E4E8"> }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">  onInteraction</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">i</span><span style="color:#F97583">:</span><span style="color:#B392F0"> SlackInteraction</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#F97583">    if</span><span style="color:#E1E4E8"> (</span><span style="color:#79B8FF">this</span><span style="color:#E1E4E8">.resolved.</span><span style="color:#B392F0">has</span><span style="color:#E1E4E8">(i.nonce)) {</span></span>
+<span class="line"><span style="color:#6A737D">      // move 4: a replayed click is a no-op, surfaced as a reason — not a second approval.</span></span>
+<span class="line"><span style="color:#79B8FF">      this</span><span style="color:#E1E4E8">.</span><span style="color:#B392F0">reject</span><span style="color:#E1E4E8">(i.nonce, </span><span style="color:#9ECBFF">"nonce already used (replay)"</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#F97583">      return</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#F97583">    const</span><span style="color:#79B8FF"> d</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> this</span><span style="color:#E1E4E8">.pending.</span><span style="color:#B392F0">get</span><span style="color:#E1E4E8">(i.nonce);</span></span>
+<span class="line"><span style="color:#F97583">    if</span><span style="color:#E1E4E8"> (</span><span style="color:#F97583">!</span><span style="color:#E1E4E8">d) { </span><span style="color:#79B8FF">this</span><span style="color:#E1E4E8">.</span><span style="color:#B392F0">reject</span><span style="color:#E1E4E8">(i.nonce, </span><span style="color:#9ECBFF">"unknown nonce"</span><span style="color:#E1E4E8">); </span><span style="color:#F97583">return</span><span style="color:#E1E4E8">; }</span></span>
+<span class="line"><span style="color:#79B8FF">    this</span><span style="color:#E1E4E8">.resolved.</span><span style="color:#B392F0">add</span><span style="color:#E1E4E8">(i.nonce);</span></span>
+<span class="line"><span style="color:#E1E4E8">    d.</span><span style="color:#B392F0">resolve</span><span style="color:#E1E4E8">({ approved: i.approved, userId: i.userId });</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">  // Timeout defaults to the nonce TTL (5 min) — the receiver never out-waits the nonce.</span></span>
+<span class="line"><span style="color:#B392F0">  awaitInteraction</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">nonce</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> string</span><span style="color:#E1E4E8">) { </span><span style="color:#6A737D">/* register + arm TTL timer */</span><span style="color:#E1E4E8"> }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>That replay-detection guard is move 4 again, mirrored: the outbox’s never-double-<em>send</em> rule becomes the receiver’s never-double-<em>act</em> rule. Same principle, opposite direction of travel.</p>
+<p>Fail-closed shows up in three places, and all three matter:</p>
+<ul>
+<li><code>stop()</code> closes the socket and <strong>fails closed on every still-pending approval</strong> — a shutdown mid-decision denies, it does not hang.</li>
+<li>In <code>run.ts</code>, <code>AGP_CHANNEL=slack</code> plus <code>AGP_SLACK_LIVE=1</code> constructs the live receiver. <strong>Unset <code>AGP_SLACK_LIVE</code> fails closed</strong> — the system refuses to post a prompt that nothing can answer. A prompt with no receiver is worse than no prompt; it implies a decision is being collected when none can be.</li>
+<li>In <code>daemon.ts</code>, a no-decision — receiver timeout or socket drop — now <strong>fails closed (deny + journaled reason) instead of crashing the loop</strong>, in both <code>mediate()</code> and <code>gate()</code>. It reuses the existing <code>approval.denied</code> journal kind, so there is no schema change: a fail-closed deny is indistinguishable, downstream, from an explicit human deny. The action does not happen, and there is a signed record of why.</li>
+</ul>
+<p>The <code>FetchWebSocketDialer</code> (<code>apps.connections.open</code> → <code>wss</code>) injects both <code>fetch</code> and the socket constructor, so the response and adapter logic is CI-tested; only the real <code>new WebSocket</code> seam runs off-CI under <code>AGP_SLACK_LIVE</code>. The same testability discipline as CCSC’s side-effect-free module — extract the seam, test everything up to it.</p>
+<h2 id="the-transferable-rule">The transferable rule</h2>
+<p>If you are building any human-in-the-loop agent — Slack, email, a web approval, a CLI prompt — these four moves are your checklist:</p>
+<ol>
+<li><strong>Record the obligation before the send.</strong> Crash-before-send must be safe.</li>
+<li><strong>Stamp an idempotency key into the message.</strong> A later scan must be able to recognize “already done.”</li>
+<li><strong>Redeliver idempotently from a poller.</strong> Reconcile from durable state; make redelivery a no-op.</li>
+<li><strong>Fail closed on no-decision.</strong> Timeout, dropped socket, no lease → deny and journal, or queue. Never crash, never silently double-act.</li>
+</ol>
+<p>Move 4 is the non-negotiable one. Anything that gates an action must treat the absence of a human decision as a <em>no</em>. Fail-open turns a safety gate into a rubber stamp the instant the network hiccups.</p>
+<p>The convergence is the evidence. When two systems built for mirror-image roles — one delivering replies out, one receiving approvals in — arrive at the same discipline, and one explicitly cites the other, that is not a local trick. It is the shape of the problem. And the discipline it demands is non-negotiable: an agent you can’t trust to fail safely is an agent you can’t deploy.</p>
+<p>Both shipped clean. CCSC’s <code>slack-delivery.ts</code> hit 100% line coverage; the test suite grew from 1127 to 1133 tests across the three PRs with all nine gates green each time, and the durable path was extracted to <code>executeReplyDurablePath</code> to keep <code>executeReply</code> under CRAP 30. AGP landed at 88.89% function / 91.43% line coverage — over the repo’s configured floor — with typecheck, Biome, claim-scan, harness verify, and escape-scan all green. The PR sequencing in CCSC is itself the lesson: #228 wired the poller into the runtime without touching the reply tool path (<a href="https://startaitools.com/posts/ship-dormant-wire-later-multi-agent-slack/">machinery live but dormant</a>), #229 added the tested building block plus the ADR (design-first), #230 flipped <code>executeReply</code> to route through it. The security-sensitive change got its own isolated PR. Ship dormant, wire later.</p>
+<h2 id="also-shipped">Also shipped</h2>
+<p>The same day, <code>claude-code-plugins</code> landed a deterministic-CI grading track: a <code>pr-classifier</code> doing file-level PR component detection, feeding per-domain lint workflows plus actionlint and a path-routing test, then a PR-level grade coordinator with golden fixtures — alongside the public 100-point grading rubric at <code>/grading</code>, a 176-test pytest harness for the penetration-tester pack, and a switch of the PR pre-screen LLM from Groq to DeepSeek. And <code>contributing-clanker</code> added two gates: C24 (engagement-frame) and C25 (maintainer-URL leakage).</p>
+<h2 id="related-posts">Related Posts</h2>
+<ul>
+<li><a href="https://startaitools.com/posts/ship-dormant-wire-later-multi-agent-slack/">Ship Dormant, Wire Later — A Multi-Agent Slack Production Day</a></li>
+<li><a href="https://startaitools.com/posts/making-agents-reliable-on-real-device-clouds/">Making Agents Reliable on Real-Device Clouds</a></li>
+<li><a href="/blog/server-ops-mcp-safety-before-tools/">Safety Model First: 16-Tool Ops MCP, One Day</a></li>
+</ul>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "Human-in-the-Loop Is a Delivery Guarantee, Not a UI Feature",
+  "description": "Human-in-the-loop agent delivery is exactly-once, fail-closed. Two repos shipped the same four-move discipline the same day — convergence, not coincidence.",
+  "datePublished": "2026-06-07T08:00:00-05:00",
+  "author": {
+    "@type": "Person",
+    "name": "Jeremy Longshore",
+    "url": "https://startaitools.com/about/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "StartAITools",
+    "url": "https://startaitools.com"
+  },
+  "articleSection": "Technical Deep-Dive",
+  "keywords": "ai-agents, typescript, architecture, slack, distributed-systems",
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "https://startaitools.com/posts/hitl-delivery-is-a-fail-closed-exactly-once-problem/"
+  }
+}
+</script>
+      </div>
+    </div>
+  </article>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,1062 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>sentry-multi-env-setup - Agent Skill</title>
+    <meta name="description" content="Configure Sentry across development, staging, and production environments with separate DSNs, environment-specific sample rates, per-environment alert rules, and dashboard filtering. Use when setting up Sentry for dev/staging/production, managing environment-specific configurations, isolating data between environments, or configuring .env files for per-environment DSNs. Trigger: &quot;sentry environments&quot;, &quot;sentry staging setup&quot;, &quot;multi-environment sentry&quot;, &quot;sentry dev vs prod&quot;, &quot;sentry DSN per env&quot;.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://tonsofskills.com/tons-of-skills-marketplace/skills/sentry-multi-env-setup/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/sentry-multi-env-setup/">
+    <meta property="og:title" content="sentry-multi-env-setup - Agent Skill">
+    <meta property="og:description" content="Configure Sentry across development, staging, and production environments with separate DSNs, environment-specific sample rates, per-environment alert rules, and dashboard filtering. Use when setting up Sentry for dev/staging/production, managing environment-specific configurations, isolating data between environments, or configuring .env files for per-environment DSNs. Trigger: &quot;sentry environments&quot;, &quot;sentry staging setup&quot;, &quot;multi-environment sentry&quot;, &quot;sentry dev vs prod&quot;, &quot;sentry DSN per env&quot;.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="sentry-multi-env-setup - Agent Skill">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/sentry-multi-env-setup/">
+    <meta name="twitter:title" content="sentry-multi-env-setup - Agent Skill">
+    <meta name="twitter:description" content="Configure Sentry across development, staging, and production environments with separate DSNs, environment-specific sample rates, per-environment alert rules, and dashboard filtering. Use when setting up Sentry for dev/staging/production, managing environment-specific configurations, isolating data between environments, or configuring .env files for per-environment DSNs. Trigger: &quot;sentry environments&quot;, &quot;sentry staging setup&quot;, &quot;multi-environment sentry&quot;, &quot;sentry dev vs prod&quot;, &quot;sentry DSN per env&quot;.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"sentry-multi-env-setup","description":"Configure Sentry across development, staging, and production environments with separate DSNs, environment-specific sample rates, per-environment alert rules, and dashboard filtering. Use when setting up Sentry for dev/staging/production, managing environment-specific configurations, isolating data between environments, or configuring .env files for per-environment DSNs. Trigger: \"sentry environments\", \"sentry staging setup\", \"multi-environment sentry\", \"sentry dev vs prod\", \"sentry DSN per env\".","version":"1.51.0","author":{"@type":"Person","name":"Jeremy Longshore"},"license":"MIT","programmingLanguage":"Claude Code Agent Skill","isPartOf":{"@type":"SoftwareApplication","name":"sentry-pack","applicationCategory":"unknown"}}</script>
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.breadcrumbs[data-astro-cid-ilhxcym7]{margin-bottom:var(--space-5)}.breadcrumbs__list[data-astro-cid-ilhxcym7]{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;list-style:none;padding:0;margin:0;font-family:var(--font-mono);font-size:var(--text-sm, .8rem)}.breadcrumbs__item[data-astro-cid-ilhxcym7]{display:flex;align-items:center;gap:.375rem}.breadcrumbs__link[data-astro-cid-ilhxcym7]{color:var(--text-3);text-decoration:none;transition:color var(--duration-fast, .2s) var(--ease-out)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:hover{color:var(--primary)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:0}.breadcrumbs__sep[data-astro-cid-ilhxcym7]{color:var(--text-3);user-select:none;font-size:.7em;line-height:1}.breadcrumbs__current[data-astro-cid-ilhxcym7]{color:var(--text-2)}.detail-cta[data-astro-cid-qcigfm7x]{background:var(--surface-3, var(--brand-light-gray));border-top:1px solid var(--border, var(--brand-light-gray));border-radius:var(--radius-lg);padding:2rem 1.5rem;margin-top:2rem;text-align:center}.detail-cta__headline[data-astro-cid-qcigfm7x]{font-family:var(--font-display);font-weight:700;font-size:1.35rem;color:var(--text, var(--brand-dark));margin-bottom:1.25rem}.detail-cta__actions[data-astro-cid-qcigfm7x]{display:flex;justify-content:center;gap:.75rem;flex-wrap:wrap}.detail-cta__primary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:var(--primary);color:#0a0a0c;border:none;border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;cursor:pointer;transition:background var(--duration-fast) var(--ease-out),transform var(--duration-fast) var(--ease-out)}.detail-cta__primary[data-astro-cid-qcigfm7x]:hover{background:var(--primary-dark, var(--primary-dark));transform:translateY(-1px)}.detail-cta__primary[data-astro-cid-qcigfm7x].copied{background:var(--positive, var(--brand-green))}.detail-cta__secondary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:transparent;color:var(--text, var(--brand-dark));border:1px solid var(--border, var(--brand-mid-gray));border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;text-decoration:none;transition:border-color var(--duration-fast) var(--ease-out),color var(--duration-fast) var(--ease-out)}.detail-cta__secondary[data-astro-cid-qcigfm7x]:hover{border-color:var(--primary);color:var(--primary)}@media(max-width:480px){.detail-cta__actions[data-astro-cid-qcigfm7x]{flex-direction:column;align-items:stretch}.detail-cta__primary[data-astro-cid-qcigfm7x],.detail-cta__secondary[data-astro-cid-qcigfm7x]{justify-content:center}}
+</style>
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/_slug_@_@astro.wF9emvVq.css"></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  
+  
+
+  <div class="skill-detail" data-astro-cid-jrlgpo3w>
+    <!-- 1. Breadcrumbs -->
+    <nav aria-label="Breadcrumb" class="breadcrumbs" data-astro-cid-ilhxcym7>
+  <ol class="breadcrumbs__list" itemscope itemtype="https://schema.org/BreadcrumbList" data-astro-cid-ilhxcym7>
+    <li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Home</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="1">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/skills/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Skills</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="2">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          <span class="breadcrumbs__current" aria-current="page" itemprop="name" data-astro-cid-ilhxcym7>
+              sentry-multi-env-setup
+            </span>
+          <meta itemprop="position" content="3">
+        </li>
+  </ol>
+</nav>
+
+    <!-- 2. Header (enhanced) -->
+    <header class="skill-header" data-astro-cid-jrlgpo3w>
+      <h1 data-astro-cid-jrlgpo3w>sentry-multi-env-setup</h1>
+      <p class="skill-description" data-astro-cid-jrlgpo3w>Configure Sentry across development, staging, and production environments with separate DSNs, environment-specific sample rates, per-environment alert rules, and dashboard filtering. Use when setting up Sentry for dev/staging/production, managing environment-specific configurations, isolating data between environments, or configuring .env files for per-environment DSNs. Trigger: &quot;sentry environments&quot;, &quot;sentry staging setup&quot;, &quot;multi-environment sentry&quot;, &quot;sentry dev vs prod&quot;, &quot;sentry DSN per env&quot;.</p>
+
+      <div class="skill-metadata" data-astro-cid-jrlgpo3w>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>v1.51.0</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>Jeremy Longshore</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>MIT</span>
+        </div>
+      </div>
+
+      
+    </header>
+
+    <!-- 4. Allowed Tools -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Allowed Tools</h2>
+      <div class="tools-grid" data-astro-cid-jrlgpo3w>
+        <span class="tool-badge" data-astro-cid-jrlgpo3w>Read</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Write</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Edit</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Grep</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Glob</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(npm:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(npx:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(node:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(sentry-cli:*)</span>
+      </div>
+      
+    </section>
+
+    <!-- 5. Provided by Plugin -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Provided by Plugin</h2>
+      <div class="plugin-info" data-astro-cid-jrlgpo3w>
+        <div class="plugin-details" data-astro-cid-jrlgpo3w>
+          <h3 data-astro-cid-jrlgpo3w>
+            <a href="/plugins/sentry-pack/" data-astro-cid-jrlgpo3w>sentry-pack</a>
+          </h3>
+          <p data-astro-cid-jrlgpo3w>Claude Code skill pack for Sentry (30 skills)</p>
+          <div class="plugin-meta" data-astro-cid-jrlgpo3w>
+            <span data-astro-cid-jrlgpo3w>unknown</span>
+            <span data-astro-cid-jrlgpo3w>v1.51.0</span>
+          </div>
+        </div>
+        <a href="/plugins/sentry-pack/" class="btn-primary" data-astro-cid-jrlgpo3w>View Plugin</a>
+      </div>
+    </section>
+
+    <!-- 6. Installation -->
+    <section class="section-box dark" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Installation</h2>
+      <p class="install-note" style="color: var(--brand-light-gray); margin-bottom: 0.75rem;" data-astro-cid-jrlgpo3w>This skill is included in the sentry-pack plugin:</p>
+      <pre class="install-command" data-copy="/plugin install sentry-pack@claude-code-plugins-plus" data-astro-cid-jrlgpo3w><code data-astro-cid-jrlgpo3w>/plugin install sentry-pack@claude-code-plugins-plus</code></pre>
+      <p class="install-note" data-astro-cid-jrlgpo3w>Click to copy</p>
+    </section>
+
+    <!-- 7. Skill Content (Markdown) -->
+    <section class="skill-content-section" data-astro-cid-jrlgpo3w>
+      <h2 data-astro-cid-jrlgpo3w>Instructions</h2>
+      <div class="skill-content" data-astro-cid-jrlgpo3w>
+        <div data-astro-cid-jrlgpo3w><h1>Sentry Multi-Environment Setup</h1>
+<h2>Overview</h2>
+<p>Configure Sentry to run across development, staging, and production with isolated DSNs, tuned sample rates, environment-aware alert routing, and dashboard filtering. Covers <code>@sentry/node</code> v8+ (TypeScript) and <code>sentry-sdk</code> v2+ (Python), targeting <code>sentry.io</code> or self-hosted Sentry 24.1+. The goal is to capture everything in dev, validate in staging, and protect production with tight sampling and PII scrubbing.</p>
+<h2>Prerequisites</h2>
+<ul>
+<li>Sentry organization at <a href="https://sentry.io">sentry.io</a> with at least one project created</li>
+<li><code>@sentry/node</code> v8+ installed (<code>npm install @sentry/node</code>) or <code>sentry-sdk</code> v2+ (<code>pip install sentry-sdk</code>)</li>
+<li>Environment naming convention agreed upon (this guide uses <code>development</code>, <code>staging</code>, <code>production</code>)</li>
+<li>DSN strategy decided: single project with environment tags or separate projects per environment (see <a href="references/project-structure-options.md">project-structure-options.md</a>)</li>
+<li><code>.env</code> file management tooling (dotenv, direnv, or platform-native env config)</li>
+</ul>
+<h2>Instructions</h2>
+<h3>Step 1 — Create Environment-Aware SDK Configuration with Separate DSNs</h3>
+<p>Each environment gets its own DSN pointing to a dedicated Sentry project. This prevents dev noise from inflating production quotas and allows independent rate limits per environment.</p>
+<p><strong>Set up <code>.env</code> files per environment:</strong></p>
+<pre data-lang="bash"><code>
+# .env.development
+SENTRY_DSN=https://dev-key@o0.ingest.sentry.io/111
+SENTRY_ENVIRONMENT=development
+SENTRY_RELEASE=local-dev
+
+# .env.staging
+SENTRY_DSN=https://staging-key@o0.ingest.sentry.io/222
+SENTRY_ENVIRONMENT=staging
+
+# .env.production
+SENTRY_DSN=https://prod-key@o0.ingest.sentry.io/333
+SENTRY_ENVIRONMENT=production
+</code></pre>
+<p><strong>TypeScript — environment-aware init with typed config:</strong></p>
+<pre data-lang="typescript"><code>
+// config/sentry.ts
+import * as Sentry from &#39;@sentry/node&#39;;
+
+type Environment = &#39;development&#39; | &#39;staging&#39; | &#39;production&#39;;
+
+interface EnvSentryConfig {
+  tracesSampleRate: number;
+  sampleRate: number;
+  debug: boolean;
+  sendDefaultPii: boolean;
+  maxBreadcrumbs: number;
+  enabled: boolean;
+}
+
+const ENV_CONFIG: Record&lt;Environment, EnvSentryConfig&gt; = {
+  development: {
+    tracesSampleRate: 1.0,   // Capture every transaction for local debugging
+    sampleRate: 1.0,         // Every error
+    debug: true,             // Verbose console output for SDK troubleshooting
+    sendDefaultPii: true,    // Include PII for local debugging only
+    maxBreadcrumbs: 100,     // Full breadcrumb trail
+    enabled: true,           // Set to false to fully disable in dev
+  },
+  staging: {
+    tracesSampleRate: 0.5,   // 50% of transactions — enough to catch regressions
+    sampleRate: 1.0,         // All errors — staging validates error handling
+    debug: false,
+    sendDefaultPii: false,   // Staging mirrors prod PII policy
+    maxBreadcrumbs: 50,
+    enabled: true,
+  },
+  production: {
+    tracesSampleRate: 0.1,   // 10% — balances visibility with quota budget
+    sampleRate: 1.0,         // All errors — never drop production errors
+    debug: false,
+    sendDefaultPii: false,   // Never send PII in production
+    maxBreadcrumbs: 50,
+    enabled: true,
+  },
+};
+
+export function initSentry(env?: Environment): void {
+  const environment = env
+    || (process.env.SENTRY_ENVIRONMENT as Environment)
+    || (process.env.NODE_ENV as Environment)
+    || &#39;development&#39;;
+
+  const config = ENV_CONFIG[environment] || ENV_CONFIG.development;
+
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    environment,
+    release: process.env.SENTRY_RELEASE || `app@${process.env.npm_package_version || &#39;unknown&#39;}`,
+    ...config,
+
+    // Environment-specific event filtering
+    beforeSend(event) {
+      // Dev: capture everything for debugging
+      if (environment === &#39;development&#39;) return event;
+
+      // Staging: drop debug-level events to reduce noise
+      if (environment === &#39;staging&#39; &amp;&amp; event.level === &#39;debug&#39;) return null;
+
+      // Production: aggressive filtering
+      if (environment === &#39;production&#39;) {
+        // Drop known non-actionable browser errors
+        if (event.exception?.values?.some(e =&gt;
+          e.value?.match(/ResizeObserver|Loading chunk|AbortError/)
+        )) return null;
+
+        // Scrub sensitive headers
+        if (event.request?.headers) {
+          delete event.request.headers[&#39;Authorization&#39;];
+          delete event.request.headers[&#39;Cookie&#39;];
+          delete event.request.headers[&#39;X-API-Key&#39;];
+        }
+      }
+
+      return event;
+    },
+  });
+}
+</code></pre>
+<p><strong>Python — equivalent multi-environment init:</strong></p>
+<pre data-lang="python"><code>
+# config/sentry_config.py
+import os
+import sentry_sdk
+
+ENV_CONFIG = {
+    &quot;development&quot;: {
+        &quot;traces_sample_rate&quot;: 1.0,
+        &quot;sample_rate&quot;: 1.0,
+        &quot;debug&quot;: True,
+        &quot;send_default_pii&quot;: True,
+        &quot;max_breadcrumbs&quot;: 100,
+    },
+    &quot;staging&quot;: {
+        &quot;traces_sample_rate&quot;: 0.5,
+        &quot;sample_rate&quot;: 1.0,
+        &quot;debug&quot;: False,
+        &quot;send_default_pii&quot;: False,
+        &quot;max_breadcrumbs&quot;: 50,
+    },
+    &quot;production&quot;: {
+        &quot;traces_sample_rate&quot;: 0.1,
+        &quot;sample_rate&quot;: 1.0,
+        &quot;debug&quot;: False,
+        &quot;send_default_pii&quot;: False,
+        &quot;max_breadcrumbs&quot;: 50,
+    },
+}
+
+
+def init_sentry() -&gt; None:
+    environment = os.environ.get(
+        &quot;SENTRY_ENVIRONMENT&quot;,
+        os.environ.get(&quot;PYTHON_ENV&quot;, &quot;development&quot;),
+    )
+    config = ENV_CONFIG.get(environment, ENV_CONFIG[&quot;development&quot;])
+
+    def before_send(event, hint):
+        if environment == &quot;production&quot;:
+            exc_info = hint.get(&quot;exc_info&quot;)
+            if exc_info:
+                exc_type = exc_info[0]
+                # Drop expected exceptions in production
+                if exc_type in (KeyboardInterrupt, SystemExit):
+                    return None
+            # Scrub PII from headers
+            request = event.get(&quot;request&quot;, {})
+            headers = request.get(&quot;headers&quot;, {})
+            for key in (&quot;Authorization&quot;, &quot;Cookie&quot;, &quot;X-API-Key&quot;):
+                headers.pop(key, None)
+        return event
+
+    sentry_sdk.init(
+        dsn=os.environ.get(&quot;SENTRY_DSN&quot;, &quot;&quot;),
+        environment=environment,
+        release=os.environ.get(&quot;SENTRY_RELEASE&quot;, &quot;unknown&quot;),
+        before_send=before_send,
+        **config,
+    )
+</code></pre>
+<h3>Step 2 — Configure Per-Environment Alert Rules and Dashboard Filtering</h3>
+<p>Alert routing prevents dev noise from waking on-call engineers. Each environment gets alert rules matching its severity tier.</p>
+<p><strong>Production alert rules (Sentry dashboard &gt; Alerts &gt; Create Rule):</strong></p>
+<table><thead><tr>
+<th>Alert Type</th>
+<th>Condition</th>
+<th>Filter</th>
+<th>Action</th>
+</tr></thead><tbody>
+<tr>
+<td>Issue alert</td>
+<td>New issue</td>
+<td><code>environment:production</code></td>
+<td>PagerDuty on-call</td>
+</tr>
+<tr>
+<td>Metric alert</td>
+<td>Error rate &gt; 50/min for 5 min</td>
+<td><code>environment:production</code></td>
+<td>Slack <code>#alerts-critical</code></td>
+</tr>
+<tr>
+<td>Metric alert</td>
+<td>P95 latency &gt; 2s for 10 min</td>
+<td><code>environment:production</code></td>
+<td>Slack <code>#alerts-performance</code></td>
+</tr>
+</tbody></table>
+<p><strong>Staging alert rules:</strong></p>
+<table><thead><tr>
+<th>Alert Type</th>
+<th>Condition</th>
+<th>Filter</th>
+<th>Action</th>
+</tr></thead><tbody>
+<tr>
+<td>Issue alert</td>
+<td>New issue (first seen)</td>
+<td><code>environment:staging</code></td>
+<td>Slack <code>#alerts-staging</code></td>
+</tr>
+<tr>
+<td>Metric alert</td>
+<td>Error rate &gt; 100/min for 5 min</td>
+<td><code>environment:staging</code></td>
+<td>Slack <code>#alerts-staging</code></td>
+</tr>
+</tbody></table>
+<p><strong>Development:</strong> No alerts configured. Developers check the dashboard manually or use <code>debug: true</code> for console output.</p>
+<p><strong>Add environment context tags for richer filtering:</strong></p>
+<pre data-lang="typescript"><code>
+// Add to Sentry.init() for dashboard filtering
+Sentry.init({
+  // ...base config from Step 1
+  initialScope: {
+    tags: {
+      environment: process.env.SENTRY_ENVIRONMENT || process.env.NODE_ENV,
+      region: process.env.AWS_REGION || process.env.GCP_REGION || &#39;us-east-1&#39;,
+      service: process.env.SERVICE_NAME || &#39;app&#39;,
+      deployment: process.env.DEPLOYMENT_ID || &#39;unknown&#39;,
+    },
+  },
+});
+
+// Dashboard filter queries:
+//   Issues &gt; environment:production is:unresolved
+//   Performance &gt; environment:staging service:api-gateway
+//   Discover &gt; environment:production region:us-east-1
+</code></pre>
+<p><strong>Disable Sentry in test and CI environments:</strong></p>
+<pre data-lang="typescript"><code>
+// test/setup.ts — prevent test runs from sending events
+const isTestEnv = process.env.NODE_ENV === &#39;test&#39; || process.env.CI === &#39;true&#39;;
+
+if (!isTestEnv) {
+  initSentry();
+} else {
+  // Initialize with empty DSN — SDK loads but sends nothing
+  // All Sentry.captureException() calls become safe no-ops
+  Sentry.init({ dsn: &#39;&#39; });
+}
+</code></pre>
+<h3>Step 3 — Wire CI/CD Releases to the Correct Environment</h3>
+<p>Tag Sentry releases with the deploy target so the Releases dashboard shows which commit is running where. Each <code>sentry-cli releases deploys</code> call records a deployment event on the timeline.</p>
+<pre data-lang="bash"><code>
+#!/usr/bin/env bash
+# scripts/sentry-release.sh — call from CI after deploy
+set -euo pipefail
+
+VERSION=&quot;${SENTRY_RELEASE:-$(git rev-parse --short HEAD)}&quot;
+ENVIRONMENT=&quot;${1:?Usage: sentry-release.sh &lt;environment&gt;}&quot;
+ORG=&quot;${SENTRY_ORG:-my-org}&quot;
+PROJECT=&quot;${SENTRY_PROJECT:-my-app}&quot;
+
+echo &quot;Creating Sentry release ${VERSION} for ${ENVIRONMENT}...&quot;
+
+# Create release and associate commits
+sentry-cli releases --org &quot;$ORG&quot; --project &quot;$PROJECT&quot; new &quot;$VERSION&quot;
+sentry-cli releases --org &quot;$ORG&quot; --project &quot;$PROJECT&quot; set-commits &quot;$VERSION&quot; --auto
+
+# Upload source maps (if applicable)
+if [ -d &quot;./dist&quot; ]; then
+  sentry-cli sourcemaps --org &quot;$ORG&quot; --project &quot;$PROJECT&quot; \
+    upload --release=&quot;$VERSION&quot; ./dist
+fi
+
+# Finalize and record deployment
+sentry-cli releases --org &quot;$ORG&quot; --project &quot;$PROJECT&quot; finalize &quot;$VERSION&quot;
+sentry-cli releases --org &quot;$ORG&quot; --project &quot;$PROJECT&quot; \
+  deploys &quot;$VERSION&quot; new --env &quot;$ENVIRONMENT&quot;
+
+echo &quot;Release ${VERSION} deployed to ${ENVIRONMENT}&quot;
+
+# Usage in CI:
+#   ./scripts/sentry-release.sh staging     # after staging deploy
+#   ./scripts/sentry-release.sh production  # after production deploy
+</code></pre>
+<p><strong>GitHub Actions integration:</strong></p>
+<pre data-lang="yaml"><code>
+# .github/workflows/deploy.yml (snippet)
+- name: Create Sentry release
+  env:
+    SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+    SENTRY_ORG: my-org
+    SENTRY_PROJECT: my-app
+  run: |
+    npm install -g @sentry/cli
+    ./scripts/sentry-release.sh ${{ github.event.inputs.environment || &#39;staging&#39; }}
+</code></pre>
+<h2>Output</h2>
+<p>After completing all three steps you will have:</p>
+<ul>
+<li><strong>Per-environment <code>.env</code> files</strong> with isolated DSNs pointing to separate Sentry projects</li>
+<li><strong>Typed SDK init module</strong> (<code>config/sentry.ts</code> or <code>config/sentry_config.py</code>) that reads <code>SENTRY_ENVIRONMENT</code> and applies the correct sample rates, PII policy, and filtering</li>
+<li><strong>Alert rules</strong> routed by environment: PagerDuty for production, Slack for staging, none for dev</li>
+<li><strong>Dashboard filter tags</strong> (<code>environment</code>, <code>region</code>, <code>service</code>) for scoped queries</li>
+<li><strong>CI/CD release script</strong> that tags deploys with the correct environment in Sentry&#39;s timeline</li>
+<li><strong>Test/CI guard</strong> that disables Sentry during automated test runs</li>
+</ul>
+<h2>Error Handling</h2>
+<table><thead><tr>
+<th>Error</th>
+<th>Cause</th>
+<th>Solution</th>
+</tr></thead><tbody>
+<tr>
+<td>Dev events appearing in production dashboard</td>
+<td>Wrong DSN loaded at runtime</td>
+<td>Verify <code>SENTRY_DSN</code> points to the correct project; use <code>dotenv</code> with <code>--env-file .env.production</code></td>
+</tr>
+<tr>
+<td><code>environment: undefined</code> in Sentry events</td>
+<td><code>SENTRY_ENVIRONMENT</code> and <code>NODE_ENV</code> both unset</td>
+<td>Set <code>SENTRY_ENVIRONMENT</code> explicitly in deployment config</td>
+</tr>
+<tr>
+<td>Staging alerts routing to PagerDuty</td>
+<td>Alert rule missing environment filter</td>
+<td>Add <code>environment:production</code> condition to PagerDuty alert rules</td>
+</tr>
+<tr>
+<td>Quota exhausted by dev/staging events</td>
+<td>All environments share one Sentry project</td>
+<td>Use separate projects per environment for independent quotas</td>
+</tr>
+<tr>
+<td>Source maps not resolving in staging</td>
+<td>Release version mismatch</td>
+<td>Ensure <code>SENTRY_RELEASE</code> matches between <code>Sentry.init()</code> and <code>sentry-cli</code> upload</td>
+</tr>
+<tr>
+<td><code>beforeSend</code> dropping wanted events</td>
+<td>Filter regex too broad</td>
+<td>Test filters in staging first; log dropped events with <code>console.warn</code> during rollout</td>
+</tr>
+<tr>
+<td>Python <code>sentry_sdk.init()</code> silently fails</td>
+<td>DSN env var empty string</td>
+<td>Check <code>os.environ.get(&quot;SENTRY_DSN&quot;)</code> is set; empty string disables the SDK</td>
+</tr>
+</tbody></table>
+<h2>Examples</h2>
+<p><strong>TypeScript — Express app with multi-environment Sentry:</strong></p>
+<pre data-lang="typescript"><code>
+// app.ts
+import express from &#39;express&#39;;
+import * as Sentry from &#39;@sentry/node&#39;;
+import { initSentry } from &#39;./config/sentry&#39;;
+
+// Initialize before any other imports that need instrumentation
+initSentry();
+
+const app = express();
+
+// Sentry request handler — must be first middleware
+Sentry.setupExpressErrorHandler(app);
+
+app.get(&#39;/health&#39;, (_req, res) =&gt; res.json({ status: &#39;ok&#39; }));
+
+app.get(&#39;/api/data&#39;, async (_req, res) =&gt; {
+  const span = Sentry.startSpan({ name: &#39;fetch-data&#39;, op: &#39;db.query&#39; }, () =&gt; {
+    // Your database call here
+    return { items: [] };
+  });
+  res.json(span);
+});
+
+// Error handler — Sentry captures unhandled errors automatically
+app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) =&gt; {
+  Sentry.captureException(err);
+  res.status(500).json({ error: &#39;Internal server error&#39; });
+});
+
+app.listen(3000, () =&gt; {
+  console.log(`Server running in ${process.env.SENTRY_ENVIRONMENT || process.env.NODE_ENV} mode`);
+});
+</code></pre>
+<p><strong>Python — FastAPI with multi-environment Sentry:</strong></p>
+<pre data-lang="python"><code>
+# main.py
+import os
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+import sentry_sdk
+from config.sentry_config import init_sentry
+
+# Initialize before app creation
+init_sentry()
+
+app = FastAPI()
+
+
+@app.get(&quot;/health&quot;)
+async def health():
+    return {&quot;status&quot;: &quot;ok&quot;}
+
+
+@app.get(&quot;/api/data&quot;)
+async def get_data():
+    with sentry_sdk.start_span(op=&quot;db.query&quot;, name=&quot;fetch-data&quot;):
+        # Your database call here
+        return {&quot;items&quot;: []}
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    sentry_sdk.capture_exception(exc)
+    return JSONResponse(status_code=500, content={&quot;error&quot;: &quot;Internal server error&quot;})
+
+
+if __name__ == &quot;__main__&quot;:
+    import uvicorn
+    env = os.environ.get(&quot;SENTRY_ENVIRONMENT&quot;, &quot;development&quot;)
+    print(f&quot;Server running in {env} mode&quot;)
+    uvicorn.run(app, host=&quot;0.0.0.0&quot;, port=8000)
+</code></pre>
+<h2>Resources</h2>
+<ul>
+<li><a href="https://docs.sentry.io/product/sentry-basics/environments/">Sentry Environments</a> — official environment concepts</li>
+<li><a href="https://docs.sentry.io/platforms/javascript/configuration/filtering/">Filtering Events</a> — <code>beforeSend</code>, <code>ignoreErrors</code>, deny lists</li>
+<li><a href="https://docs.sentry.io/product/alerts/create-alerts/">Alert Configuration</a> — issue and metric alert rules</li>
+<li><a href="https://docs.sentry.io/product/releases/">Releases &amp; Deploys</a> — commit tracking, deploy markers, suspect commits</li>
+<li><a href="https://docs.sentry.io/cli/">sentry-cli Reference</a> — release creation, source map upload, deploy recording</li>
+<li><a href="https://docs.sentry.io/platforms/python/configuration/options/">Python SDK Configuration</a> — <code>sentry_sdk.init()</code> options reference</li>
+<li><a href="references/examples.md">Additional examples</a> — end-to-end environment setup scenarios</li>
+</ul>
+<h2>Next Steps</h2>
+<ul>
+<li><strong>Per-route sampling</strong>: Replace flat <code>tracesSampleRate</code> with <code>tracesSampler</code> for route-level control (see <code>sentry-performance-tuning</code> skill)</li>
+<li><strong>Feature flag integration</strong>: Use Sentry&#39;s feature flag support to tie errors to specific flag variants</li>
+<li><strong>Environment promotion workflow</strong>: Automate staging-to-production promotion with <code>sentry-cli releases deploys</code></li>
+<li><strong>Cost monitoring</strong>: Set per-project rate limits and budget alerts to catch runaway staging costs (see <code>sentry-cost-tuning</code> skill)</li>
+<li><strong>Distributed tracing</strong>: Connect traces across services with <code>tracePropagationTargets</code> (see <code>sentry-reference-architecture</code> skill)</li>
+</ul></div>
+      </div>
+    </section>
+
+    <!-- 8. Bottom CTA -->
+    <section class="detail-cta" data-astro-cid-qcigfm7x>
+  <h2 class="detail-cta__headline" data-astro-cid-qcigfm7x>Ready to use sentry-pack?</h2>
+  <div class="detail-cta__actions" data-astro-cid-qcigfm7x>
+    <button class="detail-cta__primary" data-copy-install="/plugin install sentry-pack@claude-code-plugins-plus" data-astro-cid-qcigfm7x>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" data-astro-cid-qcigfm7x>
+        <rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" stroke-width="1.5" data-astro-cid-qcigfm7x></rect>
+        <path d="M3 11V3a1 1 0 011-1h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" data-astro-cid-qcigfm7x></path>
+      </svg>
+      <span class="detail-cta__btn-text" data-astro-cid-qcigfm7x>Copy Install Command</span>
+    </button>
+    
+  </div>
+</section>
+
+<script type="module">document.querySelectorAll("[data-copy-install]").forEach(t=>{t.addEventListener("click",async()=>{const a=t.dataset.copyInstall||"";await navigator.clipboard.writeText(a);const e=t.querySelector(".detail-cta__btn-text");if(e){const o=e.textContent;e.textContent="Copied!",t.classList.add("copied"),window.trackEvent&&window.trackEvent("install_copied",{plugin_name:a.split(" ").pop()||"",source:"detail_cta"}),setTimeout(()=>{e.textContent=o,t.classList.remove("copied")},2e3)}})});</script>
+
+    <!-- 9. Related Skills (6, with tool pills) -->
+    <section class="related-skills-section" data-astro-cid-jrlgpo3w>
+        <h2 class="related-skills-heading" data-astro-cid-jrlgpo3w>Related Skills</h2>
+        <div class="related-skills-grid" data-astro-cid-jrlgpo3w>
+          <a href="/skills/abridge-ci-integration/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-ci-integration</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Configure CI/CD pipeline for Abridge clinical AI integrations with GitHub Actions.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-common-errors/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-common-errors</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Diagnose and fix common Abridge clinical AI integration errors.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-a/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-a</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge ambient clinical documentation capture-to-note pipeline.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-b/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-b</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge patient-facing documentation and after-visit summary generation.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-cost-tuning/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-cost-tuning</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Optimize Abridge clinical AI costs through tier selection, session management, and usage monitoring for healthcare organizations.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-debug-bundle/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-debug-bundle</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Collect Abridge debug evidence for support tickets and troubleshooting.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a>
+        </div>
+      </section>
+
+  </div>
+
+  
+  <script>
+    document.querySelectorAll('.install-command').forEach(el => {
+      el.addEventListener('click', function() {
+        const text = this.dataset.copy || this.textContent;
+        navigator.clipboard.writeText(text).then(() => {
+          const originalText = this.textContent;
+          this.textContent = 'Copied to clipboard!';
+          this.style.color = 'var(--brand-green)';
+          setTimeout(() => {
+            this.textContent = originalText;
+            this.style.color = '';
+          }, 2000);
+        });
+      });
+    });
+  </script>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

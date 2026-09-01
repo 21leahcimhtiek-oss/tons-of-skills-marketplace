@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>podium-webhook-reliability - Agent Skill</title>
+    <meta name="description" content="Operate a Podium webhook receiver that survives the delivery-side failures — forged events without signature verification, replay attacks against a stateless handler, duplicate processing from Podium's 24h retry policy, lost events with no dead-letter queue, out-of-order batch deliveries, and timing-attack-vulnerable HMAC compares. Use when building a webhook endpoint for call transcripts, webchat events, conversation lifecycle, or review notifications; hardening an existing handler that processes events twice or drops them silently; or wiring a DLQ + replay path before the on-call rotation starts. Trigger with &quot;podium webhook&quot;, &quot;podium hmac&quot;, &quot;podium signature&quot;, &quot;podium webhook idempotency&quot;, &quot;podium webhook replay&quot;, &quot;podium dlq&quot;, &quot;podium webhook retries&quot;.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://tonsofskills.com/tons-of-skills-marketplace/skills/podium-webhook-reliability/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/podium-webhook-reliability/">
+    <meta property="og:title" content="podium-webhook-reliability - Agent Skill">
+    <meta property="og:description" content="Operate a Podium webhook receiver that survives the delivery-side failures — forged events without signature verification, replay attacks against a stateless handler, duplicate processing from Podium's 24h retry policy, lost events with no dead-letter queue, out-of-order batch deliveries, and timing-attack-vulnerable HMAC compares. Use when building a webhook endpoint for call transcripts, webchat events, conversation lifecycle, or review notifications; hardening an existing handler that processes events twice or drops them silently; or wiring a DLQ + replay path before the on-call rotation starts. Trigger with &quot;podium webhook&quot;, &quot;podium hmac&quot;, &quot;podium signature&quot;, &quot;podium webhook idempotency&quot;, &quot;podium webhook replay&quot;, &quot;podium dlq&quot;, &quot;podium webhook retries&quot;.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="podium-webhook-reliability - Agent Skill">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/podium-webhook-reliability/">
+    <meta name="twitter:title" content="podium-webhook-reliability - Agent Skill">
+    <meta name="twitter:description" content="Operate a Podium webhook receiver that survives the delivery-side failures — forged events without signature verification, replay attacks against a stateless handler, duplicate processing from Podium's 24h retry policy, lost events with no dead-letter queue, out-of-order batch deliveries, and timing-attack-vulnerable HMAC compares. Use when building a webhook endpoint for call transcripts, webchat events, conversation lifecycle, or review notifications; hardening an existing handler that processes events twice or drops them silently; or wiring a DLQ + replay path before the on-call rotation starts. Trigger with &quot;podium webhook&quot;, &quot;podium hmac&quot;, &quot;podium signature&quot;, &quot;podium webhook idempotency&quot;, &quot;podium webhook replay&quot;, &quot;podium dlq&quot;, &quot;podium webhook retries&quot;.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"podium-webhook-reliability","description":"Operate a Podium webhook receiver that survives the delivery-side failures — forged events without signature verification, replay attacks against a stateless handler, duplicate processing from Podium's 24h retry policy, lost events with no dead-letter queue, out-of-order batch deliveries, and timing-attack-vulnerable HMAC compares. Use when building a webhook endpoint for call transcripts, webchat events, conversation lifecycle, or review notifications; hardening an existing handler that processes events twice or drops them silently; or wiring a DLQ + replay path before the on-call rotation starts. Trigger with \"podium webhook\", \"podium hmac\", \"podium signature\", \"podium webhook idempotency\", \"podium webhook replay\", \"podium dlq\", \"podium webhook retries\".","version":"2.9.0","author":{"@type":"Person","name":"Jeremy Longshore"},"license":"MIT","programmingLanguage":"Claude Code Agent Skill","isPartOf":{"@type":"SoftwareApplication","name":"podium-pack","applicationCategory":"unknown"}}</script>
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.breadcrumbs[data-astro-cid-ilhxcym7]{margin-bottom:var(--space-5)}.breadcrumbs__list[data-astro-cid-ilhxcym7]{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;list-style:none;padding:0;margin:0;font-family:var(--font-mono);font-size:var(--text-sm, .8rem)}.breadcrumbs__item[data-astro-cid-ilhxcym7]{display:flex;align-items:center;gap:.375rem}.breadcrumbs__link[data-astro-cid-ilhxcym7]{color:var(--text-3);text-decoration:none;transition:color var(--duration-fast, .2s) var(--ease-out)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:hover{color:var(--primary)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:0}.breadcrumbs__sep[data-astro-cid-ilhxcym7]{color:var(--text-3);user-select:none;font-size:.7em;line-height:1}.breadcrumbs__current[data-astro-cid-ilhxcym7]{color:var(--text-2)}.detail-cta[data-astro-cid-qcigfm7x]{background:var(--surface-3, var(--brand-light-gray));border-top:1px solid var(--border, var(--brand-light-gray));border-radius:var(--radius-lg);padding:2rem 1.5rem;margin-top:2rem;text-align:center}.detail-cta__headline[data-astro-cid-qcigfm7x]{font-family:var(--font-display);font-weight:700;font-size:1.35rem;color:var(--text, var(--brand-dark));margin-bottom:1.25rem}.detail-cta__actions[data-astro-cid-qcigfm7x]{display:flex;justify-content:center;gap:.75rem;flex-wrap:wrap}.detail-cta__primary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:var(--primary);color:#0a0a0c;border:none;border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;cursor:pointer;transition:background var(--duration-fast) var(--ease-out),transform var(--duration-fast) var(--ease-out)}.detail-cta__primary[data-astro-cid-qcigfm7x]:hover{background:var(--primary-dark, var(--primary-dark));transform:translateY(-1px)}.detail-cta__primary[data-astro-cid-qcigfm7x].copied{background:var(--positive, var(--brand-green))}.detail-cta__secondary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:transparent;color:var(--text, var(--brand-dark));border:1px solid var(--border, var(--brand-mid-gray));border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;text-decoration:none;transition:border-color var(--duration-fast) var(--ease-out),color var(--duration-fast) var(--ease-out)}.detail-cta__secondary[data-astro-cid-qcigfm7x]:hover{border-color:var(--primary);color:var(--primary)}@media(max-width:480px){.detail-cta__actions[data-astro-cid-qcigfm7x]{flex-direction:column;align-items:stretch}.detail-cta__primary[data-astro-cid-qcigfm7x],.detail-cta__secondary[data-astro-cid-qcigfm7x]{justify-content:center}}
+</style>
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/_slug_@_@astro.wF9emvVq.css"></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  
+  
+
+  <div class="skill-detail" data-astro-cid-jrlgpo3w>
+    <!-- 1. Breadcrumbs -->
+    <nav aria-label="Breadcrumb" class="breadcrumbs" data-astro-cid-ilhxcym7>
+  <ol class="breadcrumbs__list" itemscope itemtype="https://schema.org/BreadcrumbList" data-astro-cid-ilhxcym7>
+    <li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Home</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="1">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/skills/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Skills</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="2">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          <span class="breadcrumbs__current" aria-current="page" itemprop="name" data-astro-cid-ilhxcym7>
+              podium-webhook-reliability
+            </span>
+          <meta itemprop="position" content="3">
+        </li>
+  </ol>
+</nav>
+
+    <!-- 2. Header (enhanced) -->
+    <header class="skill-header" data-astro-cid-jrlgpo3w>
+      <h1 data-astro-cid-jrlgpo3w>podium-webhook-reliability</h1>
+      <p class="skill-description" data-astro-cid-jrlgpo3w>Operate a Podium webhook receiver that survives the delivery-side failures — forged events without signature verification, replay attacks against a stateless handler, duplicate processing from Podium&#39;s 24h retry policy, lost events with no dead-letter queue, out-of-order batch deliveries, and timing-attack-vulnerable HMAC compares. Use when building a webhook endpoint for call transcripts, webchat events, conversation lifecycle, or review notifications; hardening an existing handler that processes events twice or drops them silently; or wiring a DLQ + replay path before the on-call rotation starts. Trigger with &quot;podium webhook&quot;, &quot;podium hmac&quot;, &quot;podium signature&quot;, &quot;podium webhook idempotency&quot;, &quot;podium webhook replay&quot;, &quot;podium dlq&quot;, &quot;podium webhook retries&quot;.</p>
+
+      <div class="skill-metadata" data-astro-cid-jrlgpo3w>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>v2.9.0</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>Jeremy Longshore</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>MIT</span>
+        </div>
+      </div>
+
+      
+    </header>
+
+    <!-- 4. Allowed Tools -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Allowed Tools</h2>
+      <div class="tools-grid" data-astro-cid-jrlgpo3w>
+        <span class="tool-badge" data-astro-cid-jrlgpo3w>Read</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Write</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Edit</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(curl:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(jq:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(python3:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(redis-cli:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Grep</span>
+      </div>
+      
+    </section>
+
+    <!-- 5. Provided by Plugin -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Provided by Plugin</h2>
+      <div class="plugin-info" data-astro-cid-jrlgpo3w>
+        <div class="plugin-details" data-astro-cid-jrlgpo3w>
+          <h3 data-astro-cid-jrlgpo3w>
+            <a href="/plugins/podium-pack/" data-astro-cid-jrlgpo3w>podium-pack</a>
+          </h3>
+          <p data-astro-cid-jrlgpo3w>Claude Code skill pack for Podium (10 production-engineer skills)</p>
+          <div class="plugin-meta" data-astro-cid-jrlgpo3w>
+            <span data-astro-cid-jrlgpo3w>unknown</span>
+            <span data-astro-cid-jrlgpo3w>v2.9.0</span>
+          </div>
+        </div>
+        <a href="/plugins/podium-pack/" class="btn-primary" data-astro-cid-jrlgpo3w>View Plugin</a>
+      </div>
+    </section>
+
+    <!-- 6. Installation -->
+    <section class="section-box dark" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Installation</h2>
+      <p class="install-note" style="color: var(--brand-light-gray); margin-bottom: 0.75rem;" data-astro-cid-jrlgpo3w>This skill is included in the podium-pack plugin:</p>
+      <pre class="install-command" data-copy="/plugin install podium-pack@claude-code-plugins-plus" data-astro-cid-jrlgpo3w><code data-astro-cid-jrlgpo3w>/plugin install podium-pack@claude-code-plugins-plus</code></pre>
+      <p class="install-note" data-astro-cid-jrlgpo3w>Click to copy</p>
+    </section>
+
+    <!-- 7. Skill Content (Markdown) -->
+    <section class="skill-content-section" data-astro-cid-jrlgpo3w>
+      <h2 data-astro-cid-jrlgpo3w>Instructions</h2>
+      <div class="skill-content" data-astro-cid-jrlgpo3w>
+        <div data-astro-cid-jrlgpo3w><h1>Podium Webhook Reliability</h1>
+<h2>Overview</h2>
+<p>Receive Podium webhooks in production without forged events, double-charged AI side-effects, lost notifications, or out-of-order conversation events. This is not an introductory webhook walkthrough — it is the receiver code your integration runs when Podium retries a 5xx response six times over 24 hours, when a leaked secret lets an attacker POST forged events, when a batch delivery arrives with <code>conversation.deleted</code> ahead of <code>conversation.created</code>, and when on-call needs to drain and replay 800 failed events without re-firing the ones that already succeeded.</p>
+<p>The six production failures this skill prevents:</p>
+<ol>
+<li><strong>Missing signature verification</strong> — a webhook endpoint that accepts any POST will accept forged events. An attacker who learns the URL can create phantom contacts, fire phantom review requests, or impersonate a real customer in a webchat. HMAC-SHA256 over the raw request body is non-optional and must run before any handler logic.</li>
+<li><strong>Replay attacks against a stateless handler</strong> — a valid signed event POSTed twice (or 1000 times) re-runs every side effect each time. Signature validity alone is not enough — the receiver must reject events whose timestamp falls outside a 5-minute window AND whose nonce has already been seen.</li>
+<li><strong>Duplicate event processing from Podium retries</strong> — Podium retries webhook delivery on 5xx for up to 24 hours. Without an idempotency cache, every retry re-runs the handler (writes the contact again, fires the review request again, double-charges an AI call). <code>SET NX EX 86400</code> on the event_id is the cheapest fix that exists.</li>
+<li><strong>Lost events without a dead-letter queue</strong> — if a handler raises and Podium retries six times and gives up, the event is gone. On-call has nothing to replay. Every handler exception must persist the raw signed payload to a DLQ before the response returns 5xx, so the event is recoverable independent of Podium&#39;s retry clock.</li>
+<li><strong>Batch event reordering</strong> — Podium can deliver multiple events in one POST and ordering across deliveries is not guaranteed. A naive handler processes <code>conversation.deleted</code> before <code>conversation.created</code> and the system observes a delete on a contact that does not exist. Within a batch, sort by <code>occurred_at</code> before dispatch; across batches, gate causally-dependent handlers on the precondition existing.</li>
+<li><strong>Timing-attack vulnerability on signature compare</strong> — <code>received_sig == computed_sig</code> with <code>==</code> short-circuits on the first byte mismatch. An attacker measures response latency to recover the signature byte-by-byte over a few thousand probes. Always use <code>hmac.compare_digest</code>, which is constant-time over the longer of the two inputs.</li>
+</ol>
+<h2>Prerequisites</h2>
+<ul>
+<li>Python 3.10+ with <code>fastapi</code>, <code>uvicorn</code>, <code>httpx</code>, and <code>redis</code> (in-memory fallback for dev is provided)</li>
+<li>Podium account with an OAuth app authorized for webhook delivery: Settings → Developer → Apps → Webhooks</li>
+<li>The webhook signing secret from the app&#39;s Webhooks tab (saved to a secret store — never committed)</li>
+<li>A receiver URL reachable from Podium (publicly resolvable HTTPS endpoint with valid cert)</li>
+<li>Redis 6+ for production dedup + DLQ; an in-memory dict + SQLite file fallback exists for dev</li>
+<li>A <code>podium-auth</code> instance if your handler needs to call back into the Podium API after processing</li>
+</ul>
+<h2>Instructions</h2>
+<p>Build in this order. Each section neutralizes one production failure mode.</p>
+<h3>1. HMAC-SHA256 signature verification on the raw body (neutralizes forgery)</h3>
+<p>Verify the signature against the <strong>raw, unparsed</strong> request body. Any framework middleware that JSON-decodes-and-re-encodes before signature check will fail because whitespace and key ordering change. Read the body once, verify, then parse:</p>
+<pre data-lang="python"><code>
+import hmac, hashlib
+from fastapi import FastAPI, Request, HTTPException, Header
+
+app = FastAPI()
+SIGNING_SECRET = os.environ[&quot;PODIUM_WEBHOOK_SECRET&quot;].encode(&quot;utf-8&quot;)
+
+@app.post(&quot;/webhooks/podium&quot;)
+async def receive(request: Request, x_podium_signature: str = Header(None)):
+    raw = await request.body()              # bytes — DO NOT decode/re-encode
+    if not x_podium_signature:
+        raise HTTPException(401, &quot;missing X-Podium-Signature&quot;)
+    if not verify_signature(raw, x_podium_signature):
+        raise HTTPException(401, &quot;signature mismatch&quot;)
+    # ... continue with replay/dedup/dispatch
+</code></pre>
+<pre data-lang="python"><code>
+def verify_signature(body: bytes, header_value: str) -&gt; bool:
+    # Podium signature header format: &quot;t=&lt;unix_ts&gt;,v1=&lt;hex_hmac&gt;&quot;
+    # Adapt to current spec — verify against the Podium developer docs at integration time.
+    parts = dict(p.split(&quot;=&quot;, 1) for p in header_value.split(&quot;,&quot;) if &quot;=&quot; in p)
+    ts, sig = parts.get(&quot;t&quot;), parts.get(&quot;v1&quot;)
+    if not ts or not sig:
+        return False
+    signed_payload = f&quot;{ts}.&quot;.encode(&quot;utf-8&quot;) + body
+    expected = hmac.new(SIGNING_SECRET, signed_payload, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected, sig)    # constant-time, byte-by-byte safe
+</code></pre>
+<p>The <code>t=</code> timestamp is what makes the next mitigation possible. A signature alone with no timestamp is replayable forever.</p>
+<h3>2. Replay-attack window (neutralizes timestamp replay)</h3>
+<p>Reject any event whose signed timestamp is more than 5 minutes from now (in either direction — clock skew goes both ways). This bounds the replay window an attacker has even if they capture a valid signed event off the wire:</p>
+<pre data-lang="python"><code>
+import time
+
+REPLAY_WINDOW_SECONDS = 300        # 5 minutes; tune to your clock-skew tolerance
+
+def within_replay_window(ts_str: str) -&gt; bool:
+    try:
+        ts = int(ts_str)
+    except (TypeError, ValueError):
+        return False
+    return abs(time.time() - ts) &lt;= REPLAY_WINDOW_SECONDS
+</code></pre>
+<p>Wire <code>within_replay_window(parts[&quot;t&quot;])</code> immediately after signature verification. A failed window check is a 401 — do not return 200, do not enqueue, do not log the body (the attacker is probing).</p>
+<h3>3. Idempotent dedup with <code>SET NX EX 86400</code> (neutralizes duplicate processing)</h3>
+<p>Every Podium webhook carries an <code>event_id</code> (or equivalent unique identifier — verify against the current schema). Reject any event whose <code>event_id</code> is already in the dedup cache. Use Redis <code>SET key value NX EX 86400</code> so the check and the claim are atomic; 86400 seconds matches Podium&#39;s 24-hour retry ceiling:</p>
+<pre data-lang="python"><code>
+import redis.asyncio as redis
+
+REDIS = redis.from_url(os.environ.get(&quot;REDIS_URL&quot;, &quot;redis://localhost:6379/0&quot;))
+
+async def claim_event(event_id: str) -&gt; bool:
+    # Returns True if this process is the first to see this event_id.
+    # Returns False if the event_id is already in the cache (duplicate).
+    return await REDIS.set(f&quot;podium:evt:{event_id}&quot;, &quot;1&quot;, nx=True, ex=86400)
+</code></pre>
+<p>In the handler:</p>
+<pre data-lang="python"><code>
+event = json.loads(raw)
+event_id = event[&quot;id&quot;]
+if not await claim_event(event_id):
+    return {&quot;status&quot;: &quot;duplicate&quot;, &quot;event_id&quot;: event_id}     # 200 — Podium stops retrying
+</code></pre>
+<p>Returning 200 on duplicate is correct — Podium has correctly delivered, the receiver has correctly identified it as already processed. The handler is idempotent by construction.</p>
+<p>For dev / smoke environments without Redis, fall back to an in-memory <code>set()</code> with a periodic eviction loop. Documented in <code>references/implementation.md</code>.</p>
+<h3>4. Dead-letter queue before responding 5xx (neutralizes silent event loss)</h3>
+<p>Wrap every handler invocation in a try/except. On any exception, persist the <strong>raw signed payload plus the timestamp plus the signature</strong> to the DLQ before letting the exception bubble. The DLQ entry is the recovery anchor — <code>dlq_replay.py</code> can re-POST it to the handler later:</p>
+<pre data-lang="python"><code>
+async def safe_dispatch(event: dict, raw: bytes, sig_header: str):
+    try:
+        await dispatch(event)
+    except Exception as e:
+        await dlq_persist({
+            &quot;event_id&quot;: event.get(&quot;id&quot;),
+            &quot;event_type&quot;: event.get(&quot;type&quot;),
+            &quot;raw_body&quot;: raw.decode(&quot;utf-8&quot;, errors=&quot;replace&quot;),
+            &quot;signature_header&quot;: sig_header,
+            &quot;occurred_at&quot;: event.get(&quot;occurred_at&quot;),
+            &quot;received_at&quot;: time.time(),
+            &quot;exception&quot;: f&quot;{type(e).__name__}: {e}&quot;,
+        })
+        raise          # let FastAPI return 5xx; Podium will retry
+</code></pre>
+<p>DLQ backend options (in priority order):</p>
+<table><thead><tr>
+<th>Backend</th>
+<th>When</th>
+</tr></thead><tbody>
+<tr>
+<td>Redis list <code>LPUSH podium:dlq</code> + scheduled archiver to S3/GCS</td>
+<td>Default for prod</td>
+</tr>
+<tr>
+<td>SQLite file at <code>/var/lib/podium-dlq.sqlite</code></td>
+<td>Single-node deployments, dev</td>
+</tr>
+<tr>
+<td>Append-only JSONL at <code>/var/log/podium-dlq.jsonl</code></td>
+<td>Fallback when nothing else is available — durable, parseable, ugly</td>
+</tr>
+</tbody></table>
+<p>The DLQ is durable independent of the Redis dedup cache. If Redis dies, dedup is degraded but events are still recoverable.</p>
+<h3>5. Batch event ordering by <code>occurred_at</code> (neutralizes reordering)</h3>
+<p>Podium can deliver multiple events in one POST. Within the batch, sort by <code>occurred_at</code> ascending before dispatch. Across batches, do not assume earlier-timestamped events arrived first — guard causally-dependent handlers with an existence check:</p>
+<pre data-lang="python"><code>
+async def dispatch_batch(events: list[dict]):
+    events.sort(key=lambda e: (e.get(&quot;occurred_at&quot;, 0), e.get(&quot;id&quot;, &quot;&quot;)))
+    for event in events:
+        await safe_dispatch_one(event)
+
+async def handle_conversation_deleted(event: dict):
+    convo_id = event[&quot;data&quot;][&quot;conversation_id&quot;]
+    # Guard: if the create event hasn&#39;t been processed yet, defer this delete.
+    if not await convo_exists(convo_id):
+        await dlq_persist({
+            &quot;reason&quot;: &quot;out_of_order_delete_before_create&quot;,
+            &quot;event_id&quot;: event[&quot;id&quot;],
+            &quot;raw_body&quot;: json.dumps(event),
+            &quot;received_at&quot;: time.time(),
+        })
+        return
+    await delete_conversation_locally(convo_id)
+</code></pre>
+<p>Sorting within a batch is cheap and correct. Cross-batch ordering is undecidable from the receiver side — the DLQ + replay path is the recovery mechanism when out-of-order delivery violates a precondition.</p>
+<h3>6. Constant-time HMAC compare (neutralizes signature-byte timing leak)</h3>
+<p>The single most common implementation bug in webhook receivers is <code>received == expected</code> with <code>==</code>. Python string <code>==</code> short-circuits on the first differing byte; an attacker measures response latency over a few thousand probes and reconstructs the signature byte by byte.</p>
+<pre data-lang="python"><code>
+# WRONG — leaks signature byte-by-byte via timing
+if received_sig == expected_sig:
+    return True
+
+# CORRECT — constant-time over the longer of the two inputs
+if hmac.compare_digest(received_sig, expected_sig):
+    return True
+</code></pre>
+<p><code>hmac.compare_digest</code> is the only acceptable comparison. The same rule applies to Node (<code>crypto.timingSafeEqual</code>), Go (<code>hmac.Equal</code>), and Rust (<code>subtle::ConstantTimeEq</code>).</p>
+<h2>Error Handling</h2>
+<table><thead><tr>
+<th>HTTP returned</th>
+<th>Internal condition</th>
+<th>Caller (Podium) behavior</th>
+</tr></thead><tbody>
+<tr>
+<td><code>401 Unauthorized</code></td>
+<td>Signature mismatch, missing header, replay window failed</td>
+<td>Podium does NOT retry — log + audit</td>
+</tr>
+<tr>
+<td><code>400 Bad Request</code></td>
+<td>Body is not parseable JSON post-signature-verify</td>
+<td>Podium does NOT retry — investigate Podium-side payload</td>
+</tr>
+<tr>
+<td><code>200 OK (duplicate)</code></td>
+<td><code>event_id</code> already in dedup cache</td>
+<td>Podium stops retrying — system is idempotent</td>
+</tr>
+<tr>
+<td><code>200 OK (processed)</code></td>
+<td>Handler dispatched successfully</td>
+<td>Podium stops retrying — normal path</td>
+</tr>
+<tr>
+<td><code>200 OK (deferred)</code></td>
+<td>Out-of-order event written to DLQ; will resolve via replay</td>
+<td>Podium stops retrying — recovery is internal</td>
+</tr>
+<tr>
+<td><code>500 Internal Server Error</code></td>
+<td>Handler raised; DLQ entry persisted</td>
+<td>Podium retries with exponential backoff up to 24h</td>
+</tr>
+<tr>
+<td><code>503 Service Unavailable</code></td>
+<td>Redis dedup unreachable; handler refuses</td>
+<td>Podium retries — fail-closed is the safe default</td>
+</tr>
+</tbody></table>
+<h2>Examples</h2>
+<h3>Verify a captured webhook payload from the command line</h3>
+<pre data-lang="bash"><code>
+# Use the CLI bundled with the skill to verify a captured payload + header against the secret.
+python3 scripts/signature_verify.py \
+  --body-file /tmp/captured_webhook_body.json \
+  --signature-header &quot;t={your-timestamp},v1={your-podium-signature}&quot; \
+  --secret-env PODIUM_WEBHOOK_SECRET
+# exit 0 = valid; exit 1 = signature mismatch; exit 2 = replay window exceeded
+</code></pre>
+<h3>Manually check if an event_id has been seen</h3>
+<pre data-lang="bash"><code>
+python3 scripts/dedup_check.py --event-id evt_{your-event-identifier} --redis-url redis://localhost:6379/0
+# exit 0 = first sight (would be processed); exit 1 = duplicate (would be rejected)
+</code></pre>
+<h3>Drain the DLQ and replay events through the handler</h3>
+<pre data-lang="bash"><code>
+# After a handler bug is fixed, replay DLQ entries through the receiver.
+# The replay path goes through the SAME endpoint as Podium, so signature + dedup still apply.
+python3 scripts/dlq_replay.py \
+  --target-url https://your-receiver.example.com/webhooks/podium \
+  --secret-env PODIUM_WEBHOOK_SECRET \
+  --batch-size 25 \
+  --rate-per-sec 10
+</code></pre>
+<p>The replay script reuses the original signature header captured at DLQ-persist time — Podium&#39;s signing secret is the same secret your replayer uses to compute the header, so no re-signing is required for events captured within the secret&#39;s lifetime.</p>
+<h3>Boot the receiver locally for development</h3>
+<pre data-lang="bash"><code>
+export PODIUM_WEBHOOK_SECRET={your-webhook-secret}
+export REDIS_URL=redis://localhost:6379/0   # or unset to use in-memory fallback
+uvicorn scripts.webhook_server:app --host 0.0.0.0 --port 8080 --reload
+</code></pre>
+<h2>Output</h2>
+<ul>
+<li>FastAPI receiver with HMAC verification on the raw body, replay window, dedup, DLQ, and batch ordering</li>
+<li>Signature verifier CLI (<code>signature_verify.py</code>) for incident forensics on captured payloads</li>
+<li>Dedup-cache checker CLI (<code>dedup_check.py</code>) for confirming a specific event was already processed</li>
+<li>DLQ replayer CLI (<code>dlq_replay.py</code>) for draining persisted failures after a handler fix</li>
+<li>Redis-backed dedup with 24h TTL aligned to Podium&#39;s retry ceiling</li>
+<li>DLQ persistence with multiple backend options (Redis list, SQLite, JSONL)</li>
+<li><code>.gitignore</code> rules covering the webhook secret + captured payload files</li>
+</ul>
+<h2>Resources</h2>
+<ul>
+<li><a href="https://docs.podium.com/reference/webhooks">Podium API docs — Webhooks</a></li>
+<li><a href="https://docs.podium.com/reference/webhook-signatures">Podium API docs — Webhook signatures</a></li>
+<li><a href="config/settings.yaml">config/settings.yaml</a> — replay window, dedup TTL, DLQ backend selection, batch sizing</li>
+<li><a href="references/errors.md">references/errors.md</a> — ERR_WHK_* codes with cause + solution</li>
+<li><a href="references/examples.md">references/examples.md</a> — 10 worked examples (single handler, batch, multi-tenant, replay)</li>
+<li><a href="references/implementation.md">references/implementation.md</a> — Node.js port, Redis schema, DLQ backends, in-memory fallback</li>
+<li><a href="scripts/webhook_server.py">scripts/webhook_server.py</a> — FastAPI receiver with the full pipeline wired</li>
+<li><a href="scripts/signature_verify.py">scripts/signature_verify.py</a> — CLI: verify a captured payload + signature</li>
+<li><a href="scripts/dedup_check.py">scripts/dedup_check.py</a> — CLI: check if an event_id is already cached</li>
+<li><a href="scripts/dlq_replay.py">scripts/dlq_replay.py</a> — CLI: drain the DLQ and re-POST to the receiver</li>
+</ul></div>
+      </div>
+    </section>
+
+    <!-- 8. Bottom CTA -->
+    <section class="detail-cta" data-astro-cid-qcigfm7x>
+  <h2 class="detail-cta__headline" data-astro-cid-qcigfm7x>Ready to use podium-pack?</h2>
+  <div class="detail-cta__actions" data-astro-cid-qcigfm7x>
+    <button class="detail-cta__primary" data-copy-install="/plugin install podium-pack@claude-code-plugins-plus" data-astro-cid-qcigfm7x>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" data-astro-cid-qcigfm7x>
+        <rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" stroke-width="1.5" data-astro-cid-qcigfm7x></rect>
+        <path d="M3 11V3a1 1 0 011-1h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" data-astro-cid-qcigfm7x></path>
+      </svg>
+      <span class="detail-cta__btn-text" data-astro-cid-qcigfm7x>Copy Install Command</span>
+    </button>
+    
+  </div>
+</section>
+
+<script type="module">document.querySelectorAll("[data-copy-install]").forEach(t=>{t.addEventListener("click",async()=>{const a=t.dataset.copyInstall||"";await navigator.clipboard.writeText(a);const e=t.querySelector(".detail-cta__btn-text");if(e){const o=e.textContent;e.textContent="Copied!",t.classList.add("copied"),window.trackEvent&&window.trackEvent("install_copied",{plugin_name:a.split(" ").pop()||"",source:"detail_cta"}),setTimeout(()=>{e.textContent=o,t.classList.remove("copied")},2e3)}})});</script>
+
+    <!-- 9. Related Skills (6, with tool pills) -->
+    <section class="related-skills-section" data-astro-cid-jrlgpo3w>
+        <h2 class="related-skills-heading" data-astro-cid-jrlgpo3w>Related Skills</h2>
+        <div class="related-skills-grid" data-astro-cid-jrlgpo3w>
+          <a href="/skills/abridge-ci-integration/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-ci-integration</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Configure CI/CD pipeline for Abridge clinical AI integrations with GitHub Actions.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-common-errors/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-common-errors</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Diagnose and fix common Abridge clinical AI integration errors.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-a/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-a</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge ambient clinical documentation capture-to-note pipeline.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-b/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-b</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge patient-facing documentation and after-visit summary generation.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-cost-tuning/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-cost-tuning</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Optimize Abridge clinical AI costs through tier selection, session management, and usage monitoring for healthcare organizations.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-debug-bundle/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-debug-bundle</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Collect Abridge debug evidence for support tickets and troubleshooting.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a>
+        </div>
+      </section>
+
+  </div>
+
+  
+  <script>
+    document.querySelectorAll('.install-command').forEach(el => {
+      el.addEventListener('click', function() {
+        const text = this.dataset.copy || this.textContent;
+        navigator.clipboard.writeText(text).then(() => {
+          const originalText = this.textContent;
+          this.textContent = 'Copied to clipboard!';
+          this.style.color = 'var(--brand-green)';
+          setTimeout(() => {
+            this.textContent = originalText;
+            this.style.color = '';
+          }, 2000);
+        });
+      });
+    });
+  </script>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
