@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Every Check Should Report What It Did Not Look At — Tons of Skills Work Diary</title>
+    <meta name="description" content="A status job that always runs reports which checks executed and which are unproven, so a skipped GitHub Actions job cannot read as a pass.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://startaitools.com/posts/the-lane-that-reviewed-nothing/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/the-lane-that-reviewed-nothing/">
+    <meta property="og:title" content="Every Check Should Report What It Did Not Look At — Tons of Skills Work Diary">
+    <meta property="og:description" content="A status job that always runs reports which checks executed and which are unproven, so a skipped GitHub Actions job cannot read as a pass.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="Every Check Should Report What It Did Not Look At — Tons of Skills Work Diary">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/the-lane-that-reviewed-nothing/">
+    <meta name="twitter:title" content="Every Check Should Report What It Did Not Look At — Tons of Skills Work Diary">
+    <meta name="twitter:description" content="A status job that always runs reports which checks executed and which are unproven, so a skipped GitHub Actions job cannot read as a pass.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"Every Check Should Report What It Did Not Look At","description":"A status job that always runs reports which checks executed and which are unproven, so a skipped GitHub Actions job cannot read as a pass.","datePublished":"2026-08-22","url":"https://tonsofskills.com/blog/undefined","author":{"@type":"Person","name":"Jeremy Longshore"},"publisher":{"@type":"Organization","name":"Tons of Skills","url":"https://tonsofskills.com"}}</script>
+  
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.post-header[data-astro-cid-7jjqptxk]{background:var(--panel);padding:4rem 1.5rem 3rem;border-bottom:1px solid var(--border)}.post-header-inner[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto}.back-link[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3);text-decoration:none;display:inline-block;margin-bottom:1.5rem;transition:color .2s}.back-link[data-astro-cid-7jjqptxk]:hover{color:var(--primary)}.post-meta[data-astro-cid-7jjqptxk]{display:flex;align-items:center;gap:.75rem;margin-bottom:1rem}time[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3)}.featured-badge[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.2rem .6rem;background:#ce114126;color:var(--red);border-radius:0;font-weight:600;text-transform:uppercase;letter-spacing:.05em}.post-header[data-astro-cid-7jjqptxk] h1[data-astro-cid-7jjqptxk]{font-family:var(--font-body);font-size:clamp(1.5rem,4vw,2.2rem);font-weight:700;color:var(--text);line-height:1.25;margin-bottom:.75rem;letter-spacing:0}.post-desc[data-astro-cid-7jjqptxk]{color:var(--text-2);font-size:1.05rem;line-height:1.6;margin-bottom:1rem}.post-tags[data-astro-cid-7jjqptxk]{display:flex;gap:.4rem;flex-wrap:wrap}.tag[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.15rem .5rem;background:var(--surface-3);color:var(--text-3);border-radius:0}.post-body[data-astro-cid-7jjqptxk]{padding:3rem 1.5rem 4rem}.prose[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto;color:var(--text-2);line-height:1.8;font-size:1rem}.prose[data-astro-cid-7jjqptxk] h2{font-family:var(--font-body);font-size:1.5rem;font-weight:700;color:var(--text);margin:2.5rem 0 1rem;letter-spacing:0}.prose[data-astro-cid-7jjqptxk] h3{font-size:1.2rem;font-weight:600;color:var(--text);margin:2rem 0 .75rem}.prose[data-astro-cid-7jjqptxk] p{margin-bottom:1rem}.prose[data-astro-cid-7jjqptxk] ul,.prose[data-astro-cid-7jjqptxk] ol{margin:.5rem 0 1rem 1.5rem}.prose[data-astro-cid-7jjqptxk] li{margin-bottom:.35rem}.prose[data-astro-cid-7jjqptxk] strong{color:var(--text);font-weight:600}.prose[data-astro-cid-7jjqptxk] code{font-family:var(--font-mono);font-size:.88em;background:var(--surface-3);padding:.15em .35em;border-radius:0;color:var(--primary)}.prose[data-astro-cid-7jjqptxk] a{color:var(--primary);text-decoration:none}.prose[data-astro-cid-7jjqptxk] a:hover{text-decoration:underline}@media(max-width:768px){.post-header[data-astro-cid-7jjqptxk]{padding:3rem 1rem 2rem}.post-body[data-astro-cid-7jjqptxk]{padding:2rem 1rem 3rem}}
+</style></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  <article class="post" data-astro-cid-7jjqptxk>
+    <header class="post-header" data-astro-cid-7jjqptxk>
+      <div class="post-header-inner" data-astro-cid-7jjqptxk>
+        <a href="/blog" class="back-link" data-astro-cid-7jjqptxk>Back to Work Diary</a>
+        <div class="post-meta" data-astro-cid-7jjqptxk>
+          <time datetime="2026-08-22" data-astro-cid-7jjqptxk>August 21, 2026</time>
+          
+        </div>
+        <h1 data-astro-cid-7jjqptxk>Every Check Should Report What It Did Not Look At</h1>
+        <p class="post-desc" data-astro-cid-7jjqptxk>A status job that always runs reports which checks executed and which are unproven, so a skipped GitHub Actions job cannot read as a pass.</p>
+        <div class="post-tags" data-astro-cid-7jjqptxk>
+          <span class="tag" data-astro-cid-7jjqptxk>ci-cd</span><span class="tag" data-astro-cid-7jjqptxk>security</span><span class="tag" data-astro-cid-7jjqptxk>devops</span><span class="tag" data-astro-cid-7jjqptxk>testing</span><span class="tag" data-astro-cid-7jjqptxk>automation</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="post-body" data-astro-cid-7jjqptxk>
+      <div class="prose" data-astro-cid-7jjqptxk>
+        <p>Yesterday I wrote about <a href="https://startaitools.com/posts/the-skip-that-counted-as-a-pass/">the gate runner that counted SKIP as PASS</a>, and the rig proof receipt that closed it. That is the setup, not today’s subject. Today’s subject is what happened next. The same defect shape surfaced twice more inside a single day, and the second time it was inside the tooling built to catch it.</p>
+<p>58 commits across 11 repos. The interesting part is that three of them are the same bug wearing different clothes.</p>
+<h2 id="the-review-lane-that-could-not-review">The review lane that could not review</h2>
+<p>Seven plugin repos vendor a four lane MiniMax review workflow. Every lane carries the same guard.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">jobs</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  review-correctness</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    if</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">vars.ENABLE_MINIMAX_REVIEW == 'true'</span></span>
+<span class="line"><span style="color:#6A737D">    # three sibling lanes, same condition</span></span></code></pre>
+<p>If the repository variable is unset, or the API key is absent, the workflow conditional evaluates false and GitHub Actions skips the jobs. A skipped job renders as a grey tick. A reader scanning a pull request sees four ticks in the checks list and concludes the pull request was reviewed. Nothing ran. No model read a line of the diff.</p>
+<p>That is precisely the shape I had spent the week digging out of the <a href="https://startaitools.com/posts/the-gate-that-could-not-fail/">gate runner</a>, reintroduced in the workflow whose entire job is to catch bad diffs.</p>
+<h3 id="does-a-skipped-github-actions-job-show-as-passing">Does a skipped GitHub Actions job show as passing</h3>
+<p>Not literally, but in practice yes. A skipped job renders as a grey tick in the checks list rather than a red X, and a reader scanning the list reads absence of failure as success. GitHub reports the job’s real state accurately. The failure is that a human, and a branch protection summary, treat grey and green the same way.</p>
+<p>The fix is a status job with no <code>if</code> at all, so it always runs and always reports. When the lanes are off it emits a GitHub warning annotation, and the annotation says the thing plainly: green ticks on this PR do not mean it was reviewed. On a fork pull request it reports a notice instead of a warning, because a fork never receives the repository secret, so skipping there is by design rather than misconfiguration. A warning that fires on every external contribution is a warning people learn to ignore.</p>
+<h3 id="why-not-just-fail-the-build">Why not just fail the build</h3>
+<p>The obvious approach is to make the workflow fail when the lanes are disabled. No ambiguity, no annotation to read, a red X that nobody mistakes for a pass.</p>
+<p>I did not do that, and the reason is what the lanes are. They are advisory. A maintainer can merge a plugin fix without a model review, and the seven repos deliberately ship with the feature off until someone sets the variable and the key. Failing the build converts an optional feature into a mandatory one by side effect. The next person to hit a red X on a repo that never enabled reviews would not go enable reviews, they would delete the check, and then the disabled state becomes invisible again with an extra step of history behind it.</p>
+<p>The requirement was never that the lanes must run. It is that a disabled lane must not be mistakable for a passing one. An always running status job satisfies exactly that requirement and nothing more. Failing the build satisfies a stronger requirement I did not have and do not want.</p>
+<h2 id="the-fix-that-shipped-a-merge-conflict">The fix that shipped a merge conflict</h2>
+<p>The commit that landed this is titled “stop a disabled review lane from rendering as a passing one.” It shipped a merge conflict into <code>.github/workflows/minimax-review.yml</code> and pushed it to main. Six of the seven entry repos carried three conflict markers each.</p>
+<p>The workflow no longer parsed. Every run died at 0s, while the gate lane and the test jobs reported success in the same checks list beside it.</p>
+<p>Root cause was a rebase where I assumed only the changelog conflicted.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">git</span><span style="color:#9ECBFF"> checkout</span><span style="color:#79B8FF"> --ours</span><span style="color:#9ECBFF"> CHANGELOG.md</span></span>
+<span class="line"><span style="color:#B392F0">git</span><span style="color:#9ECBFF"> add</span><span style="color:#79B8FF"> -A</span><span style="color:#6A737D">               # staged the workflow WITH its conflict markers</span></span>
+<span class="line"><span style="color:#B392F0">git</span><span style="color:#9ECBFF"> rebase</span><span style="color:#79B8FF"> --continue</span><span style="color:#6A737D">    # committed them</span></span></code></pre>
+<p><code>git add -A</code> does not care whether a file still contains <code>&#x3C;&#x3C;&#x3C;&#x3C;&#x3C;&#x3C;&#x3C;</code>. It stages what is on disk.</p>
+<p>The part worth writing down is not the rebase mistake. It is the verification. I checked the fix had landed by grepping for the string <code>Review lanes status</code>, found a match, and reported the file present and correct. The string was there. It was inside a file that could not parse.</p>
+<p>That is a check narrower than the claim it makes. Which is the same defect the broken commit was fixing. The fix for skip renders as green shipped a workflow that renders as nothing at all.</p>
+<p>The second verification parses instead of greps.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">grep</span><span style="color:#79B8FF"> -c</span><span style="color:#9ECBFF"> '^&#x3C;&#x3C;&#x3C;&#x3C;&#x3C;&#x3C;&#x3C;\|^=======\|^>>>>>>>'</span><span style="color:#9ECBFF"> "</span><span style="color:#E1E4E8">$f</span><span style="color:#9ECBFF">"</span><span style="color:#6A737D">          # expect 0</span></span>
+<span class="line"><span style="color:#B392F0">python3</span><span style="color:#79B8FF"> -c</span><span style="color:#9ECBFF"> 'import yaml,sys; yaml.safe_load(open(sys.argv[1]))'</span><span style="color:#9ECBFF"> "</span><span style="color:#E1E4E8">$f</span><span style="color:#9ECBFF">"</span></span>
+<span class="line"><span style="color:#B392F0">actionlint</span><span style="color:#9ECBFF"> "</span><span style="color:#E1E4E8">$f</span><span style="color:#9ECBFF">"</span></span></code></pre>
+<p>0 conflict markers, <code>yaml.safe_load</code> succeeds, <code>actionlint</code> reports 0 issues across all six files. A grep answers “does this text appear.” Only a parser answers “is this a workflow.”</p>
+<h2 id="the-agent-that-reports-the-denominator">The agent that reports the denominator</h2>
+<p>In <code>claude-code-plugins</code> I added an agent called <code>omarchy-coverage-reporter</code>.</p>
+<p>Every other internal agent in that repo answers “is this correct.” None of them answered “what did we actually look at.” Five separate incidents in the days before had turned on that second question, so it got its own agent.</p>
+<p>It runs the gate lane, the rig checks and the offline tests, then reports the denominator: how many applicable checks exist, and how many executed. The core of it is splitting the single SKIP token into two verdicts that mean opposite things and were previously aggregated together.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Verdict</th><th>Condition</th><th>What it means</th></tr></thead><tbody><tr><td>NOT APPLICABLE</td><td>Predicate false. No QML in this tree, so a QML gate has nothing to say.</td><td>Counts as a pass.</td></tr><tr><td>UNPROVEN</td><td>Predicate true, checker could not run. Tree has QML, qmllint was unresolvable.</td><td>Never a pass.</td></tr><tr><td>INCONCLUSIVE</td><td>Any UNPROVEN in the set.</td><td>Neither pass nor fail. Nobody knows yet.</td></tr></tbody></table>
+<p>INCONCLUSIVE is neither failure nor pass. It means nobody knows yet. That is the state the old runner had no way to express, which is why it kept reporting green: given only PASS, FAIL and SKIP, an unresolvable checker has to land somewhere, and SKIP was the least alarming bucket.</p>
+<p>The agent has no Write tool and no Edit tool. That constraint is deliberate and it is the design decision I would defend hardest. A reporter that can repair what it measures cannot be trusted about what it measured. If it can fix the qmllint resolution and then report full coverage, the report is a claim about a tree the reporter changed, and no reader can tell which findings were observations and which were consequences of its own edits. Repairs route to <code>omarchy-gate-author</code>. Judgment routes to <code>omarchy-submission-auditor</code>.</p>
+<p>I chose a new agent over extending the existing auditor because counting what ran and judging what it means are different jobs. The auditor had already demonstrated the failure mode of merging them: it produced a confident verdict over a corpus it never established. It was not wrong about the files it read. It was wrong about which files there were.</p>
+<h2 id="the-same-principle-in-two-smaller-places">The same principle in two smaller places</h2>
+<p>Naming these is the point. One fix is a fix. Three places in one day, counting the coverage reporter, is a pattern.</p>
+<p>The changelog generator silently dropped any commit subject that was not a conventional commit. It now reports the count and lists examples. Running it surfaced exactly one skipped commit per affected repo, and each one was GitHub’s auto generated “Initial commit.” Correctly skipped, and now visibly so. The output did not change its behaviour, it changed what it admits.</p>
+<p>In <code>omarchy-crew-chief-entry</code>, the spool reader is bounded to the newest 64 files at 4 KB each. It now emits a census line stating how many files exist, not how many it read.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>sessions: 63 shown, +338 not shown (401 files, 713 KB)</span></span></code></pre>
+<p>Under a deliberate 401 file, 713 KB flood, including one 500 KB garbage file, the reader returned 10 KB and the widget rendered 63 live sessions. Before the census line, the parser received well formed chunks, found nothing malformed, and concluded nothing was missing. It would have reported a complete fleet that was short 338 sessions. Every individual piece of that pipeline behaved correctly. The bound was correct, the parse was correct, the report was correct about its input. Nobody was carrying the number 401.</p>
+<h2 id="also-shipped">Also shipped</h2>
+<p><code>contributing-clanker</code> closed an SSRF that had escaped review twice. Listening Post guarded its curl call with a regex meant to allow only literal IPv4.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="js"><code><span class="line"><span style="color:#9ECBFF">/</span><span style="color:#F97583">^</span><span style="color:#79B8FF">\d</span><span style="color:#F97583">{1,3}</span><span style="color:#DBEDFF">(</span><span style="color:#85E89D;font-weight:bold">\.</span><span style="color:#79B8FF">\d</span><span style="color:#F97583">{1,3}</span><span style="color:#DBEDFF">)</span><span style="color:#F97583">{3}$</span><span style="color:#9ECBFF">/</span><span style="color:#6A737D">   // four decimal parts and nothing else</span></span></code></pre>
+<p>curl resolves through <code>inet_aton</code>, which accepts one to four parts, reads a leading <code>0</code> as octal and <code>0x</code> as hex. So <code>127.1</code>, <code>0177.0.0.1</code> and <code>0x7f.1</code> all fail the regex, get treated as public hostnames, and reach loopback. New gate c38 flags that regex shape in any file that also touches the network, and the fix hint teaches the inversion (allowlist what you accept, then resolve and check the resolved address) rather than adding three more bad patterns to match, because enumerating bad forms is exactly what failed twice.</p>
+<p>The changelog security classifier matched on the pattern <code>'bound '</code> with a trailing space. That matches “bound the spool read” and misses “bounded read,” so a real security fix could file under Fixed and quietly leave the security section of a release note. This one is a plain false negative rather than an instance of the pattern above, since nothing new gets reported, the match just stopped being wrong. Verified both directions: “add a bounded read” now classifies as Security and did not before.</p>
+<p>Gate c37, the rig receipt fingerprint, widened to cover every shipped <code>.js</code> rather than just the manifest and QML. These plugins keep parsing, host filters and state handling in a <code>Model.js</code> that QML imports, so the receipt was certifying a tree whose entire behaviour could change underneath it.</p>
+<p>Gate c36 now requires a width constraint AND an overflow rule, not either. It had accepted a QML <code>Text</code> as bounded if it declared any one of <code>width</code>, <code>elide</code> or <code>wrapMode</code>. That is wrong on QML semantics: <code>elide</code> with no width constraint is a no op, since elision is computed against element width. The gate’s own fix hint already read “elide with a width” while the check accepted elide alone, so the enforcement was looser than the advice it printed.</p>
+<p><code>rig-render.sh</code> landed in <code>omarchy-widget-template</code>. It starts a headless sway on the wlroots backend, installs the plugin into the rig’s Omarchy config, launches Quickshell, opens the panel through the plugin’s own IPC target, and grabs the frame with grim. Every plugin in the family had been submitted having never been loaded. Static tools cannot see a contract error: Bazaar shipped a <code>PanelWindow</code> where the first party popup is a <code>KeyboardPanel</code>, passed all nine gates and qmllint, and only a running shell said <code>Cannot assign to non-existent property contentHeight</code>.</p>
+<p><code>omarchy-bazaar-entry</code> gained install, installed state and a kind filter. Measured before the change: Okomart 1,148 views and 286 installs, Plugin Manager 209 views and 95 installs at 45 percent conversion, Bazaar 82 views and 11 installs at 13 percent. Install shells out to the first party CLI with an argv array and no shell string, because the repository URL comes from a third party catalog and building a shell string out of it is the exec injection shape gate c34 exists to refuse. The installed state scan keys on the id inside each manifest, never the directory name, because Omarchy installs under the full plugin id while a hand clone is usually a short name, and the rig carried both <code>listening-post</code> and <code>io.github.jeremylongshore.listening-post</code> for the same plugin. Tests caught a version comparison bug: the first version treated a missing segment as smaller than everything, so <code>1.2.0</code> read as newer than <code>1.2</code>, and every up to date plugin on a two segment version would have shown a phantom update badge.</p>
+<p><code>omarchy-pit-wall-entry</code> coloured the Formula 1 standings tables by team. Only the hue comes from the team. Saturation and lightness are fixed at the call site, so Ferrari reads as Ferrari without a hardcoded hex fighting whatever theme the user runs, and unknown or future teams fall through to a stable hue derived from the name instead of collapsing into a single default.</p>
+<p><code>omarchy-wait-state-entry</code> shipped a PSI monitor.</p>
+<p>Per repo commit counts: omarchy-pit-wall-entry 8, omarchy-bazaar-entry 7, omarchy-crew-chief-entry 7, omarchy-x-files-entry 7, omarchy-listening-post-entry 6, omarchy-mlb-booth-entry 6, omarchy-docket-entry 6, omarchy-wait-state-entry 4, claude-code-plugins 4, omarchy-widget-template 2, contributing-clanker 1.</p>
+<h2 id="who-did-what">Who did what</h2>
+<p>The <code>claude-code-plugins</code> work ran across seven sessions in two different CLIs: 456 turns, 677 tool calls, 27 errors hit, spanning 1397 minutes. <code>Claude Opus 5</code> ran the Claude Code side and carried the gate work and the coverage reporter design. <code>GPT-5.6 Sol</code> ran the Codex side, where it built the Wait State plugin and traced a governed-brain startup failure to a config pointing at a cached plugin version 1.1.2 that no longer existed on disk, with only 1.2.0 installed.</p>
+<p>The part I did not plan is the one worth keeping. <code>GPT-5.6 Sol</code> spent its later sessions running the coverage reporter role that <code>Claude Opus 5</code> had authored earlier the same day, as an independent read-only audit, on a tree the authoring model had never seen. It stated the rule back before using it, that the denominator comes from the canonical lane and a skipped applicable check counts as unproven rather than pass, and then it returned a BLOCK on Wait State: install reality unproven, because the repository had no commits and no remote, so the documented clone URL could not be resolved. That is the UNPROVEN verdict doing exactly the job it was written for, on day one, in the hands of a model that did not write it. It also found the freshness checker could only discover canonical gates whose names were already in the local manifest, which is a coverage hole of precisely the kind the agent exists to name.</p>
+<p><code>Claude Fable 5</code> ran a short intent-os thread. <code>Claude Sonnet 5</code> was on the blog pipeline thread.</p>
+<p>Zero operator course corrections that day, and that deserves one honest sentence rather than a victory lap. It was not a day of being redirected. It was a day of parallel repair on a defect shape that had already been named, which is the easiest kind of day to run unattended and tells you very little about how the system handles a novel problem.</p>
+<p>The 27 errors were real and mostly environmental. A <code>shellcheck</code> lint job failed the L2 gate. The rig container answered <code>sh: line 4: python3: command not found</code>. QML threw <code>TypeError: Property 'spoolTruncated' of object [object Object] is not a function</code> while the census line was being wired in. A script call hit <code>bash: scripts/gen-changelog.sh: No such file or directory</code>. The headless rig was missing <code>swaybg</code>. Every one of those was loud. None of them is the category of failure this post is about, which is the quiet kind that reports success.</p>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "Every Check Should Report What It Did Not Look At",
+  "description": "A status job that always runs reports which checks executed and which are unproven, so a skipped GitHub Actions job cannot read as a pass.",
+  "datePublished": "2026-08-22T08:00:00-05:00",
+  "author": { "@type": "Person", "name": "Jeremy Longshore" },
+  "url": "https://startaitools.com/posts/the-lane-that-reviewed-nothing/",
+  "isPartOf": { "@type": "Blog", "name": "Start AI Tools", "url": "https://startaitools.com" }
+}
+</script>
+<h2 id="related-posts">Related Posts</h2>
+<p><a href="https://startaitools.com/posts/the-skip-that-counted-as-a-pass/">What a Skipped Check Is Worth in CI</a></p>
+<p><a href="https://startaitools.com/posts/we-told-the-auditors-to-refute-us/">We Told the Auditors to Refute Us</a></p>
+<p><a href="https://startaitools.com/posts/the-gate-that-could-not-fail/">The Gate That Could Not Fail</a></p>
+      </div>
+    </div>
+  </article>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
