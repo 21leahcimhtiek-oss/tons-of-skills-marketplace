@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>lokalise-performance-tuning - Agent Skill</title>
+    <meta name="description" content="Optimize Lokalise API performance with caching, pagination, and bulk operations. Use when experiencing slow API responses, implementing caching strategies, or optimizing request throughput for Lokalise integrations. Trigger with phrases like &quot;lokalise performance&quot;, &quot;optimize lokalise&quot;, &quot;lokalise latency&quot;, &quot;lokalise caching&quot;, &quot;lokalise slow&quot;, &quot;lokalise batch&quot;.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://tonsofskills.com/tons-of-skills-marketplace/skills/lokalise-performance-tuning/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/lokalise-performance-tuning/">
+    <meta property="og:title" content="lokalise-performance-tuning - Agent Skill">
+    <meta property="og:description" content="Optimize Lokalise API performance with caching, pagination, and bulk operations. Use when experiencing slow API responses, implementing caching strategies, or optimizing request throughput for Lokalise integrations. Trigger with phrases like &quot;lokalise performance&quot;, &quot;optimize lokalise&quot;, &quot;lokalise latency&quot;, &quot;lokalise caching&quot;, &quot;lokalise slow&quot;, &quot;lokalise batch&quot;.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="lokalise-performance-tuning - Agent Skill">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/lokalise-performance-tuning/">
+    <meta name="twitter:title" content="lokalise-performance-tuning - Agent Skill">
+    <meta name="twitter:description" content="Optimize Lokalise API performance with caching, pagination, and bulk operations. Use when experiencing slow API responses, implementing caching strategies, or optimizing request throughput for Lokalise integrations. Trigger with phrases like &quot;lokalise performance&quot;, &quot;optimize lokalise&quot;, &quot;lokalise latency&quot;, &quot;lokalise caching&quot;, &quot;lokalise slow&quot;, &quot;lokalise batch&quot;.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"lokalise-performance-tuning","description":"Optimize Lokalise API performance with caching, pagination, and bulk operations. Use when experiencing slow API responses, implementing caching strategies, or optimizing request throughput for Lokalise integrations. Trigger with phrases like \"lokalise performance\", \"optimize lokalise\", \"lokalise latency\", \"lokalise caching\", \"lokalise slow\", \"lokalise batch\".","version":"1.14.0","author":{"@type":"Person","name":"Jeremy Longshore"},"license":"MIT","programmingLanguage":"Claude Code Agent Skill","isPartOf":{"@type":"SoftwareApplication","name":"lokalise-pack","applicationCategory":"unknown"}}</script>
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.breadcrumbs[data-astro-cid-ilhxcym7]{margin-bottom:var(--space-5)}.breadcrumbs__list[data-astro-cid-ilhxcym7]{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;list-style:none;padding:0;margin:0;font-family:var(--font-mono);font-size:var(--text-sm, .8rem)}.breadcrumbs__item[data-astro-cid-ilhxcym7]{display:flex;align-items:center;gap:.375rem}.breadcrumbs__link[data-astro-cid-ilhxcym7]{color:var(--text-3);text-decoration:none;transition:color var(--duration-fast, .2s) var(--ease-out)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:hover{color:var(--primary)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:0}.breadcrumbs__sep[data-astro-cid-ilhxcym7]{color:var(--text-3);user-select:none;font-size:.7em;line-height:1}.breadcrumbs__current[data-astro-cid-ilhxcym7]{color:var(--text-2)}.detail-cta[data-astro-cid-qcigfm7x]{background:var(--surface-3, var(--brand-light-gray));border-top:1px solid var(--border, var(--brand-light-gray));border-radius:var(--radius-lg);padding:2rem 1.5rem;margin-top:2rem;text-align:center}.detail-cta__headline[data-astro-cid-qcigfm7x]{font-family:var(--font-display);font-weight:700;font-size:1.35rem;color:var(--text, var(--brand-dark));margin-bottom:1.25rem}.detail-cta__actions[data-astro-cid-qcigfm7x]{display:flex;justify-content:center;gap:.75rem;flex-wrap:wrap}.detail-cta__primary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:var(--primary);color:#0a0a0c;border:none;border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;cursor:pointer;transition:background var(--duration-fast) var(--ease-out),transform var(--duration-fast) var(--ease-out)}.detail-cta__primary[data-astro-cid-qcigfm7x]:hover{background:var(--primary-dark, var(--primary-dark));transform:translateY(-1px)}.detail-cta__primary[data-astro-cid-qcigfm7x].copied{background:var(--positive, var(--brand-green))}.detail-cta__secondary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:transparent;color:var(--text, var(--brand-dark));border:1px solid var(--border, var(--brand-mid-gray));border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;text-decoration:none;transition:border-color var(--duration-fast) var(--ease-out),color var(--duration-fast) var(--ease-out)}.detail-cta__secondary[data-astro-cid-qcigfm7x]:hover{border-color:var(--primary);color:var(--primary)}@media(max-width:480px){.detail-cta__actions[data-astro-cid-qcigfm7x]{flex-direction:column;align-items:stretch}.detail-cta__primary[data-astro-cid-qcigfm7x],.detail-cta__secondary[data-astro-cid-qcigfm7x]{justify-content:center}}
+</style>
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/_slug_@_@astro.wF9emvVq.css"></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  
+  
+
+  <div class="skill-detail" data-astro-cid-jrlgpo3w>
+    <!-- 1. Breadcrumbs -->
+    <nav aria-label="Breadcrumb" class="breadcrumbs" data-astro-cid-ilhxcym7>
+  <ol class="breadcrumbs__list" itemscope itemtype="https://schema.org/BreadcrumbList" data-astro-cid-ilhxcym7>
+    <li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Home</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="1">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/skills/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Skills</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="2">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          <span class="breadcrumbs__current" aria-current="page" itemprop="name" data-astro-cid-ilhxcym7>
+              lokalise-performance-tuning
+            </span>
+          <meta itemprop="position" content="3">
+        </li>
+  </ol>
+</nav>
+
+    <!-- 2. Header (enhanced) -->
+    <header class="skill-header" data-astro-cid-jrlgpo3w>
+      <h1 data-astro-cid-jrlgpo3w>lokalise-performance-tuning</h1>
+      <p class="skill-description" data-astro-cid-jrlgpo3w>Optimize Lokalise API performance with caching, pagination, and bulk operations. Use when experiencing slow API responses, implementing caching strategies, or optimizing request throughput for Lokalise integrations. Trigger with phrases like &quot;lokalise performance&quot;, &quot;optimize lokalise&quot;, &quot;lokalise latency&quot;, &quot;lokalise caching&quot;, &quot;lokalise slow&quot;, &quot;lokalise batch&quot;.</p>
+
+      <div class="skill-metadata" data-astro-cid-jrlgpo3w>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>v1.14.0</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>Jeremy Longshore</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>MIT</span>
+        </div>
+      </div>
+
+      
+    </header>
+
+    <!-- 4. Allowed Tools -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Allowed Tools</h2>
+      <div class="tools-grid" data-astro-cid-jrlgpo3w>
+        <span class="tool-badge" data-astro-cid-jrlgpo3w>Read</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Write</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Edit</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(npm:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(node:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(curl:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(jq:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Grep</span>
+      </div>
+      
+    </section>
+
+    <!-- 5. Provided by Plugin -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Provided by Plugin</h2>
+      <div class="plugin-info" data-astro-cid-jrlgpo3w>
+        <div class="plugin-details" data-astro-cid-jrlgpo3w>
+          <h3 data-astro-cid-jrlgpo3w>
+            <a href="/plugins/lokalise-pack/" data-astro-cid-jrlgpo3w>lokalise-pack</a>
+          </h3>
+          <p data-astro-cid-jrlgpo3w>Claude Code skill pack for Lokalise (24 skills)</p>
+          <div class="plugin-meta" data-astro-cid-jrlgpo3w>
+            <span data-astro-cid-jrlgpo3w>unknown</span>
+            <span data-astro-cid-jrlgpo3w>v1.14.0</span>
+          </div>
+        </div>
+        <a href="/plugins/lokalise-pack/" class="btn-primary" data-astro-cid-jrlgpo3w>View Plugin</a>
+      </div>
+    </section>
+
+    <!-- 6. Installation -->
+    <section class="section-box dark" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Installation</h2>
+      <p class="install-note" style="color: var(--brand-light-gray); margin-bottom: 0.75rem;" data-astro-cid-jrlgpo3w>This skill is included in the lokalise-pack plugin:</p>
+      <pre class="install-command" data-copy="/plugin install lokalise-pack@claude-code-plugins-plus" data-astro-cid-jrlgpo3w><code data-astro-cid-jrlgpo3w>/plugin install lokalise-pack@claude-code-plugins-plus</code></pre>
+      <p class="install-note" data-astro-cid-jrlgpo3w>Click to copy</p>
+    </section>
+
+    <!-- 7. Skill Content (Markdown) -->
+    <section class="skill-content-section" data-astro-cid-jrlgpo3w>
+      <h2 data-astro-cid-jrlgpo3w>Instructions</h2>
+      <div class="skill-content" data-astro-cid-jrlgpo3w>
+        <div data-astro-cid-jrlgpo3w><h1>Lokalise Performance Tuning</h1>
+<h2>Overview</h2>
+<p>Optimize Lokalise API throughput for translation pipelines by implementing cursor pagination, local caching, batch key operations (500/request), request throttling under the 6 req/s rate limit, and selective language downloads.</p>
+<h2>Prerequisites</h2>
+<ul>
+<li><code>@lokalise/node-api</code> SDK v9+ (ESM) or REST API access</li>
+<li><code>LOKALISE_API_TOKEN</code> environment variable set</li>
+<li>Understanding of project size (key count, language count) to calibrate batch sizes</li>
+<li>Optional: Redis or LRU cache library for persistent caching</li>
+</ul>
+<h2>Instructions</h2>
+<h3>Step 1: Use Cursor Pagination for Large Datasets</h3>
+<p>Cursor pagination is significantly faster than offset pagination for projects with 5K+ keys. Offset pagination degrades as page numbers increase because the server must skip rows; cursor pagination uses a pointer.</p>
+<pre data-lang="typescript"><code>
+import { LokaliseApi } from &#39;@lokalise/node-api&#39;;
+const lok = new LokaliseApi({ apiKey: process.env.LOKALISE_API_TOKEN! });
+
+// Generator that yields all keys using cursor pagination
+async function* getAllKeys(projectId: string) {
+  let cursor: string | undefined;
+  do {
+    const result = await lok.keys().list({
+      project_id: projectId,
+      limit: 500,              // Maximum allowed per request
+      pagination: &#39;cursor&#39;,
+      cursor,
+    });
+    for (const key of result.items) yield key;
+    cursor = result.hasNextCursor() ? result.nextCursor : undefined;
+  } while (cursor);
+}
+
+// Usage: 10,000 keys = 20 API calls (vs 100 with default limit=100)
+let count = 0;
+for await (const key of getAllKeys(&#39;PROJECT_ID&#39;)) {
+  count++;
+}
+console.log(`Fetched ${count} keys`);
+</code></pre>
+<p><strong>Offset pagination comparison (avoid for large projects):</strong></p>
+<table><thead><tr>
+<th>Keys</th>
+<th>Offset (limit=100)</th>
+<th>Cursor (limit=500)</th>
+<th>Time saved</th>
+</tr></thead><tbody>
+<tr>
+<td>1,000</td>
+<td>10 requests</td>
+<td>2 requests</td>
+<td>80%</td>
+</tr>
+<tr>
+<td>10,000</td>
+<td>100 requests</td>
+<td>20 requests</td>
+<td>80%</td>
+</tr>
+<tr>
+<td>50,000</td>
+<td>500 requests (~84s)</td>
+<td>100 requests (~17s)</td>
+<td>80%</td>
+</tr>
+</tbody></table>
+<h3>Step 2: Cache Translation Downloads Locally</h3>
+<p>Translation file downloads are the most expensive Lokalise operation. Cache them locally and use project <code>last_activity</code> timestamps to invalidate.</p>
+<pre data-lang="typescript"><code>
+import { LokaliseApi } from &#39;@lokalise/node-api&#39;;
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from &#39;fs&#39;;
+
+const lok = new LokaliseApi({ apiKey: process.env.LOKALISE_API_TOKEN! });
+const CACHE_DIR = &#39;.lokalise-cache&#39;;
+
+interface CacheEntry {
+  url: string;
+  timestamp: string;
+  languages: string[];
+}
+
+function getCachePath(projectId: string, langIso: string): string {
+  return `${CACHE_DIR}/${projectId}/${langIso}.json`;
+}
+
+function getMetaPath(projectId: string): string {
+  return `${CACHE_DIR}/${projectId}/meta.json`;
+}
+
+async function downloadWithCache(projectId: string, langIso: string, format = &#39;json&#39;) {
+  mkdirSync(`${CACHE_DIR}/${projectId}`, { recursive: true });
+  const cachePath = getCachePath(projectId, langIso);
+  const metaPath = getMetaPath(projectId);
+
+  // Check if project was modified since last cache
+  const project = await lok.projects().get(projectId);
+  const lastActivity = project.statistics?.last_activity ?? project.created_at;
+
+  if (existsSync(metaPath)) {
+    const meta: CacheEntry = JSON.parse(readFileSync(metaPath, &#39;utf8&#39;));
+    if (meta.timestamp === lastActivity &amp;&amp; existsSync(cachePath)) {
+      console.log(`Cache hit: ${langIso} (unchanged since ${lastActivity})`);
+      return JSON.parse(readFileSync(cachePath, &#39;utf8&#39;));
+    }
+  }
+
+  // Cache miss — download fresh
+  const bundle = await lok.files().download(projectId, {
+    format,
+    filter_langs: [langIso],
+    original_filenames: false,
+  });
+
+  // bundle.bundle_url contains a temporary download URL
+  const response = await fetch(bundle.bundle_url);
+  const data = await response.arrayBuffer();
+
+  writeFileSync(cachePath, Buffer.from(data));
+  writeFileSync(metaPath, JSON.stringify({
+    url: bundle.bundle_url,
+    timestamp: lastActivity,
+    languages: [langIso],
+  }));
+
+  console.log(`Cache miss: downloaded ${langIso} (${data.byteLength} bytes)`);
+  return data;
+}
+</code></pre>
+<h3>Step 3: Batch Key Operations</h3>
+<p>Lokalise supports creating, updating, and deleting up to 500 keys per request. Always batch instead of making individual requests.</p>
+<pre data-lang="typescript"><code>
+// Bulk create keys — 500 per batch with rate limit awareness
+async function createKeysBatched(projectId: string, keys: any[]) {
+  const BATCH_SIZE = 500;
+  const results = [];
+
+  for (let i = 0; i &lt; keys.length; i += BATCH_SIZE) {
+    const batch = keys.slice(i, i + BATCH_SIZE);
+    const result = await lok.keys().create({
+      project_id: projectId,
+      keys: batch,
+    });
+    results.push(...result.items);
+    console.log(`Batch ${Math.floor(i / BATCH_SIZE) + 1}: created ${result.items.length} keys`);
+    await new Promise(r =&gt; setTimeout(r, 200)); // Stay under 6 req/s
+  }
+
+  return results;
+}
+
+// Bulk update keys — same 500-key batch limit
+async function updateKeysBatched(projectId: string, updates: Array&lt;{key_id: number; [k: string]: any}&gt;) {
+  const BATCH_SIZE = 500;
+  for (let i = 0; i &lt; updates.length; i += BATCH_SIZE) {
+    const batch = updates.slice(i, i + BATCH_SIZE);
+    await lok.keys().bulk_update({
+      project_id: projectId,
+      keys: batch,
+    });
+    await new Promise(r =&gt; setTimeout(r, 200));
+  }
+}
+
+// Bulk delete — up to 500 key IDs per request
+async function deleteKeysBatched(projectId: string, keyIds: number[]) {
+  const BATCH_SIZE = 500;
+  for (let i = 0; i &lt; keyIds.length; i += BATCH_SIZE) {
+    const batch = keyIds.slice(i, i + BATCH_SIZE);
+    await lok.keys().bulk_delete({
+      project_id: projectId,
+      keys: batch,
+    });
+    await new Promise(r =&gt; setTimeout(r, 200));
+  }
+}
+
+// 2,000 keys: 4 batched requests instead of 2,000 individual ones
+</code></pre>
+<h3>Step 4: Implement Request Throttling</h3>
+<p>A proper request queue prevents <code>429 Too Many Requests</code> errors and makes your integration resilient under load.</p>
+<pre data-lang="typescript"><code>
+import PQueue from &#39;p-queue&#39;;
+
+// Lokalise rate limit: 6 requests/second
+// Use 5 concurrent with 1s interval for safety margin
+const queue = new PQueue({
+  concurrency: 5,
+  interval: 1000,
+  intervalCap: 5,
+});
+
+async function throttledRequest&lt;T&gt;(fn: () =&gt; Promise&lt;T&gt;): Promise&lt;T&gt; {
+  return queue.add(fn) as Promise&lt;T&gt;;
+}
+
+// All API calls go through the queue automatically
+const project = await throttledRequest(() =&gt; lok.projects().get(projectId));
+const keys = await throttledRequest(() =&gt; lok.keys().list({
+  project_id: projectId,
+  limit: 500,
+  pagination: &#39;cursor&#39;,
+}));
+
+// Works for parallel operations too — queue enforces the rate limit
+const projectIds = [&#39;PROJ_1&#39;, &#39;PROJ_2&#39;, &#39;PROJ_3&#39;, &#39;PROJ_4&#39;, &#39;PROJ_5&#39;];
+const allProjects = await Promise.all(
+  projectIds.map(id =&gt; throttledRequest(() =&gt; lok.projects().get(id)))
+);
+</code></pre>
+<h3>Step 5: Async File Operations with Webhooks</h3>
+<p>File uploads and downloads are processed asynchronously by Lokalise. Instead of polling the process status endpoint, use webhooks to get notified when processing completes.</p>
+<pre data-lang="bash"><code>
+set -euo pipefail
+# Set up a webhook for file operation events
+curl -s -X POST &quot;https://api.lokalise.com/api2/projects/${PROJECT_ID}/webhooks&quot; \
+  -H &quot;X-Api-Token: ${LOKALISE_API_TOKEN}&quot; \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{
+    &quot;url&quot;: &quot;https://hooks.company.com/lokalise&quot;,
+    &quot;events&quot;: [
+      &quot;project.imported&quot;,
+      &quot;project.exported&quot;,
+      &quot;project.keys_added&quot;
+    ]
+  }&#39; | jq &#39;{webhook_id: .webhook.webhook_id, url: .webhook.url, events: .webhook.events}&#39;
+</code></pre>
+<p><strong>If you must poll (no webhook endpoint available):</strong></p>
+<pre data-lang="typescript"><code>
+async function waitForProcess(projectId: string, processId: string, timeoutMs = 120_000) {
+  const start = Date.now();
+  while (Date.now() - start &lt; timeoutMs) {
+    const proc = await throttledRequest(() =&gt;
+      lok.queuedProcesses().get(projectId, processId)
+    );
+    if (proc.status === &#39;finished&#39;) return proc;
+    if (proc.status === &#39;cancelled&#39; || proc.status === &#39;failed&#39;) {
+      throw new Error(`Process ${processId} ${proc.status}: ${proc.message}`);
+    }
+    await new Promise(r =&gt; setTimeout(r, 2000)); // Poll every 2s
+  }
+  throw new Error(`Process ${processId} timed out after ${timeoutMs}ms`);
+}
+</code></pre>
+<h3>Step 6: Selective Language Downloads (Delta Exports)</h3>
+<p>Downloading all languages when you only need one wastes bandwidth and API time. Always filter by language and, when possible, by modification timestamp.</p>
+<pre data-lang="typescript"><code>
+// Download only changed translations since last sync
+async function downloadDelta(projectId: string, langIso: string, sinceTimestamp: string) {
+  // Filter keys modified after the given timestamp
+  const keys = await lok.keys().list({
+    project_id: projectId,
+    limit: 500,
+    pagination: &#39;cursor&#39;,
+    filter_translation_lang_ids: langIso,
+    // Unfortunately, Lokalise doesn&#39;t support filter_modified_after on keys endpoint.
+    // Workaround: download full file and diff locally, or use webhooks for real-time sync.
+  });
+
+  return keys.items;
+}
+
+// Download a single language file instead of all languages
+async function downloadSingleLanguage(projectId: string, langIso: string) {
+  const result = await lok.files().download(projectId, {
+    format: &#39;json&#39;,
+    filter_langs: [langIso],        // Only this language
+    original_filenames: false,       // Flat structure
+    bundle_structure: &#39;%LANG_ISO%.%FORMAT%&#39;, // e.g., fr.json
+    export_empty_as: &#39;base&#39;,         // Fall back to base language for untranslated
+    include_tags: [&#39;production&#39;],    // Only production-tagged keys
+  });
+  return result.bundle_url;
+}
+</code></pre>
+<h3>Step 7: Measure and Benchmark</h3>
+<pre data-lang="bash"><code>
+set -euo pipefail
+# Benchmark API response times across endpoints
+echo &quot;=== Lokalise API Benchmarks ===&quot;
+
+echo -n &quot;Projects list: &quot;
+curl -s -o /dev/null -w &quot;%{time_total}s&quot; \
+  -H &quot;X-Api-Token: ${LOKALISE_API_TOKEN}&quot; \
+  &quot;https://api.lokalise.com/api2/projects?limit=10&quot;
+echo &quot;&quot;
+
+echo -n &quot;Keys list (limit=500): &quot;
+curl -s -o /dev/null -w &quot;%{time_total}s&quot; \
+  -H &quot;X-Api-Token: ${LOKALISE_API_TOKEN}&quot; \
+  &quot;https://api.lokalise.com/api2/projects/${PROJECT_ID}/keys?limit=500&quot;
+echo &quot;&quot;
+
+echo -n &quot;File download trigger: &quot;
+curl -s -o /dev/null -w &quot;%{time_total}s&quot; \
+  -X POST -H &quot;X-Api-Token: ${LOKALISE_API_TOKEN}&quot; \
+  -H &quot;Content-Type: application/json&quot; \
+  &quot;https://api.lokalise.com/api2/projects/${PROJECT_ID}/files/download&quot; \
+  -d &#39;{&quot;format&quot;:&quot;json&quot;,&quot;filter_langs&quot;:[&quot;en&quot;],&quot;original_filenames&quot;:false}&#39;
+echo &quot;&quot;
+
+echo -n &quot;Rate limit headers: &quot;
+curl -s -D - -o /dev/null \
+  -H &quot;X-Api-Token: ${LOKALISE_API_TOKEN}&quot; \
+  &quot;https://api.lokalise.com/api2/projects?limit=1&quot; \
+  | grep -i x-ratelimit
+</code></pre>
+<h2>Output</h2>
+<ul>
+<li>Cursor pagination implemented for all list operations (80% fewer API calls)</li>
+<li>Translation download cache with timestamp-based invalidation</li>
+<li>Batch key operations (create/update/delete) using 500-key batches</li>
+<li>Request queue with PQueue throttling at 5 req/s (safety margin under 6 req/s limit)</li>
+<li>Webhooks configured for async file operations (replacing polling)</li>
+<li>Selective language downloads reducing bandwidth and processing time</li>
+<li>Benchmark results for baseline performance measurement</li>
+</ul>
+<h2>Error Handling</h2>
+<table><thead><tr>
+<th>Issue</th>
+<th>Cause</th>
+<th>Solution</th>
+</tr></thead><tbody>
+<tr>
+<td><code>429 Too Many Requests</code></td>
+<td>Exceeded 6 req/s global rate limit</td>
+<td>Use PQueue throttling (Step 4), retry with exponential backoff</td>
+</tr>
+<tr>
+<td>Slow file downloads</td>
+<td>Large project with 50+ languages</td>
+<td>Filter by <code>filter_langs</code> to download one language at a time</td>
+</tr>
+<tr>
+<td>Pagination timeout</td>
+<td>Offset pagination on 50K+ key projects</td>
+<td>Switch to cursor pagination (Step 1)</td>
+</tr>
+<tr>
+<td>Bulk create partial failure</td>
+<td>Network timeout on large batch</td>
+<td>Reduce batch size from 500 to 200 and add retry logic per batch</td>
+</tr>
+<tr>
+<td>Cache stale after team edits</td>
+<td><code>last_activity</code> not granular enough</td>
+<td>Reduce cache TTL or use webhooks to invalidate on <code>project.translation_updated</code></td>
+</tr>
+<tr>
+<td><code>bundle_url</code> expired</td>
+<td>Download URL only valid for ~30 minutes</td>
+<td>Fetch the URL and download immediately; do not store URLs for later</td>
+</tr>
+</tbody></table>
+<h2>Examples</h2>
+<h3>Quick Rate Limit Check</h3>
+<pre data-lang="bash"><code>
+set -euo pipefail
+# See how much rate limit headroom you have right now
+curl -s -D - -o /dev/null \
+  -H &quot;X-Api-Token: ${LOKALISE_API_TOKEN}&quot; \
+  &quot;https://api.lokalise.com/api2/system/languages?limit=1&quot; 2&gt;/dev/null \
+  | grep -iE &#39;x-ratelimit&#39; | while read -r line; do echo &quot;  $line&quot;; done
+</code></pre>
+<h2>Resources</h2>
+<ul>
+<li><a href="https://developers.lokalise.com/docs/api-rate-limits">Lokalise Rate Limits</a></li>
+<li><a href="https://developers.lokalise.com/docs/cursor-pagination">Cursor Pagination Docs</a></li>
+<li><a href="https://developers.lokalise.com/reference/download-files">File Download API</a></li>
+<li><a href="https://developers.lokalise.com/reference/create-keys">Bulk Key Operations</a></li>
+<li><a href="https://developers.lokalise.com/reference/webhook-events">Webhook Events</a></li>
+<li><a href="https://www.npmjs.com/package/p-queue">p-queue (npm)</a></li>
+</ul>
+<h2>Next Steps</h2>
+<ul>
+<li>For debugging performance issues, collect diagnostics with <code>lokalise-debug-bundle</code>.</li>
+<li>For SDK upgrade to get latest pagination improvements, see <code>lokalise-upgrade-migration</code>.</li>
+<li>For setting up CI pipelines with optimized API usage, see <code>lokalise-ci-integration</code>.</li>
+</ul></div>
+      </div>
+    </section>
+
+    <!-- 8. Bottom CTA -->
+    <section class="detail-cta" data-astro-cid-qcigfm7x>
+  <h2 class="detail-cta__headline" data-astro-cid-qcigfm7x>Ready to use lokalise-pack?</h2>
+  <div class="detail-cta__actions" data-astro-cid-qcigfm7x>
+    <button class="detail-cta__primary" data-copy-install="/plugin install lokalise-pack@claude-code-plugins-plus" data-astro-cid-qcigfm7x>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" data-astro-cid-qcigfm7x>
+        <rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" stroke-width="1.5" data-astro-cid-qcigfm7x></rect>
+        <path d="M3 11V3a1 1 0 011-1h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" data-astro-cid-qcigfm7x></path>
+      </svg>
+      <span class="detail-cta__btn-text" data-astro-cid-qcigfm7x>Copy Install Command</span>
+    </button>
+    
+  </div>
+</section>
+
+<script type="module">document.querySelectorAll("[data-copy-install]").forEach(t=>{t.addEventListener("click",async()=>{const a=t.dataset.copyInstall||"";await navigator.clipboard.writeText(a);const e=t.querySelector(".detail-cta__btn-text");if(e){const o=e.textContent;e.textContent="Copied!",t.classList.add("copied"),window.trackEvent&&window.trackEvent("install_copied",{plugin_name:a.split(" ").pop()||"",source:"detail_cta"}),setTimeout(()=>{e.textContent=o,t.classList.remove("copied")},2e3)}})});</script>
+
+    <!-- 9. Related Skills (6, with tool pills) -->
+    <section class="related-skills-section" data-astro-cid-jrlgpo3w>
+        <h2 class="related-skills-heading" data-astro-cid-jrlgpo3w>Related Skills</h2>
+        <div class="related-skills-grid" data-astro-cid-jrlgpo3w>
+          <a href="/skills/abridge-ci-integration/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-ci-integration</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Configure CI/CD pipeline for Abridge clinical AI integrations with GitHub Actions.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-common-errors/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-common-errors</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Diagnose and fix common Abridge clinical AI integration errors.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-a/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-a</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge ambient clinical documentation capture-to-note pipeline.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-b/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-b</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge patient-facing documentation and after-visit summary generation.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-cost-tuning/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-cost-tuning</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Optimize Abridge clinical AI costs through tier selection, session management, and usage monitoring for healthcare organizations.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-debug-bundle/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-debug-bundle</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Collect Abridge debug evidence for support tickets and troubleshooting.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a>
+        </div>
+      </section>
+
+  </div>
+
+  
+  <script>
+    document.querySelectorAll('.install-command').forEach(el => {
+      el.addEventListener('click', function() {
+        const text = this.dataset.copy || this.textContent;
+        navigator.clipboard.writeText(text).then(() => {
+          const originalText = this.textContent;
+          this.textContent = 'Copied to clipboard!';
+          this.style.color = 'var(--brand-green)';
+          setTimeout(() => {
+            this.textContent = originalText;
+            this.style.color = '';
+          }, 2000);
+        });
+      });
+    });
+  </script>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

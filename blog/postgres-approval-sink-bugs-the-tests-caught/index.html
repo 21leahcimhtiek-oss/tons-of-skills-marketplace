@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Two Postgres Bugs the Tests Caught: A Real-DB Integration Test Case Study — Tons of Skills Work Diary</title>
+    <meta name="description" content="A no-mocks testcontainers policy caught two production-fatal Postgres bugs in one test run — PG 15's schema USAGE removal and an asymmetric SELECT grant for a state-machine-driving sink.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://startaitools.com/posts/postgres-approval-sink-bugs-the-tests-caught/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/postgres-approval-sink-bugs-the-tests-caught/">
+    <meta property="og:title" content="The Two Postgres Bugs the Tests Caught: A Real-DB Integration Test Case Study — Tons of Skills Work Diary">
+    <meta property="og:description" content="A no-mocks testcontainers policy caught two production-fatal Postgres bugs in one test run — PG 15's schema USAGE removal and an asymmetric SELECT grant for a state-machine-driving sink.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="The Two Postgres Bugs the Tests Caught: A Real-DB Integration Test Case Study — Tons of Skills Work Diary">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/postgres-approval-sink-bugs-the-tests-caught/">
+    <meta name="twitter:title" content="The Two Postgres Bugs the Tests Caught: A Real-DB Integration Test Case Study — Tons of Skills Work Diary">
+    <meta name="twitter:description" content="A no-mocks testcontainers policy caught two production-fatal Postgres bugs in one test run — PG 15's schema USAGE removal and an asymmetric SELECT grant for a state-machine-driving sink.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"The Two Postgres Bugs the Tests Caught: A Real-DB Integration Test Case Study","description":"A no-mocks testcontainers policy caught two production-fatal Postgres bugs in one test run — PG 15's schema USAGE removal and an asymmetric SELECT grant for a state-machine-driving sink.","datePublished":"2026-05-05","url":"https://tonsofskills.com/blog/undefined","author":{"@type":"Person","name":"Jeremy Longshore"},"publisher":{"@type":"Organization","name":"Tons of Skills","url":"https://tonsofskills.com"}}</script>
+  
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.post-header[data-astro-cid-7jjqptxk]{background:var(--panel);padding:4rem 1.5rem 3rem;border-bottom:1px solid var(--border)}.post-header-inner[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto}.back-link[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3);text-decoration:none;display:inline-block;margin-bottom:1.5rem;transition:color .2s}.back-link[data-astro-cid-7jjqptxk]:hover{color:var(--primary)}.post-meta[data-astro-cid-7jjqptxk]{display:flex;align-items:center;gap:.75rem;margin-bottom:1rem}time[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3)}.featured-badge[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.2rem .6rem;background:#ce114126;color:var(--red);border-radius:0;font-weight:600;text-transform:uppercase;letter-spacing:.05em}.post-header[data-astro-cid-7jjqptxk] h1[data-astro-cid-7jjqptxk]{font-family:var(--font-body);font-size:clamp(1.5rem,4vw,2.2rem);font-weight:700;color:var(--text);line-height:1.25;margin-bottom:.75rem;letter-spacing:0}.post-desc[data-astro-cid-7jjqptxk]{color:var(--text-2);font-size:1.05rem;line-height:1.6;margin-bottom:1rem}.post-tags[data-astro-cid-7jjqptxk]{display:flex;gap:.4rem;flex-wrap:wrap}.tag[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.15rem .5rem;background:var(--surface-3);color:var(--text-3);border-radius:0}.post-body[data-astro-cid-7jjqptxk]{padding:3rem 1.5rem 4rem}.prose[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto;color:var(--text-2);line-height:1.8;font-size:1rem}.prose[data-astro-cid-7jjqptxk] h2{font-family:var(--font-body);font-size:1.5rem;font-weight:700;color:var(--text);margin:2.5rem 0 1rem;letter-spacing:0}.prose[data-astro-cid-7jjqptxk] h3{font-size:1.2rem;font-weight:600;color:var(--text);margin:2rem 0 .75rem}.prose[data-astro-cid-7jjqptxk] p{margin-bottom:1rem}.prose[data-astro-cid-7jjqptxk] ul,.prose[data-astro-cid-7jjqptxk] ol{margin:.5rem 0 1rem 1.5rem}.prose[data-astro-cid-7jjqptxk] li{margin-bottom:.35rem}.prose[data-astro-cid-7jjqptxk] strong{color:var(--text);font-weight:600}.prose[data-astro-cid-7jjqptxk] code{font-family:var(--font-mono);font-size:.88em;background:var(--surface-3);padding:.15em .35em;border-radius:0;color:var(--primary)}.prose[data-astro-cid-7jjqptxk] a{color:var(--primary);text-decoration:none}.prose[data-astro-cid-7jjqptxk] a:hover{text-decoration:underline}@media(max-width:768px){.post-header[data-astro-cid-7jjqptxk]{padding:3rem 1rem 2rem}.post-body[data-astro-cid-7jjqptxk]{padding:2rem 1rem 3rem}}
+</style></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  <article class="post" data-astro-cid-7jjqptxk>
+    <header class="post-header" data-astro-cid-7jjqptxk>
+      <div class="post-header-inner" data-astro-cid-7jjqptxk>
+        <a href="/blog" class="back-link" data-astro-cid-7jjqptxk>Back to Work Diary</a>
+        <div class="post-meta" data-astro-cid-7jjqptxk>
+          <time datetime="2026-05-05" data-astro-cid-7jjqptxk>May 4, 2026</time>
+          
+        </div>
+        <h1 data-astro-cid-7jjqptxk>The Two Postgres Bugs the Tests Caught: A Real-DB Integration Test Case Study</h1>
+        <p class="post-desc" data-astro-cid-7jjqptxk>A no-mocks testcontainers policy caught two production-fatal Postgres bugs in one test run — PG 15&#39;s schema USAGE removal and an asymmetric SELECT grant for a state-machine-driving sink.</p>
+        <div class="post-tags" data-astro-cid-7jjqptxk>
+          <span class="tag" data-astro-cid-7jjqptxk>postgres</span><span class="tag" data-astro-cid-7jjqptxk>testing</span><span class="tag" data-astro-cid-7jjqptxk>testcontainers</span><span class="tag" data-astro-cid-7jjqptxk>architecture</span><span class="tag" data-astro-cid-7jjqptxk>ci-cd</span><span class="tag" data-astro-cid-7jjqptxk>authentication</span><span class="tag" data-astro-cid-7jjqptxk>typescript</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="post-body" data-astro-cid-7jjqptxk>
+      <div class="prose" data-astro-cid-7jjqptxk>
+        <h2 id="thesis">Thesis</h2>
+<p>A “no mocks” testcontainers policy caught two production-fatal Postgres bugs in one test run. The first would have shipped silently and failed at runtime on every fresh tenant. The second would have shipped to staging and waited there for a real human approver to exercise it — late integration at best, production runtime at worst, depending on how strict the pre-deploy soak is.</p>
+<p>The artifact is PR #92 in the Guidewire MCP repo: +1581 lines, -2 lines, 11 new testcontainer cases against a real Postgres 16 image. The tests failed on the first run, surfaced two distinct migration bugs, got the fixes, and now report 51/51 pass at the package level (40 existing + 11 new) and 115/115 across all 8 workspaces.</p>
+<p>The post is about the bugs and the methodology that exposed them. The bigger argument: role boundaries belong in tests, not in staging environments. A migration that compiles, applies clean, and grants what it claims to grant can still be wrong in two different ways — and only a test that drives a real Postgres role through a real state machine will tell you so.</p>
+<h2 id="what-got-built">What got built</h2>
+<p>The harness pattern (plan → policy → approval → execute → audit → rollback) needs a place to put approvals. The previous sink was in-memory: fine for unit tests, useless the moment a CLI session dies mid-<code>wait()</code>, the host restarts, or a network partition drops the harness off the audit bus.</p>
+<p>The replacement is a Postgres-backed <code>ApprovalSink</code>. Per the PRD it must survive restart, network partition, and CLI session death. The pool’s connection identity must hold the <code>audit_writer</code> Postgres role — the same role used by the audit-chain writer, by design, so a single connection identity covers both tables in one transaction when needed.</p>
+<p>The sink does not enforce state-machine legality at the DDL level. The application does. Every UPDATE carries a state precondition in its WHERE clause:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#79B8FF">UPDATE</span><span style="color:#E1E4E8"> approvals </span><span style="color:#79B8FF">SET</span><span style="color:#E1E4E8"> state </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> $new</span></span>
+<span class="line"><span style="color:#79B8FF"> WHERE</span><span style="color:#E1E4E8"> approval_id </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> $id </span><span style="color:#79B8FF">AND</span><span style="color:#E1E4E8"> state </span><span style="color:#F97583">=</span><span style="color:#9ECBFF"> 'pending'</span></span></code></pre>
+<p>That precondition does three things at once:</p>
+<ul>
+<li><strong>Race-safe.</strong> Two concurrent <code>decide()</code> calls cannot both flip the row. The first to acquire the row write lock wins; the second sees <code>rowCount === 0</code> and reads the actual state back.</li>
+<li><strong>Idempotent for the loser.</strong> No throw. The losing call returns the current state. A retry that arrives after a successful approval just gets the approval.</li>
+<li><strong>Hard-error on illegal user-driven transitions.</strong> A <code>decide()</code> call against an already-terminal row returns <code>rowCount === 0</code>, the sink reads the current state, sees it is terminal, and throws. The application layer is the one source of truth for legal transitions.</li>
+</ul>
+<p>There is no <code>RETURNING</code> clause in the UPDATE. The sink does a separate SELECT to read the post-state. That SELECT is what triggered Bug 2 — covered below.</p>
+<h2 id="the-first-failure-grants-that-grant-nothing">The first failure: GRANTs that grant nothing</h2>
+<p>The migration declared the role and table grants the way every Postgres tutorial since 9.x has shown:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="sql"><code><span class="line"><span style="color:#F97583">CREATE</span><span style="color:#F97583"> ROLE</span><span style="color:#E1E4E8"> audit_writer NOLOGIN;</span></span>
+<span class="line"><span style="color:#F97583">CREATE</span><span style="color:#F97583"> ROLE</span><span style="color:#E1E4E8"> audit_reader NOLOGIN;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">-- ... table DDL ...</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">GRANT</span><span style="color:#F97583"> INSERT</span><span style="color:#E1E4E8">, </span><span style="color:#F97583">SELECT</span><span style="color:#F97583"> ON</span><span style="color:#E1E4E8"> audit_entries </span><span style="color:#F97583">TO</span><span style="color:#E1E4E8"> audit_writer;</span></span>
+<span class="line"><span style="color:#F97583">GRANT</span><span style="color:#F97583"> SELECT</span><span style="color:#F97583">          ON</span><span style="color:#E1E4E8"> audit_entries </span><span style="color:#F97583">TO</span><span style="color:#E1E4E8"> audit_reader;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">GRANT</span><span style="color:#F97583"> INSERT</span><span style="color:#E1E4E8"> (...), </span><span style="color:#F97583">UPDATE</span><span style="color:#E1E4E8"> (</span><span style="color:#F97583">state</span><span style="color:#E1E4E8">, approvers, updated_at)</span></span>
+<span class="line"><span style="color:#F97583">                  ON</span><span style="color:#E1E4E8"> approvals </span><span style="color:#F97583">TO</span><span style="color:#E1E4E8"> audit_writer;</span></span></code></pre>
+<p>The migration applied clean against the testcontainers <code>postgres:16</code> image. No errors. <code>\dp approvals</code> showed the privileges exactly as written. Nothing in the SQL surface said anything was wrong.</p>
+<p>The first test then failed:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>error: permission denied for table approvals</span></span>
+<span class="line"><span>    at Parser.parseErrorMessage</span></span>
+<span class="line"><span>    at PgApprovalSink.request (.../packages/harness/src/approvals/pg.ts:74:18)</span></span></code></pre>
+<p>The role had INSERT on the table. <code>\dp</code> confirmed it. The pool was authenticating as the right role. The test was inserting through the documented path. Permission denied.</p>
+<p>The line in the <a href="https://www.postgresql.org/docs/15/release-15.html">Postgres 15 release notes</a> that explains this is buried under a heading most people scroll past:</p>
+<blockquote>
+<p>Remove PUBLIC creation permission on the public schema (Noah Misch). The new default is one of the secure schema usage patterns that we have been recommending since the security release for CVE-2018-1058.</p>
+</blockquote>
+<p>That entry undersells the practical effect. PG 15 tightened the default permissions on the <code>public</code> schema in <strong>newly created databases</strong>: the schema is now owned by <code>pg_database_owner</code>, and <code>PUBLIC</code> lost its <code>CREATE</code> privilege. New roles created inside such a database — including the <code>NOLOGIN</code> roles this migration declares — cannot exercise any table grant in <code>public</code> until somebody hands them schema-level <code>USAGE</code> explicitly. Existing PG 13 / 14 databases that get upgraded in place are unaffected; only fresh databases inherit the new posture.</p>
+<p>Without <code>USAGE</code>, a <code>GRANT INSERT ON public.approvals TO audit_writer</code> is a no-op the database cheerfully accepts and silently ignores at runtime — the role has no schema visibility, so the table grant never resolves.</p>
+<p>Three lines of SQL fixed it:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="sql"><code><span class="line"><span style="color:#6A737D">-- PG 15+ removed implicit USAGE on the public schema for new roles.</span></span>
+<span class="line"><span style="color:#6A737D">-- Without this, the table-level GRANTs above are no-ops because the</span></span>
+<span class="line"><span style="color:#6A737D">-- role cannot see the schema. This would have failed any fresh prod</span></span>
+<span class="line"><span style="color:#6A737D">-- deploy on PG 15+. See PG 15 release notes.</span></span>
+<span class="line"><span style="color:#F97583">GRANT</span><span style="color:#E1E4E8"> USAGE </span><span style="color:#F97583">ON</span><span style="color:#F97583"> SCHEMA</span><span style="color:#E1E4E8"> public </span><span style="color:#F97583">TO</span><span style="color:#E1E4E8"> audit_writer, audit_reader;</span></span></code></pre>
+<p>The detail that matters for the case-study argument: this would not have failed in a long-running staging environment. Most staging databases were created on PG 13 or 14 and got upgraded in place. Existing roles kept their <code>USAGE</code> from before the change. The bug shows up only on <strong>fresh</strong> deploys to PG 15+ — every new tenant, every disaster-recovery rebuild, every Kubernetes-native ephemeral test environment. The class of bug that bites once and then goes quiet for a year and bites again on a customer that you didn’t know was a customer yet.</p>
+<p>testcontainers is the inverse of that environment. Every test run is a fresh deploy. <code>postgres:16</code> image, no rows, no migrations, full migration replayed top-to-bottom against a freshly created database with freshly created roles. Bug 1 cannot hide there.</p>
+<h2 id="the-second-failure-a-writer-that-has-to-read">The second failure: a writer that has to read</h2>
+<p>Tests progressed past Bug 1. The INSERT in <code>request()</code> worked. The UPDATE in <code>decide()</code> worked. Then the <code>wait()</code> test failed:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>error: permission denied for table approvals</span></span>
+<span class="line"><span>    at PgApprovalSink.wait (.../packages/harness/src/approvals/pg.ts:178:24)</span></span></code></pre>
+<p>The <code>wait()</code> method polls. The query is a one-line SELECT against the row by <code>approval_id</code>:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="sql"><code><span class="line"><span style="color:#F97583">SELECT</span><span style="color:#F97583"> state</span><span style="color:#E1E4E8">, approvers, expires_at, updated_at</span></span>
+<span class="line"><span style="color:#F97583">  FROM</span><span style="color:#E1E4E8"> approvals</span></span>
+<span class="line"><span style="color:#F97583"> WHERE</span><span style="color:#E1E4E8"> approval_id </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> $</span><span style="color:#79B8FF">1</span><span style="color:#F97583"> AND</span><span style="color:#E1E4E8"> tenant_id </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> $</span><span style="color:#79B8FF">2</span><span style="color:#E1E4E8">;</span></span></code></pre>
+<p><code>wait()</code> runs that statement at every poll interval, checks if the state is terminal, sleeps, repeats. The poll runs as the same role that did the INSERT. And <code>audit_writer</code> had INSERT and column-restricted UPDATE on <code>approvals</code> — but no SELECT.</p>
+<p>The migration had been written by analogy to <code>audit_entries</code>, where the asymmetry is correct: the audit table is append-only from the writer’s perspective. Verification (<code>verifyChain()</code>) runs under <code>audit_reader</code>, a different connection identity by design decision D-019, so the writer never needs to see what it just wrote. The hash chain is what provides tamper-evidence; the writer’s lack of read privilege is part of that.</p>
+<p>That model breaks for <code>approvals</code>. The same identity that INSERTs the <code>pending</code> row has to wait for an external actor (a human approver, a sibling service, a partner system) to call <code>decide()</code>, then observe the new state. Forcing a separate reader pool for that polling path means dragging a second set of connection credentials, a second pool config, and a second observability surface around for zero security benefit. The provenance for an approval lives in the <code>audit_entries</code> rows that reference <code>approval_id</code> — not in whether the writer can read the approval row itself.</p>
+<p>The fix is one line. The comment that justifies it is fourteen:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="sql"><code><span class="line"><span style="color:#6A737D">-- The audit_writer ALSO gets SELECT on `approvals` (but NOT on</span></span>
+<span class="line"><span style="color:#6A737D">-- `audit_entries`). This is the asymmetry between the two tables:</span></span>
+<span class="line"><span style="color:#6A737D">--   • `audit_entries` is append-only from the writer's perspective —</span></span>
+<span class="line"><span style="color:#6A737D">--     the writer NEVER reads its own log entries; verifyChain() runs</span></span>
+<span class="line"><span style="color:#6A737D">--     as `audit_reader` (a separate operational identity per D-019).</span></span>
+<span class="line"><span style="color:#6A737D">--   • `approvals` is state-machine-driven by the harness. The same</span></span>
+<span class="line"><span style="color:#6A737D">--     identity that INSERTs the pending row must also wait()-poll it</span></span>
+<span class="line"><span style="color:#6A737D">--     to observe external decisions. Forcing a separate reader pool</span></span>
+<span class="line"><span style="color:#6A737D">--     for that polling path adds connection-management complexity</span></span>
+<span class="line"><span style="color:#6A737D">--     for zero tamper-evidence benefit — provenance comes from the</span></span>
+<span class="line"><span style="color:#6A737D">--     audit_entries rows that reference approval_id, not from</span></span>
+<span class="line"><span style="color:#6A737D">--     approvals row visibility. The defense-in-depth on the</span></span>
+<span class="line"><span style="color:#6A737D">--     approval table is the column-restricted UPDATE + denied DELETE</span></span>
+<span class="line"><span style="color:#6A737D">--     below — both intact under this SELECT grant.</span></span>
+<span class="line"><span style="color:#F97583">GRANT</span><span style="color:#F97583"> SELECT</span><span style="color:#F97583"> ON</span><span style="color:#E1E4E8"> approvals </span><span style="color:#F97583">TO</span><span style="color:#E1E4E8"> audit_writer;</span></span></code></pre>
+<p>The defense-in-depth properties survive. <code>audit_writer</code> still cannot mutate any column except the three the state machine touches (<code>state</code>, <code>approvers</code>, <code>updated_at</code>). It still cannot DELETE from <code>approvals</code> at all — forensic retention is non-negotiable. The seven immutable columns (<code>tenant_id</code>, <code>plan_id</code>, <code>decision_id</code>, <code>requested_at</code>, <code>expires_at</code>, <code>created_at</code>, <code>approval_id</code>) are still locked down at the column-grant level. A test asserts that explicitly.</p>
+<p>The bug class: an asymmetric privilege model that was right for one table got copy-pasted onto a second table where it was wrong. The pattern is correct in both places — the audit table needs a tamper-evidence boundary, the approvals table needs a state-machine boundary. The grants need to express two different invariants.</p>
+<h2 id="why-testcontainers-is-the-only-test-type-that-catches-this">Why testcontainers is the only test type that catches this</h2>
+<p>A mock-based test of <code>PgApprovalSink</code> would have passed both bugs.</p>
+<p>Bug 1 would have passed because mocks do not have schemas. There is no <code>public</code> to lack <code>USAGE</code> on. The mock returns whatever you tell it to.</p>
+<p>Bug 2 would have passed because mocks do not enforce row-level grants. The mock would have responded to the SELECT in <code>wait()</code> with whatever the test fixture said. The actual privilege boundary lives in the database; a mock substitutes for the database; the boundary is not in the test.</p>
+<p>A staging-environment integration test would have caught Bug 1 only on the first deploy to a fresh PG 15+ tenant. Most staging databases at most companies were created on PG 13 or PG 14 and upgraded in place; existing roles kept their <code>USAGE</code> privilege from the upgrade. Bug 1 shows up on a <strong>new</strong> tenant — exactly the scenario that staging-environment tests rarely cover, because staging databases live for years.</p>
+<p>Staging would have caught Bug 2, but only after a <code>wait()</code> actually fired against a real approval — meaning after a real human approver decided a real plan, in a real CLI session, against a database the writer role had been bound to for the first time. Most synthetic staging traffic short-circuits the wait-loop with pre-set test fixtures rather than running the polling path end-to-end. The bug surfaces on the first end-to-end approval cycle, which by definition is on the boundary between “caught it in staging” and “shipped it to prod” — and which one of those two the team gets depends on how disciplined the pre-deploy soak is, not on the design of the test.</p>
+<p>testcontainers per the repo’s CLAUDE.md hard rule #2 — <code>NO MOCKS, NO STUBS, NO FAKES for any I/O dependency</code> — is what makes both bugs visible inside a developer’s commit cycle. Bug 1 surfaced on the first test that hit <code>request()</code>. Bug 2 surfaced on the first test that exercised <code>wait()</code> after a <code>decide()</code>. Neither bug needed a code review to find. Neither needed a customer.</p>
+<h2 id="tradeoffs">Tradeoffs</h2>
+<p>The bill for this approach is real and itemized.</p>
+<ul>
+<li><strong>+934 lines of <code>pnpm-lock.yaml</code></strong> out of the +1581 PR total. The new dev dependencies are <code>pg</code> (the node Postgres driver) and <code>testcontainers</code> (the orchestrator). Their transitive footprint is what it is. Lockfile churn on a <code>pnpm install</code> is the headline visual diff in PR #92. The other +647 lines split roughly: +252 sink implementation (<code>pg.ts</code>), +357 testcontainer test cases (<code>approvals.pg.test.ts</code>), +29 SQL migration deltas, +9 across <code>package.json</code> and the harness <code>index.ts</code> export.</li>
+<li><strong>First-run latency.</strong> The <code>postgres:16</code> image is ~451 MB. CI pulls it once per runner; locally the developer pulls it once per machine. After that the image is cached.</li>
+<li><strong>Per-test-file startup.</strong> Each test file spins up its own container, runs migrations, tears down. About 3 seconds of overhead per file. Eleven test cases in one file means 3 seconds amortized, not 33.</li>
+</ul>
+<p>The team accepts these costs because the alternative — finding Bug 1 in a Sev 1 customer ticket six months from now during a tenant rebuild, or finding Bug 2 the first time a human approver actually approves something through a real production CLI session — is more expensive in every dimension that matters.</p>
+<h2 id="what-this-means-for-the-guidewire-mcp-architecture">What this means for the Guidewire MCP architecture</h2>
+<p>Approvals are the pivot for E3, the write-tools epic. Without a durable approval record, every write tool — <code>bind-this-quote-with-these-changes</code>, <code>submit-payment</code>, <code>cancel-policy-with-effective-date</code> — has nowhere to anchor its proof-of-consent. The audit chain references <code>approval_id</code>. The <code>idempotency.pruned</code> field in audit entries (PR #85) references <code>approval_id</code>. The BAA-carve enforcement at boot for <code>lob_class:health</code> (PR #87) gates the approval workflow on a tenant attribute.</p>
+<p>Approvals are load-bearing. Approvals must outlive the harness process that requested them. Approvals must survive a CLI session ending mid-<code>wait()</code>. Approvals must be readable across audit-chain verification windows that may span weeks (long-tail compliance review, partner reconciliation, dispute resolution).</p>
+<p>A Postgres-backed sink is the cheapest way to get all of those properties at once. Postgres gives durability, role-based access control, the column-restricted UPDATE primitive, the per-table DELETE-denied stance, and the SQL we already use everywhere else for tenancy, indexing, and audit. The state-machine guard in the WHERE clause is a Postgres feature being used as a Postgres feature.</p>
+<p>The audit chain references <code>approval_id</code>. The approval row must therefore exist for at least as long as the audit log that cites it. Forensic retention on <code>approvals</code> is permanent. DELETE is denied to every role. That stance is the precondition for the <code>audit_writer</code> SELECT grant being safe — the writer can read approvals, but it cannot make approvals disappear.</p>
+<h2 id="also-shipped-today">Also shipped today</h2>
+<p>The same day produced eight more PRs across two repos and started a third.</p>
+<ul>
+<li><strong>PR #91 / #90 (governance):</strong> corrected the OWNER-bypass documentation and recorded the main-branch ruleset that’s now actually enforced. Bypass requires explicit <code>bypass_actors</code>.</li>
+<li><strong>PR #89 (lint cleanup):</strong> dropped the biome baseline from 43 ignored issues to 0. Karate JS files now have a targeted ignore; the harness package got auto-fixes applied.</li>
+<li><strong>PR #88 (CI):</strong> unbroke <code>ci.yml</code> workflow startup. The previous startup race meant the very first job in a fresh runner couldn’t find a peer dependency.</li>
+<li><strong>PR #87 (BAA carve):</strong> enforce the carve at boot when <code>lob_class:health</code> is set on a tenant. Maps to safeguards SA-6 and MS-6.</li>
+<li><strong>PR #86 (E3):</strong> approvals table + grants in <code>0001_init.sql</code> (the table this sink targets — HR-4).</li>
+<li><strong>PR #85 (audit chain):</strong> plumb <code>oauthScope</code> and <code>idempotency.pruned</code> through audit chain (GA-3, HR-3).</li>
+<li><strong>PR #82 (GW-1.9 closure):</strong> filed re-pass memos and applied 6 findings — sealing blueprint v1.0.</li>
+</ul>
+<p>Plus: <code>partner-portals</code> shipped its initial Hugo site with the Kobiton portal, a Download-PDF action, and a deploy workflow (5 commits). The Kobiton exp-06 work added 16 tests (78 → 94) and reproduced Plane bug <code>makeplane/plane#8909</code> via a browser-log interceptor + click-driver.</p>
+<h2 id="recap">Recap</h2>
+<p>Two production-fatal bugs surfaced in one test run. Both were in a migration that looked correct under static review. Both required a real Postgres database, exercising real role boundaries, against the actual state machine the sink drives. Mocks would have hidden both. Staging would have caught one of them, on the first new tenant, sometime later, in a place that wasn’t a developer’s IDE.</p>
+<p>The case-study argument: when a privilege boundary is load-bearing, the test that proves it has to be the same kind of database the production runs on. testcontainers makes that affordable. The +934 lines of lockfile is the price of being able to delete the phrase “should work in prod” from the team vocabulary.</p>
+<h2 id="related-posts">Related Posts</h2>
+<ul>
+<li><a href="/blog/guidewire-mcp-v0-1-0-foundation-ship/">Guidewire MCP v0.1.0: The Foundation Ship</a> — yesterday’s post on the v0.1.0 ship that this sink continues</li>
+<li><a href="/blog/anti-slop-framework-found-three-bugs-inside-itself/">Anti-Slop Framework Found Three Bugs Inside Itself</a> — earlier dogfooding case study on quality gates catching their own author</li>
+<li><a href="/blog/audit-harness-v010-enforcement-travels-with-code/">Audit Harness v0.1.0: Enforcement Travels With the Code</a> — the harness package the test methodology depends on</li>
+</ul>
+      </div>
+    </div>
+  </article>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

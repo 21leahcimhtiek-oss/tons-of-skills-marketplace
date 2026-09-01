@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>supabase-security-basics - Agent Skill</title>
+    <meta name="description" content="Apply Supabase security best practices: anon vs service_role key separation, RLS enforcement, policy patterns, JWT verification, and API hardening. Use when securing a Supabase project, auditing API key usage, implementing Row Level Security, or running a production security checklist. Trigger with phrases like &quot;supabase security&quot;, &quot;supabase RLS&quot;, &quot;secure supabase&quot;, &quot;supabase API key&quot;, &quot;supabase hardening&quot;, &quot;row level security&quot;, &quot;service role key&quot;.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://tonsofskills.com/tons-of-skills-marketplace/skills/supabase-security-basics/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/supabase-security-basics/">
+    <meta property="og:title" content="supabase-security-basics - Agent Skill">
+    <meta property="og:description" content="Apply Supabase security best practices: anon vs service_role key separation, RLS enforcement, policy patterns, JWT verification, and API hardening. Use when securing a Supabase project, auditing API key usage, implementing Row Level Security, or running a production security checklist. Trigger with phrases like &quot;supabase security&quot;, &quot;supabase RLS&quot;, &quot;secure supabase&quot;, &quot;supabase API key&quot;, &quot;supabase hardening&quot;, &quot;row level security&quot;, &quot;service role key&quot;.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="supabase-security-basics - Agent Skill">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/supabase-security-basics/">
+    <meta name="twitter:title" content="supabase-security-basics - Agent Skill">
+    <meta name="twitter:description" content="Apply Supabase security best practices: anon vs service_role key separation, RLS enforcement, policy patterns, JWT verification, and API hardening. Use when securing a Supabase project, auditing API key usage, implementing Row Level Security, or running a production security checklist. Trigger with phrases like &quot;supabase security&quot;, &quot;supabase RLS&quot;, &quot;secure supabase&quot;, &quot;supabase API key&quot;, &quot;supabase hardening&quot;, &quot;row level security&quot;, &quot;service role key&quot;.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"supabase-security-basics","description":"Apply Supabase security best practices: anon vs service_role key separation, RLS enforcement, policy patterns, JWT verification, and API hardening. Use when securing a Supabase project, auditing API key usage, implementing Row Level Security, or running a production security checklist. Trigger with phrases like \"supabase security\", \"supabase RLS\", \"secure supabase\", \"supabase API key\", \"supabase hardening\", \"row level security\", \"service role key\".","version":"1.54.0","author":{"@type":"Person","name":"Jeremy Longshore"},"license":"MIT","programmingLanguage":"Claude Code Agent Skill","isPartOf":{"@type":"SoftwareApplication","name":"supabase-pack","applicationCategory":"unknown"}}</script>
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.breadcrumbs[data-astro-cid-ilhxcym7]{margin-bottom:var(--space-5)}.breadcrumbs__list[data-astro-cid-ilhxcym7]{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;list-style:none;padding:0;margin:0;font-family:var(--font-mono);font-size:var(--text-sm, .8rem)}.breadcrumbs__item[data-astro-cid-ilhxcym7]{display:flex;align-items:center;gap:.375rem}.breadcrumbs__link[data-astro-cid-ilhxcym7]{color:var(--text-3);text-decoration:none;transition:color var(--duration-fast, .2s) var(--ease-out)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:hover{color:var(--primary)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:0}.breadcrumbs__sep[data-astro-cid-ilhxcym7]{color:var(--text-3);user-select:none;font-size:.7em;line-height:1}.breadcrumbs__current[data-astro-cid-ilhxcym7]{color:var(--text-2)}.detail-cta[data-astro-cid-qcigfm7x]{background:var(--surface-3, var(--brand-light-gray));border-top:1px solid var(--border, var(--brand-light-gray));border-radius:var(--radius-lg);padding:2rem 1.5rem;margin-top:2rem;text-align:center}.detail-cta__headline[data-astro-cid-qcigfm7x]{font-family:var(--font-display);font-weight:700;font-size:1.35rem;color:var(--text, var(--brand-dark));margin-bottom:1.25rem}.detail-cta__actions[data-astro-cid-qcigfm7x]{display:flex;justify-content:center;gap:.75rem;flex-wrap:wrap}.detail-cta__primary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:var(--primary);color:#0a0a0c;border:none;border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;cursor:pointer;transition:background var(--duration-fast) var(--ease-out),transform var(--duration-fast) var(--ease-out)}.detail-cta__primary[data-astro-cid-qcigfm7x]:hover{background:var(--primary-dark, var(--primary-dark));transform:translateY(-1px)}.detail-cta__primary[data-astro-cid-qcigfm7x].copied{background:var(--positive, var(--brand-green))}.detail-cta__secondary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:transparent;color:var(--text, var(--brand-dark));border:1px solid var(--border, var(--brand-mid-gray));border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;text-decoration:none;transition:border-color var(--duration-fast) var(--ease-out),color var(--duration-fast) var(--ease-out)}.detail-cta__secondary[data-astro-cid-qcigfm7x]:hover{border-color:var(--primary);color:var(--primary)}@media(max-width:480px){.detail-cta__actions[data-astro-cid-qcigfm7x]{flex-direction:column;align-items:stretch}.detail-cta__primary[data-astro-cid-qcigfm7x],.detail-cta__secondary[data-astro-cid-qcigfm7x]{justify-content:center}}
+</style>
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/_slug_@_@astro.wF9emvVq.css"></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  
+  
+
+  <div class="skill-detail" data-astro-cid-jrlgpo3w>
+    <!-- 1. Breadcrumbs -->
+    <nav aria-label="Breadcrumb" class="breadcrumbs" data-astro-cid-ilhxcym7>
+  <ol class="breadcrumbs__list" itemscope itemtype="https://schema.org/BreadcrumbList" data-astro-cid-ilhxcym7>
+    <li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Home</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="1">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/skills/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Skills</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="2">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          <span class="breadcrumbs__current" aria-current="page" itemprop="name" data-astro-cid-ilhxcym7>
+              supabase-security-basics
+            </span>
+          <meta itemprop="position" content="3">
+        </li>
+  </ol>
+</nav>
+
+    <!-- 2. Header (enhanced) -->
+    <header class="skill-header" data-astro-cid-jrlgpo3w>
+      <h1 data-astro-cid-jrlgpo3w>supabase-security-basics</h1>
+      <p class="skill-description" data-astro-cid-jrlgpo3w>Apply Supabase security best practices: anon vs service_role key separation, RLS enforcement, policy patterns, JWT verification, and API hardening. Use when securing a Supabase project, auditing API key usage, implementing Row Level Security, or running a production security checklist. Trigger with phrases like &quot;supabase security&quot;, &quot;supabase RLS&quot;, &quot;secure supabase&quot;, &quot;supabase API key&quot;, &quot;supabase hardening&quot;, &quot;row level security&quot;, &quot;service role key&quot;.</p>
+
+      <div class="skill-metadata" data-astro-cid-jrlgpo3w>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>v1.54.0</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>Jeremy Longshore</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>MIT</span>
+        </div>
+      </div>
+
+      
+    </header>
+
+    <!-- 4. Allowed Tools -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Allowed Tools</h2>
+      <div class="tools-grid" data-astro-cid-jrlgpo3w>
+        <span class="tool-badge" data-astro-cid-jrlgpo3w>Read</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Write</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Edit</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Grep</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(supabase:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(npx supabase:*)</span>
+      </div>
+      
+    </section>
+
+    <!-- 5. Provided by Plugin -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Provided by Plugin</h2>
+      <div class="plugin-info" data-astro-cid-jrlgpo3w>
+        <div class="plugin-details" data-astro-cid-jrlgpo3w>
+          <h3 data-astro-cid-jrlgpo3w>
+            <a href="/plugins/supabase-pack/" data-astro-cid-jrlgpo3w>supabase-pack</a>
+          </h3>
+          <p data-astro-cid-jrlgpo3w>Claude Code skill pack for Supabase (30 skills)</p>
+          <div class="plugin-meta" data-astro-cid-jrlgpo3w>
+            <span data-astro-cid-jrlgpo3w>unknown</span>
+            <span data-astro-cid-jrlgpo3w>v1.54.0</span>
+          </div>
+        </div>
+        <a href="/plugins/supabase-pack/" class="btn-primary" data-astro-cid-jrlgpo3w>View Plugin</a>
+      </div>
+    </section>
+
+    <!-- 6. Installation -->
+    <section class="section-box dark" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Installation</h2>
+      <p class="install-note" style="color: var(--brand-light-gray); margin-bottom: 0.75rem;" data-astro-cid-jrlgpo3w>This skill is included in the supabase-pack plugin:</p>
+      <pre class="install-command" data-copy="/plugin install supabase-pack@claude-code-plugins-plus" data-astro-cid-jrlgpo3w><code data-astro-cid-jrlgpo3w>/plugin install supabase-pack@claude-code-plugins-plus</code></pre>
+      <p class="install-note" data-astro-cid-jrlgpo3w>Click to copy</p>
+    </section>
+
+    <!-- 7. Skill Content (Markdown) -->
+    <section class="skill-content-section" data-astro-cid-jrlgpo3w>
+      <h2 data-astro-cid-jrlgpo3w>Instructions</h2>
+      <div class="skill-content" data-astro-cid-jrlgpo3w>
+        <div data-astro-cid-jrlgpo3w><h1>Supabase Security Basics</h1>
+<h2>Overview</h2>
+<p>Supabase exposes a Postgres database directly to the internet via PostgREST. Every table without Row Level Security enabled is fully readable and writable by anyone with your project URL and anon key — both of which are public. This skill covers the three pillars of Supabase security: key separation (anon vs service_role), RLS policy enforcement, and API surface hardening.</p>
+<h2>Prerequisites</h2>
+<ul>
+<li>Supabase project created (local or hosted) with Dashboard access</li>
+<li><code>@supabase/supabase-js</code> installed (<code>npm install @supabase/supabase-js</code>)</li>
+<li><code>SUPABASE_URL</code> and <code>SUPABASE_ANON_KEY</code> environment variables configured</li>
+<li>Basic understanding of SQL and Postgres</li>
+</ul>
+<h2>Instructions</h2>
+<h3>Step 1 — Understand the Two API Keys</h3>
+<p>Supabase issues two keys per project. Confusing them is the most common security mistake:</p>
+<table><thead><tr>
+<th>Key</th>
+<th>Environment Variable</th>
+<th>Exposed to Client?</th>
+<th>RLS Behavior</th>
+</tr></thead><tbody>
+<tr>
+<td><strong>Anon key</strong></td>
+<td><code>SUPABASE_ANON_KEY</code></td>
+<td>Yes — browser-safe</td>
+<td>Respects all RLS policies</td>
+</tr>
+<tr>
+<td><strong>Service role key</strong></td>
+<td><code>SUPABASE_SERVICE_ROLE_KEY</code></td>
+<td><strong>NEVER</strong> expose</td>
+<td>Bypasses ALL RLS</td>
+</tr>
+</tbody></table>
+<p>The anon key is a JWT that PostgREST uses to determine which RLS policies apply. It is safe to include in client-side bundles — it can only access data that RLS policies explicitly allow. The service role key bypasses every RLS policy and should only ever exist in server-side code (API routes, Edge Functions, cron jobs, migration scripts).</p>
+<pre data-lang="typescript"><code>
+// CORRECT: anon key on the client
+import { createClient } from &#39;@supabase/supabase-js&#39;
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
+</code></pre>
+<pre data-lang="typescript"><code>
+// CORRECT: service role key ONLY in server-side code
+// e.g., app/api/admin/route.ts (Next.js server route)
+import { createClient } from &#39;@supabase/supabase-js&#39;
+
+const supabaseAdmin = createClient(
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  { auth: { autoRefreshToken: false, persistSession: false } }
+)
+</code></pre>
+<pre data-lang="typescript"><code>
+// WRONG — service role key in client-side code
+// This bypasses ALL RLS and leaks your admin key to every user
+const supabase = createClient(url, process.env.NEXT_PUBLIC_SERVICE_ROLE_KEY!)  // NEVER DO THIS
+</code></pre>
+<p><strong>Key rotation:</strong> Regenerate keys in Dashboard &gt; Settings &gt; API. After rotation, update every environment variable and redeploy all services. Old keys are invalidated immediately — there is no grace period.</p>
+<h3>Step 2 — Enforce Row Level Security on Every Table</h3>
+<p>Without RLS, any table in the <code>public</code> schema is fully accessible via the REST API to anyone holding the anon key. RLS is not optional — it is the primary access control layer.</p>
+<pre data-lang="sql"><code>
+-- Audit: find tables missing RLS
+SELECT schemaname, tablename, rowsecurity
+FROM pg_tables
+WHERE schemaname = &#39;public&#39;
+ORDER BY tablename;
+
+-- Enable RLS on every public table
+ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.todos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+
+-- CRITICAL: enabling RLS with NO policies blocks ALL access via the API.
+-- You MUST add at least one policy per table per operation (SELECT, INSERT, UPDATE, DELETE).
+</code></pre>
+<p><strong>Policy pattern — users read/write their own rows:</strong></p>
+<pre data-lang="sql"><code>
+-- SELECT: user can only read their own rows
+CREATE POLICY &quot;Users read own data&quot;
+  ON public.todos FOR SELECT
+  USING (auth.uid() = user_id);
+
+-- INSERT: user can only insert rows for themselves
+CREATE POLICY &quot;Users insert own data&quot;
+  ON public.todos FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+-- UPDATE: user can only update their own rows
+CREATE POLICY &quot;Users update own data&quot;
+  ON public.todos FOR UPDATE
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+-- DELETE: user can only delete their own rows
+CREATE POLICY &quot;Users delete own data&quot;
+  ON public.todos FOR DELETE
+  USING (auth.uid() = user_id);
+</code></pre>
+<p><strong>Policy pattern — public read, authenticated write:</strong></p>
+<pre data-lang="sql"><code>
+CREATE POLICY &quot;Anyone can read posts&quot;
+  ON public.posts FOR SELECT
+  USING (true);
+
+CREATE POLICY &quot;Authenticated users can insert&quot;
+  ON public.posts FOR INSERT
+  WITH CHECK (auth.uid() IS NOT NULL);
+</code></pre>
+<p><strong>Policy pattern — role-based access via custom JWT claims:</strong></p>
+<pre data-lang="sql"><code>
+-- Admin-only policy using app_metadata
+CREATE POLICY &quot;Admins have full access&quot;
+  ON public.settings FOR ALL
+  USING (
+    (auth.jwt() -&gt; &#39;app_metadata&#39; -&gt;&gt; &#39;role&#39;) = &#39;admin&#39;
+  );
+</code></pre>
+<p>To set custom claims server-side:</p>
+<pre data-lang="typescript"><code>
+// Server-side only — requires service role key
+const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+  app_metadata: { role: &#39;admin&#39; }
+})
+</code></pre>
+<p><strong>Policy pattern — organization-scoped access:</strong></p>
+<pre data-lang="sql"><code>
+CREATE POLICY &quot;Org members can read projects&quot;
+  ON public.projects FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.members
+      WHERE members.organization_id = projects.organization_id
+      AND members.user_id = auth.uid()
+    )
+  );
+</code></pre>
+<p><strong>Key distinction — USING vs WITH CHECK:</strong></p>
+<ul>
+<li><code>USING (expr)</code> — filters which existing rows the user can see (SELECT, UPDATE, DELETE)</li>
+<li><code>WITH CHECK (expr)</code> — validates new/modified row data (INSERT, UPDATE)</li>
+<li>For UPDATE, you need both: USING controls which rows can be targeted, WITH CHECK controls what the new values can be</li>
+</ul>
+<h3>Step 3 — Harden the API Surface</h3>
+<p><strong>JWT verification:</strong> Supabase verifies JWTs server-side automatically. The <code>auth.uid()</code> function in RLS policies extracts the authenticated user&#39;s ID from the verified JWT. You do not need to verify tokens manually in RLS policies — Supabase handles this.</p>
+<p><strong>SQL injection prevention:</strong> The Supabase JS SDK uses parameterized queries internally. Never build raw SQL strings from user input — always use the SDK query builder:</p>
+<pre data-lang="typescript"><code>
+// SAFE: SDK parameterizes automatically
+const { data } = await supabase
+  .from(&#39;posts&#39;)
+  .select(&#39;*&#39;)
+  .eq(&#39;author_id&#39;, userId)
+  .ilike(&#39;title&#39;, `%${searchTerm}%`)
+
+// DANGEROUS: raw SQL with string interpolation
+// Only use supabase.rpc() with parameterized functions, never template literals
+</code></pre>
+<p><strong>Network restrictions:</strong> Restrict direct database connections to known IP ranges in Dashboard &gt; Settings &gt; Database &gt; Network Restrictions. This does not affect the REST API (which goes through PostgREST) but protects direct Postgres connections.</p>
+<p><strong>CORS configuration:</strong> Configure allowed origins per project in Dashboard &gt; Settings &gt; API &gt; CORS. Default allows all origins (<code>*</code>) — restrict to your domains in production.</p>
+<p><strong>Disable unused auth providers:</strong> Dashboard &gt; Authentication &gt; Providers. Disable any provider you are not actively using (email, phone, Google, GitHub, etc.) to reduce attack surface.</p>
+<p><strong>SSL enforcement:</strong> Dashboard &gt; Settings &gt; Database &gt; SSL Configuration. Enforce SSL for all direct database connections.</p>
+<p><strong>Statement timeouts:</strong> Prevent long-running queries from exhausting database resources:</p>
+<pre data-lang="sql"><code>
+ALTER ROLE authenticated SET statement_timeout = &#39;10s&#39;;
+ALTER ROLE anon SET statement_timeout = &#39;5s&#39;;
+</code></pre>
+<p><strong>Revoke default schema grants (verify only):</strong></p>
+<pre data-lang="sql"><code>
+-- Supabase handles this by default, but verify:
+-- anon and authenticated roles should only access data through RLS policies
+SELECT grantee, privilege_type, table_name
+FROM information_schema.role_table_grants
+WHERE table_schema = &#39;public&#39;
+AND grantee IN (&#39;anon&#39;, &#39;authenticated&#39;)
+ORDER BY table_name, grantee;
+</code></pre>
+<h2>Output</h2>
+<p>After completing these steps you will have:</p>
+<ul>
+<li>Anon key used exclusively in client-side code, service role key restricted to server-side</li>
+<li>RLS enabled on every public table with explicit policies per operation</li>
+<li>Custom JWT claims configured for role-based access patterns</li>
+<li>Network restrictions, CORS, SSL, and statement timeouts hardened</li>
+<li>Unused auth providers disabled</li>
+</ul>
+<h3>Security Audit Checklist</h3>
+<ul>
+<li>[ ] RLS enabled on ALL public tables (<code>SELECT rowsecurity FROM pg_tables WHERE schemaname=&#39;public&#39;</code>)</li>
+<li>[ ] Every table has at least one RLS policy per needed operation</li>
+<li>[ ] Service role key is NOT in any client-side or <code>NEXT_PUBLIC_*</code> environment variables</li>
+<li>[ ] <code>.env</code> files are in <code>.gitignore</code></li>
+<li>[ ] Email confirmation enabled (Dashboard &gt; Authentication &gt; Settings)</li>
+<li>[ ] OAuth redirect URLs restricted to your domains</li>
+<li>[ ] Unused auth providers disabled</li>
+<li>[ ] SSL enforcement enabled (Dashboard &gt; Database &gt; SSL)</li>
+<li>[ ] Database password changed from default</li>
+<li>[ ] Network restrictions configured for direct DB connections</li>
+<li>[ ] <code>statement_timeout</code> set for <code>authenticated</code> and <code>anon</code> roles</li>
+<li>[ ] MFA enabled for sensitive user operations</li>
+<li>[ ] Point-in-time recovery (PITR) enabled for production</li>
+<li>[ ] API keys rotated after any suspected exposure</li>
+</ul>
+<h2>Error Handling</h2>
+<table><thead><tr>
+<th>Error</th>
+<th>Cause</th>
+<th>Solution</th>
+</tr></thead><tbody>
+<tr>
+<td><code>42501: new row violates row-level security policy</code></td>
+<td>RLS policy missing or <code>WITH CHECK</code> condition fails</td>
+<td>Add or fix the RLS policy for that operation; verify <code>auth.uid()</code> matches the row&#39;s user column</td>
+</tr>
+<tr>
+<td>Query returns empty <code>data</code> with no error</td>
+<td>RLS <code>USING</code> clause filters out all rows</td>
+<td>Verify <code>auth.uid()</code> in the policy matches the authenticated user; check JWT claims</td>
+</tr>
+<tr>
+<td><code>PGRST301: JWSError</code></td>
+<td>Invalid or expired JWT token</td>
+<td>Re-authenticate the user; verify <code>SUPABASE_ANON_KEY</code> matches the project</td>
+</tr>
+<tr>
+<td><code>PGRST302: anonymous access disabled</code></td>
+<td>Anon key not provided in client init</td>
+<td>Pass the anon key to <code>createClient()</code>; check environment variable is set</td>
+</tr>
+<tr>
+<td><code>permission denied for table X</code></td>
+<td>RLS enabled but no matching policy</td>
+<td>Create a policy for the specific operation (SELECT/INSERT/UPDATE/DELETE)</td>
+</tr>
+<tr>
+<td><code>Could not find the function auth.uid()</code></td>
+<td>Running SQL outside PostgREST context</td>
+<td><code>auth.uid()</code> only works in RLS policies evaluated by PostgREST; use explicit user IDs in migrations</td>
+</tr>
+</tbody></table>
+<h2>Examples</h2>
+<p><strong>Minimal secure setup for a new table:</strong></p>
+<pre data-lang="sql"><code>
+-- 1. Create table
+CREATE TABLE public.notes (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) NOT NULL DEFAULT auth.uid(),
+  content TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- 2. Enable RLS immediately
+ALTER TABLE public.notes ENABLE ROW LEVEL SECURITY;
+
+-- 3. Add policies
+CREATE POLICY &quot;Users manage own notes&quot; ON public.notes
+  FOR ALL USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+</code></pre>
+<p><strong>Client-side query (anon key — RLS enforced):</strong></p>
+<pre data-lang="typescript"><code>
+import { createClient } from &#39;@supabase/supabase-js&#39;
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
+
+// This only returns notes belonging to the authenticated user
+// because the RLS policy filters by auth.uid()
+const { data: notes, error } = await supabase
+  .from(&#39;notes&#39;)
+  .select(&#39;*&#39;)
+  .order(&#39;created_at&#39;, { ascending: false })
+</code></pre>
+<h2>Resources</h2>
+<ul>
+<li><a href="https://supabase.com/docs/guides/database/postgres/row-level-security">Row Level Security Guide</a></li>
+<li><a href="https://supabase.com/docs/guides/api/securing-your-api">Securing Your API</a></li>
+<li><a href="https://supabase.com/docs/guides/security">Security Overview</a></li>
+<li><a href="https://supabase.com/docs/guides/deployment/going-into-prod">Production Checklist</a></li>
+<li><a href="https://supabase.com/docs/guides/auth/custom-claims-and-role-based-access-control-rbac">Custom Claims &amp; RBAC</a></li>
+<li><a href="https://supabase.com/docs/reference/javascript/introduction">@supabase/supabase-js Reference</a></li>
+</ul>
+<h2>Next Steps</h2>
+<ul>
+<li>Apply production hardening with <code>supabase-prod-checklist</code></li>
+<li>Set up auth flows with <code>supabase-auth-flows</code></li>
+<li>Configure database migrations with <code>supabase-migrations</code></li>
+</ul></div>
+      </div>
+    </section>
+
+    <!-- 8. Bottom CTA -->
+    <section class="detail-cta" data-astro-cid-qcigfm7x>
+  <h2 class="detail-cta__headline" data-astro-cid-qcigfm7x>Ready to use supabase-pack?</h2>
+  <div class="detail-cta__actions" data-astro-cid-qcigfm7x>
+    <button class="detail-cta__primary" data-copy-install="/plugin install supabase-pack@claude-code-plugins-plus" data-astro-cid-qcigfm7x>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" data-astro-cid-qcigfm7x>
+        <rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" stroke-width="1.5" data-astro-cid-qcigfm7x></rect>
+        <path d="M3 11V3a1 1 0 011-1h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" data-astro-cid-qcigfm7x></path>
+      </svg>
+      <span class="detail-cta__btn-text" data-astro-cid-qcigfm7x>Copy Install Command</span>
+    </button>
+    
+  </div>
+</section>
+
+<script type="module">document.querySelectorAll("[data-copy-install]").forEach(t=>{t.addEventListener("click",async()=>{const a=t.dataset.copyInstall||"";await navigator.clipboard.writeText(a);const e=t.querySelector(".detail-cta__btn-text");if(e){const o=e.textContent;e.textContent="Copied!",t.classList.add("copied"),window.trackEvent&&window.trackEvent("install_copied",{plugin_name:a.split(" ").pop()||"",source:"detail_cta"}),setTimeout(()=>{e.textContent=o,t.classList.remove("copied")},2e3)}})});</script>
+
+    <!-- 9. Related Skills (6, with tool pills) -->
+    <section class="related-skills-section" data-astro-cid-jrlgpo3w>
+        <h2 class="related-skills-heading" data-astro-cid-jrlgpo3w>Related Skills</h2>
+        <div class="related-skills-grid" data-astro-cid-jrlgpo3w>
+          <a href="/skills/abridge-ci-integration/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-ci-integration</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Configure CI/CD pipeline for Abridge clinical AI integrations with GitHub Actions.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-common-errors/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-common-errors</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Diagnose and fix common Abridge clinical AI integration errors.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-a/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-a</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge ambient clinical documentation capture-to-note pipeline.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-b/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-b</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge patient-facing documentation and after-visit summary generation.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-cost-tuning/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-cost-tuning</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Optimize Abridge clinical AI costs through tier selection, session management, and usage monitoring for healthcare organizations.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-debug-bundle/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-debug-bundle</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Collect Abridge debug evidence for support tickets and troubleshooting.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a>
+        </div>
+      </section>
+
+  </div>
+
+  
+  <script>
+    document.querySelectorAll('.install-command').forEach(el => {
+      el.addEventListener('click', function() {
+        const text = this.dataset.copy || this.textContent;
+        navigator.clipboard.writeText(text).then(() => {
+          const originalText = this.textContent;
+          this.textContent = 'Copied to clipboard!';
+          this.style.color = 'var(--brand-green)';
+          setTimeout(() => {
+            this.textContent = originalText;
+            this.style.color = '';
+          }, 2000);
+        });
+      });
+    });
+  </script>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
