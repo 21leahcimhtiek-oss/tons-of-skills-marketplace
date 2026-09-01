@@ -1,0 +1,1056 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Agent Rate Limits | Production Playbooks</title>
+    <meta name="description" content="Prevent API throttling in concurrent multi-agent systems. Token bucket algorithms, sliding windows, priority queues, and backpressure handling for Claude API rate limits.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://tonsofskills.com/tons-of-skills-marketplace/playbooks/01-multi-agent-rate-limits/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/playbooks/01-multi-agent-rate-limits/">
+    <meta property="og:title" content="Multi-Agent Rate Limits | Production Playbooks">
+    <meta property="og:description" content="Prevent API throttling in concurrent multi-agent systems. Token bucket algorithms, sliding windows, priority queues, and backpressure handling for Claude API rate limits.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="Multi-Agent Rate Limits | Production Playbooks">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/playbooks/01-multi-agent-rate-limits/">
+    <meta name="twitter:title" content="Multi-Agent Rate Limits | Production Playbooks">
+    <meta name="twitter:description" content="Prevent API throttling in concurrent multi-agent systems. Token bucket algorithms, sliding windows, priority queues, and backpressure handling for Claude API rate limits.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/_..-YgZcVYT.css"></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  <div class="playbook-page" data-astro-cid-hidutmah>
+    <header class="playbook-header" data-astro-cid-hidutmah>
+      <div class="container" data-astro-cid-hidutmah>
+        <nav class="breadcrumbs" aria-label="Breadcrumb" data-astro-cid-hidutmah>
+          <a href="/" data-astro-cid-hidutmah>Home</a>
+          <span class="breadcrumb-separator" data-astro-cid-hidutmah>/</span>
+          <a href="/playbooks" data-astro-cid-hidutmah>Playbooks</a>
+          <span class="breadcrumb-separator" data-astro-cid-hidutmah>/</span>
+          <span class="breadcrumb-current" data-astro-cid-hidutmah>Multi-Agent Rate Limits</span>
+        </nav>
+
+        <div class="playbook-hero" data-astro-cid-hidutmah>
+          <span class="category-badge" data-astro-cid-hidutmah>Cost</span>
+          <h1 class="playbook-title" data-astro-cid-hidutmah>Multi-Agent Rate Limits</h1>
+          <p class="playbook-description" data-astro-cid-hidutmah>Prevent API throttling in concurrent multi-agent systems. Token bucket algorithms, sliding windows, priority queues, and backpressure handling for Claude API rate limits.</p>
+          <div class="playbook-meta" data-astro-cid-hidutmah>
+            <span class="meta-item" data-astro-cid-hidutmah>~14 min read</span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="playbook-main" data-astro-cid-hidutmah>
+      <div class="container" data-astro-cid-hidutmah>
+        <div class="playbook-layout" data-astro-cid-hidutmah>
+          <aside class="toc-sidebar" id="toc-sidebar" data-astro-cid-hidutmah>
+            <div class="toc-sticky" data-astro-cid-hidutmah>
+              <h2 class="toc-title" data-astro-cid-hidutmah>Table of Contents</h2>
+              <nav class="toc-nav" id="toc-nav" aria-label="Section navigation" data-astro-cid-hidutmah>
+                <!-- Populated by script below -->
+              </nav>
+            </div>
+          </aside>
+
+          <article class="playbook-content" data-astro-cid-hidutmah>
+            
+  <p>Managing API rate limits when orchestrating multiple Claude AI agents is critical for building reliable, production-grade automation. This playbook provides battle-tested patterns, real-world examples, and concrete strategies for avoiding rate limit errors while maximizing throughput.</p>
+<h2>Understanding Rate Limits</h2>
+<h3>Anthropic Claude API Limits (January 2025)</h3>
+<table>
+<thead>
+<tr>
+<th>Tier</th>
+<th>Requests/min</th>
+<th>Tokens/min</th>
+<th>Daily Tokens</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Free</strong></td>
+<td>5</td>
+<td>40,000</td>
+<td>300,000</td>
+</tr>
+<tr>
+<td><strong>Build</strong></td>
+<td>50</td>
+<td>100,000</td>
+<td>5,000,000</td>
+</tr>
+<tr>
+<td><strong>Scale</strong></td>
+<td>1,000</td>
+<td>2,000,000</td>
+<td>100,000,000</td>
+</tr>
+<tr>
+<td><strong>Enterprise</strong></td>
+<td>Custom</td>
+<td>Custom</td>
+<td>Custom</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Reality Check</strong>: A single multi-agent workflow with 5 agents can exhaust Free tier limits in <strong>60 seconds</strong>.</p>
+<h3>Why Rate Limits Matter</h3>
+<pre><code class="language-typescript">// ❌ This WILL fail on Free tier
+async function analyzeCodebase() {
+  const agents = [
+    'security-auditor',
+    'performance-analyzer',
+    'code-reviewer',
+    'test-generator',
+    'documentation-writer'
+  ];
+
+// 5 agents × 1 request each = instant rate limit
+return await Promise.all(
+agents.map(agent => callClaude(agent, code))
+);
+}</code></pre>
+<p><strong>Error you'll see:</strong></p>
+<pre><code>Error 429: Rate limit exceeded. Please try again in 12 seconds.</code></pre>
+<hr>
+<h2>Detection &#x26; Monitoring</h2>
+<h3>1. Implement Rate Limit Headers Tracking</h3>
+<p>Claude API returns rate limit information in response headers:</p>
+<pre><code class="language-typescript">interface RateLimitHeaders {
+  'anthropic-ratelimit-requests-limit': string;      // "50"
+  'anthropic-ratelimit-requests-remaining': string;  // "45"
+  'anthropic-ratelimit-requests-reset': string;      // "2025-01-20T10:30:00Z"
+  'anthropic-ratelimit-tokens-limit': string;        // "100000"
+  'anthropic-ratelimit-tokens-remaining': string;    // "95000"
+  'anthropic-ratelimit-tokens-reset': string;        // "2025-01-20T10:30:00Z"
+}
+
+class RateLimitTracker {
+private limits = {
+requests: { remaining: 0, reset: new Date() },
+tokens: { remaining: 0, reset: new Date() }
+};
+
+updateFromHeaders(headers: Headers) {
+this.limits.requests.remaining =
+parseInt(headers.get('anthropic-ratelimit-requests-remaining') || '0');
+this.limits.requests.reset =
+new Date(headers.get('anthropic-ratelimit-requests-reset') || Date.now());
+
+this.limits.tokens.remaining =
+parseInt(headers.get('anthropic-ratelimit-tokens-remaining') || '0');
+this.limits.tokens.reset =
+new Date(headers.get('anthropic-ratelimit-tokens-reset') || Date.now());
+}
+
+shouldThrottle(): boolean {
+// Throttle if less than 10% capacity remaining
+return this.limits.requests.remaining &#x3C; 5 ||
+this.limits.tokens.remaining &#x3C; 10000;
+}
+
+getWaitTime(): number {
+if (!this.shouldThrottle()) return 0;
+return this.limits.requests.reset.getTime() - Date.now();
+}
+}</code></pre>
+<h3>2. Real-Time Dashboard Monitoring</h3>
+<p>Use the analytics daemon (<code>@claude-code-plugins/analytics-daemon</code>) to track rate limits:</p>
+<pre><code class="language-typescript">// packages/analytics-daemon/src/watcher.ts emits events
+interface RateLimitWarningEvent {
+  type: 'rate_limit.warning';
+  timestamp: number;
+  conversationId: string;
+  service: 'anthropic-api';
+  limit: 50;
+  current: 48;  // 96% capacity used
+  resetAt: 1737369000000;
+}
+
+// Monitor via WebSocket
+const ws = new WebSocket('ws://localhost:3456');
+ws.onmessage = (event) => {
+const data = JSON.parse(event.data);
+if (data.type === 'rate_limit.warning') {
+console.warn(`⚠️ Rate limit: ${data.current}/${data.limit}`);
+// Trigger throttling
+}
+};</code></pre>
+<hr>
+<h2>Prevention Strategies</h2>
+<h3>Strategy 1: Sequential Execution with Delays</h3>
+<p><strong>Best for</strong>: Small workflows (&#x3C;10 agents), non-time-critical tasks</p>
+<pre><code class="language-typescript">async function sequentialAgents(tasks: AgentTask[]) {
+  const results = [];
+  const DELAY_MS = 1200; // 1.2s between requests
+
+  for (const task of tasks) {
+    const result = await callClaude(task);
+    results.push(result);
+
+    // Wait before next request
+    if (tasks.indexOf(task) &#x3C; tasks.length - 1) {
+      await sleep(DELAY_MS);
+    }
+  }
+
+  return results;
+}
+
+// Real numbers:
+// 5 agents × 1.2s = 6 seconds total
+// Requests per minute: 10 (well under Free tier limit of 5/min)</code></pre>
+<p><strong>Pros</strong>: Simple, guaranteed to avoid rate limits</p>
+<p><strong>Cons</strong>: Slow (6s for 5 agents), doesn't utilize parallel capacity</p>
+<hr>
+<h3>Strategy 2: Token Bucket Algorithm</h3>
+<p><strong>Best for</strong>: Medium workflows (10-50 agents), production systems</p>
+<pre><code class="language-typescript">class TokenBucket {
+  private tokens: number;
+  private lastRefill: number;
+
+constructor(
+private capacity: number,      // e.g., 50 requests/min
+private refillRate: number     // tokens per second
+) {
+this.tokens = capacity;
+this.lastRefill = Date.now();
+}
+
+async consume(cost: number = 1): Promise<void> {
+await this.refill();
+
+while (this.tokens &#x3C; cost) {
+const waitTime = (cost - this.tokens) / this.refillRate * 1000;
+await sleep(waitTime);
+await this.refill();
+}
+
+this.tokens -= cost;
+}
+
+private async refill() {
+const now = Date.now();
+const elapsed = (now - this.lastRefill) / 1000; // seconds
+const tokensToAdd = elapsed * this.refillRate;
+
+this.tokens = Math.min(this.capacity, this.tokens + tokensToAdd);
+this.lastRefill = now;
+}
+}
+
+// Usage for Build tier (50 req/min)
+const bucket = new TokenBucket(50, 50/60); // 50 capacity, 0.833 tokens/sec
+
+async function rateLimitedCall(task: AgentTask) {
+await bucket.consume(1);
+return await callClaude(task);
+}
+
+// Real performance:
+// - Can burst 50 requests immediately
+// - Then throttles to 50/min sustained
+// - No 429 errors</void></code></pre>
+<p><strong>Pros</strong>: Efficient, allows bursts, smooth throttling</p>
+<p><strong>Cons</strong>: More complex implementation</p>
+<hr>
+<h3>Strategy 3: Adaptive Concurrency Control</h3>
+<p><strong>Best for</strong>: Large workflows (>50 agents), variable workloads</p>
+<pre><code class="language-typescript">class AdaptiveLimiter {
+  private inFlight = 0;
+  private maxConcurrency: number;
+  private successfulRequests = 0;
+  private failedRequests = 0;
+
+constructor(initialConcurrency = 5) {
+this.maxConcurrency = initialConcurrency;
+}
+
+async execute<t>(fn: () => Promise<t>): Promise<t> {
+// Wait for slot
+while (this.inFlight >= this.maxConcurrency) {
+await sleep(100);
+}
+
+this.inFlight++;
+
+try {
+const result = await fn();
+this.successfulRequests++;
+this.adjustConcurrency('success');
+return result;
+} catch (error) {
+if (error.status === 429) {
+this.failedRequests++;
+this.adjustConcurrency('rate_limit');
+// Retry after backoff
+await sleep(5000);
+return this.execute(fn);
+}
+throw error;
+} finally {
+this.inFlight--;
+}
+}
+
+private adjustConcurrency(event: 'success' | 'rate_limit') {
+if (event === 'success' &#x26;&#x26; this.successfulRequests % 10 === 0) {
+// Increase concurrency by 1 every 10 successful requests
+this.maxConcurrency = Math.min(this.maxConcurrency + 1, 20);
+} else if (event === 'rate_limit') {
+// Halve concurrency on rate limit
+this.maxConcurrency = Math.max(Math.floor(this.maxConcurrency / 2), 1);
+}
+}
+}
+
+// Usage
+const limiter = new AdaptiveLimiter(5);
+
+async function processAgents(agents: AgentTask[]) {
+return await Promise.all(
+agents.map(agent => limiter.execute(() => callClaude(agent)))
+);
+}
+
+// Real behavior:
+// - Starts at 5 concurrent requests
+// - Increases to 6, 7, 8... if successful
+// - Drops to 2 if rate limited
+// - Self-adjusts to optimal throughput</t></t></t></code></pre>
+<p><strong>Pros</strong>: Self-optimizing, handles variable loads</p>
+<p><strong>Cons</strong>: Complex, requires tuning</p>
+<hr>
+<h2>Recovery Patterns</h2>
+<h3>Pattern 1: Exponential Backoff with Jitter</h3>
+<pre><code class="language-typescript">async function retryWithBackoff<t>(
+  fn: () => Promise<t>,
+  maxRetries = 5
+): Promise<t> {
+  for (let attempt = 0; attempt &#x3C; maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      if (error.status !== 429 || attempt === maxRetries - 1) {
+        throw error;
+      }
+
+// Exponential backoff: 1s, 2s, 4s, 8s, 16s
+const baseDelay = 1000 * Math.pow(2, attempt);
+
+// Add jitter to prevent thundering herd
+const jitter = Math.random() * baseDelay * 0.3;
+const delay = baseDelay + jitter;
+
+console.log(`Rate limited. Retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries})`);
+await sleep(delay);
+}
+}
+
+throw new Error('Max retries exceeded');
+}</t></t></t></code></pre>
+<h3>Pattern 2: Circuit Breaker</h3>
+<pre><code class="language-typescript">class CircuitBreaker {
+  private state: 'closed' | 'open' | 'half-open' = 'closed';
+  private failures = 0;
+  private lastFailure = 0;
+
+constructor(
+private threshold = 5,          // failures before opening
+private timeout = 60000,        // 60s before trying again
+private resetAfter = 30000      // 30s of success to reset
+) {}
+
+async execute<t>(fn: () => Promise<t>): Promise<t> {
+if (this.state === 'open') {
+if (Date.now() - this.lastFailure > this.timeout) {
+this.state = 'half-open';
+} else {
+throw new Error('Circuit breaker open');
+}
+}
+
+try {
+const result = await fn();
+
+if (this.state === 'half-open') {
+this.state = 'closed';
+this.failures = 0;
+}
+
+return result;
+} catch (error) {
+if (error.status === 429) {
+this.failures++;
+this.lastFailure = Date.now();
+
+if (this.failures >= this.threshold) {
+this.state = 'open';
+console.error('🔴 Circuit breaker opened due to rate limits');
+}
+}
+throw error;
+}
+}
+}</t></t></t></code></pre>
+<hr>
+<h2>Production Examples</h2>
+<h3>Example 1: Code Review Pipeline</h3>
+<pre><code class="language-typescript">// Real-world plugin: code-reviewer
+// 258 plugins × average 5 files/plugin = 1,290 API calls
+// Build tier limit: 50 req/min = 26 minutes minimum
+
+import { TokenBucket } from './rate-limit';
+
+const bucket = new TokenBucket(50, 50/60); // Build tier
+
+async function reviewAllPlugins() {
+const plugins = await getPlugins(); // 258 plugins
+const results = [];
+
+for (const plugin of plugins) {
+const files = await getPluginFiles(plugin);
+
+for (const file of files) {
+await bucket.consume(1);
+const review = await callClaude({
+agent: 'code-reviewer',
+file: file.content
+});
+results.push({ plugin, file, review });
+}
+}
+
+return results;
+}
+
+// Performance metrics:
+// - Total calls: 1,290
+// - Time: ~26 minutes (theoretical minimum)
+// - Actual: ~28 minutes (with overhead)
+// - Success rate: 99.8% (no 429 errors)</code></pre>
+<h3>Example 2: Multi-Agent Documentation Generator</h3>
+<pre><code class="language-typescript">// Generate docs using 5 specialized agents in parallel
+
+const limiter = new AdaptiveLimiter(5);
+
+async function generateDocs(codebase: File[]) {
+const agents = [
+'api-documenter',      // OpenAPI specs
+'tutorial-engineer',   // Step-by-step guides
+'reference-builder',   // API reference
+'mermaid-expert',      // Architecture diagrams
+'seo-content-writer'   // SEO-optimized content
+];
+
+const results = await Promise.all(
+codebase.flatMap(file =>
+agents.map(agent =>
+limiter.execute(() => callClaude({ agent, file }))
+)
+)
+);
+
+return results;
+}
+
+// Performance with 100 files:
+// - Total calls: 500 (100 files × 5 agents)
+// - Without limiting: 429 error after 5 requests
+// - With adaptive limiter: ~12 minutes, 0 errors</code></pre>
+<hr>
+<h2>Performance Metrics</h2>
+<h3>Throughput Comparison</h3>
+<table>
+<thead>
+<tr>
+<th>Strategy</th>
+<th>100 Requests</th>
+<th>Success Rate</th>
+<th>Time</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>No limiting</strong></td>
+<td>❌ Fails at request 6</td>
+<td>6%</td>
+<td>N/A</td>
+</tr>
+<tr>
+<td><strong>Sequential</strong></td>
+<td>✅</td>
+<td>100%</td>
+<td>120 seconds</td>
+</tr>
+<tr>
+<td><strong>Token Bucket</strong></td>
+<td>✅</td>
+<td>100%</td>
+<td>70 seconds</td>
+</tr>
+<tr>
+<td><strong>Adaptive</strong></td>
+<td>✅</td>
+<td>100%</td>
+<td>65 seconds</td>
+</tr>
+</tbody>
+</table>
+<h3>Cost Analysis</h3>
+<p><strong>Build Tier ($20/month)</strong>:</p>
+<ul>
+<li>50 req/min = 72,000 req/day</li>
+<li>100,000 tokens/min = 144M tokens/day</li>
+<li>Average cost per 1M tokens: ~$3</li>
+<li>Daily cost: ~$432 at max throughput</li>
+</ul>
+<p><strong>Optimization Impact</strong>:</p>
+<ul>
+<li>Without rate limiting: Wastes 40% of requests on retries</li>
+<li>With token bucket: 99.8% utilization</li>
+<li><strong>Savings</strong>: ~$172/day in retry costs</li>
+</ul>
+<hr>
+<h2>Best Practices</h2>
+<h3>DO ✅</h3>
+<ul>
+<li><strong>Track limits proactively</strong></li>
+</ul>
+   <pre><code class="language-typescript">const tracker = new RateLimitTracker();
+   // Update after every API call</code></pre>
+<ul>
+<li><strong>Use analytics dashboard</strong></li>
+</ul>
+   <pre><code class="language-bash">ccp-analytics  # Monitor real-time rate limit usage</code></pre>
+<ul>
+<li><strong>Implement circuit breakers</strong></li>
+</ul>
+- Prevent cascading failures
+- Automatic recovery
+<ul>
+<li><strong>Add request metadata</strong></li>
+</ul>
+   <pre><code class="language-typescript">await callClaude({
+     agent: 'code-reviewer',
+     metadata: {
+       priority: 'high',
+       retryable: true
+     }
+   });</code></pre>
+<ul>
+<li><strong>Monitor token usage</strong></li>
+</ul>
+- Track <code>anthropic-ratelimit-tokens-remaining</code>
+- Consider token limits, not just request limits
+<h3>DON'T ❌</h3>
+<ul>
+<li><strong>Don't use Promise.all() without limiting</strong></li>
+</ul>
+   <pre><code class="language-typescript">// ❌ Will hit rate limits instantly
+   await Promise.all(agents.map(a => callClaude(a)));</code></pre>
+<ul>
+<li><strong>Don't ignore 429 errors</strong></li>
+</ul>
+   <pre><code class="language-typescript">// ❌ Silent failures
+   try {
+     await callClaude(agent);
+   } catch (e) {
+     // Error swallowed
+   }</code></pre>
+<ul>
+<li><strong>Don't use fixed delays</strong></li>
+</ul>
+   <pre><code class="language-typescript">// ❌ Inefficient
+   await sleep(5000); // Always waits, even if not needed</code></pre>
+<ul>
+<li><strong>Don't retry infinitely</strong></li>
+</ul>
+   <pre><code class="language-typescript">// ❌ Can cause infinite loops
+   while (true) {
+     try { return await callClaude(agent); }
+     catch { /* retry */ }
+   }</code></pre>
+<hr>
+<h2>Tools &#x26; Resources</h2>
+<h3>Analytics Daemon</h3>
+<p>Monitor rate limits in real-time:</p>
+<pre><code class="language-bash">cd packages/analytics-daemon
+pnpm start
+# WebSocket: ws://localhost:3456
+# HTTP API: http://localhost:3333/api/status</code></pre>
+<h3>Plugins with Built-in Rate Limiting</h3>
+<ul>
+<li><code>performance-engineer</code> - Automatic throttling</li>
+<li><code>test-automator</code> - Batch processing</li>
+<li><code>database-optimizer</code> - Query rate limiting</li>
+</ul>
+<h3>External Tools</h3>
+<ul>
+<li><a href="https://console.anthropic.com/">Anthropic Dashboard</a> - Official rate limit monitoring</li>
+<li><a href="http://localhost:3333/api/status">Claude Code Analytics</a> - Local monitoring</li>
+</ul>
+<hr>
+<h2>Summary</h2>
+<p><strong>Key Takeaways</strong>:</p>
+<ul>
+<li><strong>Free tier = 5 req/min</strong> - Unusable for multi-agent workflows</li>
+<li><strong>Build tier = 50 req/min</strong> - Suitable for small-medium workflows</li>
+<li><strong>Token bucket</strong> - Best balance of simplicity and performance</li>
+<li><strong>Adaptive limiting</strong> - Best for variable workloads</li>
+<li><strong>Always monitor</strong> - Use analytics daemon for visibility</li>
+</ul>
+<p><strong>Production Checklist</strong>:</p>
+<ul>
+<li>[ ] Implement rate limit tracking</li>
+<li>[ ] Choose throttling strategy (token bucket recommended)</li>
+<li>[ ] Add exponential backoff retry logic</li>
+<li>[ ] Monitor with analytics dashboard</li>
+<li>[ ] Set up alerts at 80% capacity</li>
+<li>[ ] Document rate limit handling in README</li>
+</ul>
+<hr>
+<p><strong>Last Updated</strong>: 2025-12-24</p>
+<p><strong>Author</strong>: Jeremy Longshore</p>
+<p><strong>Related Playbooks</strong>: <a href="/playbooks/02-cost-caps/">Cost Caps</a>, <a href="/playbooks/05-incident-debugging/">Incident Debugging</a></p>
+
+          </article>
+        </div>
+      </div>
+    </main>
+
+    <footer class="playbook-footer" data-astro-cid-hidutmah>
+      <div class="container" data-astro-cid-hidutmah>
+        <div class="footer-nav" data-astro-cid-hidutmah>
+          
+          <a href="/playbooks/02-cost-caps" class="nav-link nav-next" data-astro-cid-hidutmah>
+              <span class="nav-label" data-astro-cid-hidutmah>Next</span>
+              <span class="nav-title" data-astro-cid-hidutmah>Cost Caps &amp; Budget Management</span>
+            </a>
+        </div>
+
+        <div class="back-to-index" data-astro-cid-hidutmah>
+          <a href="/playbooks" class="back-link" data-astro-cid-hidutmah>← Back to All Playbooks</a>
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  
+
+  <script type="module">function i(){const r=document.querySelector(".playbook-content"),n=document.getElementById("toc-nav");if(!r||!n)return;const c=r.querySelectorAll("h2, h3");c.forEach((e,o)=>{e.id||(e.id=`section-${o}`);const t=document.createElement("a");t.href=`#${e.id}`,t.textContent=e.textContent,t.style.paddingLeft=e.tagName==="H3"?"1.5rem":"0.75rem",n.appendChild(t)});const a=new IntersectionObserver(e=>{e.forEach(o=>{if(o.isIntersecting){const t=o.target.id;n.querySelectorAll("a").forEach(s=>{s.classList.toggle("active",s.getAttribute("href")===`#${t}`)})}})},{rootMargin:"-100px 0px -66%"});c.forEach(e=>a.observe(e))}document.addEventListener("DOMContentLoaded",i);</script>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
