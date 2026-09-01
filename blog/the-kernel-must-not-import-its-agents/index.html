@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Kernel Must Not Import Its Agents — Tons of Skills Work Diary</title>
+    <meta name="description" content="We extracted a stateful watcher agent from a governance kernel and enforced a one-way agent-to-kernel dependency edge — the kernel must not import its agents.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://startaitools.com/posts/the-kernel-must-not-import-its-agents/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/the-kernel-must-not-import-its-agents/">
+    <meta property="og:title" content="The Kernel Must Not Import Its Agents — Tons of Skills Work Diary">
+    <meta property="og:description" content="We extracted a stateful watcher agent from a governance kernel and enforced a one-way agent-to-kernel dependency edge — the kernel must not import its agents.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="The Kernel Must Not Import Its Agents — Tons of Skills Work Diary">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/the-kernel-must-not-import-its-agents/">
+    <meta name="twitter:title" content="The Kernel Must Not Import Its Agents — Tons of Skills Work Diary">
+    <meta name="twitter:description" content="We extracted a stateful watcher agent from a governance kernel and enforced a one-way agent-to-kernel dependency edge — the kernel must not import its agents.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"The Kernel Must Not Import Its Agents","description":"We extracted a stateful watcher agent from a governance kernel and enforced a one-way agent-to-kernel dependency edge — the kernel must not import its agents.","datePublished":"2026-07-12","url":"https://tonsofskills.com/blog/undefined","author":{"@type":"Person","name":"Jeremy Longshore"},"publisher":{"@type":"Organization","name":"Tons of Skills","url":"https://tonsofskills.com"}}</script>
+  
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.post-header[data-astro-cid-7jjqptxk]{background:var(--panel);padding:4rem 1.5rem 3rem;border-bottom:1px solid var(--border)}.post-header-inner[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto}.back-link[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3);text-decoration:none;display:inline-block;margin-bottom:1.5rem;transition:color .2s}.back-link[data-astro-cid-7jjqptxk]:hover{color:var(--primary)}.post-meta[data-astro-cid-7jjqptxk]{display:flex;align-items:center;gap:.75rem;margin-bottom:1rem}time[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3)}.featured-badge[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.2rem .6rem;background:#ce114126;color:var(--red);border-radius:0;font-weight:600;text-transform:uppercase;letter-spacing:.05em}.post-header[data-astro-cid-7jjqptxk] h1[data-astro-cid-7jjqptxk]{font-family:var(--font-body);font-size:clamp(1.5rem,4vw,2.2rem);font-weight:700;color:var(--text);line-height:1.25;margin-bottom:.75rem;letter-spacing:0}.post-desc[data-astro-cid-7jjqptxk]{color:var(--text-2);font-size:1.05rem;line-height:1.6;margin-bottom:1rem}.post-tags[data-astro-cid-7jjqptxk]{display:flex;gap:.4rem;flex-wrap:wrap}.tag[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.15rem .5rem;background:var(--surface-3);color:var(--text-3);border-radius:0}.post-body[data-astro-cid-7jjqptxk]{padding:3rem 1.5rem 4rem}.prose[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto;color:var(--text-2);line-height:1.8;font-size:1rem}.prose[data-astro-cid-7jjqptxk] h2{font-family:var(--font-body);font-size:1.5rem;font-weight:700;color:var(--text);margin:2.5rem 0 1rem;letter-spacing:0}.prose[data-astro-cid-7jjqptxk] h3{font-size:1.2rem;font-weight:600;color:var(--text);margin:2rem 0 .75rem}.prose[data-astro-cid-7jjqptxk] p{margin-bottom:1rem}.prose[data-astro-cid-7jjqptxk] ul,.prose[data-astro-cid-7jjqptxk] ol{margin:.5rem 0 1rem 1.5rem}.prose[data-astro-cid-7jjqptxk] li{margin-bottom:.35rem}.prose[data-astro-cid-7jjqptxk] strong{color:var(--text);font-weight:600}.prose[data-astro-cid-7jjqptxk] code{font-family:var(--font-mono);font-size:.88em;background:var(--surface-3);padding:.15em .35em;border-radius:0;color:var(--primary)}.prose[data-astro-cid-7jjqptxk] a{color:var(--primary);text-decoration:none}.prose[data-astro-cid-7jjqptxk] a:hover{text-decoration:underline}@media(max-width:768px){.post-header[data-astro-cid-7jjqptxk]{padding:3rem 1rem 2rem}.post-body[data-astro-cid-7jjqptxk]{padding:2rem 1rem 3rem}}
+</style></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  <article class="post" data-astro-cid-7jjqptxk>
+    <header class="post-header" data-astro-cid-7jjqptxk>
+      <div class="post-header-inner" data-astro-cid-7jjqptxk>
+        <a href="/blog" class="back-link" data-astro-cid-7jjqptxk>Back to Work Diary</a>
+        <div class="post-meta" data-astro-cid-7jjqptxk>
+          <time datetime="2026-07-12" data-astro-cid-7jjqptxk>July 11, 2026</time>
+          
+        </div>
+        <h1 data-astro-cid-7jjqptxk>The Kernel Must Not Import Its Agents</h1>
+        <p class="post-desc" data-astro-cid-7jjqptxk>We extracted a stateful watcher agent from a governance kernel and enforced a one-way agent-to-kernel dependency edge — the kernel must not import its agents.</p>
+        <div class="post-tags" data-astro-cid-7jjqptxk>
+          <span class="tag" data-astro-cid-7jjqptxk>architecture</span><span class="tag" data-astro-cid-7jjqptxk>agents</span><span class="tag" data-astro-cid-7jjqptxk>dependency-management</span><span class="tag" data-astro-cid-7jjqptxk>governance</span><span class="tag" data-astro-cid-7jjqptxk>refactoring</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="post-body" data-astro-cid-7jjqptxk>
+      <div class="prose" data-astro-cid-7jjqptxk>
+        <p>There is a moment in the life of every framework where an application-shaped thing has grown up inside it. It started as a demo, a reference implementation, a “let’s just prove the primitives work” spike. Then it kept running. Now it has cron entries, an operator surface, a test pack, and traceability rows — and it lives in the same repository as the primitives it was only ever meant to exercise.</p>
+<p>On 2026-07-12 we did the extraction. We pulled a stateful watcher agent out of a governance kernel and gave it its own leaf repository. The interesting part is not that we moved files. It is the single rule that made the move safe, and that made the resulting kernel worth trusting:</p>
+<blockquote>
+<p><strong>The kernel must not import its agents.</strong> When you split an agent out of its governance kernel, the dependency must point from the agent to the kernel — never the reverse.</p>
+</blockquote>
+<p>This is the agent-framework restatement of a much older law: <em>the framework must not depend on the application</em>, and <em>the composition root lives in the leaf</em>. Everything below is one concrete execution of that law.</p>
+<p>In practice the agent repo imports the kernel’s published contracts as a pinned dependency, composing governance primitives like the trigger interface and policy engine. The kernel has zero knowledge of the agent’s existence — no import, no reference, no coupling. That one-way edge is what keeps the kernel small, independently verifiable, and trustworthy as a standalone governance system.</p>
+<h2 id="the-two-systems">The two systems</h2>
+<p><strong><code>agent-governance-plane</code> (AGP)</strong> is the governance <em>kernel</em>. It owns the durable governance primitives and nothing else: a policy engine, a Docker sandbox for tool execution, Slack human-in-the-loop (HITL) approval, and an Ed25519-signed, hash-chained audit journal. Its doctrine line is worth memorizing because it dictates the whole shape:</p>
+<blockquote>
+<p>The model proposes; the deterministic system decides and records.</p>
+</blockquote>
+<p>Every autonomous tool call passes through the same governed path:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="text"><code><span class="line"><span>trigger → policy gate → (if risky) human approval → sandboxed exec → signed journal</span></span></code></pre>
+<p><strong><code>bob-the-intendant</code></strong> is the new <em>leaf</em> product repo. It composes AGP as a pinned dependency and owns the agent/composition layer. Its product category is “governed background agents” — long-lived processes that wake on a trigger and want to do something a human might not want them to do unsupervised. AGP is what keeps them honest. Bob is what makes them useful.</p>
+<p>Before the extraction, the watcher lived inside AGP. After it, AGP has zero knowledge that the watcher exists, and Bob owns it outright.</p>
+<h2 id="the-invariant-we-were-protecting">The invariant we were protecting</h2>
+<p>The boundary has two halves, and they are not the same rule. The headline half is the thesis: <strong>the kernel imports nothing from the leaf</strong> — it does not know the agents that compose it exist. The mirror half constrains the leaf: <strong>the leaf may import only the kernel’s frozen contracts, never the daemon’s internals</strong> — where “the daemon” is the kernel’s live governance loop (<code>runMediated()</code>) and the machinery around it. The composed agent composes the contracts the kernel publishes; it never reaches past them into implementation.</p>
+<p>Put together, the two halves define one edge: it runs from agent (leaf) to kernel, touches only the published surface, and never runs the other way. A governance kernel that imports the agents it governs breaks the acyclic-dependency rule — it is a governance kernel you cannot reason about. You can no longer point at it and say “this small thing decides and records; here is its trust boundary” — because its <a href="https://startaitools.com/posts/govern-at-merge-untrusted-union/">trust boundary</a> now includes every agent that ever leaked into it.</p>
+<p>So the extraction had two acceptance tests, both structural:</p>
+<ul>
+<li>After extraction, <strong>AGP has zero knowledge of the watcher.</strong> No import, no CLI command, no template, no traceability row.</li>
+<li>After extraction, <strong>Bob has zero references to removed AGP modules.</strong> It composes contracts that still exist; it points at nothing that was deleted.</li>
+</ul>
+<h2 id="what-moved-out-what-stayed-in">What moved out, what stayed in</h2>
+<p>The discipline of the move is entirely in <em>where the cut runs</em>. The cut runs exactly along the contract boundary — the bounded context between kernel and leaf: agent-specific composition leaves, primitives stay.</p>
+<p>Moved <strong>out</strong> of the kernel and into the leaf:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="text"><code><span class="line"><span>src/triggers/github-watcher/     # the trigger-woken GitHub watcher agent</span></span>
+<span class="line"><span>src/cli/commands/watch.ts        # `agp watch` — the operator surface a human runs</span></span>
+<span class="line"><span>templates/github-watcher/        # the per-agent template test packs</span></span>
+<span class="line"><span>RTM REQ-043 / 045 / 046 / 047 / 048 / 049   # this agent's traceability rows</span></span>
+<span class="line"><span>Journey J2 + the "run-governed-watch" persona flow</span></span></code></pre>
+<p>Stayed <strong>in</strong> the kernel, because these are the primitives the agent <em>composes</em>, not the agent itself:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="text"><code><span class="line"><span>trigger-source contract (RTM REQ-050)   # the frozen interface the agent fires through</span></span>
+<span class="line"><span>daemon runMediated() loop (REQ-042)     # the governance loop itself</span></span>
+<span class="line"><span>journal cross-chain causal-pointer (REQ-044)   # a journal primitive</span></span></code></pre>
+<p>Notice the requirements-traceability discipline here, because it is the part most teams skip. REQ-042 and REQ-044 were <em>re-anchored to the retained code</em> — the rows didn’t get deleted, they got re-pointed at the primitives that stayed. The agent’s own rows (REQ-043/045/046/047/048/049) followed the agent into the leaf’s docs. Traceability is a graph, and when you cut the code graph you have to cut the requirements graph along the same line or your “signed audit of everything” claim quietly develops holes.</p>
+<h2 id="the-dependency-edge">The dependency edge</h2>
+<p>This is the entire point of the exercise, in one picture:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="text"><code><span class="line"><span>        ┌───────────────────────────────────────────────┐</span></span>
+<span class="line"><span>        │  bob-the-intendant  (LEAF — the application)   │</span></span>
+<span class="line"><span>        │                                                │</span></span>
+<span class="line"><span>        │   • github-watcher agent                       │</span></span>
+<span class="line"><span>        │   • `bob watch` operator CLI                   │</span></span>
+<span class="line"><span>        │   • template test packs                        │</span></span>
+<span class="line"><span>        │   • J2 / run-governed-watch persona flow       │</span></span>
+<span class="line"><span>        │                                                │</span></span>
+<span class="line"><span>        │        imports  agp/src/... (contracts only)   │</span></span>
+<span class="line"><span>        └───────────────────────┬───────────────────────┘</span></span>
+<span class="line"><span>                                 │   pinned dependency</span></span>
+<span class="line"><span>                                 │   ONE WAY — leaf → kernel</span></span>
+<span class="line"><span>                                 ▼</span></span>
+<span class="line"><span>        ┌───────────────────────────────────────────────┐</span></span>
+<span class="line"><span>        │  agent-governance-plane  (KERNEL — frozen)     │</span></span>
+<span class="line"><span>        │                                                │</span></span>
+<span class="line"><span>        │   • trigger-source contract   (REQ-050)        │</span></span>
+<span class="line"><span>        │   • runMediated() gov. loop   (REQ-042)        │</span></span>
+<span class="line"><span>        │   • policy engine · Docker sandbox             │</span></span>
+<span class="line"><span>        │   • Slack HITL · Ed25519 hash-chained journal  │</span></span>
+<span class="line"><span>        │                                                │</span></span>
+<span class="line"><span>        │        knows NOTHING about the watcher         │</span></span>
+<span class="line"><span>        └───────────────────────────────────────────────┘</span></span></code></pre>
+<p>Bob consumes AGP as a <strong>pinned dependency</strong>. The watcher’s imports were rewired from in-tree relative paths to <code>agp/src/...</code>. There is no arrow back up. The kernel cannot see the leaf, cannot import the leaf, and does not know the leaf exists. That is not an accident of the current file layout — it is the property we spent the day buying.</p>
+<h2 id="three-tradeoffs-and-why-each-went-the-way-it-did">Three tradeoffs, and why each went the way it did</h2>
+<p>Every real extraction is a sequence of forks in the road. Three of them carried the design.</p>
+<p><strong>1. Clean removal + a cross-repo pinned-dependency edge — over keeping the watcher as a flag-gated in-tree spike.</strong> The tempting cheap move is to leave the watcher in AGP behind a feature flag and call it “disabled.” We chose the harder cut. A flag-gated agent left in-tree keeps the boundary muddy: the code is still <em>there</em>, still importable, still one careless <code>import</code> away from the kernel depending on its own agent. The flag protects runtime behavior; it does nothing for the dependency graph. We wanted the kernel to physically shrink to contracts, so that the invariant is enforced by <em>absence</em>, not by a boolean.</p>
+<p><strong>2. Composing AGP as a pinned dependency — over vendoring or forking the kernel.</strong> The frozen contracts and the trigger-source interface must be authored in exactly one place: AGP. If the leaf vendored or forked the kernel, those contracts would exist in two copies, and two copies of a contract drift — slowly, silently, and always at the worst time. Importing a pinned version means the leaf reads the contracts, never owns them. One author, one source of truth, one thing to version.</p>
+<p><strong>3. Owning the watcher locally in the leaf — over importing <code>agp/src/triggers</code>.</strong> This is the mirror image of tradeoff 2, and it is what makes the cut <em>symmetric</em>. After extraction the kernel no longer has the watcher modules, so the leaf cannot import them from AGP — they aren’t there anymore. The leaf must own the watcher outright to build against the post-extraction kernel. Contracts: imported. Agent: owned. That split <em>is</em> the boundary.</p>
+<h2 id="why-it-was-a-breaking-change-on-both-sides">Why it was a breaking change on both sides</h2>
+<p>Extraction that touches a published surface is a breaking change by definition, and honest versioning has to say so.</p>
+<ul>
+<li><strong>On the kernel:</strong> <code>agp watch</code> was <strong>removed</strong> from the AGP CLI. <code>BREAKING CHANGE</code> — the governed watcher now ships in the leaf. Anyone who typed <code>agp watch</code> has to move.</li>
+<li><strong>On the leaf:</strong> the CLI was renamed <code>intendants → bob</code>; the npm package was renamed <code>@intentsolutions/intendants → @intentsolutions/bob-the-intendant</code>. <code>BREAKING CHANGE</code> on both the binary name and the package name.</li>
+</ul>
+<p>You cannot smuggle a change like this through as a patch. The whole value of the extraction is that consumers can <em>reason</em> about the kernel independently — and that reasoning depends on the kernel’s version number telling the truth.</p>
+<h2 id="the-part-everyone-underestimates-it-was-a-live-migration">The part everyone underestimates: it was a live migration</h2>
+<p>Here is the detail worth teaching, because it is the one that bites. The watcher was not a dormant module. It was <strong>running in production</strong> on a cron: <code>~/bin/intendants-release-watch.sh</code>, firing on a schedule, in a governed loop, on a real repo.</p>
+<p>Extracting a <em>running</em> component is a live-migration problem, not a code move. If you merge the kernel PR that removes <code>agp watch</code> while production cron still calls <code>agp watch</code>, you have — for however long it takes to notice — a production job pointed at <a href="/blog/every-safety-gate-has-a-failure-direction/">a command that no longer exists</a>.</p>
+<p>So the order was inverted deliberately:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#6A737D"># 1. Repoint the production cron to the LEAF's command FIRST,</span></span>
+<span class="line"><span style="color:#6A737D">#    while `agp watch` still exists in the merged kernel.</span></span>
+<span class="line"><span style="color:#6A737D">#    ~/bin/intendants-release-watch.sh  →  `bob watch ...`</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># 2. THEN merge the kernel PR that removes `agp watch`.</span></span></code></pre>
+<p>At no instant was production pointed at a command that didn’t exist. The cutover of the running process precedes the removal of the thing it used to call. This is the same expand/contract pattern database migrations use — you add the new path, move traffic, and only then remove the old path — applied to a CLI command instead of a column.</p>
+<p>The releases were coordinated to match:</p>
+<ul>
+<li><strong>AGP cut <code>v0.1.100</code></strong> — the post-extraction clean kernel.</li>
+<li><strong>The leaf cut <code>v0.0.1</code>, then <code>v0.0.2</code>.</strong></li>
+<li>During the work, the leaf pinned the post-extraction <em>commit</em> of AGP; once the kernel PR merged, it <strong>repinned to the <code>v0.1.100</code> release tag.</strong> Pin to a commit while the edge is in flight; pin to a tag once the edge is real.</li>
+</ul>
+<h2 id="verification-link-the-evidence-dont-say-verified">Verification: link the evidence, don’t say “verified”</h2>
+<p>The whole claim of a governance kernel is auditability, so the extraction has to be auditable too. Both sides landed green.</p>
+<p><strong>Kernel branch (post-extraction clean AGP):</strong></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="text"><code><span class="line"><span>bun run typecheck      0 errors</span></span>
+<span class="line"><span>bun test               360 pass / 8 skip / 0 fail</span></span>
+<span class="line"><span>coverage (lines)       94.46%   (gate ≥ 90)</span></span>
+<span class="line"><span>coverage (funcs)       91.80%   (gate ≥ 88)</span></span>
+<span class="line"><span>lint                   clean</span></span>
+<span class="line"><span>claim-scan             PASS</span></span>
+<span class="line"><span>doc-drift              PASS</span></span>
+<span class="line"><span>audit-harness verify   OK</span></span>
+<span class="line"><span>escape-scan            REFUSE=0 / CHALLENGE=0 / FLAG=0</span></span></code></pre>
+<p><strong>Leaf, built against the post-extraction kernel:</strong></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="text"><code><span class="line"><span>bun run typecheck      0 errors</span></span>
+<span class="line"><span>bun test               52 pass / 0 fail  (10 files)</span></span>
+<span class="line"><span>references to removed AGP modules:   ZERO</span></span>
+<span class="line"><span>  (no `agp/src/triggers`, no `agp/src/cli/commands/watch`)</span></span></code></pre>
+<p>That last line is the acceptance test made mechanical. “Bob has zero references to removed AGP modules” is not a vibe — it is a grep that returns nothing. The kernel’s side has the mirror check: nothing in AGP mentions the watcher. Two structural assertions, both green, and the invariant is proven rather than asserted.</p>
+<h2 id="the-generalizable-principle">The generalizable principle</h2>
+<p>Strip away the specific repos and here is what is left, for anyone building an agent framework, a policy layer, or any governance kernel that other things compose.</p>
+<p>If your governance kernel imports the agents it governs, three things break at once:</p>
+<ol>
+<li><strong>You cannot ship or version the kernel independently.</strong> Its releases are hostage to every agent tangled into it; a change in one agent forces a kernel release, and the kernel’s version number stops meaning anything.</li>
+<li><strong>You cannot reason about the kernel’s trust boundary in isolation.</strong> “Here is the small deterministic thing that decides and records” is only a true sentence if the small thing has a fixed edge. Import an agent and the boundary now wraps that agent’s code too.</li>
+<li><strong>Every new agent widens the kernel’s attack and verification surface.</strong> The set of things you must audit to trust the kernel grows with every agent you add — which is exactly backwards, because the kernel is supposed to be the <em>fixed point</em> you audit once. The watcher we just extracted was one such agent; every agent we <em>don’t</em> extract would fold exactly this cost back into the kernel, which is why the extraction is a repeatable discipline and not a one-off cleanup.</li>
+</ol>
+<p>Extracting agents into leaves keeps the kernel a small, independently-verifiable dependency with a stable trust boundary. That is not architectural neatness for its own sake — it is the entire reason to have a governance kernel in the first place. The one-way edge, agent → kernel, is what makes “a signed audit log of every tool call” a claim you can verify by looking at the kernel <em>alone</em>, without first reading every agent that happens to use it. The direction of a single dependency arrow is the difference between a trust boundary and a wish.</p>
+      </div>
+    </div>
+  </article>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

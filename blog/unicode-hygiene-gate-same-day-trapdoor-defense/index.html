@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Unicode Layer Your Validator Can&#39;t See — Tons of Skills Work Diary</title>
+    <meta name="description" content="Schema validation can't see invisible Unicode. A stdlib-only CI gate that catches tag-char injection, Trojan Source bidi overrides, and homoglyph attacks.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://startaitools.com/posts/unicode-hygiene-gate-same-day-trapdoor-defense/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/unicode-hygiene-gate-same-day-trapdoor-defense/">
+    <meta property="og:title" content="The Unicode Layer Your Validator Can't See — Tons of Skills Work Diary">
+    <meta property="og:description" content="Schema validation can't see invisible Unicode. A stdlib-only CI gate that catches tag-char injection, Trojan Source bidi overrides, and homoglyph attacks.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="The Unicode Layer Your Validator Can't See — Tons of Skills Work Diary">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/unicode-hygiene-gate-same-day-trapdoor-defense/">
+    <meta name="twitter:title" content="The Unicode Layer Your Validator Can't See — Tons of Skills Work Diary">
+    <meta name="twitter:description" content="Schema validation can't see invisible Unicode. A stdlib-only CI gate that catches tag-char injection, Trojan Source bidi overrides, and homoglyph attacks.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"The Unicode Layer Your Validator Can't See","description":"Schema validation can't see invisible Unicode. A stdlib-only CI gate that catches tag-char injection, Trojan Source bidi overrides, and homoglyph attacks.","datePublished":"2026-05-24","url":"https://tonsofskills.com/blog/undefined","author":{"@type":"Person","name":"Jeremy Longshore"},"publisher":{"@type":"Organization","name":"Tons of Skills","url":"https://tonsofskills.com"}}</script>
+  
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.post-header[data-astro-cid-7jjqptxk]{background:var(--panel);padding:4rem 1.5rem 3rem;border-bottom:1px solid var(--border)}.post-header-inner[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto}.back-link[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3);text-decoration:none;display:inline-block;margin-bottom:1.5rem;transition:color .2s}.back-link[data-astro-cid-7jjqptxk]:hover{color:var(--primary)}.post-meta[data-astro-cid-7jjqptxk]{display:flex;align-items:center;gap:.75rem;margin-bottom:1rem}time[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3)}.featured-badge[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.2rem .6rem;background:#ce114126;color:var(--red);border-radius:0;font-weight:600;text-transform:uppercase;letter-spacing:.05em}.post-header[data-astro-cid-7jjqptxk] h1[data-astro-cid-7jjqptxk]{font-family:var(--font-body);font-size:clamp(1.5rem,4vw,2.2rem);font-weight:700;color:var(--text);line-height:1.25;margin-bottom:.75rem;letter-spacing:0}.post-desc[data-astro-cid-7jjqptxk]{color:var(--text-2);font-size:1.05rem;line-height:1.6;margin-bottom:1rem}.post-tags[data-astro-cid-7jjqptxk]{display:flex;gap:.4rem;flex-wrap:wrap}.tag[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.15rem .5rem;background:var(--surface-3);color:var(--text-3);border-radius:0}.post-body[data-astro-cid-7jjqptxk]{padding:3rem 1.5rem 4rem}.prose[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto;color:var(--text-2);line-height:1.8;font-size:1rem}.prose[data-astro-cid-7jjqptxk] h2{font-family:var(--font-body);font-size:1.5rem;font-weight:700;color:var(--text);margin:2.5rem 0 1rem;letter-spacing:0}.prose[data-astro-cid-7jjqptxk] h3{font-size:1.2rem;font-weight:600;color:var(--text);margin:2rem 0 .75rem}.prose[data-astro-cid-7jjqptxk] p{margin-bottom:1rem}.prose[data-astro-cid-7jjqptxk] ul,.prose[data-astro-cid-7jjqptxk] ol{margin:.5rem 0 1rem 1.5rem}.prose[data-astro-cid-7jjqptxk] li{margin-bottom:.35rem}.prose[data-astro-cid-7jjqptxk] strong{color:var(--text);font-weight:600}.prose[data-astro-cid-7jjqptxk] code{font-family:var(--font-mono);font-size:.88em;background:var(--surface-3);padding:.15em .35em;border-radius:0;color:var(--primary)}.prose[data-astro-cid-7jjqptxk] a{color:var(--primary);text-decoration:none}.prose[data-astro-cid-7jjqptxk] a:hover{text-decoration:underline}@media(max-width:768px){.post-header[data-astro-cid-7jjqptxk]{padding:3rem 1rem 2rem}.post-body[data-astro-cid-7jjqptxk]{padding:2rem 1rem 3rem}}
+</style></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  <article class="post" data-astro-cid-7jjqptxk>
+    <header class="post-header" data-astro-cid-7jjqptxk>
+      <div class="post-header-inner" data-astro-cid-7jjqptxk>
+        <a href="/blog" class="back-link" data-astro-cid-7jjqptxk>Back to Work Diary</a>
+        <div class="post-meta" data-astro-cid-7jjqptxk>
+          <time datetime="2026-05-24" data-astro-cid-7jjqptxk>May 23, 2026</time>
+          
+        </div>
+        <h1 data-astro-cid-7jjqptxk>The Unicode Layer Your Validator Can&#39;t See</h1>
+        <p class="post-desc" data-astro-cid-7jjqptxk>Schema validation can&#39;t see invisible Unicode. A stdlib-only CI gate that catches tag-char injection, Trojan Source bidi overrides, and homoglyph attacks.</p>
+        <div class="post-tags" data-astro-cid-7jjqptxk>
+          <span class="tag" data-astro-cid-7jjqptxk>ci-cd</span><span class="tag" data-astro-cid-7jjqptxk>python</span><span class="tag" data-astro-cid-7jjqptxk>security</span><span class="tag" data-astro-cid-7jjqptxk>claude-code</span><span class="tag" data-astro-cid-7jjqptxk>automation</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="post-body" data-astro-cid-7jjqptxk>
+      <div class="prose" data-astro-cid-7jjqptxk>
+        <p>A schema validator reads parsed structure. It never sees the bytes.</p>
+<p>That gap is where a whole class of supply-chain attack lives. The <code>claude-code-plugins</code> marketplace already ran a schema validator over every skill, agent, command, and catalog file — confirming required fields, enum values, shapes. All of it operating on the <em>parsed</em> document. None of it looking at the raw codepoints underneath.</p>
+<p>An attacker can hide an instruction in characters that are invisible to a human reviewer and invisible to a structural validator, yet fully meaningful to an LLM that parses the file as text — or to a shell that executes a line copied out of it. The reviewer sees <code>npm install left-pad</code>. The model sees something else.</p>
+<p>On 2026-05-24 the Socket “TrapDoor” advisory described exactly this: invisible Unicode tag characters smuggling instructions into LLM-parsed content. The same day, we shipped a CI gate for it — and folded in the older Trojan Source class (CVE-2021-42574) while we were at it.</p>
+<h2 id="the-threat-model-has-three-shapes">The threat model has three shapes</h2>
+<p>The detection model is built around three distinct attack surfaces, each with a different blast radius and a different rate of legitimate false positives. That asymmetry is the whole reason the gate is tiered instead of binary.</p>
+<p><strong>Tag characters (U+E0000–U+E007F).</strong> These render as nothing. A human sees an empty span. An LLM reading the file as a token stream reads them as text — they can carry a complete hidden instruction inside what looks like an innocent line of documentation. This is the TrapDoor vector. There is no legitimate reason for a tag character to appear in a skill file. Unambiguous attack.</p>
+<p><strong>Bidirectional (bidi) overrides and isolates (U+202A–U+202E, U+2066–U+2069).</strong> Trojan Source. These reorder how text <em>renders</em> without changing how it <em>parses</em>. The classic demonstration: code that displays as a benign comment to a reviewer but executes as an active statement. Renders as one thing, parses as another. Also unambiguous.</p>
+<p><strong>Homoglyphs.</strong> A Cyrillic <code>а</code> (U+0430) is pixel-identical to a Latin <code>a</code> (U+0061) in most fonts. Drop one into <code>npm install pаckage</code> and the reviewer reads the right name while the resolver fetches a different one. This is a real attack — but mixing scripts is also completely normal in human prose. Cyrillic next to Latin in a sentence is not suspicious. The signal only matters in a narrow context.</p>
+<h2 id="the-artifact">The artifact</h2>
+<p><code>scripts/validate-unicode-hygiene.py</code> — 317 lines, stdlib only. <code>argparse</code>, <code>pathlib</code>, <code>re</code>, <code>unicodedata</code>, <code>dataclasses</code>. No third-party dependency, nothing to pin, nothing to audit transitively. The detection rules are original, derived from the public Unicode Standard, the CVE-2021-42574 advisory, and the TrapDoor advisory. Not a fork of any existing scanner.</p>
+<p>The codepoint classes map straight onto the threat model:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#79B8FF">TAG_CHARS</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> range</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">0x</span><span style="color:#79B8FF">E0000</span><span style="color:#E1E4E8">, </span><span style="color:#F97583">0x</span><span style="color:#79B8FF">E0080</span><span style="color:#E1E4E8">)  </span><span style="color:#6A737D"># exclusive end -> U+E0000-U+E007F inclusive</span></span>
+<span class="line"><span style="color:#79B8FF">BIDI_CONTROLS</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> frozenset</span><span style="color:#E1E4E8">({</span><span style="color:#F97583">0x</span><span style="color:#79B8FF">202A</span><span style="color:#E1E4E8">, </span><span style="color:#F97583">0x</span><span style="color:#79B8FF">202B</span><span style="color:#E1E4E8">, </span><span style="color:#F97583">0x</span><span style="color:#79B8FF">202C</span><span style="color:#E1E4E8">, </span><span style="color:#F97583">0x</span><span style="color:#79B8FF">202D</span><span style="color:#E1E4E8">, </span><span style="color:#F97583">0x</span><span style="color:#79B8FF">202E</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#F97583">                           0x</span><span style="color:#79B8FF">2066</span><span style="color:#E1E4E8">, </span><span style="color:#F97583">0x</span><span style="color:#79B8FF">2067</span><span style="color:#E1E4E8">, </span><span style="color:#F97583">0x</span><span style="color:#79B8FF">2068</span><span style="color:#E1E4E8">, </span><span style="color:#F97583">0x</span><span style="color:#79B8FF">2069</span><span style="color:#E1E4E8">})</span></span>
+<span class="line"><span style="color:#79B8FF">ZERO_WIDTH_MAJOR</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> frozenset</span><span style="color:#E1E4E8">({</span><span style="color:#F97583">0x</span><span style="color:#79B8FF">200B</span><span style="color:#E1E4E8">, </span><span style="color:#F97583">0x</span><span style="color:#79B8FF">200C</span><span style="color:#E1E4E8">, </span><span style="color:#F97583">0x</span><span style="color:#79B8FF">200D</span><span style="color:#E1E4E8">, </span><span style="color:#F97583">0x</span><span style="color:#79B8FF">2060</span><span style="color:#E1E4E8">, </span><span style="color:#F97583">0x</span><span style="color:#79B8FF">FEFF</span><span style="color:#E1E4E8">})</span></span>
+<span class="line"><span style="color:#79B8FF">OTHER_INVISIBLE</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> frozenset</span><span style="color:#E1E4E8">({</span><span style="color:#F97583">0x</span><span style="color:#79B8FF">00AD</span><span style="color:#E1E4E8">, </span><span style="color:#F97583">0x</span><span style="color:#79B8FF">034F</span><span style="color:#E1E4E8">, </span><span style="color:#F97583">0x</span><span style="color:#79B8FF">115F</span><span style="color:#E1E4E8">, </span><span style="color:#F97583">0x</span><span style="color:#79B8FF">1160</span><span style="color:#E1E4E8">, </span><span style="color:#F97583">0x</span><span style="color:#79B8FF">17B4</span><span style="color:#E1E4E8">, </span><span style="color:#F97583">0x</span><span style="color:#79B8FF">17B5</span><span style="color:#E1E4E8">})</span></span>
+<span class="line"><span style="color:#79B8FF">HOMOGLYPH_SCRIPTS</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> frozenset</span><span style="color:#E1E4E8">({</span><span style="color:#9ECBFF">"Cyrillic"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"Greek"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"Armenian"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"Cherokee"</span><span style="color:#E1E4E8">})</span></span></code></pre>
+<h2 id="tiered-severity-not-a-single-verdict">Tiered severity, not a single verdict</h2>
+<p>A binary pass/fail gate forces a bad choice: either it’s too loud (every zero-width space halts the build) or too quiet (you skip the ambiguous cases and miss the homoglyph in an install line). Three tiers resolve the tension.</p>
+<p><strong>BLOCKER</strong> — tag characters and bidi controls. These fail CI by default. There is no benign use, so there is no false-positive cost to refusing them outright.</p>
+<p><strong>MAJOR</strong> — zero-width and format characters (U+200B, U+200C, U+200D, U+2060, U+FEFF) anywhere they don’t belong, plus other invisibles like soft hyphen (U+00AD), combining grapheme joiner (U+034F), Hangul fillers, and Khmer zero-width vowels. These <em>can</em> be attacks, but they also show up in legitimate-if-messy authoring. So they warn by default and only fail under <code>--strict</code>.</p>
+<p><strong>MINOR</strong> — mixed-script identifiers, but scoped hard. The homoglyph pass fires only inside URLs, package-manager install lines, and code-fence language tags. Never on prose.</p>
+<p>That scoping is a deliberate design call. The line patterns the homoglyph pass inspects: <code>https?://</code>, <code>npm</code>/<code>pnpm</code>/<code>yarn</code>/<code>bun install</code>, <code>pip</code>/<code>uv install</code>, <code>cargo install</code>/<code>add</code>, <code>brew</code>/<code>gem</code>/<code>composer</code>/<code>go install</code>, and <code>gh repo clone</code>. Those are the lines a reader copies and runs. Prose is left alone because flagging every Greek letter in a math explanation would bury the one finding that matters.</p>
+<h3 id="severity-tiers-at-a-glance">Severity tiers at a glance</h3>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Tier</th><th>Character class</th><th>Examples</th><th>Action</th><th>False-positive cost</th></tr></thead><tbody><tr><td><strong>BLOCKER</strong></td><td>Tag chars, bidi controls</td><td>U+E0000–U+E007F, U+202A–U+202E</td><td>Fail CI immediately</td><td>None — no legitimate use</td></tr><tr><td><strong>MAJOR</strong></td><td>Zero-width / format chars</td><td>U+200B, U+FEFF (non-BOM), U+00AD</td><td>Warn by default; fail under <code>--strict</code></td><td>Possible in legitimate authoring</td></tr><tr><td><strong>MINOR</strong></td><td>Mixed-script identifiers</td><td>Cyrillic <code>а</code>, Greek <code>α</code> in URLs / install lines</td><td>Warn in narrow contexts only</td><td>Low — scoped to package lines</td></tr></tbody></table>
+<h3 id="the-bom-exception">The BOM exception</h3>
+<p>One codepoint sits on a fence. U+FEFF is a byte-order mark when it’s the very first byte of a file — legitimate. The same codepoint anywhere else is a zero-width no-break space, which is exactly the kind of invisible an attacker reaches for. So the rule grants a pass to exactly one position and flags every other occurrence:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#F97583">elif</span><span style="color:#E1E4E8"> cp </span><span style="color:#F97583">in</span><span style="color:#79B8FF"> ZERO_WIDTH_MAJOR</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#6A737D">    # A single U+FEFF at the very first byte of the file is a</span></span>
+<span class="line"><span style="color:#6A737D">    # legitimate BOM and gets a pass.</span></span>
+<span class="line"><span style="color:#F97583">    if</span><span style="color:#E1E4E8"> cp </span><span style="color:#F97583">==</span><span style="color:#F97583"> 0x</span><span style="color:#79B8FF">FEFF</span><span style="color:#F97583"> and</span><span style="color:#E1E4E8"> line_no </span><span style="color:#F97583">==</span><span style="color:#79B8FF"> 1</span><span style="color:#F97583"> and</span><span style="color:#E1E4E8"> col_idx </span><span style="color:#F97583">==</span><span style="color:#79B8FF"> 1</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#F97583">        continue</span></span>
+<span class="line"><span style="color:#E1E4E8">    findings.append(Finding(</span><span style="color:#FFAB70">severity</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">"MAJOR"</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">...</span><span style="color:#E1E4E8">, </span><span style="color:#FFAB70">rule</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">"zero-width-or-format"</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">...</span><span style="color:#E1E4E8">))</span></span></code></pre>
+<p>Position-aware, not codepoint-aware. The byte is fine at offset 0 and suspect everywhere else.</p>
+<h2 id="make-the-invisible-visible-in-the-log">Make the invisible visible in the log</h2>
+<p>A finding that says “MAJOR at line 14, column 22” is useless if the reviewer opens the file and sees nothing there — because the offending character is, by definition, invisible. Every finding carries <code>file:line:column</code>, the codepoint’s <code>unicodedata.name()</code> label, the rule name, and a ~32-character context window with every invisible escaped to <code>&#x3C;U+XXXX></code>:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#F97583">def</span><span style="color:#B392F0"> _escape_context</span><span style="color:#E1E4E8">(line, column, width</span><span style="color:#F97583">=</span><span style="color:#79B8FF">32</span><span style="color:#E1E4E8">):</span></span>
+<span class="line"><span style="color:#79B8FF">    ...</span></span>
+<span class="line"><span style="color:#F97583">    for</span><span style="color:#E1E4E8"> ch </span><span style="color:#F97583">in</span><span style="color:#E1E4E8"> window:</span></span>
+<span class="line"><span style="color:#E1E4E8">        cp </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> ord</span><span style="color:#E1E4E8">(ch)</span></span>
+<span class="line"><span style="color:#F97583">        if</span><span style="color:#E1E4E8"> cp </span><span style="color:#F97583">in</span><span style="color:#79B8FF"> TAG_CHARS</span><span style="color:#F97583"> or</span><span style="color:#E1E4E8"> cp </span><span style="color:#F97583">in</span><span style="color:#79B8FF"> BIDI_CONTROLS</span><span style="color:#F97583"> or</span><span style="color:#E1E4E8"> cp </span><span style="color:#F97583">in</span><span style="color:#79B8FF"> ZERO_WIDTH_MAJOR</span><span style="color:#E1E4E8"> \</span></span>
+<span class="line"><span style="color:#F97583">           or</span><span style="color:#E1E4E8"> cp </span><span style="color:#F97583">in</span><span style="color:#79B8FF"> OTHER_INVISIBLE</span><span style="color:#F97583"> or</span><span style="color:#E1E4E8"> cp </span><span style="color:#F97583">&#x3C;</span><span style="color:#F97583"> 0x</span><span style="color:#79B8FF">20</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">            out_chars.append(</span><span style="color:#F97583">f</span><span style="color:#9ECBFF">"&#x3C;U+</span><span style="color:#79B8FF">{</span><span style="color:#E1E4E8">cp</span><span style="color:#F97583">:04X</span><span style="color:#79B8FF">}</span><span style="color:#9ECBFF">>"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#F97583">        else</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">            out_chars.append(ch)</span></span>
+<span class="line"><span style="color:#F97583">    return</span><span style="color:#9ECBFF"> ""</span><span style="color:#E1E4E8">.join(out_chars)</span></span></code></pre>
+<p>Now the CI log shows <code>npm install p&#x3C;U+0430>ckage</code> instead of a line that looks identical to the clean one. The reviewer can actually see the attack.</p>
+<h2 id="ship-report-only-then-ratchet">Ship report-only, then ratchet</h2>
+<p>The gate has two rollout switches. <code>--warn-only</code> always exits 0 — it reports findings without failing the build, for the window where you’re still learning what’s in the corpus. <code>--strict</code> flips MAJOR findings into build failures once you’ve cleaned up the known-benign noise.</p>
+<p>This is the same self-expiring report-only pattern we use elsewhere: land a gate in advisory mode, let it observe production traffic, then enforce once you’ve proven it won’t false-positive your own contributors into a wall. BLOCKER fires from day one because it has no false-positive cost; MAJOR waits behind <code>--strict</code> until the corpus is clean.</p>
+<h2 id="the-result">The result</h2>
+<p>Wired into <code>.github/workflows/validate-plugins.yml</code> next to the existing schema validator. Scanned 4,776 files.</p>
+<p>Zero blockers. Clean main.</p>
+<p>Eight MAJOR findings — and the honest detail is the interesting one. All eight traced to a single community-contributed file that intentionally used a zero-width space inside a fenced code block as a rendering workaround. Not an attack. A legitimate-but-messy authoring choice. That is precisely why MAJOR sits behind <code>--strict</code> and isn’t flipped on yet: the ratchet waits until that one file is cleaned up, so the first enforced run doesn’t punish a contributor for a cosmetic hack.</p>
+<p>Tests cover the boundaries with six byte-precise fixtures — <code>blocker-tag-chars</code>, <code>blocker-bidi-override</code>, <code>bom-allowed</code>, <code>clean-skill</code>, <code>major-zero-width</code>, <code>minor-homoglyph-install</code> — driving an 8-test regression suite in <code>tests/test_validate_unicode_hygiene.py</code>. The whole thing shipped as PR #777 closing #776: ~317 lines of validator, one workflow edit, one test file.</p>
+<h2 id="also-shipped">Also shipped</h2>
+<p>Same day, part of a wider CI-hardening campaign:</p>
+<ul>
+<li>An after-action review (PR #775) closed a 2026-05-22→24 hardening sequence: 11 PRs landing v4.32.0 with 10 blocking required gates and zero report-only, plus cleanup of 974 Python errors, 223 shellcheck warnings, ~60k markdown issues, and 970 MB freed.</li>
+<li>Doc-quality gate “round 2” in two other repos (<code>intentional-cognition-os</code>, <code>qmd-team-intent-kb</code>): fixed Vale by scoping via per-directory <code>.vale.ini</code> sections instead of the action’s broken single-path <code>files:</code> input, and lychee by passing <code>.</code> as the required positional argument. Scoping refinements, not policy loosening — the gates stay BLOCKING.</li>
+<li><code>intentional-cognition-os</code> also got an <code>ico audit verify</code> SHA-256 chain verifier. The audit log had carried a tamper-evident hash chain since launch, but nothing actually walked it — so the tamper-evidence was theoretical. Now <code>ico audit verify</code> exits 2 on <code>AUDIT_TAMPERED</code>.</li>
+</ul>
+<h2 id="related-posts">Related posts</h2>
+<ul>
+<li><a href="/blog/self-expiring-report-only-ci-gates/">Self-Expiring Report-Only CI Gates</a> — the <code>--warn-only</code> → <code>--strict</code> ratchet is the same advisory-to-enforced pattern, generalized.</li>
+<li><a href="/blog/server-ops-mcp-safety-before-tools/">Safety Model First: 16-Tool Ops MCP in One Day</a> — designing the threat model before the surface, applied to an ops MCP server.</li>
+</ul>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "The Unicode Layer Your Validator Can't See",
+  "description": "Schema validation can't see invisible Unicode. A stdlib-only CI gate that catches tag-char injection, Trojan Source bidi overrides, and homoglyph attacks.",
+  "image": "https://startaitools.com/images/og-image.png",
+  "datePublished": "2026-05-24",
+  "author": {
+    "@type": "Person",
+    "name": "Jeremy Longshore"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Start AI Tools"
+  },
+  "url": "https://startaitools.com/posts/unicode-hygiene-gate-same-day-trapdoor-defense/"
+}
+</script>
+      </div>
+    </div>
+  </article>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
