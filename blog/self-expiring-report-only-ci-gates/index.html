@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Self-Expiring Report-Only CI Gates: From Advisory to Enforced — Tons of Skills Work Diary</title>
+    <meta name="description" content="How a meta-gate enforces deadline-driven CI hardening without freezing contributors — one logical concern per PR, permanent blocking by design.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://startaitools.com/posts/self-expiring-report-only-ci-gates/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/self-expiring-report-only-ci-gates/">
+    <meta property="og:title" content="Self-Expiring Report-Only CI Gates: From Advisory to Enforced — Tons of Skills Work Diary">
+    <meta property="og:description" content="How a meta-gate enforces deadline-driven CI hardening without freezing contributors — one logical concern per PR, permanent blocking by design.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="Self-Expiring Report-Only CI Gates: From Advisory to Enforced — Tons of Skills Work Diary">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/self-expiring-report-only-ci-gates/">
+    <meta name="twitter:title" content="Self-Expiring Report-Only CI Gates: From Advisory to Enforced — Tons of Skills Work Diary">
+    <meta name="twitter:description" content="How a meta-gate enforces deadline-driven CI hardening without freezing contributors — one logical concern per PR, permanent blocking by design.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"Self-Expiring Report-Only CI Gates: From Advisory to Enforced","description":"How a meta-gate enforces deadline-driven CI hardening without freezing contributors — one logical concern per PR, permanent blocking by design.","datePublished":"2026-05-23","url":"https://tonsofskills.com/blog/undefined","author":{"@type":"Person","name":"Jeremy Longshore"},"publisher":{"@type":"Organization","name":"Tons of Skills","url":"https://tonsofskills.com"}}</script>
+  
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.post-header[data-astro-cid-7jjqptxk]{background:var(--panel);padding:4rem 1.5rem 3rem;border-bottom:1px solid var(--border)}.post-header-inner[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto}.back-link[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3);text-decoration:none;display:inline-block;margin-bottom:1.5rem;transition:color .2s}.back-link[data-astro-cid-7jjqptxk]:hover{color:var(--primary)}.post-meta[data-astro-cid-7jjqptxk]{display:flex;align-items:center;gap:.75rem;margin-bottom:1rem}time[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3)}.featured-badge[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.2rem .6rem;background:#ce114126;color:var(--red);border-radius:0;font-weight:600;text-transform:uppercase;letter-spacing:.05em}.post-header[data-astro-cid-7jjqptxk] h1[data-astro-cid-7jjqptxk]{font-family:var(--font-body);font-size:clamp(1.5rem,4vw,2.2rem);font-weight:700;color:var(--text);line-height:1.25;margin-bottom:.75rem;letter-spacing:0}.post-desc[data-astro-cid-7jjqptxk]{color:var(--text-2);font-size:1.05rem;line-height:1.6;margin-bottom:1rem}.post-tags[data-astro-cid-7jjqptxk]{display:flex;gap:.4rem;flex-wrap:wrap}.tag[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.15rem .5rem;background:var(--surface-3);color:var(--text-3);border-radius:0}.post-body[data-astro-cid-7jjqptxk]{padding:3rem 1.5rem 4rem}.prose[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto;color:var(--text-2);line-height:1.8;font-size:1rem}.prose[data-astro-cid-7jjqptxk] h2{font-family:var(--font-body);font-size:1.5rem;font-weight:700;color:var(--text);margin:2.5rem 0 1rem;letter-spacing:0}.prose[data-astro-cid-7jjqptxk] h3{font-size:1.2rem;font-weight:600;color:var(--text);margin:2rem 0 .75rem}.prose[data-astro-cid-7jjqptxk] p{margin-bottom:1rem}.prose[data-astro-cid-7jjqptxk] ul,.prose[data-astro-cid-7jjqptxk] ol{margin:.5rem 0 1rem 1.5rem}.prose[data-astro-cid-7jjqptxk] li{margin-bottom:.35rem}.prose[data-astro-cid-7jjqptxk] strong{color:var(--text);font-weight:600}.prose[data-astro-cid-7jjqptxk] code{font-family:var(--font-mono);font-size:.88em;background:var(--surface-3);padding:.15em .35em;border-radius:0;color:var(--primary)}.prose[data-astro-cid-7jjqptxk] a{color:var(--primary);text-decoration:none}.prose[data-astro-cid-7jjqptxk] a:hover{text-decoration:underline}@media(max-width:768px){.post-header[data-astro-cid-7jjqptxk]{padding:3rem 1rem 2rem}.post-body[data-astro-cid-7jjqptxk]{padding:2rem 1rem 3rem}}
+</style></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  <article class="post" data-astro-cid-7jjqptxk>
+    <header class="post-header" data-astro-cid-7jjqptxk>
+      <div class="post-header-inner" data-astro-cid-7jjqptxk>
+        <a href="/blog" class="back-link" data-astro-cid-7jjqptxk>Back to Work Diary</a>
+        <div class="post-meta" data-astro-cid-7jjqptxk>
+          <time datetime="2026-05-23" data-astro-cid-7jjqptxk>May 22, 2026</time>
+          
+        </div>
+        <h1 data-astro-cid-7jjqptxk>Self-Expiring Report-Only CI Gates: From Advisory to Enforced</h1>
+        <p class="post-desc" data-astro-cid-7jjqptxk>How a meta-gate enforces deadline-driven CI hardening without freezing contributors — one logical concern per PR, permanent blocking by design.</p>
+        <div class="post-tags" data-astro-cid-7jjqptxk>
+          <span class="tag" data-astro-cid-7jjqptxk>ci</span><span class="tag" data-astro-cid-7jjqptxk>devops</span><span class="tag" data-astro-cid-7jjqptxk>github-actions</span><span class="tag" data-astro-cid-7jjqptxk>linting</span><span class="tag" data-astro-cid-7jjqptxk>code-quality</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="post-body" data-astro-cid-7jjqptxk>
+      <div class="prose" data-astro-cid-7jjqptxk>
+        <p>Advisory CI gates are where good intentions go to die. A team adds a linter “in warning mode for now,” and “for now” becomes forever. The violations scroll past in PR reviews, nobody cleans them, the gate never goes blocking. Six months later the warnings are archaeological noise.</p>
+<p>The pattern that breaks this cycle is simple but mechanical: every report-only gate carries a self-expiring deadline marker — <code>REPORT-ONLY-UNTIL: &#x3C;date></code> — and a meta-gate script fails the build if any gate outlives its deadline. Advisory mode becomes temporary by construction. The second part: organize around one logical concern per PR, bulk-cleaning all violations for that concern in the same commit. Tightly-coupled tools — like eslint and prettier, or ruff and ruff-format — flip together because they share a single run step and a single class of violation. Unrelated gates never share a PR. This keeps each change reviewable and the blame surface small.</p>
+<h2 id="what-is-a-self-expiring-report-only-ci-gate">What Is a Self-Expiring Report-Only CI Gate?</h2>
+<p>A self-expiring report-only CI gate is a quality check that runs in advisory mode — violations are warnings, not build failures — but carries an explicit deadline date. A meta-gate fails the build once that deadline passes, forcing the team to either clean the violations and flip the gate to blocking, or remove it. This prevents advisory gates from quietly becoming permanent technical debt.</p>
+<h2 id="the-meta-gate-enforced-deadlines">The Meta-Gate: Enforced Deadlines</h2>
+<p>The enforcement script is small but decisive. It lives in the workflow as a step that runs before any code cleanup and fails the build if any gate is past its deadline:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#E1E4E8">- </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Check CI deadline compliance</span></span>
+<span class="line"><span style="color:#85E89D">  run</span><span style="color:#E1E4E8">: </span><span style="color:#F97583">|</span></span>
+<span class="line"><span style="color:#9ECBFF">    python scripts/check-ci-deadlines.py</span></span>
+<span class="line"><span style="color:#85E89D">  env</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    GITHUB_REF</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">${{ github.ref }}</span></span></code></pre>
+<p>The script (~150 lines) scans workflow files for <code>REPORT-ONLY-UNTIL: &#x3C;date></code> markers and compares them against <code>datetime.now()</code>:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#F97583">import</span><span style="color:#E1E4E8"> re</span></span>
+<span class="line"><span style="color:#F97583">import</span><span style="color:#E1E4E8"> datetime</span></span>
+<span class="line"><span style="color:#F97583">import</span><span style="color:#E1E4E8"> sys</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">def</span><span style="color:#B392F0"> check_deadlines</span><span style="color:#E1E4E8">(workflow_file):</span></span>
+<span class="line"><span style="color:#F97583">    with</span><span style="color:#79B8FF"> open</span><span style="color:#E1E4E8">(workflow_file) </span><span style="color:#F97583">as</span><span style="color:#E1E4E8"> f:</span></span>
+<span class="line"><span style="color:#E1E4E8">        content </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> f.read()</span></span>
+<span class="line"><span style="color:#E1E4E8">    </span></span>
+<span class="line"><span style="color:#6A737D">    # Match: REPORT-ONLY-UNTIL: YYYY-MM-DD</span></span>
+<span class="line"><span style="color:#E1E4E8">    pattern </span><span style="color:#F97583">=</span><span style="color:#F97583"> r</span><span style="color:#9ECBFF">'</span><span style="color:#DBEDFF">REPORT-ONLY-UNTIL:</span><span style="color:#79B8FF">\s</span><span style="color:#F97583">*</span><span style="color:#79B8FF">(\d</span><span style="color:#F97583">{4}</span><span style="color:#DBEDFF">-</span><span style="color:#79B8FF">\d</span><span style="color:#F97583">{2}</span><span style="color:#DBEDFF">-</span><span style="color:#79B8FF">\d</span><span style="color:#F97583">{2}</span><span style="color:#79B8FF">)</span><span style="color:#9ECBFF">'</span></span>
+<span class="line"><span style="color:#E1E4E8">    matches </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> re.finditer(pattern, content)</span></span>
+<span class="line"><span style="color:#E1E4E8">    </span></span>
+<span class="line"><span style="color:#E1E4E8">    today </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> datetime.date.today()</span></span>
+<span class="line"><span style="color:#E1E4E8">    expired </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> []</span></span>
+<span class="line"><span style="color:#E1E4E8">    </span></span>
+<span class="line"><span style="color:#F97583">    for</span><span style="color:#E1E4E8"> match </span><span style="color:#F97583">in</span><span style="color:#E1E4E8"> matches:</span></span>
+<span class="line"><span style="color:#E1E4E8">        deadline_str </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> match.group(</span><span style="color:#79B8FF">1</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">        deadline </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> datetime.date.fromisoformat(deadline_str)</span></span>
+<span class="line"><span style="color:#E1E4E8">        </span></span>
+<span class="line"><span style="color:#F97583">        if</span><span style="color:#E1E4E8"> today </span><span style="color:#F97583">></span><span style="color:#E1E4E8"> deadline:</span></span>
+<span class="line"><span style="color:#E1E4E8">            expired.append((deadline_str, match.group(</span><span style="color:#79B8FF">0</span><span style="color:#E1E4E8">)))</span></span>
+<span class="line"><span style="color:#E1E4E8">    </span></span>
+<span class="line"><span style="color:#F97583">    return</span><span style="color:#E1E4E8"> expired</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">if</span><span style="color:#E1E4E8"> expired_gates </span><span style="color:#F97583">:=</span><span style="color:#E1E4E8"> check_deadlines(</span><span style="color:#9ECBFF">'.github/workflows/validate-plugins.yml'</span><span style="color:#E1E4E8">):</span></span>
+<span class="line"><span style="color:#79B8FF">    print</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"FATAL: report-only gates past deadline:"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#F97583">    for</span><span style="color:#E1E4E8"> deadline, marker </span><span style="color:#F97583">in</span><span style="color:#E1E4E8"> expired_gates:</span></span>
+<span class="line"><span style="color:#79B8FF">        print</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">f</span><span style="color:#9ECBFF">"  </span><span style="color:#79B8FF">{</span><span style="color:#E1E4E8">marker</span><span style="color:#79B8FF">}</span><span style="color:#9ECBFF"> (expired </span><span style="color:#79B8FF">{</span><span style="color:#E1E4E8">deadline</span><span style="color:#79B8FF">}</span><span style="color:#9ECBFF">)"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">    sys.exit(</span><span style="color:#79B8FF">1</span><span style="color:#E1E4E8">)</span></span></code></pre>
+<p>The hardcoded workflow path can be swapped for any project (or glob all workflow files in <code>.github/workflows/</code>).</p>
+<p>The marker lives as a comment in the workflow, immediately preceding the gate it guards:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#E1E4E8">- </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Run ESLint</span></span>
+<span class="line"><span style="color:#6A737D">  # REPORT-ONLY-UNTIL: 2026-06-20</span></span>
+<span class="line"><span style="color:#85E89D">  run</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">npm run lint:js || true</span></span></code></pre>
+<p>When the deadline arrives, the meta-gate blocks the build. To flip the gate to blocking, you remove the marker AND remove the <code>|| true</code> in the same commit:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="diff"><code><span class="line"><span style="color:#E1E4E8">  - name: Run ESLint</span></span>
+<span class="line"><span style="color:#FDAEB7"><span style="user-select: none;">-</span>   # REPORT-ONLY-UNTIL: 2026-06-20</span></span>
+<span class="line"><span style="color:#FDAEB7"><span style="user-select: none;">-</span>   run: npm run lint:js || true</span></span>
+<span class="line"><span style="color:#85E89D"><span style="user-select: none;">+</span>   run: npm run lint:js</span></span></code></pre>
+<p>This forces a deliberate choice: keep the gate advisory (extend the deadline or remove the marker entirely to soft-delete it), or flip it to blocking (bulk-clean the violations first, then remove both markers in one PR).</p>
+<h2 id="the-campaign-nine-prs-zero-rot">The Campaign: Nine PRs, Zero Rot</h2>
+<p>Claude-code-plugins is a 2000+ GitHub star monorepo with ~10,468 markdown files and plugins written in Python, TypeScript, shell, and markdown. The groundwork — the deadline meta-gate and one chastening moment where a freshly-blocking gate was flipped back to report-only after it caught a real failure on its first run — landed 2026-05-21. The campaign proper ran across 2026-05-22 and 2026-05-23, organized as nine sequential PRs (A through I), each addressing one logical concern.</p>
+<h3 id="pr-a-764-eslint--prettier">PR A (#764): ESLint + Prettier</h3>
+<p>ESLint and Prettier flipped to blocking gates together. No backlog of violations; the gates were added with cleanup already done, so the flip was immediate. These tools are tightly-coupled (same run step, same class of violations).</p>
+<h3 id="pr-b-765-ruff--ruff-format">PR B (#765): Ruff + ruff-format</h3>
+<p>Ruff (Python linter) and ruff-format flipped to blocking gates together. Bulk cleanup across ~180 Python files, then flip. This PR established the template: bulk cleanup + immediate gate, no deadline crutch. Again, tightly-coupled tools (same step, same violation class).</p>
+<h3 id="pr-c-767-markdownlint-report-only">PR C (#767): Markdownlint (report-only)</h3>
+<p>Markdownlint added as a report-only gate. Added with a <code>REPORT-ONLY-UNTIL: 2026-06-20</code> deadline because the backlog was large (80 violations across 10,468 files). This was deliberate: the gate exists, enforcement is temporary, and the deadline is explicit.</p>
+<h3 id="pr-d-766-root-directory-hygiene">PR D (#766): Root directory hygiene</h3>
+<p>Root directory cleanup (removed stale license files, dead symlinks, misplaced config fragments). No gate change, just hygiene.</p>
+<h3 id="pr-e-768-shellcheck--where-the-pattern-earned-its-keep">PR E (#768): Shellcheck — where the pattern earned its keep</h3>
+<p>Shellcheck cleanup and flip to blocking. This PR surfaced the real value of the pattern.</p>
+<p>Shellcheck flagged 223 violations across 47 shell script files. These weren’t nitpicks a reviewer would catch — they were silent runtime failures that report-only mode had been hiding for months. Flipping the gate to blocking forced them into the light.</p>
+<p>First detail: 47 of the .sh files were actually Python scripts with a <code>#!/usr/bin/env python3</code> shebang but <code>.sh</code> extension. Shellcheck flagged them as SC1071 (unknown shell dialect). The fix was <code>git mv</code> to rename them <code>.py</code>, which also correctly moved them under ruff’s scope (discovered later in PR G when the widened-test-loop caught new Python lint).</p>
+<p>The real bugs shellcheck surfaced:</p>
+<p><strong>SC2064 – trap expansion time.</strong> A cleanup handler was written as:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#79B8FF">trap</span><span style="color:#9ECBFF"> "rm -rf </span><span style="color:#E1E4E8">$temp_dir</span><span style="color:#9ECBFF">"</span><span style="color:#9ECBFF"> EXIT</span></span></code></pre>
+<p>The issue: <code>$temp_dir</code> expands when the trap is SET (at script start), not when it FIRES (at exit). If the script changed the variable later, the trap deleted the wrong directory (or nothing at all). The fix:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#79B8FF">trap</span><span style="color:#9ECBFF"> 'rm -rf "$temp_dir"'</span><span style="color:#9ECBFF"> EXIT</span></span></code></pre>
+<p>Single quotes defer expansion to fire-time. Shellcheck flags this by default; it’s a real gotcha.</p>
+<p><strong>Unquoted redirection operator.</strong> A dependency pinning line read:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">pip</span><span style="color:#9ECBFF"> install</span><span style="color:#9ECBFF"> some-package[extra</span><span style="color:#E1E4E8">]</span><span style="color:#F97583">></span><span style="color:#9ECBFF">=</span><span style="color:#79B8FF">1.0</span></span></code></pre>
+<p>The <code>>=1.0</code> is unquoted, so bash interprets <code>></code> as file redirection. The script silently created a file named <code>=1.0</code> instead of pinning the version. Quoting the entire argument:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">pip</span><span style="color:#9ECBFF"> install</span><span style="color:#9ECBFF"> 'some-package[extra]>=1.0'</span></span></code></pre>
+<p>fixes it. Shellcheck flags the unquoted redirection.</p>
+<p><strong>SC2166 – POSIX <code>-o</code> operator.</strong> The script used:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#E1E4E8">[ </span><span style="color:#F97583">-f</span><span style="color:#9ECBFF"> "</span><span style="color:#E1E4E8">$file1</span><span style="color:#9ECBFF">"</span><span style="color:#F97583"> -o</span><span style="color:#F97583"> -f</span><span style="color:#9ECBFF"> "</span><span style="color:#E1E4E8">$file2</span><span style="color:#9ECBFF">"</span><span style="color:#E1E4E8"> ]</span></span></code></pre>
+<p>The <code>-o</code> operator (logical OR in <code>[ ]</code> test) is not well-defined in POSIX and can misparse in edge cases. The portable form:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#E1E4E8">[ </span><span style="color:#F97583">-f</span><span style="color:#9ECBFF"> "</span><span style="color:#E1E4E8">$file1</span><span style="color:#9ECBFF">"</span><span style="color:#E1E4E8"> ] </span><span style="color:#F97583">||</span><span style="color:#E1E4E8"> [ </span><span style="color:#F97583">-f</span><span style="color:#9ECBFF"> "</span><span style="color:#E1E4E8">$file2</span><span style="color:#9ECBFF">"</span><span style="color:#E1E4E8"> ]</span></span></code></pre>
+<p>is safer and clearer.</p>
+<p>Other notable finds: SC2188 (no-command redirect — fix: <code>: > "$LOG_FILE"</code>), SC2213/SC2214 (getopts with duplicate option letters and unreachable case branches).</p>
+<p>After cleanup, PR E added a <code>.shellcheckrc</code> file with project-wide disables for checks that were genuinely incompatible with the codebase style:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="ini"><code><span class="line"><span style="color:#F97583">disable</span><span style="color:#E1E4E8">=SC1090,SC1091,SC2155,SC2034</span></span>
+<span class="line"><span style="color:#F97583">severity</span><span style="color:#E1E4E8">=warning</span></span></code></pre>
+<p>These are set in the config, NOT in the workflow step. A gotcha: <code>.shellcheckrc</code> does not have a <code>severity=</code> directive (it only recognizes <code>disable=</code>). The severity policy is set at runtime in the CI step, so the workflow must include <code>--severity=warning</code> in the <code>run:</code> command.</p>
+<h3 id="pr-f-769-typescript-coverage--codeblock-syntax">PR F (#769): TypeScript coverage + codeblock syntax</h3>
+<p>TypeScript coverage audit and code-block syntax linting flipped to blocking together. These tools are tightly-coupled (both operate on codeblock content in TypeScript/SKILL.md).</p>
+<h3 id="pr-g-770-widened-test-loop">PR G (#770): Widened test loop</h3>
+<p>Widened test loop (a 15-minute timeout gate that runs the full plugin suite). Flipped to blocking.</p>
+<h3 id="pr-h-771-codeblock-syntax-cleanup">PR H (#771): Codeblock syntax cleanup</h3>
+<p>Codeblock syntax cleanup (SKILL.md and README fenced-code fence fixes across plugins) flipped to blocking.</p>
+<h3 id="pr-i-772-markdownlint--the-last-gate-flips">PR I (#772): Markdownlint — the last gate flips</h3>
+<p>Markdownlint, the last report-only gate. 80 violations reduced to zero across 10,468 files. The largest categories were:</p>
+<ul>
+<li>MD051 (broken anchor links): 33 violations. TOC link targets regenerated to match GitHub’s auto-slug format.</li>
+<li>MD056 (table column mismatch): 20 violations. Notable: 8 were a literal <code>|</code> inside a backtick code span that needed escaping to <code>\|</code>, and 12 were genuine header/row count mismatches.</li>
+<li>MD001 (improper heading increment): 7 violations.</li>
+<li>MD045 (missing alt text on shield badges): 3 violations.</li>
+</ul>
+<p>The remaining ~17 violations were distributed across smaller categories (MD046 indented-code, MD003 setext-style, MD031 fence blank-line) and cascading —fix resolutions.</p>
+<p>After PR I merged: <strong>10 blocking required gates, zero report-only.</strong> The gates: eslint, prettier, ruff, ruff-format, shellcheck-skills, skill-codeblock-syntax, typescript-coverage-audit, widened-test-loop, markdownlint, and the base validate step.</p>
+<h2 id="the-proof-external-contributions-now-bind">The Proof: External Contributions Now Bind</h2>
+<p>The same day PR I merged (2026-05-23), a community-contributed plugin (agency-os, PR #709) landed. This PR had been open for review since before the campaign; when the 10 gates went blocking on 2026-05-23, the still-open PR’s CI started failing, forcing a restructure. Its SKILL.md was 863 lines of auto-generated cruft. The marketplace-tier required fields (name, description, allowed-tools, version, author, license, compatibility, tags) were missing.</p>
+<p>The CI ran. All 10 gates failed. The contributor restructured the SKILL.md from 863 lines to 168 and added the 6 missing marketplace fields. No human reviewer had to enforce the standard in the PR thread — the CI did. This is the payoff: the gates now bind external contributions automatically, without a human argument happening in the thread.</p>
+<h2 id="how-to-adopt-this">How to Adopt This</h2>
+<ol>
+<li><strong>Add the meta-gate script</strong> (<code>check-ci-deadlines.py</code>) to <code>scripts/</code>. Swap the hardcoded workflow path (or glob all workflow files) and any project can adopt it.</li>
+<li><strong>Mark each report-only gate with a deadline comment</strong> before the run step. Use format <code># REPORT-ONLY-UNTIL: YYYY-MM-DD</code>. Choose a date 4–6 weeks out.</li>
+<li><strong>Add the meta-gate to your workflow</strong> as an early step. It fails fast if any gate is past deadline.</li>
+<li><strong>When you’re ready to flip a gate or tool-pair to blocking:</strong> bulk-clean all violations in one commit, then remove the deadline marker AND the <code>|| true</code> in the same PR. One logical concern per PR (tightly-coupled tools flip together).</li>
+<li><strong>Never extend a deadline without a written plan.</strong> If the backlog is too large, the deadline was too aggressive; next time, choose 8–12 weeks instead. The discipline is in the deliberate choice, not in the calendar date.</li>
+</ol>
+<p>The system ensures that advisory gates cannot quietly rot into permanent technical debt. They expire, they get re-evaluated, or they go blocking. Technical governance becomes automatic.</p>
+      </div>
+    </div>
+  </article>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
