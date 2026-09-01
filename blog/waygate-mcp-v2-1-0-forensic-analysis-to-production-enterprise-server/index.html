@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Waygate MCP v2.1.0: From Forensic Analysis to Production Enterprise Server with TaskWarrior — Tons of Skills Work Diary</title>
+    <meta name="description" content="Complete breakdown of transforming Waygate MCP from framework to production server through forensic analysis, TaskWarrior project management, and systematic resolution of 19 critical issues.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://tonsofskills.com/tons-of-skills-marketplace/blog/waygate-mcp-v2-1-0-forensic-analysis-to-production-enterprise-server/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/waygate-mcp-v2-1-0-forensic-analysis-to-production-enterprise-server/">
+    <meta property="og:title" content="Waygate MCP v2.1.0: From Forensic Analysis to Production Enterprise Server with TaskWarrior — Tons of Skills Work Diary">
+    <meta property="og:description" content="Complete breakdown of transforming Waygate MCP from framework to production server through forensic analysis, TaskWarrior project management, and systematic resolution of 19 critical issues.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="Waygate MCP v2.1.0: From Forensic Analysis to Production Enterprise Server with TaskWarrior — Tons of Skills Work Diary">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/waygate-mcp-v2-1-0-forensic-analysis-to-production-enterprise-server/">
+    <meta name="twitter:title" content="Waygate MCP v2.1.0: From Forensic Analysis to Production Enterprise Server with TaskWarrior — Tons of Skills Work Diary">
+    <meta name="twitter:description" content="Complete breakdown of transforming Waygate MCP from framework to production server through forensic analysis, TaskWarrior project management, and systematic resolution of 19 critical issues.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"Waygate MCP v2.1.0: From Forensic Analysis to Production Enterprise Server with TaskWarrior","description":"Complete breakdown of transforming Waygate MCP from framework to production server through forensic analysis, TaskWarrior project management, and systematic resolution of 19 critical issues.","datePublished":"2025-09-28","url":"https://tonsofskills.com/blog/undefined","author":{"@type":"Person","name":"Jeremy Longshore"},"publisher":{"@type":"Organization","name":"Tons of Skills","url":"https://tonsofskills.com"}}</script>
+  
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.post-header[data-astro-cid-7jjqptxk]{background:var(--panel);padding:4rem 1.5rem 3rem;border-bottom:1px solid var(--border)}.post-header-inner[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto}.back-link[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3);text-decoration:none;display:inline-block;margin-bottom:1.5rem;transition:color .2s}.back-link[data-astro-cid-7jjqptxk]:hover{color:var(--primary)}.post-meta[data-astro-cid-7jjqptxk]{display:flex;align-items:center;gap:.75rem;margin-bottom:1rem}time[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3)}.featured-badge[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.2rem .6rem;background:#ce114126;color:var(--red);border-radius:0;font-weight:600;text-transform:uppercase;letter-spacing:.05em}.post-header[data-astro-cid-7jjqptxk] h1[data-astro-cid-7jjqptxk]{font-family:var(--font-body);font-size:clamp(1.5rem,4vw,2.2rem);font-weight:700;color:var(--text);line-height:1.25;margin-bottom:.75rem;letter-spacing:0}.post-desc[data-astro-cid-7jjqptxk]{color:var(--text-2);font-size:1.05rem;line-height:1.6;margin-bottom:1rem}.post-tags[data-astro-cid-7jjqptxk]{display:flex;gap:.4rem;flex-wrap:wrap}.tag[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.15rem .5rem;background:var(--surface-3);color:var(--text-3);border-radius:0}.post-body[data-astro-cid-7jjqptxk]{padding:3rem 1.5rem 4rem}.prose[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto;color:var(--text-2);line-height:1.8;font-size:1rem}.prose[data-astro-cid-7jjqptxk] h2{font-family:var(--font-body);font-size:1.5rem;font-weight:700;color:var(--text);margin:2.5rem 0 1rem;letter-spacing:0}.prose[data-astro-cid-7jjqptxk] h3{font-size:1.2rem;font-weight:600;color:var(--text);margin:2rem 0 .75rem}.prose[data-astro-cid-7jjqptxk] p{margin-bottom:1rem}.prose[data-astro-cid-7jjqptxk] ul,.prose[data-astro-cid-7jjqptxk] ol{margin:.5rem 0 1rem 1.5rem}.prose[data-astro-cid-7jjqptxk] li{margin-bottom:.35rem}.prose[data-astro-cid-7jjqptxk] strong{color:var(--text);font-weight:600}.prose[data-astro-cid-7jjqptxk] code{font-family:var(--font-mono);font-size:.88em;background:var(--surface-3);padding:.15em .35em;border-radius:0;color:var(--primary)}.prose[data-astro-cid-7jjqptxk] a{color:var(--primary);text-decoration:none}.prose[data-astro-cid-7jjqptxk] a:hover{text-decoration:underline}@media(max-width:768px){.post-header[data-astro-cid-7jjqptxk]{padding:3rem 1rem 2rem}.post-body[data-astro-cid-7jjqptxk]{padding:2rem 1rem 3rem}}
+</style></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  <article class="post" data-astro-cid-7jjqptxk>
+    <header class="post-header" data-astro-cid-7jjqptxk>
+      <div class="post-header-inner" data-astro-cid-7jjqptxk>
+        <a href="/blog" class="back-link" data-astro-cid-7jjqptxk>Back to Work Diary</a>
+        <div class="post-meta" data-astro-cid-7jjqptxk>
+          <time datetime="2025-09-28" data-astro-cid-7jjqptxk>September 27, 2025</time>
+          
+        </div>
+        <h1 data-astro-cid-7jjqptxk>Waygate MCP v2.1.0: From Forensic Analysis to Production Enterprise Server with TaskWarrior</h1>
+        <p class="post-desc" data-astro-cid-7jjqptxk>Complete breakdown of transforming Waygate MCP from framework to production server through forensic analysis, TaskWarrior project management, and systematic resolution of 19 critical issues.</p>
+        <div class="post-tags" data-astro-cid-7jjqptxk>
+          <span class="tag" data-astro-cid-7jjqptxk>mcp</span><span class="tag" data-astro-cid-7jjqptxk>taskwarrior</span><span class="tag" data-astro-cid-7jjqptxk>security</span><span class="tag" data-astro-cid-7jjqptxk>python</span><span class="tag" data-astro-cid-7jjqptxk>enterprise</span><span class="tag" data-astro-cid-7jjqptxk>debugging</span><span class="tag" data-astro-cid-7jjqptxk>project-management</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="post-body" data-astro-cid-7jjqptxk>
+      <div class="prose" data-astro-cid-7jjqptxk>
+        <p>What happens when you run a “forensic-level MCP repository diagnostic with TaskWarrior project management”? You get a complete transformation from foundational framework to enterprise-grade production server.</p>
+<p>This is the complete technical breakdown of how we took Waygate MCP from a collection of placeholder endpoints to a production-ready enterprise MCP server with 5 functional tools, comprehensive security, and Claude Desktop integration—all tracked through professional project management.</p>
+<h2 id="the-forensic-analysis-request">The Forensic Analysis Request</h2>
+<p>The mission was clear: <strong>“EXTREME MCP REPO DIAGNOSTIC WITH TASKWARRIOR PROJECT MANAGEMENT”</strong>—a forensic-level analysis tracking every issue as TaskWarrior tasks with complete metadata.</p>
+<p>No stone left unturned. No issue left untracked. Complete systematic analysis and resolution.</p>
+<h2 id="phase-1-taskwarrior-project-management-setup">Phase 1: TaskWarrior Project Management Setup</h2>
+<p>Before touching any code, we established professional project management:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#6A737D"># Custom TaskWarrior configuration for forensic analysis</span></span>
+<span class="line"><span style="color:#B392F0">task</span><span style="color:#9ECBFF"> config</span><span style="color:#9ECBFF"> alias.mcp</span><span style="color:#9ECBFF"> "project:waygate-mcp"</span></span>
+<span class="line"><span style="color:#B392F0">task</span><span style="color:#9ECBFF"> config</span><span style="color:#9ECBFF"> uda.mcp_component.label</span><span style="color:#9ECBFF"> "MCP Component"</span></span>
+<span class="line"><span style="color:#B392F0">task</span><span style="color:#9ECBFF"> config</span><span style="color:#9ECBFF"> uda.mcp_component.type</span><span style="color:#9ECBFF"> "string"</span></span>
+<span class="line"><span style="color:#B392F0">task</span><span style="color:#9ECBFF"> config</span><span style="color:#9ECBFF"> uda.security_level.label</span><span style="color:#9ECBFF"> "Security Level"</span></span>
+<span class="line"><span style="color:#B392F0">task</span><span style="color:#9ECBFF"> config</span><span style="color:#9ECBFF"> uda.security_level.type</span><span style="color:#9ECBFF"> "string"</span></span>
+<span class="line"><span style="color:#B392F0">task</span><span style="color:#9ECBFF"> config</span><span style="color:#9ECBFF"> uda.fix_complexity.label</span><span style="color:#9ECBFF"> "Fix Complexity"</span></span>
+<span class="line"><span style="color:#B392F0">task</span><span style="color:#9ECBFF"> config</span><span style="color:#9ECBFF"> uda.fix_complexity.type</span><span style="color:#9ECBFF"> "string"</span></span></code></pre>
+<p>Result: Professional tracking system that would capture every issue with full forensic detail.</p>
+<h2 id="phase-2-the-forensic-analysis---19-critical-issues-discovered">Phase 2: The Forensic Analysis - 19 Critical Issues Discovered</h2>
+<h3 id="critical-security-issues-4-tasks">Critical Security Issues (4 tasks)</h3>
+<ol>
+<li><strong>Hardcoded Secret Vulnerability</strong>: <code>'change-this-in-production'</code> found in source code</li>
+<li><strong>libsql-client Version Conflict</strong>: >=0.4.0 requirement, but max available was 0.3.1</li>
+<li><strong>Missing Dependencies</strong>: FastAPI and related packages not in virtual environment</li>
+<li><strong>Missing MCP Protocol Compliance</strong>: No mcp.json server manifest</li>
+</ol>
+<h3 id="high-priority-infrastructure-5-tasks">High Priority Infrastructure (5 tasks)</h3>
+<ol>
+<li><strong>Module Import Failures</strong>: Source modules couldn’t import database/mcp_integration</li>
+<li><strong>Duplicate API Endpoints</strong>: Two /mcp/execute routes causing conflicts</li>
+<li><strong>Placeholder Tool Responses</strong>: MCP tools returning fake data instead of real functionality</li>
+<li><strong>Missing Environment Validation</strong>: No validation of required environment variables</li>
+<li><strong>Database Connection Failures</strong>: Server crashes when database unavailable</li>
+</ol>
+<h3 id="implementation-tasks-5-tasks">Implementation Tasks (5 tasks)</h3>
+<ol>
+<li><strong>execute_command Tool</strong>: Build actual command execution with security</li>
+<li><strong>read_file Tool</strong>: Implement secure file reading with path validation</li>
+<li><strong>write_file Tool</strong>: Create protected file writing with restrictions</li>
+<li><strong>list_directory Tool</strong>: Advanced directory listing with filtering</li>
+<li><strong>search_files Tool</strong>: Content and filename search functionality</li>
+</ol>
+<h3 id="documentation--integration-5-tasks">Documentation &#x26; Integration (5 tasks)</h3>
+<ol>
+<li><strong>Claude Desktop Integration</strong>: Create config files and setup documentation</li>
+<li><strong>Environment Variable Validation</strong>: Add proper error messages and warnings</li>
+<li><strong>End-to-End Testing</strong>: Test all tools with Claude Desktop integration</li>
+<li><strong>Project Structure</strong>: Organize according to MCP server conventions</li>
+<li><strong>Integration Documentation</strong>: Complete setup guides and troubleshooting</li>
+</ol>
+<p>Each task included:</p>
+<ul>
+<li>Priority level (H/M/L)</li>
+<li>Security classification (CRITICAL/HIGH/MEDIUM/LOW)</li>
+<li>Fix complexity estimation</li>
+<li>MCP component mapping</li>
+<li>Due dates for systematic resolution</li>
+</ul>
+<h2 id="phase-3-systematic-resolution---the-technical-implementation">Phase 3: Systematic Resolution - The Technical Implementation</h2>
+<h3 id="security-fixes-eliminating-critical-vulnerabilities">Security Fixes: Eliminating Critical Vulnerabilities</h3>
+<p><strong>Problem</strong>: Hardcoded secrets throughout the codebase</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#6A737D"># BEFORE: Security nightmare</span></span>
+<span class="line"><span style="color:#E1E4E8">secret_key: </span><span style="color:#79B8FF">str</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "change-this-in-production"</span></span></code></pre>
+<p><strong>Solution</strong>: Automatic secure secret generation</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#6A737D"># AFTER: Enterprise security</span></span>
+<span class="line"><span style="color:#F97583">def</span><span style="color:#79B8FF"> __post_init__</span><span style="color:#E1E4E8">(self):</span></span>
+<span class="line"><span style="color:#9ECBFF">    """Generate secure secret key if none provided"""</span></span>
+<span class="line"><span style="color:#F97583">    if</span><span style="color:#79B8FF"> self</span><span style="color:#E1E4E8">.secret_key </span><span style="color:#F97583">is</span><span style="color:#79B8FF"> None</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#79B8FF">        self</span><span style="color:#E1E4E8">.secret_key </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> secrets.token_hex(</span><span style="color:#79B8FF">32</span><span style="color:#E1E4E8">)  </span><span style="color:#6A737D"># 64-character hex key</span></span>
+<span class="line"><span style="color:#E1E4E8">        logger.warning(</span><span style="color:#9ECBFF">"No secret key provided, generated secure random key"</span><span style="color:#E1E4E8">)</span></span></code></pre>
+<p><strong>Problem</strong>: libsql-client version conflict preventing installation</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#6A737D"># BEFORE: Dependency hell</span></span>
+<span class="line"><span style="color:#B392F0">libsql-client</span><span style="color:#E1E4E8">></span><span style="color:#9ECBFF">=0.4.0</span><span style="color:#6A737D">  # Version doesn't exist!</span></span></code></pre>
+<p><strong>Solution</strong>: Corrected version constraint</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#6A737D"># AFTER: Working dependency</span></span>
+<span class="line"><span style="color:#B392F0">libsql-client</span><span style="color:#E1E4E8">></span><span style="color:#9ECBFF">=0.3.1</span><span style="color:#6A737D">  # Actual available version</span></span></code></pre>
+<h3 id="infrastructure-fixes-module-imports-and-database-reliability">Infrastructure Fixes: Module Imports and Database Reliability</h3>
+<p><strong>Problem</strong>: Absolute imports failing in source modules</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#6A737D"># BEFORE: Import failures</span></span>
+<span class="line"><span style="color:#F97583">from</span><span style="color:#E1E4E8"> database </span><span style="color:#F97583">import</span><span style="color:#E1E4E8"> init_database  </span><span style="color:#6A737D"># ModuleNotFoundError</span></span>
+<span class="line"><span style="color:#F97583">from</span><span style="color:#E1E4E8"> mcp_integration </span><span style="color:#F97583">import</span><span style="color:#E1E4E8"> get_mcp_manager</span></span></code></pre>
+<p><strong>Solution</strong>: Relative imports for proper module resolution</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#6A737D"># AFTER: Working imports</span></span>
+<span class="line"><span style="color:#F97583">from</span><span style="color:#E1E4E8"> .database </span><span style="color:#F97583">import</span><span style="color:#E1E4E8"> init_database, db_manager</span></span>
+<span class="line"><span style="color:#F97583">from</span><span style="color:#E1E4E8"> .mcp_integration </span><span style="color:#F97583">import</span><span style="color:#E1E4E8"> initialize_mcp_integration, get_mcp_manager</span></span>
+<span class="line"><span style="color:#F97583">from</span><span style="color:#E1E4E8"> .mcp_tools </span><span style="color:#F97583">import</span><span style="color:#E1E4E8"> execute_tool, get_available_tools, MCPToolError</span></span></code></pre>
+<p><strong>Problem</strong>: Server crashes when database fails
+<strong>Solution</strong>: Graceful fallback handling</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#F97583">try</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#F97583">    await</span><span style="color:#E1E4E8"> init_database()</span></span>
+<span class="line"><span style="color:#E1E4E8">    logger.info(</span><span style="color:#9ECBFF">"Database initialized successfully"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#F97583">except</span><span style="color:#79B8FF"> Exception</span><span style="color:#F97583"> as</span><span style="color:#E1E4E8"> e:</span></span>
+<span class="line"><span style="color:#E1E4E8">    logger.error(</span><span style="color:#F97583">f</span><span style="color:#9ECBFF">"Database initialization failed: </span><span style="color:#79B8FF">{</span><span style="color:#E1E4E8">e</span><span style="color:#79B8FF">}</span><span style="color:#9ECBFF">"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">    logger.warning(</span><span style="color:#9ECBFF">"Server continuing without database functionality"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#6A737D">    # Server continues operation with degraded functionality</span></span></code></pre>
+<h3 id="mcp-tools-implementation-from-placeholders-to-production">MCP Tools Implementation: From Placeholders to Production</h3>
+<p>The most significant transformation was implementing actual MCP tools. Here’s the complete implementation:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#F97583">class</span><span style="color:#B392F0"> MCPToolsHandler</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#F97583">    def</span><span style="color:#79B8FF"> __init__</span><span style="color:#E1E4E8">(self, base_path: </span><span style="color:#79B8FF">str</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "/home/jeremy"</span><span style="color:#E1E4E8">):</span></span>
+<span class="line"><span style="color:#79B8FF">        self</span><span style="color:#E1E4E8">.base_path </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> Path(base_path)</span></span>
+<span class="line"><span style="color:#79B8FF">        self</span><span style="color:#E1E4E8">.allowed_paths </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> [</span></span>
+<span class="line"><span style="color:#79B8FF">            self</span><span style="color:#E1E4E8">.base_path </span><span style="color:#F97583">/</span><span style="color:#9ECBFF"> "waygate-mcp"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">            self</span><span style="color:#E1E4E8">.base_path </span><span style="color:#F97583">/</span><span style="color:#9ECBFF"> "projects"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">            Path(</span><span style="color:#9ECBFF">"/tmp"</span><span style="color:#E1E4E8">),</span></span>
+<span class="line"><span style="color:#E1E4E8">            Path(</span><span style="color:#9ECBFF">"/var/tmp"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">        ]</span></span>
+<span class="line"><span style="color:#79B8FF">        self</span><span style="color:#E1E4E8">.max_file_size </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> 10</span><span style="color:#F97583"> *</span><span style="color:#79B8FF"> 1024</span><span style="color:#F97583"> *</span><span style="color:#79B8FF"> 1024</span><span style="color:#6A737D">  # 10MB limit</span></span>
+<span class="line"><span style="color:#79B8FF">        self</span><span style="color:#E1E4E8">.dangerous_commands </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> [</span></span>
+<span class="line"><span style="color:#9ECBFF">            "rm -rf"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"sudo"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"chmod 777"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"wget http://"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"curl http://"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">            "python -c"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"eval"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"exec"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"format"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"fdisk"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"mkfs"</span></span>
+<span class="line"><span style="color:#E1E4E8">        ]</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">    def</span><span style="color:#B392F0"> _validate_path</span><span style="color:#E1E4E8">(self, path: Path) -> </span><span style="color:#79B8FF">bool</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#9ECBFF">        """Validate path is within allowed directories"""</span></span>
+<span class="line"><span style="color:#F97583">        try</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">            resolved_path </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> path.resolve()</span></span>
+<span class="line"><span style="color:#F97583">            return</span><span style="color:#79B8FF"> any</span><span style="color:#E1E4E8">(</span></span>
+<span class="line"><span style="color:#79B8FF">                str</span><span style="color:#E1E4E8">(resolved_path).startswith(</span><span style="color:#79B8FF">str</span><span style="color:#E1E4E8">(allowed.resolve()))</span></span>
+<span class="line"><span style="color:#F97583">                for</span><span style="color:#E1E4E8"> allowed </span><span style="color:#F97583">in</span><span style="color:#79B8FF"> self</span><span style="color:#E1E4E8">.allowed_paths</span></span>
+<span class="line"><span style="color:#E1E4E8">            )</span></span>
+<span class="line"><span style="color:#F97583">        except</span><span style="color:#79B8FF"> Exception</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#F97583">            return</span><span style="color:#79B8FF"> False</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">    async</span><span style="color:#F97583"> def</span><span style="color:#B392F0"> execute_command</span><span style="color:#E1E4E8">(self, command: </span><span style="color:#79B8FF">str</span><span style="color:#E1E4E8">, timeout: </span><span style="color:#79B8FF">int</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> 30</span><span style="color:#E1E4E8">) -> Dict[</span><span style="color:#79B8FF">str</span><span style="color:#E1E4E8">, Any]:</span></span>
+<span class="line"><span style="color:#9ECBFF">        """Execute system commands with security validation"""</span></span>
+<span class="line"><span style="color:#6A737D">        # Security validation</span></span>
+<span class="line"><span style="color:#F97583">        if</span><span style="color:#79B8FF"> any</span><span style="color:#E1E4E8">(dangerous </span><span style="color:#F97583">in</span><span style="color:#E1E4E8"> command.lower() </span><span style="color:#F97583">for</span><span style="color:#E1E4E8"> dangerous </span><span style="color:#F97583">in</span><span style="color:#79B8FF"> self</span><span style="color:#E1E4E8">.dangerous_commands):</span></span>
+<span class="line"><span style="color:#F97583">            raise</span><span style="color:#E1E4E8"> MCPToolError(</span><span style="color:#F97583">f</span><span style="color:#9ECBFF">"Dangerous command blocked: </span><span style="color:#79B8FF">{</span><span style="color:#E1E4E8">command</span><span style="color:#79B8FF">}</span><span style="color:#9ECBFF">"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">        try</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">            result </span><span style="color:#F97583">=</span><span style="color:#F97583"> await</span><span style="color:#E1E4E8"> asyncio.wait_for(</span></span>
+<span class="line"><span style="color:#E1E4E8">                asyncio.create_subprocess_shell(</span></span>
+<span class="line"><span style="color:#E1E4E8">                    command,</span></span>
+<span class="line"><span style="color:#FFAB70">                    stdout</span><span style="color:#F97583">=</span><span style="color:#E1E4E8">asyncio.subprocess.</span><span style="color:#79B8FF">PIPE</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#FFAB70">                    stderr</span><span style="color:#F97583">=</span><span style="color:#E1E4E8">asyncio.subprocess.</span><span style="color:#79B8FF">PIPE</span></span>
+<span class="line"><span style="color:#E1E4E8">                ),</span></span>
+<span class="line"><span style="color:#FFAB70">                timeout</span><span style="color:#F97583">=</span><span style="color:#E1E4E8">timeout</span></span>
+<span class="line"><span style="color:#E1E4E8">            )</span></span>
+<span class="line"><span style="color:#E1E4E8">            stdout, stderr </span><span style="color:#F97583">=</span><span style="color:#F97583"> await</span><span style="color:#E1E4E8"> result.communicate()</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">            return</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#9ECBFF">                "command"</span><span style="color:#E1E4E8">: command,</span></span>
+<span class="line"><span style="color:#9ECBFF">                "exit_code"</span><span style="color:#E1E4E8">: result.returncode,</span></span>
+<span class="line"><span style="color:#9ECBFF">                "stdout"</span><span style="color:#E1E4E8">: stdout.decode(</span><span style="color:#9ECBFF">'utf-8'</span><span style="color:#E1E4E8">, </span><span style="color:#FFAB70">errors</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">'replace'</span><span style="color:#E1E4E8">),</span></span>
+<span class="line"><span style="color:#9ECBFF">                "stderr"</span><span style="color:#E1E4E8">: stderr.decode(</span><span style="color:#9ECBFF">'utf-8'</span><span style="color:#E1E4E8">, </span><span style="color:#FFAB70">errors</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">'replace'</span><span style="color:#E1E4E8">),</span></span>
+<span class="line"><span style="color:#9ECBFF">                "success"</span><span style="color:#E1E4E8">: result.returncode </span><span style="color:#F97583">==</span><span style="color:#79B8FF"> 0</span></span>
+<span class="line"><span style="color:#E1E4E8">            }</span></span>
+<span class="line"><span style="color:#F97583">        except</span><span style="color:#E1E4E8"> asyncio.TimeoutError:</span></span>
+<span class="line"><span style="color:#F97583">            raise</span><span style="color:#E1E4E8"> MCPToolError(</span><span style="color:#F97583">f</span><span style="color:#9ECBFF">"Command timed out after </span><span style="color:#79B8FF">{</span><span style="color:#E1E4E8">timeout</span><span style="color:#79B8FF">}</span><span style="color:#9ECBFF"> seconds"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#F97583">        except</span><span style="color:#79B8FF"> Exception</span><span style="color:#F97583"> as</span><span style="color:#E1E4E8"> e:</span></span>
+<span class="line"><span style="color:#F97583">            raise</span><span style="color:#E1E4E8"> MCPToolError(</span><span style="color:#F97583">f</span><span style="color:#9ECBFF">"Command execution failed: </span><span style="color:#79B8FF">{str</span><span style="color:#E1E4E8">(e)</span><span style="color:#79B8FF">}</span><span style="color:#9ECBFF">"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">    async</span><span style="color:#F97583"> def</span><span style="color:#B392F0"> read_file</span><span style="color:#E1E4E8">(self, path: </span><span style="color:#79B8FF">str</span><span style="color:#E1E4E8">, encoding: </span><span style="color:#79B8FF">str</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "utf-8"</span><span style="color:#E1E4E8">) -> Dict[</span><span style="color:#79B8FF">str</span><span style="color:#E1E4E8">, Any]:</span></span>
+<span class="line"><span style="color:#9ECBFF">        """Read file with security validation"""</span></span>
+<span class="line"><span style="color:#E1E4E8">        file_path </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> Path(path)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">        if</span><span style="color:#F97583"> not</span><span style="color:#79B8FF"> self</span><span style="color:#E1E4E8">._validate_path(file_path):</span></span>
+<span class="line"><span style="color:#F97583">            raise</span><span style="color:#E1E4E8"> MCPToolError(</span><span style="color:#F97583">f</span><span style="color:#9ECBFF">"Access denied: Path outside allowed directories"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">        if</span><span style="color:#F97583"> not</span><span style="color:#E1E4E8"> file_path.exists():</span></span>
+<span class="line"><span style="color:#F97583">            raise</span><span style="color:#E1E4E8"> MCPToolError(</span><span style="color:#F97583">f</span><span style="color:#9ECBFF">"File not found: </span><span style="color:#79B8FF">{</span><span style="color:#E1E4E8">path</span><span style="color:#79B8FF">}</span><span style="color:#9ECBFF">"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">        if</span><span style="color:#E1E4E8"> file_path.stat().st_size </span><span style="color:#F97583">></span><span style="color:#79B8FF"> self</span><span style="color:#E1E4E8">.max_file_size:</span></span>
+<span class="line"><span style="color:#F97583">            raise</span><span style="color:#E1E4E8"> MCPToolError(</span><span style="color:#F97583">f</span><span style="color:#9ECBFF">"File too large (max </span><span style="color:#79B8FF">{self</span><span style="color:#E1E4E8">.max_file_size</span><span style="color:#79B8FF">}</span><span style="color:#9ECBFF"> bytes)"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">        try</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">            content </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> file_path.read_text(</span><span style="color:#FFAB70">encoding</span><span style="color:#F97583">=</span><span style="color:#E1E4E8">encoding)</span></span>
+<span class="line"><span style="color:#F97583">            return</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#9ECBFF">                "path"</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">str</span><span style="color:#E1E4E8">(file_path),</span></span>
+<span class="line"><span style="color:#9ECBFF">                "content"</span><span style="color:#E1E4E8">: content,</span></span>
+<span class="line"><span style="color:#9ECBFF">                "size"</span><span style="color:#E1E4E8">: file_path.stat().st_size,</span></span>
+<span class="line"><span style="color:#9ECBFF">                "encoding"</span><span style="color:#E1E4E8">: encoding</span></span>
+<span class="line"><span style="color:#E1E4E8">            }</span></span>
+<span class="line"><span style="color:#F97583">        except</span><span style="color:#79B8FF"> Exception</span><span style="color:#F97583"> as</span><span style="color:#E1E4E8"> e:</span></span>
+<span class="line"><span style="color:#F97583">            raise</span><span style="color:#E1E4E8"> MCPToolError(</span><span style="color:#F97583">f</span><span style="color:#9ECBFF">"Failed to read file: </span><span style="color:#79B8FF">{str</span><span style="color:#E1E4E8">(e)</span><span style="color:#79B8FF">}</span><span style="color:#9ECBFF">"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">    async</span><span style="color:#F97583"> def</span><span style="color:#B392F0"> write_file</span><span style="color:#E1E4E8">(self, path: </span><span style="color:#79B8FF">str</span><span style="color:#E1E4E8">, content: </span><span style="color:#79B8FF">str</span><span style="color:#E1E4E8">, encoding: </span><span style="color:#79B8FF">str</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "utf-8"</span><span style="color:#E1E4E8">) -> Dict[</span><span style="color:#79B8FF">str</span><span style="color:#E1E4E8">, Any]:</span></span>
+<span class="line"><span style="color:#9ECBFF">        """Write file with security validation"""</span></span>
+<span class="line"><span style="color:#E1E4E8">        file_path </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> Path(path)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">        if</span><span style="color:#F97583"> not</span><span style="color:#79B8FF"> self</span><span style="color:#E1E4E8">._validate_path(file_path):</span></span>
+<span class="line"><span style="color:#F97583">            raise</span><span style="color:#E1E4E8"> MCPToolError(</span><span style="color:#F97583">f</span><span style="color:#9ECBFF">"Access denied: Path outside allowed directories"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">        if</span><span style="color:#79B8FF"> len</span><span style="color:#E1E4E8">(content.encode(encoding)) </span><span style="color:#F97583">></span><span style="color:#79B8FF"> self</span><span style="color:#E1E4E8">.max_file_size:</span></span>
+<span class="line"><span style="color:#F97583">            raise</span><span style="color:#E1E4E8"> MCPToolError(</span><span style="color:#F97583">f</span><span style="color:#9ECBFF">"Content too large (max </span><span style="color:#79B8FF">{self</span><span style="color:#E1E4E8">.max_file_size</span><span style="color:#79B8FF">}</span><span style="color:#9ECBFF"> bytes)"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">        try</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">            file_path.parent.mkdir(</span><span style="color:#FFAB70">parents</span><span style="color:#F97583">=</span><span style="color:#79B8FF">True</span><span style="color:#E1E4E8">, </span><span style="color:#FFAB70">exist_ok</span><span style="color:#F97583">=</span><span style="color:#79B8FF">True</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">            file_path.write_text(content, </span><span style="color:#FFAB70">encoding</span><span style="color:#F97583">=</span><span style="color:#E1E4E8">encoding)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">            return</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#9ECBFF">                "path"</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">str</span><span style="color:#E1E4E8">(file_path),</span></span>
+<span class="line"><span style="color:#9ECBFF">                "size"</span><span style="color:#E1E4E8">: file_path.stat().st_size,</span></span>
+<span class="line"><span style="color:#9ECBFF">                "encoding"</span><span style="color:#E1E4E8">: encoding,</span></span>
+<span class="line"><span style="color:#9ECBFF">                "success"</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">True</span></span>
+<span class="line"><span style="color:#E1E4E8">            }</span></span>
+<span class="line"><span style="color:#F97583">        except</span><span style="color:#79B8FF"> Exception</span><span style="color:#F97583"> as</span><span style="color:#E1E4E8"> e:</span></span>
+<span class="line"><span style="color:#F97583">            raise</span><span style="color:#E1E4E8"> MCPToolError(</span><span style="color:#F97583">f</span><span style="color:#9ECBFF">"Failed to write file: </span><span style="color:#79B8FF">{str</span><span style="color:#E1E4E8">(e)</span><span style="color:#79B8FF">}</span><span style="color:#9ECBFF">"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">    async</span><span style="color:#F97583"> def</span><span style="color:#B392F0"> list_directory</span><span style="color:#E1E4E8">(self, path: </span><span style="color:#79B8FF">str</span><span style="color:#E1E4E8">, recursive: </span><span style="color:#79B8FF">bool</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> False</span><span style="color:#E1E4E8">, pattern: </span><span style="color:#79B8FF">str</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "*"</span><span style="color:#E1E4E8">) -> Dict[</span><span style="color:#79B8FF">str</span><span style="color:#E1E4E8">, Any]:</span></span>
+<span class="line"><span style="color:#9ECBFF">        """List directory with filtering"""</span></span>
+<span class="line"><span style="color:#E1E4E8">        dir_path </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> Path(path)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">        if</span><span style="color:#F97583"> not</span><span style="color:#79B8FF"> self</span><span style="color:#E1E4E8">._validate_path(dir_path):</span></span>
+<span class="line"><span style="color:#F97583">            raise</span><span style="color:#E1E4E8"> MCPToolError(</span><span style="color:#F97583">f</span><span style="color:#9ECBFF">"Access denied: Path outside allowed directories"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">        if</span><span style="color:#F97583"> not</span><span style="color:#E1E4E8"> dir_path.exists() </span><span style="color:#F97583">or</span><span style="color:#F97583"> not</span><span style="color:#E1E4E8"> dir_path.is_dir():</span></span>
+<span class="line"><span style="color:#F97583">            raise</span><span style="color:#E1E4E8"> MCPToolError(</span><span style="color:#F97583">f</span><span style="color:#9ECBFF">"Directory not found: </span><span style="color:#79B8FF">{</span><span style="color:#E1E4E8">path</span><span style="color:#79B8FF">}</span><span style="color:#9ECBFF">"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">        try</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#F97583">            if</span><span style="color:#E1E4E8"> recursive:</span></span>
+<span class="line"><span style="color:#E1E4E8">                files </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> list</span><span style="color:#E1E4E8">(dir_path.rglob(pattern))</span></span>
+<span class="line"><span style="color:#F97583">            else</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">                files </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> list</span><span style="color:#E1E4E8">(dir_path.glob(pattern))</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">            file_list </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> []</span></span>
+<span class="line"><span style="color:#F97583">            for</span><span style="color:#E1E4E8"> file_path </span><span style="color:#F97583">in</span><span style="color:#79B8FF"> sorted</span><span style="color:#E1E4E8">(files):</span></span>
+<span class="line"><span style="color:#E1E4E8">                stat </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> file_path.stat()</span></span>
+<span class="line"><span style="color:#E1E4E8">                file_list.append({</span></span>
+<span class="line"><span style="color:#9ECBFF">                    "name"</span><span style="color:#E1E4E8">: file_path.name,</span></span>
+<span class="line"><span style="color:#9ECBFF">                    "path"</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">str</span><span style="color:#E1E4E8">(file_path),</span></span>
+<span class="line"><span style="color:#9ECBFF">                    "type"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"directory"</span><span style="color:#F97583"> if</span><span style="color:#E1E4E8"> file_path.is_dir() </span><span style="color:#F97583">else</span><span style="color:#9ECBFF"> "file"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">                    "size"</span><span style="color:#E1E4E8">: stat.st_size </span><span style="color:#F97583">if</span><span style="color:#E1E4E8"> file_path.is_file() </span><span style="color:#F97583">else</span><span style="color:#79B8FF"> None</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">                    "modified"</span><span style="color:#E1E4E8">: datetime.fromtimestamp(stat.st_mtime).isoformat()</span></span>
+<span class="line"><span style="color:#E1E4E8">                })</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">            return</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#9ECBFF">                "directory"</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">str</span><span style="color:#E1E4E8">(dir_path),</span></span>
+<span class="line"><span style="color:#9ECBFF">                "pattern"</span><span style="color:#E1E4E8">: pattern,</span></span>
+<span class="line"><span style="color:#9ECBFF">                "recursive"</span><span style="color:#E1E4E8">: recursive,</span></span>
+<span class="line"><span style="color:#9ECBFF">                "files"</span><span style="color:#E1E4E8">: file_list,</span></span>
+<span class="line"><span style="color:#9ECBFF">                "count"</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">len</span><span style="color:#E1E4E8">(file_list)</span></span>
+<span class="line"><span style="color:#E1E4E8">            }</span></span>
+<span class="line"><span style="color:#F97583">        except</span><span style="color:#79B8FF"> Exception</span><span style="color:#F97583"> as</span><span style="color:#E1E4E8"> e:</span></span>
+<span class="line"><span style="color:#F97583">            raise</span><span style="color:#E1E4E8"> MCPToolError(</span><span style="color:#F97583">f</span><span style="color:#9ECBFF">"Failed to list directory: </span><span style="color:#79B8FF">{str</span><span style="color:#E1E4E8">(e)</span><span style="color:#79B8FF">}</span><span style="color:#9ECBFF">"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">    async</span><span style="color:#F97583"> def</span><span style="color:#B392F0"> search_files</span><span style="color:#E1E4E8">(self, query: </span><span style="color:#79B8FF">str</span><span style="color:#E1E4E8">, path: </span><span style="color:#79B8FF">str</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "."</span><span style="color:#E1E4E8">, search_type: </span><span style="color:#79B8FF">str</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "both"</span><span style="color:#E1E4E8">) -> Dict[</span><span style="color:#79B8FF">str</span><span style="color:#E1E4E8">, Any]:</span></span>
+<span class="line"><span style="color:#9ECBFF">        """Search files by content or filename"""</span></span>
+<span class="line"><span style="color:#E1E4E8">        search_path </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> Path(path)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">        if</span><span style="color:#F97583"> not</span><span style="color:#79B8FF"> self</span><span style="color:#E1E4E8">._validate_path(search_path):</span></span>
+<span class="line"><span style="color:#F97583">            raise</span><span style="color:#E1E4E8"> MCPToolError(</span><span style="color:#F97583">f</span><span style="color:#9ECBFF">"Access denied: Path outside allowed directories"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">        if</span><span style="color:#F97583"> not</span><span style="color:#E1E4E8"> search_path.exists():</span></span>
+<span class="line"><span style="color:#F97583">            raise</span><span style="color:#E1E4E8"> MCPToolError(</span><span style="color:#F97583">f</span><span style="color:#9ECBFF">"Search path not found: </span><span style="color:#79B8FF">{</span><span style="color:#E1E4E8">path</span><span style="color:#79B8FF">}</span><span style="color:#9ECBFF">"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">        results </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> []</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">        try</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#F97583">            for</span><span style="color:#E1E4E8"> file_path </span><span style="color:#F97583">in</span><span style="color:#E1E4E8"> search_path.rglob(</span><span style="color:#9ECBFF">"*"</span><span style="color:#E1E4E8">):</span></span>
+<span class="line"><span style="color:#F97583">                if</span><span style="color:#F97583"> not</span><span style="color:#E1E4E8"> file_path.is_file():</span></span>
+<span class="line"><span style="color:#F97583">                    continue</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">                # Skip binary files and large files</span></span>
+<span class="line"><span style="color:#F97583">                if</span><span style="color:#E1E4E8"> file_path.stat().st_size </span><span style="color:#F97583">></span><span style="color:#79B8FF"> self</span><span style="color:#E1E4E8">.max_file_size:</span></span>
+<span class="line"><span style="color:#F97583">                    continue</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">                match_reason </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> []</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">                # Filename search</span></span>
+<span class="line"><span style="color:#F97583">                if</span><span style="color:#E1E4E8"> search_type </span><span style="color:#F97583">in</span><span style="color:#E1E4E8"> [</span><span style="color:#9ECBFF">"filename"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"both"</span><span style="color:#E1E4E8">] </span><span style="color:#F97583">and</span><span style="color:#E1E4E8"> query.lower() </span><span style="color:#F97583">in</span><span style="color:#E1E4E8"> file_path.name.lower():</span></span>
+<span class="line"><span style="color:#E1E4E8">                    match_reason.append(</span><span style="color:#9ECBFF">"filename"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">                # Content search</span></span>
+<span class="line"><span style="color:#F97583">                if</span><span style="color:#E1E4E8"> search_type </span><span style="color:#F97583">in</span><span style="color:#E1E4E8"> [</span><span style="color:#9ECBFF">"content"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"both"</span><span style="color:#E1E4E8">]:</span></span>
+<span class="line"><span style="color:#F97583">                    try</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">                        content </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> file_path.read_text(</span><span style="color:#FFAB70">encoding</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">'utf-8'</span><span style="color:#E1E4E8">, </span><span style="color:#FFAB70">errors</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">'ignore'</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#F97583">                        if</span><span style="color:#E1E4E8"> query.lower() </span><span style="color:#F97583">in</span><span style="color:#E1E4E8"> content.lower():</span></span>
+<span class="line"><span style="color:#E1E4E8">                            match_reason.append(</span><span style="color:#9ECBFF">"content"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#F97583">                    except</span><span style="color:#79B8FF"> Exception</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#F97583">                        continue</span><span style="color:#6A737D">  # Skip files that can't be read</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">                if</span><span style="color:#E1E4E8"> match_reason:</span></span>
+<span class="line"><span style="color:#E1E4E8">                    results.append({</span></span>
+<span class="line"><span style="color:#9ECBFF">                        "path"</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">str</span><span style="color:#E1E4E8">(file_path),</span></span>
+<span class="line"><span style="color:#9ECBFF">                        "name"</span><span style="color:#E1E4E8">: file_path.name,</span></span>
+<span class="line"><span style="color:#9ECBFF">                        "size"</span><span style="color:#E1E4E8">: file_path.stat().st_size,</span></span>
+<span class="line"><span style="color:#9ECBFF">                        "match_reason"</span><span style="color:#E1E4E8">: match_reason</span></span>
+<span class="line"><span style="color:#E1E4E8">                    })</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">            return</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#9ECBFF">                "query"</span><span style="color:#E1E4E8">: query,</span></span>
+<span class="line"><span style="color:#9ECBFF">                "search_path"</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">str</span><span style="color:#E1E4E8">(search_path),</span></span>
+<span class="line"><span style="color:#9ECBFF">                "search_type"</span><span style="color:#E1E4E8">: search_type,</span></span>
+<span class="line"><span style="color:#9ECBFF">                "results"</span><span style="color:#E1E4E8">: results,</span></span>
+<span class="line"><span style="color:#9ECBFF">                "count"</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">len</span><span style="color:#E1E4E8">(results)</span></span>
+<span class="line"><span style="color:#E1E4E8">            }</span></span>
+<span class="line"><span style="color:#F97583">        except</span><span style="color:#79B8FF"> Exception</span><span style="color:#F97583"> as</span><span style="color:#E1E4E8"> e:</span></span>
+<span class="line"><span style="color:#F97583">            raise</span><span style="color:#E1E4E8"> MCPToolError(</span><span style="color:#F97583">f</span><span style="color:#9ECBFF">"Search failed: </span><span style="color:#79B8FF">{str</span><span style="color:#E1E4E8">(e)</span><span style="color:#79B8FF">}</span><span style="color:#9ECBFF">"</span><span style="color:#E1E4E8">)</span></span></code></pre>
+<h3 id="mcp-protocol-compliance-claude-desktop-integration">MCP Protocol Compliance: Claude Desktop Integration</h3>
+<p><strong>Problem</strong>: No mcp.json manifest for protocol compliance
+<strong>Solution</strong>: Complete MCP server manifest</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="json"><code><span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#79B8FF">  "mcpVersion"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"1.0.0"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">  "server"</span><span style="color:#E1E4E8">: {</span></span>
+<span class="line"><span style="color:#79B8FF">    "name"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"waygate-mcp"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">    "version"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"2.1.0"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">    "description"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"Enterprise-grade MCP Server Framework"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">    "entrypoint"</span><span style="color:#E1E4E8">: {</span></span>
+<span class="line"><span style="color:#79B8FF">      "type"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"python"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">      "module"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"source.waygate_mcp"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">      "function"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"main"</span></span>
+<span class="line"><span style="color:#E1E4E8">    },</span></span>
+<span class="line"><span style="color:#79B8FF">    "tools"</span><span style="color:#E1E4E8">: [</span></span>
+<span class="line"><span style="color:#E1E4E8">      {</span></span>
+<span class="line"><span style="color:#79B8FF">        "name"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"execute_command"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">        "description"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"Execute system commands with safety validation"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">        "inputSchema"</span><span style="color:#E1E4E8">: {</span></span>
+<span class="line"><span style="color:#79B8FF">          "type"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"object"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">          "properties"</span><span style="color:#E1E4E8">: {</span></span>
+<span class="line"><span style="color:#79B8FF">            "command"</span><span style="color:#E1E4E8">: {</span><span style="color:#79B8FF">"type"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"string"</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">"description"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"Command to execute"</span><span style="color:#E1E4E8">},</span></span>
+<span class="line"><span style="color:#79B8FF">            "timeout"</span><span style="color:#E1E4E8">: {</span><span style="color:#79B8FF">"type"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"integer"</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">"description"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"Timeout in seconds"</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">"default"</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">30</span><span style="color:#E1E4E8">}</span></span>
+<span class="line"><span style="color:#E1E4E8">          },</span></span>
+<span class="line"><span style="color:#79B8FF">          "required"</span><span style="color:#E1E4E8">: [</span><span style="color:#9ECBFF">"command"</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"><span style="color:#E1E4E8">        }</span></span>
+<span class="line"><span style="color:#E1E4E8">      }</span></span>
+<span class="line"><span style="color:#6A737D">      // ... 4 more tools with complete schemas</span></span>
+<span class="line"><span style="color:#E1E4E8">    ]</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p><strong>Claude Desktop Integration</strong>: Drop-in configuration</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="json"><code><span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#79B8FF">  "mcpServers"</span><span style="color:#E1E4E8">: {</span></span>
+<span class="line"><span style="color:#79B8FF">    "waygate-mcp"</span><span style="color:#E1E4E8">: {</span></span>
+<span class="line"><span style="color:#79B8FF">      "command"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"python"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">      "args"</span><span style="color:#E1E4E8">: [</span><span style="color:#9ECBFF">"-m"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"source.waygate_mcp"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"--port"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"8000"</span><span style="color:#E1E4E8">],</span></span>
+<span class="line"><span style="color:#79B8FF">      "cwd"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"/path/to/waygate-mcp"</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<h2 id="phase-4-professional-release-workflow">Phase 4: Professional Release Workflow</h2>
+<p>After completing all 19 TaskWarrior tasks, we executed a 10-phase professional release workflow:</p>
+<ol>
+<li><strong>Analyze and categorize changes</strong> (breaking, features, fixes)</li>
+<li><strong>Generate Conventional Commits</strong> for all changes</li>
+<li><strong>Create comprehensive CHANGELOG.md</strong> following Keep a Changelog format</li>
+<li><strong>Compose compelling release notes</strong> with engagement optimization</li>
+<li><strong>Create annotated git tag</strong> with release summary</li>
+<li><strong>Update documentation and README</strong> with new features</li>
+<li><strong>Create GitHub release</strong> with community engagement focus</li>
+<li><strong>Execute pre-release verification</strong> with comprehensive checklist</li>
+<li><strong>Execute push and publish sequence</strong> with proper git workflow</li>
+<li><strong>Generate post-release communication</strong> templates for all channels</li>
+</ol>
+<p>The result: A professional v2.1.0 “Complete Arsenal” release with enterprise documentation.</p>
+<h2 id="phase-5-verification-and-results">Phase 5: Verification and Results</h2>
+<h3 id="pre-release-verification-script">Pre-Release Verification Script</h3>
+<p>We created a comprehensive verification script that checks:</p>
+<ul>
+<li>Virtual environment and dependencies ✅</li>
+<li>Server startup functionality ✅</li>
+<li>MCP tools availability (all 5 tools) ✅</li>
+<li>Version consistency across files ✅</li>
+<li>Security validation (no hardcoded secrets) ✅</li>
+<li>Documentation completeness ✅</li>
+<li>TaskWarrior integration functionality ✅</li>
+</ul>
+<h3 id="performance-results">Performance Results</h3>
+<ul>
+<li><strong>40% faster startup time</strong> through optimized module loading</li>
+<li><strong>Graceful fallbacks</strong> when subsystems fail</li>
+<li><strong>Resource protection</strong> with size limits and timeouts</li>
+<li><strong>Complete security validation</strong> on all operations</li>
+</ul>
+<h3 id="integration-results">Integration Results</h3>
+<ul>
+<li><strong>Claude Desktop Ready</strong>: Zero-configuration setup</li>
+<li><strong>5 Production Tools</strong>: All functional with enterprise security</li>
+<li><strong>Professional Documentation</strong>: Complete setup guides and troubleshooting</li>
+<li><strong>TaskWarrior Dashboard</strong>: Real-time project health monitoring</li>
+</ul>
+<h2 id="key-technical-lessons">Key Technical Lessons</h2>
+<h3 id="1-forensic-analysis-methodology">1. Forensic Analysis Methodology</h3>
+<p>Using TaskWarrior for project management transformed chaotic debugging into systematic resolution. Every issue got proper categorization, priority assignment, and tracking through completion.</p>
+<h3 id="2-security-first-implementation">2. Security-First Implementation</h3>
+<p>Starting with security constraints (path validation, command filtering, size limits) from the beginning is easier than retrofitting security later.</p>
+<h3 id="3-graceful-degradation-design">3. Graceful Degradation Design</h3>
+<p>Building systems that continue operating when subsystems fail makes the difference between development-grade and production-grade software.</p>
+<h3 id="4-professional-release-processes">4. Professional Release Processes</h3>
+<p>The 10-phase release workflow ensured nothing was missed - from technical implementation to community engagement optimization.</p>
+<h2 id="what-we-built">What We Built</h2>
+<p>Waygate MCP v2.1.0 “Complete Arsenal” includes:</p>
+<ul>
+<li><strong>5 Production MCP Tools</strong> with enterprise security validation</li>
+<li><strong>Zero-Configuration Security</strong> with automatic secret generation</li>
+<li><strong>Claude Desktop Integration</strong> with drop-in configuration</li>
+<li><strong>TaskWarrior Project Management</strong> with forensic-level tracking</li>
+<li><strong>Professional Documentation</strong> with comprehensive setup guides</li>
+<li><strong>Pre-Release Verification</strong> with automated health checks</li>
+<li><strong>Enterprise Deployment Ready</strong> with Docker containerization</li>
+</ul>
+<h2 id="related-posts">Related Posts</h2>
+<p>This builds on our previous security work:</p>
+<ul>
+<li>When a Simple Security Audit Turns Into a 3-Hour Python Environment Battle</li>
+<li>Building AI-Friendly Codebase Documentation</li>
+</ul>
+<h2 id="the-complete-technical-achievement">The Complete Technical Achievement</h2>
+<p>What started as “forensic analysis” became a complete transformation:</p>
+<ul>
+<li><strong>19 TaskWarrior tasks</strong> → <strong>100% completion</strong></li>
+<li><strong>Placeholder endpoints</strong> → <strong>5 production tools</strong></li>
+<li><strong>Security vulnerabilities</strong> → <strong>Enterprise-grade hardening</strong></li>
+<li><strong>Development framework</strong> → <strong>Production-ready server</strong></li>
+<li><strong>Basic documentation</strong> → <strong>Professional release package</strong></li>
+</ul>
+<p>This is what systematic, professional software development looks like when you track every issue, resolve problems methodically, and follow proper release processes.</p>
+<p>The complete codebase and documentation is available at <a href="https://github.com/jeremylongshore/waygate-mcp">GitHub: waygate-mcp</a>.</p>
+<p><strong>Want to see the tools in action?</strong> Download the release, copy the Claude Desktop config, and test: “Use the list_directory tool to show the current directory contents.”</p>
+      </div>
+    </div>
+  </article>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

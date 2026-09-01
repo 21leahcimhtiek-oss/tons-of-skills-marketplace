@@ -1,0 +1,1095 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP Servers in Claude Code Plugins | Docs</title>
+    <meta name="description" content="How Model Context Protocol (MCP) servers work in Claude Code plugins — building TypeScript MCP servers that expose external tools, data sources, and APIs to Claude through a standardized protocol.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://tonsofskills.com/tons-of-skills-marketplace/docs/concepts/mcp-servers/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/docs/concepts/mcp-servers/">
+    <meta property="og:title" content="MCP Servers in Claude Code Plugins | Docs">
+    <meta property="og:description" content="How Model Context Protocol (MCP) servers work in Claude Code plugins — building TypeScript MCP servers that expose external tools, data sources, and APIs to Claude through a standardized protocol.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="MCP Servers in Claude Code Plugins | Docs">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/docs/concepts/mcp-servers/">
+    <meta name="twitter:title" content="MCP Servers in Claude Code Plugins | Docs">
+    <meta name="twitter:description" content="How Model Context Protocol (MCP) servers work in Claude Code plugins — building TypeScript MCP servers that expose external tools, data sources, and APIs to Claude through a standardized protocol.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"MCP Servers in Claude Code Plugins","description":"How Model Context Protocol (MCP) servers work in Claude Code plugins — building TypeScript MCP servers that expose external tools, data sources, and APIs to Claude through a standardized protocol.","author":{"@type":"Organization","name":"Intent Solutions","url":"https://intentsolutions.io"},"publisher":{"@type":"Organization","name":"Tons of Skills","url":"https://tonsofskills.com"},"url":"https://tonsofskills.com/docs/concepts/mcp-servers","keywords":"MCP server, Model Context Protocol, Claude Code MCP, MCP tools, TypeScript MCP server, mcp.json, Claude Code external tools, MCP plugin","mainEntityOfPage":{"@type":"WebPage","@id":"https://tonsofskills.com/docs/concepts/mcp-servers"}}</script>
+  
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/_..B9N6JsV8.css"></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  <div class="docs-page" data-astro-cid-ya4srytn>
+    <div class="docs-container" data-astro-cid-ya4srytn>
+      <aside class="docs-sidebar" id="docs-sidebar" data-astro-cid-qrwn6rcr>
+  <div class="sidebar-sticky" data-astro-cid-qrwn6rcr>
+    <a href="/docs" class="sidebar-home" data-astro-cid-qrwn6rcr>Documentation</a>
+    <nav class="sidebar-nav" data-astro-cid-qrwn6rcr>
+      <div class="sidebar-section" data-astro-cid-qrwn6rcr>
+          <h3 class="sidebar-section-title" data-astro-cid-qrwn6rcr>Getting Started</h3>
+          <ul class="sidebar-list" data-astro-cid-qrwn6rcr>
+            <li data-astro-cid-qrwn6rcr>
+                <a href="/docs/getting-started/installation" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Install Claude Code Plugins
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/getting-started/first-plugin" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Install Your First Plugin
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/getting-started/first-skill" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Your First Agent Skill
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/getting-started/cli-reference" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  ccpi CLI Quick Reference
+                </a>
+              </li>
+          </ul>
+        </div><div class="sidebar-section" data-astro-cid-qrwn6rcr>
+          <h3 class="sidebar-section-title" data-astro-cid-qrwn6rcr>Concepts</h3>
+          <ul class="sidebar-list" data-astro-cid-qrwn6rcr>
+            <li data-astro-cid-qrwn6rcr>
+                <a href="/docs/concepts/plugins" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  What Are Claude Code Plugins?
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/concepts/skills" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Understanding Agent Skills (SKILL.md)
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/concepts/agents" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Claude Code Agents and Subagents
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/concepts/commands-and-hooks" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Slash Commands and Hooks
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/concepts/mcp-servers" class="sidebar-link active" data-astro-cid-qrwn6rcr>
+                  MCP Servers in Claude Code Plugins
+                </a>
+              </li>
+          </ul>
+        </div><div class="sidebar-section" data-astro-cid-qrwn6rcr>
+          <h3 class="sidebar-section-title" data-astro-cid-qrwn6rcr>Guides</h3>
+          <ul class="sidebar-list" data-astro-cid-qrwn6rcr>
+            <li data-astro-cid-qrwn6rcr>
+                <a href="/docs/guides/write-a-skill" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  How to Write a Claude Code Skill
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/guides/build-a-plugin" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  How to Build a Claude Code Plugin
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/guides/create-an-agent" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  How to Create a Claude Code Agent
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/guides/saas-skill-packs" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  SaaS Skill Packs: Platform Integrations
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/guides/mcp-server-plugin" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Building an MCP Server Plugin
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/guides/publish-to-marketplace" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Publish a Plugin to the Marketplace
+                </a>
+              </li>
+          </ul>
+        </div><div class="sidebar-section" data-astro-cid-qrwn6rcr>
+          <h3 class="sidebar-section-title" data-astro-cid-qrwn6rcr>Reference</h3>
+          <ul class="sidebar-list" data-astro-cid-qrwn6rcr>
+            <li data-astro-cid-qrwn6rcr>
+                <a href="/docs/reference/skill-frontmatter" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  SKILL.md Frontmatter Reference
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/reference/plugin-json-schema" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  plugin.json Schema Reference
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/reference/plugin-categories" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Plugin Categories and Tags
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/reference/allowed-tools" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Allowed Tools Reference
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/reference/cli-commands" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  ccpi CLI Command Reference
+                </a>
+              </li>
+          </ul>
+        </div><div class="sidebar-section" data-astro-cid-qrwn6rcr>
+          <h3 class="sidebar-section-title" data-astro-cid-qrwn6rcr>Ecosystem</h3>
+          <ul class="sidebar-list" data-astro-cid-qrwn6rcr>
+            <li data-astro-cid-qrwn6rcr>
+                <a href="/docs/ecosystem/marketplace-overview" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Tons of Skills Marketplace Guide
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/ecosystem/official-anthropic-docs" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Official Anthropic Documentation Links
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/ecosystem/community-resources" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Claude Code Community and Resources
+                </a>
+              </li><li data-astro-cid-qrwn6rcr>
+                <a href="/docs/ecosystem/faq" class="sidebar-link" data-astro-cid-qrwn6rcr>
+                  Claude Code Plugins FAQ
+                </a>
+              </li>
+          </ul>
+        </div>
+    </nav>
+  </div>
+</aside>
+
+      <div class="docs-main" data-astro-cid-ya4srytn>
+        <!-- Breadcrumbs -->
+        <nav class="docs-breadcrumbs" aria-label="Breadcrumb" data-astro-cid-ya4srytn>
+          <a href="/" data-astro-cid-ya4srytn>Home</a>
+          <span class="sep" data-astro-cid-ya4srytn>/</span>
+          <a href="/docs" data-astro-cid-ya4srytn>Docs</a>
+          <span class="sep" data-astro-cid-ya4srytn>/</span>
+          <a href="/docs#concepts" data-astro-cid-ya4srytn>Concepts</a>
+          <span class="sep" data-astro-cid-ya4srytn>/</span>
+          <span class="current" data-astro-cid-ya4srytn>MCP Servers in Claude Code Plugins</span>
+        </nav>
+
+        <!-- Header -->
+        <header class="docs-header" data-astro-cid-ya4srytn>
+          <h1 class="docs-title" data-astro-cid-ya4srytn>MCP Servers in Claude Code Plugins</h1>
+          <p class="docs-description" data-astro-cid-ya4srytn>How Model Context Protocol (MCP) servers work in Claude Code plugins — building TypeScript MCP servers that expose external tools, data sources, and APIs to Claude through a standardized protocol.</p>
+        </header>
+
+        <!-- Content -->
+        <article class="docs-content" id="docs-content" data-astro-cid-ya4srytn>
+          
+  <p>Most Claude Code plugins are AI instruction plugins — collections of markdown files that teach Claude new behaviors through carefully written instructions. MCP server plugins are different. They are executable TypeScript applications that give Claude access to external systems, APIs, and data sources through a standardized protocol called the Model Context Protocol.</p>
+<p>Where an instruction plugin says “here is how to think about Kubernetes,” an MCP server plugin says “here is a live connection to the Kubernetes API — query pods, read logs, apply manifests.” The distinction is between knowledge and access.</p>
+<h2 id="what-is-the-model-context-protocol">What Is the Model Context Protocol?</h2>
+<p>The Model Context Protocol (MCP) is an open standard that defines how AI applications communicate with external tool servers. It provides a structured way for an AI model to:</p>
+<ul>
+<li><strong>Discover</strong> what tools are available on a server</li>
+<li><strong>Understand</strong> each tool’s parameters, types, and behavior</li>
+<li><strong>Invoke</strong> tools with validated inputs</li>
+<li><strong>Receive</strong> structured results</li>
+</ul>
+<p>MCP follows a client-server architecture. Claude Code acts as the MCP client, and your plugin runs an MCP server. The client discovers the server’s capabilities at startup, then invokes tools as needed during conversation.</p>
+<p>The protocol handles serialization, transport, error handling, and capability negotiation — so you can focus on implementing the tools themselves rather than the communication layer.</p>
+<h3 id="how-mcp-fits-into-claude-code">How MCP Fits Into Claude Code</h3>
+<p>Claude Code has a set of built-in tools: <code>Read</code>, <code>Write</code>, <code>Edit</code>, <code>Bash</code>, <code>Glob</code>, <code>Grep</code>, <code>WebFetch</code>, <code>WebSearch</code>, <code>Task</code>, <code>TodoWrite</code>, <code>NotebookEdit</code>, <code>AskUserQuestion</code>, and <code>Skill</code>. These cover general-purpose development tasks.</p>
+<p>MCP servers extend this tool set with domain-specific capabilities. When an MCP server is running, its tools appear alongside the built-in tools. Claude can call them in the same way — seamlessly mixing built-in file operations with, say, a database query tool or a Jira ticket creator.</p>
+<p>From Claude’s perspective, an MCP tool is just another tool. The protocol abstraction means Claude does not need to know whether a tool is built-in or provided by an MCP server. It sees the tool’s name, description, and parameter schema, and invokes it accordingly.</p>
+<h2 id="mcp-server-plugin-structure">MCP Server Plugin Structure</h2>
+<p>An MCP server plugin follows this directory layout:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>my-mcp-plugin/</span></span>
+<span class="line"><span>├── .claude-plugin/</span></span>
+<span class="line"><span>│   └── plugin.json           # Standard plugin manifest</span></span>
+<span class="line"><span>├── src/</span></span>
+<span class="line"><span>│   └── index.ts              # TypeScript source code</span></span>
+<span class="line"><span>├── dist/</span></span>
+<span class="line"><span>│   └── index.js              # Compiled JavaScript (must be executable)</span></span>
+<span class="line"><span>├── package.json              # Dependencies and build scripts</span></span>
+<span class="line"><span>├── tsconfig.json             # TypeScript configuration</span></span>
+<span class="line"><span>├── .mcp.json                 # MCP server configuration</span></span>
+<span class="line"><span>└── README.md                 # Documentation</span></span></code></pre>
+<h3 id="pluginjson">plugin.json</h3>
+<p>The plugin manifest follows the same schema as any Claude Code plugin:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="json"><code><span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#79B8FF">  "name"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"database-explorer"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">  "version"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"1.0.0"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">  "description"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"Query and explore SQL databases directly from Claude Code"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">  "author"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"Data Team &#x3C;data@example.com>"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">  "repository"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"https://github.com/example/database-explorer"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">  "license"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"MIT"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">  "keywords"</span><span style="color:#E1E4E8">: [</span><span style="color:#9ECBFF">"database"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"sql"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"mcp"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"query"</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<h3 id="mcpjson">.mcp.json</h3>
+<p>The <code>.mcp.json</code> file configures how Claude Code launches and connects to the MCP server:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="json"><code><span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#79B8FF">  "mcpServers"</span><span style="color:#E1E4E8">: {</span></span>
+<span class="line"><span style="color:#79B8FF">    "database-explorer"</span><span style="color:#E1E4E8">: {</span></span>
+<span class="line"><span style="color:#79B8FF">      "command"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"node"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">      "args"</span><span style="color:#E1E4E8">: [</span><span style="color:#9ECBFF">"dist/index.js"</span><span style="color:#E1E4E8">],</span></span>
+<span class="line"><span style="color:#79B8FF">      "env"</span><span style="color:#E1E4E8">: {</span></span>
+<span class="line"><span style="color:#79B8FF">        "DATABASE_URL"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"${DATABASE_URL}"</span></span>
+<span class="line"><span style="color:#E1E4E8">      }</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Field</th><th>Description</th></tr></thead><tbody><tr><td><code>command</code></td><td>The executable to run (typically <code>node</code>)</td></tr><tr><td><code>args</code></td><td>Command-line arguments (path to the compiled entry point)</td></tr><tr><td><code>env</code></td><td>Environment variables to pass to the server process</td></tr></tbody></table>
+<p>Environment variables in <code>.mcp.json</code> can reference the user’s shell environment using <code>${VARIABLE_NAME}</code> syntax. This allows configuration like database URLs and API keys to be provided at runtime without hardcoding them in the plugin.</p>
+<h3 id="srcindexts">src/index.ts</h3>
+<p>The TypeScript source file implements the MCP server. It uses the <code>@modelcontextprotocol/sdk</code> package to define tools, handle requests, and manage the server lifecycle.</p>
+<p>Here is a minimal but complete MCP server that provides a single tool:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#6A737D">#!/usr/bin/env node</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">import</span><span style="color:#E1E4E8"> { Server } </span><span style="color:#F97583">from</span><span style="color:#9ECBFF"> "@modelcontextprotocol/sdk/server/index.js"</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">import</span><span style="color:#E1E4E8"> { StdioServerTransport } </span><span style="color:#F97583">from</span><span style="color:#9ECBFF"> "@modelcontextprotocol/sdk/server/stdio.js"</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">import</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  CallToolRequestSchema,</span></span>
+<span class="line"><span style="color:#E1E4E8">  ListToolsRequestSchema,</span></span>
+<span class="line"><span style="color:#E1E4E8">} </span><span style="color:#F97583">from</span><span style="color:#9ECBFF"> "@modelcontextprotocol/sdk/types.js"</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> server</span><span style="color:#F97583"> =</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> Server</span><span style="color:#E1E4E8">(</span></span>
+<span class="line"><span style="color:#E1E4E8">  { name: </span><span style="color:#9ECBFF">"example-server"</span><span style="color:#E1E4E8">, version: </span><span style="color:#9ECBFF">"1.0.0"</span><span style="color:#E1E4E8"> },</span></span>
+<span class="line"><span style="color:#E1E4E8">  { capabilities: { tools: {} } }</span></span>
+<span class="line"><span style="color:#E1E4E8">);</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">// Register available tools</span></span>
+<span class="line"><span style="color:#E1E4E8">server.</span><span style="color:#B392F0">setRequestHandler</span><span style="color:#E1E4E8">(ListToolsRequestSchema, </span><span style="color:#F97583">async</span><span style="color:#E1E4E8"> () </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> ({</span></span>
+<span class="line"><span style="color:#E1E4E8">  tools: [</span></span>
+<span class="line"><span style="color:#E1E4E8">    {</span></span>
+<span class="line"><span style="color:#E1E4E8">      name: </span><span style="color:#9ECBFF">"get_weather"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">      description: </span><span style="color:#9ECBFF">"Get current weather for a city"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">      inputSchema: {</span></span>
+<span class="line"><span style="color:#E1E4E8">        type: </span><span style="color:#9ECBFF">"object"</span><span style="color:#F97583"> as</span><span style="color:#F97583"> const</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">        properties: {</span></span>
+<span class="line"><span style="color:#E1E4E8">          city: {</span></span>
+<span class="line"><span style="color:#E1E4E8">            type: </span><span style="color:#9ECBFF">"string"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">            description: </span><span style="color:#9ECBFF">"City name (e.g., 'San Francisco')"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">          },</span></span>
+<span class="line"><span style="color:#E1E4E8">        },</span></span>
+<span class="line"><span style="color:#E1E4E8">        required: [</span><span style="color:#9ECBFF">"city"</span><span style="color:#E1E4E8">],</span></span>
+<span class="line"><span style="color:#E1E4E8">      },</span></span>
+<span class="line"><span style="color:#E1E4E8">    },</span></span>
+<span class="line"><span style="color:#E1E4E8">  ],</span></span>
+<span class="line"><span style="color:#E1E4E8">}));</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">// Handle tool invocations</span></span>
+<span class="line"><span style="color:#E1E4E8">server.</span><span style="color:#B392F0">setRequestHandler</span><span style="color:#E1E4E8">(CallToolRequestSchema, </span><span style="color:#F97583">async</span><span style="color:#E1E4E8"> (</span><span style="color:#FFAB70">request</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">  if</span><span style="color:#E1E4E8"> (request.params.name </span><span style="color:#F97583">===</span><span style="color:#9ECBFF"> "get_weather"</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#F97583">    const</span><span style="color:#79B8FF"> city</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> request.params.arguments?.city </span><span style="color:#F97583">as</span><span style="color:#79B8FF"> string</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">    // In a real implementation, call a weather API here</span></span>
+<span class="line"><span style="color:#F97583">    return</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">      content: [</span></span>
+<span class="line"><span style="color:#E1E4E8">        {</span></span>
+<span class="line"><span style="color:#E1E4E8">          type: </span><span style="color:#9ECBFF">"text"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">          text: </span><span style="color:#9ECBFF">`Weather in ${</span><span style="color:#E1E4E8">city</span><span style="color:#9ECBFF">}: 72°F, partly cloudy`</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">        },</span></span>
+<span class="line"><span style="color:#E1E4E8">      ],</span></span>
+<span class="line"><span style="color:#E1E4E8">    };</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">  throw</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> Error</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">`Unknown tool: ${</span><span style="color:#E1E4E8">request</span><span style="color:#9ECBFF">.</span><span style="color:#E1E4E8">params</span><span style="color:#9ECBFF">.</span><span style="color:#E1E4E8">name</span><span style="color:#9ECBFF">}`</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#E1E4E8">});</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">// Start the server</span></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> transport</span><span style="color:#F97583"> =</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> StdioServerTransport</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#F97583">await</span><span style="color:#E1E4E8"> server.</span><span style="color:#B392F0">connect</span><span style="color:#E1E4E8">(transport);</span></span></code></pre>
+<h3 id="distindexjs">dist/index.js</h3>
+<p>The compiled JavaScript entry point must meet two requirements:</p>
+<ol>
+<li>
+<p><strong>Shebang line.</strong> The file must start with <code>#!/usr/bin/env node</code> so it can be executed directly.</p>
+</li>
+<li>
+<p><strong>Executable permissions.</strong> The file must have the execute bit set (<code>chmod +x dist/index.js</code>).</p>
+</li>
+</ol>
+<p>These requirements exist because Claude Code launches MCP servers as child processes. Without the shebang and execute permission, the operating system cannot run the file directly.</p>
+<p>After compiling, always set the permissions:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">npx</span><span style="color:#9ECBFF"> tsc</span></span>
+<span class="line"><span style="color:#B392F0">chmod</span><span style="color:#9ECBFF"> +x</span><span style="color:#9ECBFF"> dist/index.js</span></span></code></pre>
+<p>Or automate this in your <code>package.json</code>:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="json"><code><span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#79B8FF">  "scripts"</span><span style="color:#E1E4E8">: {</span></span>
+<span class="line"><span style="color:#79B8FF">    "build"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"tsc &#x26;&#x26; chmod +x dist/index.js"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">    "dev"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"tsc --watch"</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<h3 id="packagejson">package.json</h3>
+<p>A typical <code>package.json</code> for an MCP server plugin:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="json"><code><span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#79B8FF">  "name"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"database-explorer"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">  "version"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"1.0.0"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">  "type"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"module"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">  "scripts"</span><span style="color:#E1E4E8">: {</span></span>
+<span class="line"><span style="color:#79B8FF">    "build"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"tsc &#x26;&#x26; chmod +x dist/index.js"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">    "dev"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"tsc --watch"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">    "test"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"vitest"</span></span>
+<span class="line"><span style="color:#E1E4E8">  },</span></span>
+<span class="line"><span style="color:#79B8FF">  "dependencies"</span><span style="color:#E1E4E8">: {</span></span>
+<span class="line"><span style="color:#79B8FF">    "@modelcontextprotocol/sdk"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"^1.0.0"</span></span>
+<span class="line"><span style="color:#E1E4E8">  },</span></span>
+<span class="line"><span style="color:#79B8FF">  "devDependencies"</span><span style="color:#E1E4E8">: {</span></span>
+<span class="line"><span style="color:#79B8FF">    "typescript"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"^5.0.0"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">    "vitest"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"^1.0.0"</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>Note <code>"type": "module"</code> — the MCP SDK uses ESM imports, so your project must be configured for ES modules.</p>
+<h2 id="designing-mcp-tools">Designing MCP Tools</h2>
+<p>The tools you expose through your MCP server are the interface between Claude and your external system. Well-designed tools make Claude more effective; poorly designed ones lead to confusion and errors.</p>
+<h3 id="tool-anatomy">Tool Anatomy</h3>
+<p>Each tool has three components:</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Component</th><th>Purpose</th></tr></thead><tbody><tr><td><code>name</code></td><td>Identifier Claude uses to invoke the tool (snake_case)</td></tr><tr><td><code>description</code></td><td>Natural language explanation of what the tool does</td></tr><tr><td><code>inputSchema</code></td><td>JSON Schema defining the tool’s parameters</td></tr></tbody></table>
+<h3 id="writing-good-tool-descriptions">Writing Good Tool Descriptions</h3>
+<p>Tool descriptions are critical because Claude uses them to decide when and how to invoke the tool. The description should answer:</p>
+<ul>
+<li>What does this tool do?</li>
+<li>When should Claude use it?</li>
+<li>What are the important constraints or side effects?</li>
+</ul>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#6A737D">// Good: specific, actionable, mentions constraints</span></span>
+<span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#B392F0">  name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"query_database"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#B392F0">  description</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"Execute a read-only SQL query against the connected database. Returns up to 100 rows. Use for data exploration and analysis. Does not support INSERT, UPDATE, DELETE, or DDL statements."</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#B392F0">  inputSchema</span><span style="color:#E1E4E8">: { </span><span style="color:#6A737D">/* ... */</span><span style="color:#E1E4E8"> }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">// Poor: vague, no constraints mentioned</span></span>
+<span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#B392F0">  name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"query_database"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#B392F0">  description</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"Run a database query"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#B392F0">  inputSchema</span><span style="color:#E1E4E8">: { </span><span style="color:#6A737D">/* ... */</span><span style="color:#E1E4E8"> }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<h3 id="input-schema-design">Input Schema Design</h3>
+<p>Define precise JSON Schemas for tool parameters. Include <code>description</code> fields on every property and use <code>required</code> to mark mandatory parameters:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#B392F0">inputSchema</span><span style="color:#E1E4E8">: {</span></span>
+<span class="line"><span style="color:#B392F0">  type</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"object"</span><span style="color:#F97583"> as</span><span style="color:#F97583"> const</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#B392F0">  properties</span><span style="color:#E1E4E8">: {</span></span>
+<span class="line"><span style="color:#B392F0">    query</span><span style="color:#E1E4E8">: {</span></span>
+<span class="line"><span style="color:#B392F0">      type</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"string"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#B392F0">      description</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"SQL SELECT query to execute. Must be a read-only query."</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">    },</span></span>
+<span class="line"><span style="color:#B392F0">    database</span><span style="color:#E1E4E8">: {</span></span>
+<span class="line"><span style="color:#B392F0">      type</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"string"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#B392F0">      description</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"Target database name. Defaults to the primary database."</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#F97583">      default</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"main"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">    },</span></span>
+<span class="line"><span style="color:#B392F0">    limit</span><span style="color:#E1E4E8">: {</span></span>
+<span class="line"><span style="color:#B392F0">      type</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"number"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#B392F0">      description</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"Maximum number of rows to return (1-1000)."</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#F97583">      default</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">100</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#B392F0">      minimum</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">1</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#B392F0">      maximum</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">1000</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">    },</span></span>
+<span class="line"><span style="color:#E1E4E8">  },</span></span>
+<span class="line"><span style="color:#B392F0">  required</span><span style="color:#E1E4E8">: [</span><span style="color:#9ECBFF">"query"</span><span style="color:#E1E4E8">],</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<h3 id="tool-categories">Tool Categories</h3>
+<p>MCP tools generally fall into four categories:</p>
+<p><strong>Query tools</strong> retrieve information without side effects:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#B392F0">  name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"list_tables"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#B392F0">  description</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"List all tables in the database with their column counts and row counts"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p><strong>Action tools</strong> perform operations with side effects:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#B392F0">  name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"create_ticket"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#B392F0">  description</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"Create a new Jira ticket in the specified project. Returns the ticket ID."</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p><strong>Analysis tools</strong> process data and return insights:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#B392F0">  name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"explain_query"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#B392F0">  description</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"Analyze a SQL query's execution plan and suggest optimizations"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p><strong>Configuration tools</strong> modify settings or state:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#B392F0">  name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"set_connection"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#B392F0">  description</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"Switch the active database connection to a different server"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<h2 id="building-an-mcp-server-step-by-step">Building an MCP Server Step by Step</h2>
+<h3 id="step-1-initialize-the-project">Step 1: Initialize the Project</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">mkdir</span><span style="color:#9ECBFF"> my-mcp-plugin</span></span>
+<span class="line"><span style="color:#79B8FF">cd</span><span style="color:#9ECBFF"> my-mcp-plugin</span></span>
+<span class="line"><span style="color:#B392F0">npm</span><span style="color:#9ECBFF"> init</span><span style="color:#79B8FF"> -y</span></span>
+<span class="line"><span style="color:#B392F0">npm</span><span style="color:#9ECBFF"> install</span><span style="color:#9ECBFF"> @modelcontextprotocol/sdk</span></span>
+<span class="line"><span style="color:#B392F0">npm</span><span style="color:#9ECBFF"> install</span><span style="color:#79B8FF"> -D</span><span style="color:#9ECBFF"> typescript</span><span style="color:#9ECBFF"> vitest</span></span></code></pre>
+<h3 id="step-2-configure-typescript">Step 2: Configure TypeScript</h3>
+<p>Create <code>tsconfig.json</code>:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="json"><code><span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#79B8FF">  "compilerOptions"</span><span style="color:#E1E4E8">: {</span></span>
+<span class="line"><span style="color:#79B8FF">    "target"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"ES2022"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">    "module"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"NodeNext"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">    "moduleResolution"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"NodeNext"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">    "outDir"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"dist"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">    "rootDir"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"src"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">    "strict"</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">true</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">    "esModuleInterop"</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">true</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">    "declaration"</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">true</span></span>
+<span class="line"><span style="color:#E1E4E8">  },</span></span>
+<span class="line"><span style="color:#79B8FF">  "include"</span><span style="color:#E1E4E8">: [</span><span style="color:#9ECBFF">"src/**/*"</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<h3 id="step-3-implement-the-server">Step 3: Implement the Server</h3>
+<p>Create <code>src/index.ts</code> with your tool definitions and handlers. Follow the pattern shown in the source code example above.</p>
+<h3 id="step-4-build-and-set-permissions">Step 4: Build and Set Permissions</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">npx</span><span style="color:#9ECBFF"> tsc</span></span>
+<span class="line"><span style="color:#B392F0">chmod</span><span style="color:#9ECBFF"> +x</span><span style="color:#9ECBFF"> dist/index.js</span></span></code></pre>
+<h3 id="step-5-create-the-plugin-manifest">Step 5: Create the Plugin Manifest</h3>
+<p>Create <code>.claude-plugin/plugin.json</code> and <code>.mcp.json</code> as described above.</p>
+<h3 id="step-6-test-locally">Step 6: Test Locally</h3>
+<p>Build the plugin and verify the server starts:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#79B8FF">cd</span><span style="color:#9ECBFF"> plugins/mcp/my-mcp-plugin/</span></span>
+<span class="line"><span style="color:#B392F0">pnpm</span><span style="color:#9ECBFF"> build</span></span>
+<span class="line"><span style="color:#B392F0">node</span><span style="color:#9ECBFF"> dist/index.js</span></span></code></pre>
+<p>The server should start without errors and wait for input on stdin (since it uses the stdio transport).</p>
+<h2 id="transport-mechanisms">Transport Mechanisms</h2>
+<p>MCP supports two transport mechanisms for communication between the client (Claude Code) and the server (your plugin):</p>
+<h3 id="stdio-standard-io">stdio (Standard I/O)</h3>
+<p>The default and most common transport. Claude Code launches the server as a child process and communicates through stdin/stdout:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#F97583">import</span><span style="color:#E1E4E8"> { StdioServerTransport } </span><span style="color:#F97583">from</span><span style="color:#9ECBFF"> "@modelcontextprotocol/sdk/server/stdio.js"</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> transport</span><span style="color:#F97583"> =</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> StdioServerTransport</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#F97583">await</span><span style="color:#E1E4E8"> server.</span><span style="color:#B392F0">connect</span><span style="color:#E1E4E8">(transport);</span></span></code></pre>
+<p><strong>Advantages:</strong> Simple, no network configuration, works in sandboxed environments.
+<strong>Limitations:</strong> Server lifecycle is tied to the Claude Code process.</p>
+<h3 id="sse-server-sent-events">SSE (Server-Sent Events)</h3>
+<p>For servers that run independently (e.g., a shared team server or a remote service):</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#F97583">import</span><span style="color:#E1E4E8"> { SSEServerTransport } </span><span style="color:#F97583">from</span><span style="color:#9ECBFF"> "@modelcontextprotocol/sdk/server/sse.js"</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> transport</span><span style="color:#F97583"> =</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> SSEServerTransport</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"/messages"</span><span style="color:#E1E4E8">, response);</span></span>
+<span class="line"><span style="color:#F97583">await</span><span style="color:#E1E4E8"> server.</span><span style="color:#B392F0">connect</span><span style="color:#E1E4E8">(transport);</span></span></code></pre>
+<p><strong>Advantages:</strong> Server can run independently, shared across users, remote hosting.
+<strong>Limitations:</strong> Requires network access, more complex deployment.</p>
+<p>For most Claude Code plugins, stdio is the right choice. SSE is appropriate when you need a shared server that multiple team members connect to, or when the server needs to maintain long-lived connections to external services.</p>
+<h2 id="error-handling">Error Handling</h2>
+<p>Robust error handling is essential for MCP servers. When a tool call fails, Claude needs a clear error message to understand what went wrong and how to proceed.</p>
+<h3 id="returning-errors">Returning Errors</h3>
+<p>Return errors as text content with the <code>isError</code> flag:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#E1E4E8">server.</span><span style="color:#B392F0">setRequestHandler</span><span style="color:#E1E4E8">(CallToolRequestSchema, </span><span style="color:#F97583">async</span><span style="color:#E1E4E8"> (</span><span style="color:#FFAB70">request</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">  try</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">    const</span><span style="color:#79B8FF"> result</span><span style="color:#F97583"> =</span><span style="color:#F97583"> await</span><span style="color:#B392F0"> executeQuery</span><span style="color:#E1E4E8">(request.params.arguments?.query);</span></span>
+<span class="line"><span style="color:#F97583">    return</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">      content: [{ type: </span><span style="color:#9ECBFF">"text"</span><span style="color:#E1E4E8">, text: </span><span style="color:#79B8FF">JSON</span><span style="color:#E1E4E8">.</span><span style="color:#B392F0">stringify</span><span style="color:#E1E4E8">(result, </span><span style="color:#79B8FF">null</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">2</span><span style="color:#E1E4E8">) }],</span></span>
+<span class="line"><span style="color:#E1E4E8">    };</span></span>
+<span class="line"><span style="color:#E1E4E8">  } </span><span style="color:#F97583">catch</span><span style="color:#E1E4E8"> (error) {</span></span>
+<span class="line"><span style="color:#F97583">    return</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">      content: [</span></span>
+<span class="line"><span style="color:#E1E4E8">        {</span></span>
+<span class="line"><span style="color:#E1E4E8">          type: </span><span style="color:#9ECBFF">"text"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">          text: </span><span style="color:#9ECBFF">`Query failed: ${</span><span style="color:#E1E4E8">error</span><span style="color:#F97583"> instanceof</span><span style="color:#B392F0"> Error</span><span style="color:#F97583"> ?</span><span style="color:#E1E4E8"> error</span><span style="color:#9ECBFF">.</span><span style="color:#E1E4E8">message</span><span style="color:#F97583"> :</span><span style="color:#B392F0"> String</span><span style="color:#9ECBFF">(</span><span style="color:#E1E4E8">error</span><span style="color:#9ECBFF">)</span><span style="color:#9ECBFF">}`</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">        },</span></span>
+<span class="line"><span style="color:#E1E4E8">      ],</span></span>
+<span class="line"><span style="color:#E1E4E8">      isError: </span><span style="color:#79B8FF">true</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">    };</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">});</span></span></code></pre>
+<h3 id="common-error-patterns">Common Error Patterns</h3>
+<p><strong>Connection errors:</strong> When the external service is unavailable:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#F97583">if</span><span style="color:#E1E4E8"> (</span><span style="color:#F97583">!</span><span style="color:#E1E4E8">connection) {</span></span>
+<span class="line"><span style="color:#F97583">  return</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">    content: [{</span></span>
+<span class="line"><span style="color:#E1E4E8">      type: </span><span style="color:#9ECBFF">"text"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">      text: </span><span style="color:#9ECBFF">"Database connection not established. Set DATABASE_URL environment variable and restart Claude Code."</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">    }],</span></span>
+<span class="line"><span style="color:#E1E4E8">    isError: </span><span style="color:#79B8FF">true</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  };</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p><strong>Validation errors:</strong> When the input is invalid:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#F97583">if</span><span style="color:#E1E4E8"> (</span><span style="color:#F97583">!</span><span style="color:#E1E4E8">query.</span><span style="color:#B392F0">trim</span><span style="color:#E1E4E8">().</span><span style="color:#B392F0">toUpperCase</span><span style="color:#E1E4E8">().</span><span style="color:#B392F0">startsWith</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"SELECT"</span><span style="color:#E1E4E8">)) {</span></span>
+<span class="line"><span style="color:#F97583">  return</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">    content: [{</span></span>
+<span class="line"><span style="color:#E1E4E8">      type: </span><span style="color:#9ECBFF">"text"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">      text: </span><span style="color:#9ECBFF">"Only SELECT queries are allowed. This tool does not support INSERT, UPDATE, DELETE, or DDL statements."</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">    }],</span></span>
+<span class="line"><span style="color:#E1E4E8">    isError: </span><span style="color:#79B8FF">true</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  };</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p><strong>Rate limiting:</strong> When the external API throttles requests:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#F97583">if</span><span style="color:#E1E4E8"> (response.status </span><span style="color:#F97583">===</span><span style="color:#79B8FF"> 429</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> retryAfter</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> response.headers.</span><span style="color:#B392F0">get</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"retry-after"</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">||</span><span style="color:#9ECBFF"> "60"</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">  return</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">    content: [{</span></span>
+<span class="line"><span style="color:#E1E4E8">      type: </span><span style="color:#9ECBFF">"text"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">      text: </span><span style="color:#9ECBFF">`Rate limited by external API. Retry after ${</span><span style="color:#E1E4E8">retryAfter</span><span style="color:#9ECBFF">} seconds.`</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">    }],</span></span>
+<span class="line"><span style="color:#E1E4E8">    isError: </span><span style="color:#79B8FF">true</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  };</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<h2 id="security-considerations">Security Considerations</h2>
+<p>MCP servers have real-world impact — they connect to databases, APIs, and services. Security must be a first-class concern.</p>
+<h3 id="principle-of-least-privilege">Principle of Least Privilege</h3>
+<p>Grant the MCP server only the permissions it needs:</p>
+<ul>
+<li>Database tools should use read-only database users when possible</li>
+<li>API integrations should use scoped tokens with minimal permissions</li>
+<li>File system access should be limited to specific directories</li>
+</ul>
+<h3 id="input-validation">Input Validation</h3>
+<p>Never trust inputs from Claude directly. Validate and sanitize all parameters:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#6A737D">// Validate query is read-only</span></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> normalized</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> query.</span><span style="color:#B392F0">trim</span><span style="color:#E1E4E8">().</span><span style="color:#B392F0">toUpperCase</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#F97583">if</span><span style="color:#E1E4E8"> (normalized.</span><span style="color:#B392F0">startsWith</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"DROP"</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">||</span><span style="color:#E1E4E8"> normalized.</span><span style="color:#B392F0">startsWith</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"DELETE"</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">||</span></span>
+<span class="line"><span style="color:#E1E4E8">    normalized.</span><span style="color:#B392F0">startsWith</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"INSERT"</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">||</span><span style="color:#E1E4E8"> normalized.</span><span style="color:#B392F0">startsWith</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"UPDATE"</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">||</span></span>
+<span class="line"><span style="color:#E1E4E8">    normalized.</span><span style="color:#B392F0">startsWith</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"ALTER"</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">||</span><span style="color:#E1E4E8"> normalized.</span><span style="color:#B392F0">startsWith</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"CREATE"</span><span style="color:#E1E4E8">)) {</span></span>
+<span class="line"><span style="color:#F97583">  throw</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> Error</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"Only read-only queries are permitted"</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<h3 id="secret-management">Secret Management</h3>
+<p>Never hardcode secrets in your MCP server. Use environment variables configured in <code>.mcp.json</code>:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="json"><code><span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#79B8FF">  "mcpServers"</span><span style="color:#E1E4E8">: {</span></span>
+<span class="line"><span style="color:#79B8FF">    "my-server"</span><span style="color:#E1E4E8">: {</span></span>
+<span class="line"><span style="color:#79B8FF">      "command"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"node"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">      "args"</span><span style="color:#E1E4E8">: [</span><span style="color:#9ECBFF">"dist/index.js"</span><span style="color:#E1E4E8">],</span></span>
+<span class="line"><span style="color:#79B8FF">      "env"</span><span style="color:#E1E4E8">: {</span></span>
+<span class="line"><span style="color:#79B8FF">        "API_KEY"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"${MY_SERVICE_API_KEY}"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">        "DATABASE_URL"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"${DATABASE_URL}"</span></span>
+<span class="line"><span style="color:#E1E4E8">      }</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>Users set these environment variables in their shell profile. The values never appear in the plugin source code.</p>
+<h3 id="output-sanitization">Output Sanitization</h3>
+<p>Be careful about what your tools return. Avoid leaking sensitive data in tool responses:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#6A737D">// Strip sensitive columns before returning</span></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> sanitized</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> results.</span><span style="color:#B392F0">map</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">row</span><span style="color:#F97583"> =></span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#E1E4E8"> { </span><span style="color:#79B8FF">password_hash</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">api_key</span><span style="color:#E1E4E8">, </span><span style="color:#F97583">...</span><span style="color:#79B8FF">safe</span><span style="color:#E1E4E8"> } </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> row;</span></span>
+<span class="line"><span style="color:#F97583">  return</span><span style="color:#E1E4E8"> safe;</span></span>
+<span class="line"><span style="color:#E1E4E8">});</span></span></code></pre>
+<h2 id="mcp-servers-in-the-marketplace">MCP Servers in the Marketplace</h2>
+<p>The <a href="/">Tons of Skills marketplace</a> hosts MCP server plugins alongside AI instruction plugins. MCP plugins are identified by the <code>mcp</code> category in the <a href="/explore">Explore</a> page.</p>
+<p>When publishing an MCP server plugin to the marketplace:</p>
+<ul>
+<li>Ensure the compiled <code>dist/index.js</code> is included and has the correct permissions</li>
+<li>Document all required environment variables in the README</li>
+<li>List all exposed tools with their descriptions and parameter schemas</li>
+<li>Include a test suite (vitest) that covers the core tool logic</li>
+<li>Follow the <code>plugin.json</code> schema strictly — no extra fields</li>
+</ul>
+<p>The marketplace CI pipeline validates MCP plugins by running <code>pnpm build</code> and executing the test suite. Build failures or test failures block publishing.</p>
+<h2 id="consuming-mcp-servers">Consuming MCP Servers</h2>
+<p>From the user’s perspective, consuming an MCP server plugin is transparent. After installation, the server’s tools are available alongside Claude’s built-in tools. Users do not need to know which tools come from MCP servers versus which are built-in.</p>
+<p>However, MCP tools can be referenced in skill and agent configurations:</p>
+<h3 id="in-skills-allowed-tools">In Skills (allowed-tools)</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">allowed-tools</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Read, Glob, mcp__database-explorer__query_database</span></span></code></pre>
+<p>MCP tools use the naming convention <code>mcp__&#x3C;server-name>__&#x3C;tool-name></code> when referenced in <code>allowed-tools</code>.</p>
+<h3 id="in-agents-disallowedtools">In Agents (disallowedTools)</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">disallowedTools</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">  - </span><span style="color:#9ECBFF">"mcp__database-explorer__query_database"</span></span>
+<span class="line"><span style="color:#E1E4E8">  - </span><span style="color:#9ECBFF">"mcp__slack__send_message"</span></span></code></pre>
+<p>This allows fine-grained control over which MCP tools an agent or skill can access.</p>
+<h2 id="next-steps">Next Steps</h2>
+<ul>
+<li>Learn about the plugin system that hosts MCP servers: <a href="/docs/concepts/plugins">What Are Claude Code Plugins?</a></li>
+<li>Understand skills that can reference MCP tools: <a href="/docs/concepts/skills">Understanding Agent Skills (SKILL.md)</a></li>
+<li>See how agents can use or restrict MCP tools: <a href="/docs/concepts/agents">Claude Code Agents and Subagents</a></li>
+<li>Browse MCP server plugins: <a href="/explore">Explore Plugins</a></li>
+</ul>
+
+        </article>
+
+        <!-- Official Links Callout -->
+        <aside class="official-links" data-astro-cid-ya4srytn>
+            <h3 class="official-links-title" data-astro-cid-ya4srytn>Official Anthropic Documentation</h3>
+            <ul class="official-links-list" data-astro-cid-ya4srytn>
+              <li data-astro-cid-ya4srytn>
+                  <a href="https://modelcontextprotocol.io" target="_blank" rel="noopener noreferrer" data-astro-cid-ya4srytn>
+                    Model Context Protocol Specification
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-left:4px;vertical-align:middle;" data-astro-cid-ya4srytn><path d="M3.5 1.5H10.5V8.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-ya4srytn></path><path d="M10.5 1.5L1.5 10.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-ya4srytn></path></svg>
+                  </a>
+                </li><li data-astro-cid-ya4srytn>
+                  <a href="https://docs.anthropic.com/en/docs/claude-code/mcp" target="_blank" rel="noopener noreferrer" data-astro-cid-ya4srytn>
+                    Claude Code MCP Documentation
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-left:4px;vertical-align:middle;" data-astro-cid-ya4srytn><path d="M3.5 1.5H10.5V8.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-ya4srytn></path><path d="M10.5 1.5L1.5 10.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-ya4srytn></path></svg>
+                  </a>
+                </li><li data-astro-cid-ya4srytn>
+                  <a href="https://github.com/modelcontextprotocol/typescript-sdk" target="_blank" rel="noopener noreferrer" data-astro-cid-ya4srytn>
+                    MCP TypeScript SDK
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-left:4px;vertical-align:middle;" data-astro-cid-ya4srytn><path d="M3.5 1.5H10.5V8.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-ya4srytn></path><path d="M10.5 1.5L1.5 10.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-ya4srytn></path></svg>
+                  </a>
+                </li>
+            </ul>
+          </aside>
+
+        <!-- Related Docs -->
+        <aside class="related-docs" data-astro-cid-ya4srytn>
+            <h3 class="related-title" data-astro-cid-ya4srytn>Related Documentation</h3>
+            <div class="related-grid" data-astro-cid-ya4srytn>
+              <a href="/docs/concepts/plugins" class="related-card" data-astro-cid-ya4srytn>
+                  <span class="related-section" data-astro-cid-ya4srytn>Concepts</span>
+                  <span class="related-name" data-astro-cid-ya4srytn>What Are Claude Code Plugins?</span>
+                </a><a href="/docs/concepts/skills" class="related-card" data-astro-cid-ya4srytn>
+                  <span class="related-section" data-astro-cid-ya4srytn>Concepts</span>
+                  <span class="related-name" data-astro-cid-ya4srytn>Understanding Agent Skills (SKILL.md)</span>
+                </a><a href="/docs/concepts/agents" class="related-card" data-astro-cid-ya4srytn>
+                  <span class="related-section" data-astro-cid-ya4srytn>Concepts</span>
+                  <span class="related-name" data-astro-cid-ya4srytn>Claude Code Agents and Subagents</span>
+                </a>
+            </div>
+          </aside>
+
+        <!-- Prev/Next Navigation -->
+        <nav class="docs-nav-footer" data-astro-cid-ya4srytn>
+          <a href="/docs/concepts/commands-and-hooks" class="nav-link nav-prev" data-astro-cid-ya4srytn>
+              <span class="nav-label" data-astro-cid-ya4srytn>Previous</span>
+              <span class="nav-title" data-astro-cid-ya4srytn>Slash Commands and Hooks</span>
+            </a>
+          
+        </nav>
+      </div>
+    </div>
+  </div>
+
+  
+
+  
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Forty-Four Minutes Before First Pitch: An LLM Fallback Chain and a Live Probability Gauge in One Session — Tons of Skills Work Diary</title>
+    <meta name="description" content="Groq quota died 44 minutes before a live broadcast. The fix was a 4-tier LLM fallback chain ending in a facts-only renderer. Then we shipped JChad's Challenge in the same session.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://startaitools.com/posts/broadcast-day-llm-fallback-jchads-challenge/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/broadcast-day-llm-fallback-jchads-challenge/">
+    <meta property="og:title" content="Forty-Four Minutes Before First Pitch: An LLM Fallback Chain and a Live Probability Gauge in One Session — Tons of Skills Work Diary">
+    <meta property="og:description" content="Groq quota died 44 minutes before a live broadcast. The fix was a 4-tier LLM fallback chain ending in a facts-only renderer. Then we shipped JChad's Challenge in the same session.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="Forty-Four Minutes Before First Pitch: An LLM Fallback Chain and a Live Probability Gauge in One Session — Tons of Skills Work Diary">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/broadcast-day-llm-fallback-jchads-challenge/">
+    <meta name="twitter:title" content="Forty-Four Minutes Before First Pitch: An LLM Fallback Chain and a Live Probability Gauge in One Session — Tons of Skills Work Diary">
+    <meta name="twitter:description" content="Groq quota died 44 minutes before a live broadcast. The fix was a 4-tier LLM fallback chain ending in a facts-only renderer. Then we shipped JChad's Challenge in the same session.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"Forty-Four Minutes Before First Pitch: An LLM Fallback Chain and a Live Probability Gauge in One Session","description":"Groq quota died 44 minutes before a live broadcast. The fix was a 4-tier LLM fallback chain ending in a facts-only renderer. Then we shipped JChad's Challenge in the same session.","datePublished":"2026-04-29","url":"https://tonsofskills.com/blog/undefined","author":{"@type":"Person","name":"Jeremy Longshore"},"publisher":{"@type":"Organization","name":"Tons of Skills","url":"https://tonsofskills.com"}}</script>
+  
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.post-header[data-astro-cid-7jjqptxk]{background:var(--panel);padding:4rem 1.5rem 3rem;border-bottom:1px solid var(--border)}.post-header-inner[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto}.back-link[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3);text-decoration:none;display:inline-block;margin-bottom:1.5rem;transition:color .2s}.back-link[data-astro-cid-7jjqptxk]:hover{color:var(--primary)}.post-meta[data-astro-cid-7jjqptxk]{display:flex;align-items:center;gap:.75rem;margin-bottom:1rem}time[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3)}.featured-badge[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.2rem .6rem;background:#ce114126;color:var(--red);border-radius:0;font-weight:600;text-transform:uppercase;letter-spacing:.05em}.post-header[data-astro-cid-7jjqptxk] h1[data-astro-cid-7jjqptxk]{font-family:var(--font-body);font-size:clamp(1.5rem,4vw,2.2rem);font-weight:700;color:var(--text);line-height:1.25;margin-bottom:.75rem;letter-spacing:0}.post-desc[data-astro-cid-7jjqptxk]{color:var(--text-2);font-size:1.05rem;line-height:1.6;margin-bottom:1rem}.post-tags[data-astro-cid-7jjqptxk]{display:flex;gap:.4rem;flex-wrap:wrap}.tag[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.15rem .5rem;background:var(--surface-3);color:var(--text-3);border-radius:0}.post-body[data-astro-cid-7jjqptxk]{padding:3rem 1.5rem 4rem}.prose[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto;color:var(--text-2);line-height:1.8;font-size:1rem}.prose[data-astro-cid-7jjqptxk] h2{font-family:var(--font-body);font-size:1.5rem;font-weight:700;color:var(--text);margin:2.5rem 0 1rem;letter-spacing:0}.prose[data-astro-cid-7jjqptxk] h3{font-size:1.2rem;font-weight:600;color:var(--text);margin:2rem 0 .75rem}.prose[data-astro-cid-7jjqptxk] p{margin-bottom:1rem}.prose[data-astro-cid-7jjqptxk] ul,.prose[data-astro-cid-7jjqptxk] ol{margin:.5rem 0 1rem 1.5rem}.prose[data-astro-cid-7jjqptxk] li{margin-bottom:.35rem}.prose[data-astro-cid-7jjqptxk] strong{color:var(--text);font-weight:600}.prose[data-astro-cid-7jjqptxk] code{font-family:var(--font-mono);font-size:.88em;background:var(--surface-3);padding:.15em .35em;border-radius:0;color:var(--primary)}.prose[data-astro-cid-7jjqptxk] a{color:var(--primary);text-decoration:none}.prose[data-astro-cid-7jjqptxk] a:hover{text-decoration:underline}@media(max-width:768px){.post-header[data-astro-cid-7jjqptxk]{padding:3rem 1rem 2rem}.post-body[data-astro-cid-7jjqptxk]{padding:2rem 1rem 3rem}}
+</style></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  <article class="post" data-astro-cid-7jjqptxk>
+    <header class="post-header" data-astro-cid-7jjqptxk>
+      <div class="post-header-inner" data-astro-cid-7jjqptxk>
+        <a href="/blog" class="back-link" data-astro-cid-7jjqptxk>Back to Work Diary</a>
+        <div class="post-meta" data-astro-cid-7jjqptxk>
+          <time datetime="2026-04-29" data-astro-cid-7jjqptxk>April 28, 2026</time>
+          
+        </div>
+        <h1 data-astro-cid-7jjqptxk>Forty-Four Minutes Before First Pitch: An LLM Fallback Chain and a Live Probability Gauge in One Session</h1>
+        <p class="post-desc" data-astro-cid-7jjqptxk>Groq quota died 44 minutes before a live broadcast. The fix was a 4-tier LLM fallback chain ending in a facts-only renderer. Then we shipped JChad&#39;s Challenge in the same session.</p>
+        <div class="post-tags" data-astro-cid-7jjqptxk>
+          <span class="tag" data-astro-cid-7jjqptxk>ai-agents</span><span class="tag" data-astro-cid-7jjqptxk>ai-engineering</span><span class="tag" data-astro-cid-7jjqptxk>architecture</span><span class="tag" data-astro-cid-7jjqptxk>claude-code</span><span class="tag" data-astro-cid-7jjqptxk>devops</span><span class="tag" data-astro-cid-7jjqptxk>sports</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="post-body" data-astro-cid-7jjqptxk>
+      <div class="prose" data-astro-cid-7jjqptxk>
+        <h2 id="tldr">TL;DR</h2>
+<p>At 22:31 on 2026-04-29, Groq’s daily token quota for <code>braves-booth</code> (on-demand tier, 100K tokens/day) blew through 96.7% with first pitch 44 minutes away. The site was up and the data was flowing, but the storylines pane — the LLM-generated narrative the broadcast actually consumes — was about to go blank. The fix that landed before the broadcast started was a four-stage fallback chain: NVIDIA NIM Llama 3.3 70B as new primary, Groq 70B as warm secondary, Groq 8B as cold tertiary, and a deterministic facts-only renderer as the final floor. By the time the chain was deployed and serving, the producer asked for a second feature — a live AB-by-AB Monte Carlo probability gauge tracking a named on-air prediction by executive producer Jonathan Chadwick. JChad’s Challenge shipped in the same session, prior-art-checked, math-modelled, and live on the dashboard before the third inning. The thesis of this post is that when your free LLM tier dies 44 minutes before a live broadcast, the resilience pattern is the product. The same posture — ship the floor, then ship the feature — carried us from incident response into a genuinely novel artifact in one window.</p>
+<h2 id="section-1--the-44-minute-crisis">Section 1 — The 44-minute crisis</h2>
+<p>The Braves Booth Intelligence dashboard runs at <code>dixieroad.org</code> (since this session, also at the new canonical <code>scorecardecho.com</code>). It is the radio booth’s pre-game and live-game cockpit: GUMBO poller pulling MLB Stats every five seconds, a FastAPI Python sidecar driving pybaseball lookups, an Express backend assembling pre-game briefings, an SSE-pushed React frontend. The narrative copy that the booth reads on air is generated by an LLM call — <code>callLLM()</code> — which hits Groq’s free tier serving Llama 3.3 70B Versatile. That had been fine for nineteen straight game days.</p>
+<p>The check-in at 22:31 was routine. All three containers green. <code>/api/health</code> returning 200 in 40ms. SSE streaming. Logs clean except for one line that wasn’t:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>groq.error.RateLimitError: 429 Too Many Requests</span></span>
+<span class="line"><span>{</span></span>
+<span class="line"><span>  "error": {</span></span>
+<span class="line"><span>    "type": "tokens",</span></span>
+<span class="line"><span>    "message": "Rate limit reached for model llama-3.3-70b-versatile in organization</span></span>
+<span class="line"><span>                org_xxx: Limit 100000 tokens per day, Used 96749, Requested 4108"</span></span>
+<span class="line"><span>  }</span></span>
+<span class="line"><span>}</span></span></code></pre>
+<p>96,749 of 100,000 tokens used. Daily ceiling. Three thousand tokens of headroom against a single pre-game request that costs four thousand. First pitch in 44 minutes. The broadcast doesn’t care that we’re on a free tier.</p>
+<p>There were three real options. Pay Groq for a paid tier — fast, but it requires a billing decision the project doesn’t have approval for and a credit card that nobody had on file at 22:31. Wire Vertex AI on GCP — the dormant Vertex code path was still in the codebase from the Cloud Run era — but that would mean re-enabling a billable surface area we’d intentionally walked away from on 2026-04-14. Or build resilience: a fallback chain that survives any single provider’s quota event, with the floor low enough that storylines never come back empty.</p>
+<p>The third option was the only one that buys you something past tonight.</p>
+<h2 id="section-2--the-4-tier-fallback-design">Section 2 — The 4-tier fallback design</h2>
+<p>The first version of the chain was Groq 70B → Groq 8B → facts-only. That’s what landed in PR #52 a few minutes after midnight in transcript time. The second version — landed within the same hour, before broadcast — slotted NVIDIA NIM in as the new primary after a quick spec compare:</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Provider</th><th>Daily token cap</th><th>Per-minute cap</th><th>Authentication</th></tr></thead><tbody><tr><td>Groq Llama 3.3 70B (on-demand)</td><td>100K tokens/day</td><td>6K TPM</td><td>API key</td></tr><tr><td>NVIDIA NIM Llama 3.3 70B free</td><td>None</td><td>~40 RPM</td><td>API key</td></tr><tr><td>Groq Llama 3.1 8B free</td><td>500K tokens/day</td><td>30K TPM</td><td>API key</td></tr></tbody></table>
+<p>The big win is the absent daily cap on NVIDIA’s free tier. The braves-booth never bursts past 40 requests per minute — pregame is one large call, live narratives fire on inning boundaries — so request-rate limiting is not the binding constraint. Tokens-per-day is the constraint that just killed us, and NVIDIA doesn’t have one.</p>
+<p>The wrapper that made this practical is small. The whole thing is one TypeScript module:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#6A737D">// backend/src/services/llm.ts (excerpt)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">type</span><span style="color:#B392F0"> LLMResult</span><span style="color:#F97583"> =</span></span>
+<span class="line"><span style="color:#F97583">  |</span><span style="color:#E1E4E8"> { </span><span style="color:#FFAB70">ok</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> true</span><span style="color:#E1E4E8">; </span><span style="color:#FFAB70">text</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> string</span><span style="color:#E1E4E8">; </span><span style="color:#FFAB70">provider</span><span style="color:#F97583">:</span><span style="color:#B392F0"> Provider</span><span style="color:#E1E4E8">; </span><span style="color:#FFAB70">model</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> string</span><span style="color:#E1E4E8"> }</span></span>
+<span class="line"><span style="color:#F97583">  |</span><span style="color:#E1E4E8"> { </span><span style="color:#FFAB70">ok</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> false</span><span style="color:#E1E4E8">; </span><span style="color:#FFAB70">reason</span><span style="color:#F97583">:</span><span style="color:#9ECBFF"> 'all-providers-failed'</span><span style="color:#E1E4E8"> };</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> CHAIN</span><span style="color:#F97583">:</span><span style="color:#B392F0"> Provider</span><span style="color:#E1E4E8">[] </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> [</span><span style="color:#9ECBFF">'nvidia'</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">'groq-70b'</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">'groq-8b'</span><span style="color:#E1E4E8">];</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">export</span><span style="color:#F97583"> async</span><span style="color:#F97583"> function</span><span style="color:#B392F0"> callLLM</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">prompt</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> string</span><span style="color:#E1E4E8">, </span><span style="color:#FFAB70">opts</span><span style="color:#F97583">:</span><span style="color:#B392F0"> CallOpts</span><span style="color:#E1E4E8">)</span><span style="color:#F97583">:</span><span style="color:#B392F0"> Promise</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">LLMResult</span><span style="color:#E1E4E8">> {</span></span>
+<span class="line"><span style="color:#F97583">  for</span><span style="color:#E1E4E8"> (</span><span style="color:#F97583">const</span><span style="color:#79B8FF"> provider</span><span style="color:#F97583"> of</span><span style="color:#79B8FF"> CHAIN</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#F97583">    if</span><span style="color:#E1E4E8"> (</span><span style="color:#F97583">!</span><span style="color:#B392F0">isConfigured</span><span style="color:#E1E4E8">(provider)) </span><span style="color:#F97583">continue</span><span style="color:#E1E4E8">;          </span><span style="color:#6A737D">// skip if no API key</span></span>
+<span class="line"><span style="color:#F97583">    if</span><span style="color:#E1E4E8"> (</span><span style="color:#B392F0">isCircuitOpen</span><span style="color:#E1E4E8">(provider)) </span><span style="color:#F97583">continue</span><span style="color:#E1E4E8">;          </span><span style="color:#6A737D">// skip if recent fail</span></span>
+<span class="line"><span style="color:#F97583">    try</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">      const</span><span style="color:#79B8FF"> text</span><span style="color:#F97583"> =</span><span style="color:#F97583"> await</span><span style="color:#B392F0"> invokeProvider</span><span style="color:#E1E4E8">(provider, prompt, opts);</span></span>
+<span class="line"><span style="color:#B392F0">      closeCircuit</span><span style="color:#E1E4E8">(provider);</span></span>
+<span class="line"><span style="color:#F97583">      return</span><span style="color:#E1E4E8"> { ok: </span><span style="color:#79B8FF">true</span><span style="color:#E1E4E8">, text, provider, model: </span><span style="color:#B392F0">modelFor</span><span style="color:#E1E4E8">(provider) };</span></span>
+<span class="line"><span style="color:#E1E4E8">    } </span><span style="color:#F97583">catch</span><span style="color:#E1E4E8"> (err) {</span></span>
+<span class="line"><span style="color:#F97583">      const</span><span style="color:#79B8FF"> status</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> (err </span><span style="color:#F97583">as</span><span style="color:#B392F0"> ProviderError</span><span style="color:#E1E4E8">)?.status;</span></span>
+<span class="line"><span style="color:#F97583">      const</span><span style="color:#79B8FF"> transient</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> status </span><span style="color:#F97583">===</span><span style="color:#79B8FF"> 429</span><span style="color:#F97583"> ||</span><span style="color:#E1E4E8"> status </span><span style="color:#F97583">===</span><span style="color:#79B8FF"> 413</span><span style="color:#F97583"> ||</span><span style="color:#E1E4E8"> status </span><span style="color:#F97583">>=</span><span style="color:#79B8FF"> 500</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">      if</span><span style="color:#E1E4E8"> (transient) {</span></span>
+<span class="line"><span style="color:#B392F0">        openCircuit</span><span style="color:#E1E4E8">(provider, </span><span style="color:#6A737D">/* coolMs= */</span><span style="color:#79B8FF"> 60_000</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#E1E4E8">        log.</span><span style="color:#B392F0">warn</span><span style="color:#E1E4E8">({ provider, status }, </span><span style="color:#9ECBFF">'llm provider transient — falling through'</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#F97583">        continue</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">      }</span></span>
+<span class="line"><span style="color:#6A737D">      // 4xx that isn't 429/413 — unrecoverable for THIS call; fall through anyway</span></span>
+<span class="line"><span style="color:#E1E4E8">      log.</span><span style="color:#B392F0">error</span><span style="color:#E1E4E8">({ provider, status, err }, </span><span style="color:#9ECBFF">'llm provider unrecoverable — falling through'</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#F97583">  return</span><span style="color:#E1E4E8"> { ok: </span><span style="color:#79B8FF">false</span><span style="color:#E1E4E8">, reason: </span><span style="color:#9ECBFF">'all-providers-failed'</span><span style="color:#E1E4E8"> };</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>Three things in that block earn their place. First, <code>isCircuitOpen(provider)</code> — a sixty-second cool-down per provider after any transient error. Without it the chain re-pings a dead provider on every request and you get cascading 429s that consume what little quota recovers. Second, the explicit handling of HTTP 413 alongside 429. Groq’s 8B fallback turned out to be 413-prone on parallel narrative calls that fit the tokens-per-minute window but exceeded the per-request size limit; treating 413 like 429 keeps the chain moving instead of bailing. Third, returning a tagged <code>{ ok: false }</code> result rather than throwing — the caller is responsible for deciding what “no LLM” means in context.</p>
+<p>Above this wrapper sits the storylines pipeline, which handles <code>ok: false</code> by rendering from facts alone:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#6A737D">// backend/src/services/pregame.ts (excerpt)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> llmResult</span><span style="color:#F97583"> =</span><span style="color:#F97583"> await</span><span style="color:#B392F0"> callLLM</span><span style="color:#E1E4E8">(</span><span style="color:#B392F0">buildStorylinesPrompt</span><span style="color:#E1E4E8">(state), {</span></span>
+<span class="line"><span style="color:#E1E4E8">  maxTokens: </span><span style="color:#79B8FF">1200</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  temperature: </span><span style="color:#79B8FF">0.7</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">});</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">if</span><span style="color:#E1E4E8"> (llmResult.ok) {</span></span>
+<span class="line"><span style="color:#F97583">  return</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">    storylines: </span><span style="color:#B392F0">parseStorylinesJSON</span><span style="color:#E1E4E8">(llmResult.text),</span></span>
+<span class="line"><span style="color:#E1E4E8">    provenance: {</span></span>
+<span class="line"><span style="color:#E1E4E8">      source: </span><span style="color:#9ECBFF">'llm'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">      provider: llmResult.provider,</span></span>
+<span class="line"><span style="color:#E1E4E8">      model: llmResult.model,</span></span>
+<span class="line"><span style="color:#E1E4E8">      generatedAt: Date.</span><span style="color:#B392F0">now</span><span style="color:#E1E4E8">(),</span></span>
+<span class="line"><span style="color:#E1E4E8">    },</span></span>
+<span class="line"><span style="color:#E1E4E8">  };</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">// All LLM providers exhausted. Render from raw stats.</span></span>
+<span class="line"><span style="color:#E1E4E8">log.</span><span style="color:#B392F0">warn</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'llm chain exhausted — rendering facts-only briefing'</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#F97583">return</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  storylines: </span><span style="color:#B392F0">renderFactsOnly</span><span style="color:#E1E4E8">(state),     </span><span style="color:#6A737D">// deterministic, no model</span></span>
+<span class="line"><span style="color:#E1E4E8">  provenance: {</span></span>
+<span class="line"><span style="color:#E1E4E8">    source: </span><span style="color:#9ECBFF">'facts-only'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">    generatedAt: Date.</span><span style="color:#B392F0">now</span><span style="color:#E1E4E8">(),</span></span>
+<span class="line"><span style="color:#E1E4E8">  },</span></span>
+<span class="line"><span style="color:#E1E4E8">};</span></span></code></pre>
+<p>The <code>renderFactsOnly()</code> renderer is the floor. It’s a pure function over the same state object the LLM prompt is built from. It produces shorter, drier paragraphs — “Tarik Skubal enters with a 2.72 ERA and 9.41 K/9 over 36.1 IP. Ronald Acuña Jr. is hitting .276 with a .894 OPS at home” — but nothing on the broadcast page goes blank. The producer can read it on air without apology.</p>
+<p>The provenance field is load-bearing. Whichever path served the request gets stamped on the response. The frontend can choose to show “narrative by NVIDIA Llama 3.3 70B” in a footer or hide it entirely, but the audit trail is always there, and the in-memory cache key incorporates it so a facts-only briefing doesn’t permanently shadow a healthy LLM call. As soon as a provider comes back, the next request blows past the cache.</p>
+<p>The deploy itself was uneventful. <code>pnpm test</code> — 105 tests pass. <code>pnpm typecheck</code> — clean. Image rebuild, rolling restart, smoke test against <code>/api/pregame/824930</code> showed a fresh narrative arriving from NVIDIA: Acuña, Skubal, real numbers, no error log lines. PR #52 merged at 23:11. First pitch was 7:15 PM ET, twenty-four minutes later. The chain has held since.</p>
+<h2 id="section-3--jchads-challenge">Section 3 — JChad’s Challenge</h2>
+<p>The voice memo at 23:13 was characteristically ambitious: “Executive producer Jonathan Chadwick made a prediction that Matt Olson would be at .300 by the time they got to Denver batting average. I need you to pull all the stats, the Braves schedule, figure out all the possibilities, different ways in which… break it down into highly likely… make it fun though, fun project. We’re gonna post a little something maybe on the website. Called Jay Chad’s Challenge. Jay Chad Olson’s BA Challenge. I don’t know.”</p>
+<p>That’s a one-paragraph prompt for a feature with three unknowns: the math model, the prior art, and the live update mechanism. Plan mode kicked in.</p>
+<h3 id="prior-art-research">Prior art research</h3>
+<p>Before writing a line of TypeScript I ran the originality question — has anyone shipped a live, AB-by-AB probability tracker tied to a specific player milestone with a hard deadline? Searched MLB.com, FanGraphs, Baseball-Reference, MLB Player Tracker, Baseball Savant Game Feed, OddsTrader, FanGraphs Steamer Rest-of-Season projections. The closest analogs:</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Existing project</th><th>What it does</th><th>What it is missing</th></tr></thead><tbody><tr><td>MLB.com 2022 Aaron Judge HR pace tracker</td><td>Daily pace projection toward 60+ HRs</td><td>Daily, not live; pace not probability; no on-air tie</td></tr><tr><td>FanGraphs ZiPS / Steamer RoS</td><td>Daily-updated player projections</td><td>Daily; aggregate; no fan-facing widget</td></tr><tr><td>Baseball-Reference Milestone Watch</td><td>Static career-milestone countdowns</td><td>Static; no probability layer</td></tr><tr><td>OddsTrader player props</td><td>Sportsbook single-game prop projections</td><td>Single-game; sportsbook UX, not booth UX</td></tr><tr><td>Baseball Savant Game Feed</td><td>Live pitch-by-pitch Statcast</td><td>Pitch-level, not season-arc-milestone</td></tr></tbody></table>
+<p>None of them surface a live probability gauge that moves with each at-bat, anchored to a named on-air call by a specific person with a hard date deadline. That’s a small, defensible niche. The combination of <em>live</em>, <em>named-call-anchored</em>, and <em>deadline-shaped</em> clears the originality bar even though every individual ingredient (Monte Carlo, probability gauge, pace tracker) is well-trodden.</p>
+<h3 id="math-model">Math model</h3>
+<p>The first instinct — single binomial against remaining at-bats — undersells what’s actually happening. Olson’s path to .300 by Denver depends on <em>which</em> games are left, <em>who</em> he’s facing, and <em>where</em> they’re being played. The model that landed is a per-game Monte Carlo walking the actual schedule with per-game adjustments stacked multiplicatively against a blended baseline <code>pTrue</code>.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#6A737D">// backend/src/services/olson-challenge.ts (excerpt)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">function</span><span style="color:#B392F0"> blendTrueTalent</span><span style="color:#E1E4E8">(</span></span>
+<span class="line"><span style="color:#FFAB70">  seasonAvg</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> number</span><span style="color:#E1E4E8">,    </span><span style="color:#6A737D">// 2026 to date</span></span>
+<span class="line"><span style="color:#FFAB70">  careerAvg</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> number</span><span style="color:#E1E4E8">,    </span><span style="color:#6A737D">// last 3 seasons from getPlayerBio()</span></span>
+<span class="line"><span style="color:#FFAB70">  rolling21</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> number</span><span style="color:#E1E4E8">,    </span><span style="color:#6A737D">// rolling last-21-days from game log</span></span>
+<span class="line"><span style="color:#E1E4E8">)</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> number</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> blended</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> 0.45</span><span style="color:#F97583"> *</span><span style="color:#E1E4E8"> seasonAvg </span><span style="color:#F97583">+</span><span style="color:#79B8FF"> 0.30</span><span style="color:#F97583"> *</span><span style="color:#E1E4E8"> careerAvg </span><span style="color:#F97583">+</span><span style="color:#79B8FF"> 0.25</span><span style="color:#F97583"> *</span><span style="color:#E1E4E8"> rolling21;</span></span>
+<span class="line"><span style="color:#F97583">  return</span><span style="color:#B392F0"> clamp</span><span style="color:#E1E4E8">(blended, </span><span style="color:#79B8FF">0.220</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">0.330</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">function</span><span style="color:#B392F0"> pTrueForGame</span><span style="color:#E1E4E8">(</span></span>
+<span class="line"><span style="color:#FFAB70">  baseline</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> number</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#FFAB70">  game</span><span style="color:#F97583">:</span><span style="color:#B392F0"> ScheduledGame</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#FFAB70">  splits</span><span style="color:#F97583">:</span><span style="color:#B392F0"> PlayerSplits</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">)</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> number</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">  let</span><span style="color:#E1E4E8"> p </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> baseline;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">  // Opp starter handedness</span></span>
+<span class="line"><span style="color:#F97583">  if</span><span style="color:#E1E4E8"> (game.opponentSP.throws </span><span style="color:#F97583">===</span><span style="color:#9ECBFF"> 'L'</span><span style="color:#E1E4E8">) p </span><span style="color:#F97583">*=</span><span style="color:#E1E4E8"> splits.vsLHP_factor </span><span style="color:#F97583">??</span><span style="color:#79B8FF"> 0.84</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">  else</span><span style="color:#E1E4E8">                                p </span><span style="color:#F97583">*=</span><span style="color:#E1E4E8"> splits.vsRHP_factor </span><span style="color:#F97583">??</span><span style="color:#79B8FF"> 1.07</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">  // Opp starter ERA tier</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> era</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> game.opponentSP.seasonERA;</span></span>
+<span class="line"><span style="color:#F97583">  if</span><span style="color:#E1E4E8">      (era </span><span style="color:#F97583">&#x3C;</span><span style="color:#79B8FF"> 3.0</span><span style="color:#E1E4E8">)  p </span><span style="color:#F97583">*=</span><span style="color:#79B8FF"> 0.92</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">  else</span><span style="color:#F97583"> if</span><span style="color:#E1E4E8"> (era </span><span style="color:#F97583">&#x3C;</span><span style="color:#79B8FF"> 4.5</span><span style="color:#E1E4E8">)  p </span><span style="color:#F97583">*=</span><span style="color:#79B8FF"> 1.00</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">  else</span><span style="color:#E1E4E8">                 p </span><span style="color:#F97583">*=</span><span style="color:#79B8FF"> 1.08</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">  // Park factor (small static table keyed by venueId)</span></span>
+<span class="line"><span style="color:#E1E4E8">  p </span><span style="color:#F97583">*=</span><span style="color:#79B8FF"> PARK_FACTORS</span><span style="color:#E1E4E8">[game.venueId] </span><span style="color:#F97583">??</span><span style="color:#79B8FF"> 1.00</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">  // Home / Away</span></span>
+<span class="line"><span style="color:#E1E4E8">  p </span><span style="color:#F97583">*=</span><span style="color:#E1E4E8"> game.isHome </span><span style="color:#F97583">?</span><span style="color:#E1E4E8"> splits.homeFactor </span><span style="color:#F97583">:</span><span style="color:#E1E4E8"> splits.awayFactor;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">  return</span><span style="color:#B392F0"> clamp</span><span style="color:#E1E4E8">(p, </span><span style="color:#79B8FF">0.180</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">0.380</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>The clamps are not cosmetic. Without them, a brutal matchup (lefty starter, sub-3.00 ERA, pitcher’s park, on the road) can multiplicatively zero out the per-game <code>pTrue</code>, and a juicy one (righty starter, 5.00+ ERA, hitter’s park, at home) can peg it at one. Both extremes are wrong as priors. Olson is a real hitter against real pitching with real variance. Clamping to <code>[0.180, 0.380]</code> is the cheap way to keep the simulator honest.</p>
+<p>The Monte Carlo loop is twenty lines:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#F97583">function</span><span style="color:#B392F0"> simulate</span><span style="color:#E1E4E8">(</span></span>
+<span class="line"><span style="color:#FFAB70">  state</span><span style="color:#F97583">:</span><span style="color:#B392F0"> ChallengeState</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#FFAB70">  remaining</span><span style="color:#F97583">:</span><span style="color:#B392F0"> ScheduledGame</span><span style="color:#E1E4E8">[],</span></span>
+<span class="line"><span style="color:#FFAB70">  splits</span><span style="color:#F97583">:</span><span style="color:#B392F0"> PlayerSplits</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#FFAB70">  baseline</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> number</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#FFAB70">  N</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> 10_000</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">)</span><span style="color:#F97583">:</span><span style="color:#B392F0"> SimulationResult</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> finals</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> number</span><span style="color:#E1E4E8">[] </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> [];</span></span>
+<span class="line"><span style="color:#F97583">  let</span><span style="color:#E1E4E8"> aboveTarget </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> 0</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">  for</span><span style="color:#E1E4E8"> (</span><span style="color:#F97583">let</span><span style="color:#E1E4E8"> run </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> 0</span><span style="color:#E1E4E8">; run </span><span style="color:#F97583">&#x3C;</span><span style="color:#79B8FF"> N</span><span style="color:#E1E4E8">; run</span><span style="color:#F97583">++</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#F97583">    let</span><span style="color:#79B8FF"> H</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> state.hitsActual;</span></span>
+<span class="line"><span style="color:#F97583">    let</span><span style="color:#79B8FF"> AB</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> state.atBatsActual;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">    for</span><span style="color:#E1E4E8"> (</span><span style="color:#F97583">const</span><span style="color:#79B8FF"> game</span><span style="color:#F97583"> of</span><span style="color:#E1E4E8"> remaining) {</span></span>
+<span class="line"><span style="color:#F97583">      const</span><span style="color:#79B8FF"> ab</span><span style="color:#F97583"> =</span><span style="color:#B392F0"> sampleABDistribution</span><span style="color:#E1E4E8">(rng);          </span><span style="color:#6A737D">// 5/4/3/2/0 weighted</span></span>
+<span class="line"><span style="color:#F97583">      if</span><span style="color:#E1E4E8"> (ab </span><span style="color:#F97583">===</span><span style="color:#79B8FF"> 0</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">continue</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">      const</span><span style="color:#79B8FF"> p</span><span style="color:#F97583"> =</span><span style="color:#B392F0"> pTrueForGame</span><span style="color:#E1E4E8">(baseline, game, splits);</span></span>
+<span class="line"><span style="color:#F97583">      const</span><span style="color:#79B8FF"> h</span><span style="color:#F97583"> =</span><span style="color:#B392F0"> sampleBinomial</span><span style="color:#E1E4E8">(ab, p, rng);          </span><span style="color:#6A737D">// pure JS, ~10 lines</span></span>
+<span class="line"><span style="color:#79B8FF">      H</span><span style="color:#F97583"> +=</span><span style="color:#E1E4E8"> h;</span></span>
+<span class="line"><span style="color:#79B8FF">      AB</span><span style="color:#F97583"> +=</span><span style="color:#E1E4E8"> ab;</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">    const</span><span style="color:#79B8FF"> finalAvg</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> H</span><span style="color:#F97583"> /</span><span style="color:#79B8FF"> AB</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">    finals.</span><span style="color:#B392F0">push</span><span style="color:#E1E4E8">(finalAvg);</span></span>
+<span class="line"><span style="color:#F97583">    if</span><span style="color:#E1E4E8"> (finalAvg </span><span style="color:#F97583">>=</span><span style="color:#79B8FF"> 0.300</span><span style="color:#E1E4E8">) aboveTarget</span><span style="color:#F97583">++</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">  finals.</span><span style="color:#B392F0">sort</span><span style="color:#E1E4E8">((</span><span style="color:#FFAB70">a</span><span style="color:#E1E4E8">, </span><span style="color:#FFAB70">b</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> a </span><span style="color:#F97583">-</span><span style="color:#E1E4E8"> b);</span></span>
+<span class="line"><span style="color:#F97583">  return</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">    probAtOrAbove: aboveTarget </span><span style="color:#F97583">/</span><span style="color:#79B8FF"> N</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">    median: finals[</span><span style="color:#79B8FF">N</span><span style="color:#F97583"> >></span><span style="color:#79B8FF"> 1</span><span style="color:#E1E4E8">],</span></span>
+<span class="line"><span style="color:#E1E4E8">    p10: finals[Math.</span><span style="color:#B392F0">floor</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">N</span><span style="color:#F97583"> *</span><span style="color:#79B8FF"> 0.10</span><span style="color:#E1E4E8">)],</span></span>
+<span class="line"><span style="color:#E1E4E8">    p90: finals[Math.</span><span style="color:#B392F0">floor</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">N</span><span style="color:#F97583"> *</span><span style="color:#79B8FF"> 0.90</span><span style="color:#E1E4E8">)],</span></span>
+<span class="line"><span style="color:#E1E4E8">  };</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>10,000 runs × ~30 remaining games × ~4 ABs per game × the per-game adjustment work runs in well under 50ms in pure JS. There’s no external dependency, no Python sidecar call, no statistical library. The RNG is a deterministic xorshift32 seeded from <code>(playerId, gamePk, h, ab, lastUpdateMs)</code> so the same input state produces the same probability — important for caching and for the “if today flops” hypothetical the booth wanted to surface.</p>
+<h3 id="frontend-gauge">Frontend gauge</h3>
+<p>The card lives in IdleView between NextGameCard and StandingsSection. It subscribes to an SSE stream relayed off the existing GUMBO poller’s per-player boxscore extraction, which already detects line changes; the new event type is <code>olson-challenge</code>, the route is <code>/api/olson-challenge</code>, and the polling fallback for between-games hits the same route every five minutes:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="tsx"><code><span class="line"><span style="color:#6A737D">// frontend/src/hooks/useOlsonChallenge.ts (excerpt)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">export</span><span style="color:#F97583"> function</span><span style="color:#B392F0"> useOlsonChallenge</span><span style="color:#E1E4E8">() {</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#E1E4E8"> [</span><span style="color:#79B8FF">state</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">setState</span><span style="color:#E1E4E8">] </span><span style="color:#F97583">=</span><span style="color:#B392F0"> useState</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">OlsonChallengeState</span><span style="color:#F97583"> |</span><span style="color:#79B8FF"> null</span><span style="color:#E1E4E8">>(</span><span style="color:#79B8FF">null</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">  // Live mode: subscribe to SSE</span></span>
+<span class="line"><span style="color:#B392F0">  useEventStream</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'/api/events'</span><span style="color:#E1E4E8">, {</span></span>
+<span class="line"><span style="color:#B392F0">    onEvent</span><span style="color:#E1E4E8">: (</span><span style="color:#FFAB70">ev</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">      if</span><span style="color:#E1E4E8"> (ev.type </span><span style="color:#F97583">===</span><span style="color:#9ECBFF"> 'olson-challenge'</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#B392F0">        setState</span><span style="color:#E1E4E8">((</span><span style="color:#FFAB70">prev</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> ({</span></span>
+<span class="line"><span style="color:#F97583">          ...</span><span style="color:#E1E4E8">ev.data,</span></span>
+<span class="line"><span style="color:#E1E4E8">          trend: prev </span><span style="color:#F97583">?</span><span style="color:#E1E4E8"> Math.</span><span style="color:#B392F0">sign</span><span style="color:#E1E4E8">(ev.data.probAtOrAbove </span><span style="color:#F97583">-</span><span style="color:#E1E4E8"> prev.probAtOrAbove) </span><span style="color:#F97583">:</span><span style="color:#79B8FF"> 0</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">        }));</span></span>
+<span class="line"><span style="color:#E1E4E8">      }</span></span>
+<span class="line"><span style="color:#E1E4E8">    },</span></span>
+<span class="line"><span style="color:#E1E4E8">  });</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">  // Idle mode: poll every 5 min when no live game</span></span>
+<span class="line"><span style="color:#B392F0">  usePolling</span><span style="color:#E1E4E8">(</span></span>
+<span class="line"><span style="color:#E1E4E8">    () </span><span style="color:#F97583">=></span><span style="color:#B392F0"> fetchOlsonChallenge</span><span style="color:#E1E4E8">().</span><span style="color:#B392F0">then</span><span style="color:#E1E4E8">(setState),</span></span>
+<span class="line"><span style="color:#6A737D">    /* intervalMs= */</span><span style="color:#79B8FF"> 5</span><span style="color:#F97583"> *</span><span style="color:#79B8FF"> 60_000</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#6A737D">    /* enabled= */</span><span style="color:#F97583"> !</span><span style="color:#E1E4E8">state?.liveGameInProgress,</span></span>
+<span class="line"><span style="color:#E1E4E8">  );</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">  return</span><span style="color:#E1E4E8"> state;</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>The trend pill — <code>▲ +3%</code> after a hit, <code>▼ -2%</code> after an out, animates briefly — is the bit that gives the gauge its 538-election-needle-shaped charm. The probability ticking up <em>during the at-bat</em> is the thing nobody else has shipped, because nobody else has tied a probability gauge to a named on-air call with a hard deadline. That’s the originality budget the prior-art research bought.</p>
+<p>By the end of the session: 22 backend tests passing, 127 total backend suite green, frontend typecheck clean, frontend tests green. The card was rendering live on the IdleView. PR #53 included the JChad’s Challenge backend and frontend; PR was merged. The same session also included a vanity-but-warranted domain rebrand to <code>scorecardecho.com</code> via the Porkbun API (DNS records updated, Caddy block rewritten, dixieroad.org 301-redirected to the new canonical), so the JChad’s Challenge endpoint went live at both <code>https://dixieroad.org/api/olson-challenge</code> and <code>https://scorecardecho.com/api/olson-challenge</code>.</p>
+<h2 id="section-4--what-we-gave-up">Section 4 — What we gave up</h2>
+<p>The fallback chain and the gauge each carry tradeoffs that deserve naming, because resilience patterns and live widgets both have a way of accumulating debt that’s invisible on launch day.</p>
+<p><strong>A latency hop on cold-path requests.</strong> The chain’s circuit-breaker is per-provider, not global. A NVIDIA blip that opens its breaker re-routes the next request to Groq 70B with a small added latency from the failed first call. We measured roughly 200-400ms of dead time per cold-path, which on a 1.5-second pre-game generation is a 13-26% tail-latency tax. We accepted it. The alternative — racing all three providers in parallel — burns three times the token budget and is the exact failure mode the chain exists to prevent.</p>
+<p><strong>Model variance across providers.</strong> NVIDIA’s Llama 3.3 70B and Groq’s Llama 3.3 70B <em>should</em> return identical or near-identical text for identical prompts. They don’t. The serving stacks differ, sampling defaults differ, and even at temperature 0 we observe small lexical differences that occasionally surface in the booth’s narrative voice. We handle this by writing the storylines prompt to be model-portable (no provider-specific markdown quirks, no chain-of-thought prompting that varies in how each backend handles it) and by accepting that a cold-path narrative may read slightly differently from a hot-path one. A purist might want strict equivalence and a single primary; we’d rather have the chain.</p>
+<p><strong>Infrastructure surface area.</strong> Three API keys instead of one. Three sets of failure modes to monitor. Three providers’ terms of service to track. The NVIDIA NIM key landed in <code>.env</code>, gitignored, never committed; the rotation discipline is on the human, not the code. We added a startup log line that prints which providers are configured (<code>llm chain: nvidia=ok groq-70b=ok groq-8b=ok facts-only=ok</code>) so a missing key is obvious in a fresh deploy. That’s the cheapest version of monitoring; a Prometheus counter per provider per outcome is what we’d add next.</p>
+<p><strong>JChad’s Challenge is single-player.</strong> The math model is hard-coded around Matt Olson and around the .300-by-Denver call. We considered making it generic — any player, any milestone, any deadline — and explicitly rejected the generalization. Generic widgets are not stories. The story is <em>Chad called this on-air, Matt Olson is hitting .297, the Denver series is in eleven games, here is the live probability</em>. A generic version of that is a stat tool for analysts. The specific version is a fan-shaped, broadcast-shaped artifact. If a second on-air call surfaces, we’ll lift the abstraction then.</p>
+<p><strong>The probability surfaces a real number to a public audience.</strong> This is the tradeoff that took the longest to think through. A 38% probability tells a story; a 38% probability that drifts to 22% mid-game tells a different and slightly cruel story; a 38% probability that drifts to 22% mid-game <em>and is wrong because the per-game adjustments are imperfect</em> tells a story we don’t want to tell. We anchored on <em>transparency over precision</em>: the card has an expandable detail panel showing the median final AVG, the P10/P90 band, the hardest and easiest remaining matchups, and the deterministic “if today goes well” / “if today flops” hypotheticals. The model is openly imperfect; the imperfection is part of the story; the booth has more to talk about, not less.</p>
+<h2 id="also-shipped">Also shipped</h2>
+<p>The day’s cycle of work touched four other projects in parallel with the broadcast-day work, in roughly descending order of stakes.</p>
+<p><strong>The stale-briefing schema fix that ran 22:09–22:20 was the warm-up act for the LLM chain.</strong> The producer flagged “Casey Mize is the starter tonight” — except Mize was scratched and Skubal was the actual probable. The 22:08 briefing from the night before still had four “Mize” mentions and zero “Skubal” because the briefing was cached in SQLite without any pitcher-identity stamp. The fix: a migration that adds <code>away_pitcher_id</code> and <code>home_pitcher_id</code> columns to <code>pregame_briefings</code>, a write-path stamp on every briefing generation, and a read-path validator that compares stored pitcher IDs against the current <code>gameState.probablePitchers</code> and invalidates plus regenerates on mismatch. Branch <code>fix/pregame-pitcher-id-validation</code>, PR #51, merged. Validation proven live by tampering with stored IDs and watching the log emit <code>"Pregame briefing invalidated", reason="probable pitcher changed (stored away=666157 home=702275, current away=669373 home=702275)"</code>. Same posture as the LLM chain: durable schema, observable log, no human-only failsafe.</p>
+<p><strong>Twenty CRM v1.22.4 → v2.1.0 major upgrade with rollback discipline.</strong> The Twenty deploy had been pinned at v1.22.4 for reproducibility. The user asked for current; current was v2.1.0, which crosses a major and includes DB migrations. The sequence: pre-upgrade <code>pg_dump</code> to a 211KB gzipped file (the rollback artifact), release-notes scan for breaking changes (mostly fixes + i18n + AI feature defaults — no compose-config breakage), <code>TAG=v2.1</code> in <code>.env</code>, <code>docker compose up -d</code>. Post-upgrade verification: API health green, all 13 cohort People records preserved, the cohort Opportunity intact, 16 Notes intact, all 7 EMAIL_* env vars survived (SMTP wiring lived through the major upgrade because it was env-driven, not config-file-driven), all 5 containers healthy. Watchtower reconfigured to track <code>v2.1</code> floating tag for patches at 03:15 UTC. The 13 cohort members also got re-attributed from the placeholder “API CcA” creator to “Jeremy Longshore” via direct DB update on <code>createdByWorkspaceMemberId</code> and <code>createdByName</code> while preserving <code>createdBySource='API'</code> for audit honesty.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#6A737D"># Rollback recipe (what we'd run if v2.1 broke after restart)</span></span>
+<span class="line"><span style="color:#B392F0">docker</span><span style="color:#9ECBFF"> compose</span><span style="color:#9ECBFF"> down</span></span>
+<span class="line"><span style="color:#B392F0">gunzip</span><span style="color:#F97583"> &#x3C;</span><span style="color:#9ECBFF"> .twenty-pre-v2-backup.sql.gz</span><span style="color:#F97583"> |</span><span style="color:#B392F0"> docker</span><span style="color:#9ECBFF"> exec</span><span style="color:#79B8FF"> -i</span><span style="color:#9ECBFF"> twenty-db-1</span><span style="color:#9ECBFF"> psql</span><span style="color:#79B8FF"> -U</span><span style="color:#9ECBFF"> postgres</span><span style="color:#9ECBFF"> twenty</span></span>
+<span class="line"><span style="color:#B392F0">sed</span><span style="color:#79B8FF"> -i</span><span style="color:#9ECBFF"> 's/^TAG=v2.1$/TAG=v1.22.4/'</span><span style="color:#9ECBFF"> .env</span></span>
+<span class="line"><span style="color:#B392F0">docker</span><span style="color:#9ECBFF"> compose</span><span style="color:#9ECBFF"> up</span><span style="color:#79B8FF"> -d</span></span>
+<span class="line"><span style="color:#6A737D"># Verify against the backup-time row counts in person/opportunity/note/noteTarget</span></span></code></pre>
+<p>The rollback recipe is the durable artifact. If you don’t write the rollback recipe before the upgrade, the upgrade is a one-way door pretending to be a two-way door.</p>
+<p><strong>Kobiton plugin pilot — JWT REST API breakthrough.</strong> Earlier in the M1 review window we’d assumed a credential gap would block end-to-end Appium drive-throughs against Kobiton’s automate API. That assumption was overturned this session: the OAuth flow yields a JWT, the JWT works against Kobiton’s REST endpoints, and a full Appium session against a real device completed. Eight GitHub issues were backfilled with the citations, the snapshot tag was cut, and the R1 sitrep email went out to Stu and Frank. The pilot is now positioned for R2 mid-cycle re-validation on May 4.</p>
+<p><strong>Nixtla v1.9.0 release with public-readiness audit + 13-epic build plan.</strong> The day’s nixtla work landed v1.9.0, including F1 SDK migration baseline (the audit table that was corrected mid-PR via gemini and coderabbit review comments), a black-formatted timegpt-finetune-lab, a CI fix dropping the backslash escapes in the jq split filter for the plugin-validator, and a dependency floor bump to <code>nixtla>=0.7.3</code> across 7 plugins plus root. The 35-skill migration to the new validator landed alongside; a Tessl PR was audited and declined; the F1+F2 foundation work was scaffolded with a 13-epic build plan committed to beads.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#6A737D"># nixtla v1.9.0 release sanity check (post-tag)</span></span>
+<span class="line"><span style="color:#B392F0">git</span><span style="color:#9ECBFF"> fetch</span><span style="color:#79B8FF"> --tags</span></span>
+<span class="line"><span style="color:#B392F0">git</span><span style="color:#9ECBFF"> tag</span><span style="color:#79B8FF"> -l</span><span style="color:#F97583"> |</span><span style="color:#B392F0"> grep</span><span style="color:#9ECBFF"> '^v1.9.0$'</span><span style="color:#6A737D">                                      # exists</span></span>
+<span class="line"><span style="color:#B392F0">git</span><span style="color:#9ECBFF"> log</span><span style="color:#9ECBFF"> v1.8.0..v1.9.0</span><span style="color:#79B8FF"> --oneline</span><span style="color:#F97583"> |</span><span style="color:#B392F0"> wc</span><span style="color:#79B8FF"> -l</span><span style="color:#6A737D">                          # commit count</span></span>
+<span class="line"><span style="color:#B392F0">gh</span><span style="color:#9ECBFF"> release</span><span style="color:#9ECBFF"> view</span><span style="color:#9ECBFF"> v1.9.0</span><span style="color:#79B8FF"> --json</span><span style="color:#9ECBFF"> publishedAt,assets,body</span><span style="color:#F97583"> |</span><span style="color:#B392F0"> jq</span><span style="color:#9ECBFF"> .</span><span style="color:#6A737D">      # release artifact</span></span>
+<span class="line"><span style="color:#B392F0">pnpm</span><span style="color:#79B8FF"> -r</span><span style="color:#9ECBFF"> exec</span><span style="color:#9ECBFF"> audit-harness</span><span style="color:#9ECBFF"> verify</span><span style="color:#6A737D">                                  # no drift</span></span></code></pre>
+<h2 id="closing--the-thesis-revisited">Closing — the thesis revisited</h2>
+<p>The thesis at the top of this post was that the resilience pattern is the product. By the end of the session that statement reads less like a slogan and more like a description. The fallback chain <em>is</em> the broadcast-grade narrative engine — the LLM is just the fastest implementation of one of the four tiers. JChad’s Challenge <em>is</em> a feature only because the resilience floor was solid enough by 23:11 to free up the next 90 minutes for novel work. The chain bought the gauge. The gauge wouldn’t exist without the chain.</p>
+<p>The deeper lesson, the one I want to hold onto: when a free tier dies 44 minutes before a broadcast, “ship it” and “ship the floor” are the same instruction. You don’t get to choose between the urgent fix and the durable fix. You ship the durable fix because there isn’t time for two passes. The version of this story where we paid Groq for a paid tier and went back to bed gets us through tonight; the version where we built the fallback chain gets us through every tonight after that. Same window, same hour, two completely different artifacts at the end of it. The producer’s prediction-tracking widget is the receipt for picking the second version.</p>
+<h2 id="related-posts">Related Posts</h2>
+<ul>
+<li><a href="https://startaitools.com/posts/collaboratively-shaped-roadmap/">Four Primitives, Three Reviews: How a Contributor PR Reshaped a Roadmap</a> — design-rationale case study on convergent review reshaping a planned release</li>
+<li><a href="/blog/braves-postgame-expansion-and-two-ai-lessons/">Braves Postgame Expansion and Two AI Lessons</a> — earlier cycle of broadcast-grade resilience work in the same booth dashboard</li>
+<li><a href="/blog/audit-harness-v010-enforcement-travels-with-code/">audit-harness v0.10: Enforcement Travels With the Code</a> — the durable-fix-not-urgent-fix posture as applied to test enforcement infrastructure</li>
+</ul>
+      </div>
+    </div>
+  </article>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
