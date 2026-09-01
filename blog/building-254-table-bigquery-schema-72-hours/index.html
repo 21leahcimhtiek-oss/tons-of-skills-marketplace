@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Building a 254-Table BigQuery Schema in 72 Hours — Tons of Skills Work Diary</title>
+    <meta name="description" content="How we architected and deployed a massive 254-table BigQuery schema in just 72 hours, handling data from multiple sources at scale with 10,000 records/second throughput">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://startaitools.com/posts/building-a-254-table-bigquery-schema-in-72-hours/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/building-254-table-bigquery-schema-72-hours/">
+    <meta property="og:title" content="Building a 254-Table BigQuery Schema in 72 Hours — Tons of Skills Work Diary">
+    <meta property="og:description" content="How we architected and deployed a massive 254-table BigQuery schema in just 72 hours, handling data from multiple sources at scale with 10,000 records/second throughput">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="Building a 254-Table BigQuery Schema in 72 Hours — Tons of Skills Work Diary">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/building-254-table-bigquery-schema-72-hours/">
+    <meta name="twitter:title" content="Building a 254-Table BigQuery Schema in 72 Hours — Tons of Skills Work Diary">
+    <meta name="twitter:description" content="How we architected and deployed a massive 254-table BigQuery schema in just 72 hours, handling data from multiple sources at scale with 10,000 records/second throughput">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"Building a 254-Table BigQuery Schema in 72 Hours","description":"How we architected and deployed a massive 254-table BigQuery schema in just 72 hours, handling data from multiple sources at scale with 10,000 records/second throughput","datePublished":"2025-09-08","url":"https://tonsofskills.com/blog/undefined","author":{"@type":"Person","name":"Jeremy Longshore"},"publisher":{"@type":"Organization","name":"Tons of Skills","url":"https://tonsofskills.com"}}</script>
+  
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.post-header[data-astro-cid-7jjqptxk]{background:var(--panel);padding:4rem 1.5rem 3rem;border-bottom:1px solid var(--border)}.post-header-inner[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto}.back-link[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3);text-decoration:none;display:inline-block;margin-bottom:1.5rem;transition:color .2s}.back-link[data-astro-cid-7jjqptxk]:hover{color:var(--primary)}.post-meta[data-astro-cid-7jjqptxk]{display:flex;align-items:center;gap:.75rem;margin-bottom:1rem}time[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3)}.featured-badge[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.2rem .6rem;background:#ce114126;color:var(--red);border-radius:0;font-weight:600;text-transform:uppercase;letter-spacing:.05em}.post-header[data-astro-cid-7jjqptxk] h1[data-astro-cid-7jjqptxk]{font-family:var(--font-body);font-size:clamp(1.5rem,4vw,2.2rem);font-weight:700;color:var(--text);line-height:1.25;margin-bottom:.75rem;letter-spacing:0}.post-desc[data-astro-cid-7jjqptxk]{color:var(--text-2);font-size:1.05rem;line-height:1.6;margin-bottom:1rem}.post-tags[data-astro-cid-7jjqptxk]{display:flex;gap:.4rem;flex-wrap:wrap}.tag[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.15rem .5rem;background:var(--surface-3);color:var(--text-3);border-radius:0}.post-body[data-astro-cid-7jjqptxk]{padding:3rem 1.5rem 4rem}.prose[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto;color:var(--text-2);line-height:1.8;font-size:1rem}.prose[data-astro-cid-7jjqptxk] h2{font-family:var(--font-body);font-size:1.5rem;font-weight:700;color:var(--text);margin:2.5rem 0 1rem;letter-spacing:0}.prose[data-astro-cid-7jjqptxk] h3{font-size:1.2rem;font-weight:600;color:var(--text);margin:2rem 0 .75rem}.prose[data-astro-cid-7jjqptxk] p{margin-bottom:1rem}.prose[data-astro-cid-7jjqptxk] ul,.prose[data-astro-cid-7jjqptxk] ol{margin:.5rem 0 1rem 1.5rem}.prose[data-astro-cid-7jjqptxk] li{margin-bottom:.35rem}.prose[data-astro-cid-7jjqptxk] strong{color:var(--text);font-weight:600}.prose[data-astro-cid-7jjqptxk] code{font-family:var(--font-mono);font-size:.88em;background:var(--surface-3);padding:.15em .35em;border-radius:0;color:var(--primary)}.prose[data-astro-cid-7jjqptxk] a{color:var(--primary);text-decoration:none}.prose[data-astro-cid-7jjqptxk] a:hover{text-decoration:underline}@media(max-width:768px){.post-header[data-astro-cid-7jjqptxk]{padding:3rem 1rem 2rem}.post-body[data-astro-cid-7jjqptxk]{padding:2rem 1rem 3rem}}
+</style></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  <article class="post" data-astro-cid-7jjqptxk>
+    <header class="post-header" data-astro-cid-7jjqptxk>
+      <div class="post-header-inner" data-astro-cid-7jjqptxk>
+        <a href="/blog" class="back-link" data-astro-cid-7jjqptxk>Back to Work Diary</a>
+        <div class="post-meta" data-astro-cid-7jjqptxk>
+          <time datetime="2025-09-08" data-astro-cid-7jjqptxk>September 7, 2025</time>
+          
+        </div>
+        <h1 data-astro-cid-7jjqptxk>Building a 254-Table BigQuery Schema in 72 Hours</h1>
+        <p class="post-desc" data-astro-cid-7jjqptxk>How we architected and deployed a massive 254-table BigQuery schema in just 72 hours, handling data from multiple sources at scale with 10,000 records/second throughput</p>
+        <div class="post-tags" data-astro-cid-7jjqptxk>
+          <span class="tag" data-astro-cid-7jjqptxk>bigquery</span><span class="tag" data-astro-cid-7jjqptxk>data-architecture</span><span class="tag" data-astro-cid-7jjqptxk>google-cloud-platform</span><span class="tag" data-astro-cid-7jjqptxk>python</span><span class="tag" data-astro-cid-7jjqptxk>data-engineering</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="post-body" data-astro-cid-7jjqptxk>
+      <div class="prose" data-astro-cid-7jjqptxk>
+        <h2 id="the-challenge-zero-to-production-in-72-hours">The Challenge: Zero to Production in 72 Hours</h2>
+<p>In January 2025, we faced an ambitious challenge: build a production-ready data platform capable of ingesting, processing, and storing diagnostic data from multiple sources at massive scale. The requirements were clear but daunting:</p>
+<ul>
+<li><strong>254+ production tables</strong> in BigQuery</li>
+<li><strong>Multiple data sources</strong>: YouTube API, Reddit (PRAW), GitHub repositories, RSS feeds</li>
+<li><strong>Real-time processing</strong> with sub-100ms validation</li>
+<li><strong>10,000 records/second</strong> bulk import capability</li>
+<li><strong>Complete separation of concerns</strong> between data collection and storage</li>
+<li><strong>72-hour deadline</strong> for production deployment</li>
+</ul>
+<p>What followed was an intense sprint of architectural design, rapid prototyping, and systematic deployment that resulted in a fully operational BigQuery data warehouse now running as <code>diagnostic-pro-start-up</code> on Google Cloud Platform.</p>
+<h2 id="architecture-overview-the-four-project-symphony">Architecture Overview: The Four-Project Symphony</h2>
+<p>The key to achieving this scale and speed was a clean architectural separation into four interconnected projects, each with a specific responsibility:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>┌─────────────────────────────────────────────────────────────┐</span></span>
+<span class="line"><span>│                    DiagnosticPro Platform                    │</span></span>
+<span class="line"><span>├───────────────────────────────────────────────────────────────┤</span></span>
+<span class="line"><span>│                                                               │</span></span>
+<span class="line"><span>│  ┌─────────────────┐     ┌─────────────────┐                │</span></span>
+<span class="line"><span>│  │ daily-energizer │     │   rss_feeds     │                │</span></span>
+<span class="line"><span>│  │    workflow     │     │  (226 feeds)    │                │</span></span>
+<span class="line"><span>│  │      (N8N)      │     │                 │                │</span></span>
+<span class="line"><span>│  └────────┬────────┘     └────────┬────────┘                │</span></span>
+<span class="line"><span>│           │                        │                          │</span></span>
+<span class="line"><span>│           ▼                        ▼                          │</span></span>
+<span class="line"><span>│  ┌──────────────────────────────────────────┐                │</span></span>
+<span class="line"><span>│  │              scraper                      │                │</span></span>
+<span class="line"><span>│  │  ┌──────────┐  ┌──────────┐  ┌─────────┐│                │</span></span>
+<span class="line"><span>│  │  │ YouTube  │  │  Reddit  │  │ GitHub  ││                │</span></span>
+<span class="line"><span>│  │  │ Scraper  │  │   PRAW   │  │  Miner  ││                │</span></span>
+<span class="line"><span>│  │  └────┬─────┘  └────┬─────┘  └────┬────┘│                │</span></span>
+<span class="line"><span>│  │       │              │              │     │                │</span></span>
+<span class="line"><span>│  │       ▼              ▼              ▼     │                │</span></span>
+<span class="line"><span>│  │  ┌────────────────────────────────────┐  │                │</span></span>
+<span class="line"><span>│  │  │       Export Gateway               │  │                │</span></span>
+<span class="line"><span>│  │  │  /export_gateway/cloud_ready/      │  │                │</span></span>
+<span class="line"><span>│  │  └────────────────┬───────────────────┘  │                │</span></span>
+<span class="line"><span>│  └───────────────────┼───────────────────────┘                │</span></span>
+<span class="line"><span>│                      │                                        │</span></span>
+<span class="line"><span>│                      ▼                                        │</span></span>
+<span class="line"><span>│  ┌──────────────────────────────────────────┐                │</span></span>
+<span class="line"><span>│  │              schema                       │                │</span></span>
+<span class="line"><span>│  │  ┌────────────────────────────────────┐  │                │</span></span>
+<span class="line"><span>│  │  │    Data Pipeline Import            │  │                │</span></span>
+<span class="line"><span>│  │  │  /datapipeline_import/pending/     │  │                │</span></span>
+<span class="line"><span>│  │  └────────────────┬───────────────────┘  │                │</span></span>
+<span class="line"><span>│  │                   │                       │                │</span></span>
+<span class="line"><span>│  │                   ▼                       │                │</span></span>
+<span class="line"><span>│  │  ┌────────────────────────────────────┐  │                │</span></span>
+<span class="line"><span>│  │  │    BigQuery (254 Tables)           │  │                │</span></span>
+<span class="line"><span>│  │  │  diagnostic-pro-start-up           │  │                │</span></span>
+<span class="line"><span>│  │  │  :diagnosticpro_prod               │  │                │</span></span>
+<span class="line"><span>│  │  └────────────────────────────────────┘  │                │</span></span>
+<span class="line"><span>│  └───────────────────────────────────────────┘                │</span></span>
+<span class="line"><span>│                                                               │</span></span>
+<span class="line"><span>└───────────────────────────────────────────────────────────────┘</span></span></code></pre>
+<h3 id="the-export-gateway-pattern">The Export Gateway Pattern</h3>
+<p>The architectural breakthrough was implementing an <strong>Export Gateway Pattern</strong> that completely decouples data collection from storage:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#6A737D"># Export Gateway Structure</span></span>
+<span class="line"><span style="color:#F97583">/</span><span style="color:#E1E4E8">scraper</span><span style="color:#F97583">/</span><span style="color:#E1E4E8">export_gateway</span><span style="color:#F97583">/</span></span>
+<span class="line"><span style="color:#E1E4E8">├── raw</span><span style="color:#F97583">/</span><span style="color:#6A737D">              # Unprocessed data from scrapers</span></span>
+<span class="line"><span style="color:#E1E4E8">├── transformed</span><span style="color:#F97583">/</span><span style="color:#6A737D">      # Schema-validated data</span></span>
+<span class="line"><span style="color:#E1E4E8">├── cloud_ready</span><span style="color:#F97583">/</span><span style="color:#6A737D">      # NDJSON files ready for BigQuery</span></span>
+<span class="line"><span style="color:#E1E4E8">├── sent</span><span style="color:#F97583">/</span><span style="color:#6A737D">            # Successfully imported archives</span></span>
+<span class="line"><span style="color:#E1E4E8">└── failed</span><span style="color:#F97583">/</span><span style="color:#6A737D">          # Failed imports for retry</span></span></code></pre>
+<p>This pattern ensures:</p>
+<ul>
+<li><strong>No direct database access</strong> from scrapers</li>
+<li><strong>Single exit point</strong> for all collected data</li>
+<li><strong>Schema validation</strong> before BigQuery import</li>
+<li><strong>Automatic retry</strong> for failed imports</li>
+<li><strong>Complete audit trail</strong> of all data movement</li>
+</ul>
+<h2 id="technical-implementation-from-code-to-cloud">Technical Implementation: From Code to Cloud</h2>
+<h3 id="1-schema-definition-and-validation">1. Schema Definition and Validation</h3>
+<p>The heart of the system is a comprehensive schema definition that validates every piece of data before it enters BigQuery. Here’s how we structured the universal equipment registry:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="json"><code><span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#79B8FF">  "universal_equipment_registry"</span><span style="color:#E1E4E8">: {</span></span>
+<span class="line"><span style="color:#79B8FF">    "required_fields"</span><span style="color:#E1E4E8">: [</span></span>
+<span class="line"><span style="color:#9ECBFF">      "primary_id_type"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">      "primary_id_value"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">      "equipment_category"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">      "manufacturer"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">      "model"</span></span>
+<span class="line"><span style="color:#E1E4E8">    ],</span></span>
+<span class="line"><span style="color:#79B8FF">    "identification_types"</span><span style="color:#E1E4E8">: [</span></span>
+<span class="line"><span style="color:#9ECBFF">      "VIN"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"HIN"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"Serial"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"IMEI"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"ESN"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">      "Registration"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"AssetTag"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"MAC"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"UUID"</span></span>
+<span class="line"><span style="color:#E1E4E8">    ],</span></span>
+<span class="line"><span style="color:#79B8FF">    "equipment_categories"</span><span style="color:#E1E4E8">: [</span></span>
+<span class="line"><span style="color:#9ECBFF">      "passenger_vehicle"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"motorcycle"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"commercial_truck"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">      "boat"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"aircraft"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"construction"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"agricultural"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">      "generator"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"medical"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"industrial"</span></span>
+<span class="line"><span style="color:#E1E4E8">    ],</span></span>
+<span class="line"><span style="color:#79B8FF">    "validation_rules"</span><span style="color:#E1E4E8">: {</span></span>
+<span class="line"><span style="color:#79B8FF">      "VIN"</span><span style="color:#E1E4E8">: {</span></span>
+<span class="line"><span style="color:#79B8FF">        "length"</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">17</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">        "pattern"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"^[A-HJ-NPR-Z0-9]{17}$"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">        "description"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"17-character Vehicle Identification Number"</span></span>
+<span class="line"><span style="color:#E1E4E8">      },</span></span>
+<span class="line"><span style="color:#79B8FF">      "IMEI"</span><span style="color:#E1E4E8">: {</span></span>
+<span class="line"><span style="color:#79B8FF">        "length"</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">15</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">        "pattern"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"^[0-9]{15}$"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">        "description"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"15-digit International Mobile Equipment Identity"</span></span>
+<span class="line"><span style="color:#E1E4E8">      }</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<h3 id="2-high-performance-bulk-import-pipeline">2. High-Performance Bulk Import Pipeline</h3>
+<p>The BigQuery import pipeline achieves 10,000 records/second through optimized batch processing:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#6A737D">#!/bin/bash</span></span>
+<span class="line"><span style="color:#6A737D"># bigquery_import_pipeline.sh - Production Import Script</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79B8FF">set</span><span style="color:#79B8FF"> -e</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Configuration</span></span>
+<span class="line"><span style="color:#E1E4E8">PROJECT_ID</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">"diagnostic-pro-start-up"</span></span>
+<span class="line"><span style="color:#E1E4E8">DATASET_ID</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">"diagnosticpro_prod"</span></span>
+<span class="line"><span style="color:#E1E4E8">DATA_DIR</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">""</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Parallel import function</span></span>
+<span class="line"><span style="color:#B392F0">import_table</span><span style="color:#E1E4E8">() {</span></span>
+<span class="line"><span style="color:#F97583">    local</span><span style="color:#E1E4E8"> table_name</span><span style="color:#F97583">=</span><span style="color:#FFAB70">$1</span></span>
+<span class="line"><span style="color:#F97583">    local</span><span style="color:#E1E4E8"> data_file</span><span style="color:#F97583">=</span><span style="color:#FFAB70">$2</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">    bq</span><span style="color:#9ECBFF"> load</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">        --source_format=NEWLINE_DELIMITED_JSON</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">        --autodetect</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">        --write_disposition=WRITE_TRUNCATE</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">        --max_bad_records=100</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">        --ignore_unknown_values</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#E1E4E8">        $PROJECT_ID</span><span style="color:#9ECBFF">:</span><span style="color:#E1E4E8">$DATASET_ID</span><span style="color:#9ECBFF">.</span><span style="color:#E1E4E8">$table_name </span><span style="color:#79B8FF">\</span></span>
+<span class="line"><span style="color:#E1E4E8">        $data_file &#x26;</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Launch parallel imports (up to 10 simultaneous)</span></span>
+<span class="line"><span style="color:#F97583">for</span><span style="color:#E1E4E8"> ndjson_file </span><span style="color:#F97583">in</span><span style="color:#E1E4E8"> $DATA_DIR</span><span style="color:#9ECBFF">/*.ndjson</span><span style="color:#E1E4E8">; </span><span style="color:#F97583">do</span></span>
+<span class="line"><span style="color:#E1E4E8">    table_name</span><span style="color:#F97583">=</span><span style="color:#E1E4E8">$(</span><span style="color:#B392F0">basename</span><span style="color:#E1E4E8"> $ndjson_file </span><span style="color:#9ECBFF">.ndjson</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#B392F0">    import_table</span><span style="color:#E1E4E8"> $table_name $ndjson_file</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">    # Limit parallel jobs</span></span>
+<span class="line"><span style="color:#F97583">    while</span><span style="color:#E1E4E8"> [ $(</span><span style="color:#79B8FF">jobs</span><span style="color:#79B8FF"> -r</span><span style="color:#F97583"> |</span><span style="color:#B392F0"> wc</span><span style="color:#79B8FF"> -l</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">-ge</span><span style="color:#79B8FF"> 10</span><span style="color:#E1E4E8"> ]; </span><span style="color:#F97583">do</span></span>
+<span class="line"><span style="color:#B392F0">        sleep</span><span style="color:#79B8FF"> 1</span></span>
+<span class="line"><span style="color:#F97583">    done</span></span>
+<span class="line"><span style="color:#F97583">done</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Wait for all imports to complete</span></span>
+<span class="line"><span style="color:#79B8FF">wait</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79B8FF">echo</span><span style="color:#9ECBFF"> "✅ All imports completed successfully"</span></span></code></pre>
+<h3 id="3-data-collection-at-scale">3. Data Collection at Scale</h3>
+<p>Each scraper is optimized for its specific data source. Here’s the YouTube scraper architecture:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#F97583">class</span><span style="color:#B392F0"> YouTubeMassiveExtractor</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#9ECBFF">    """High-performance YouTube data extraction"""</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">    def</span><span style="color:#79B8FF"> __init__</span><span style="color:#E1E4E8">(self):</span></span>
+<span class="line"><span style="color:#79B8FF">        self</span><span style="color:#E1E4E8">.batch_size </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> 50</span><span style="color:#6A737D">  # YouTube API max</span></span>
+<span class="line"><span style="color:#79B8FF">        self</span><span style="color:#E1E4E8">.export_gateway </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> Path(</span><span style="color:#9ECBFF">"/scraper/export_gateway/raw"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#79B8FF">        self</span><span style="color:#E1E4E8">.session_pool </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> self</span><span style="color:#E1E4E8">._create_session_pool()</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">    def</span><span style="color:#B392F0"> extract_channel_batch</span><span style="color:#E1E4E8">(self, channel_ids):</span></span>
+<span class="line"><span style="color:#9ECBFF">        """Extract videos from multiple channels in parallel"""</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">        # Build batch request</span></span>
+<span class="line"><span style="color:#E1E4E8">        batch_request </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> self</span><span style="color:#E1E4E8">.youtube.new_batch_http_request()</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">        for</span><span style="color:#E1E4E8"> channel_id </span><span style="color:#F97583">in</span><span style="color:#E1E4E8"> channel_ids[:</span><span style="color:#79B8FF">50</span><span style="color:#E1E4E8">]:  </span><span style="color:#6A737D"># API limit</span></span>
+<span class="line"><span style="color:#E1E4E8">            request </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> self</span><span style="color:#E1E4E8">.youtube.channels().list(</span></span>
+<span class="line"><span style="color:#FFAB70">                part</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">"snippet,statistics,contentDetails"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#FFAB70">                id</span><span style="color:#F97583">=</span><span style="color:#E1E4E8">channel_id</span></span>
+<span class="line"><span style="color:#E1E4E8">            )</span></span>
+<span class="line"><span style="color:#E1E4E8">            batch_request.add(request, </span><span style="color:#FFAB70">callback</span><span style="color:#F97583">=</span><span style="color:#79B8FF">self</span><span style="color:#E1E4E8">._process_channel)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">        # Execute batch</span></span>
+<span class="line"><span style="color:#E1E4E8">        batch_request.execute()</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">    def</span><span style="color:#B392F0"> _process_channel</span><span style="color:#E1E4E8">(self, request_id, response, exception):</span></span>
+<span class="line"><span style="color:#9ECBFF">        """Process individual channel response"""</span></span>
+<span class="line"><span style="color:#F97583">        if</span><span style="color:#E1E4E8"> exception:</span></span>
+<span class="line"><span style="color:#79B8FF">            self</span><span style="color:#E1E4E8">._handle_error(exception)</span></span>
+<span class="line"><span style="color:#F97583">            return</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">        # Extract and transform data</span></span>
+<span class="line"><span style="color:#E1E4E8">        channel_data </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> self</span><span style="color:#E1E4E8">._transform_channel_data(response)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">        # Write to export gateway</span></span>
+<span class="line"><span style="color:#E1E4E8">        output_file </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> self</span><span style="color:#E1E4E8">.export_gateway </span><span style="color:#F97583">/</span><span style="color:#F97583"> f</span><span style="color:#9ECBFF">"youtube_</span><span style="color:#79B8FF">{</span><span style="color:#E1E4E8">request_id</span><span style="color:#79B8FF">}</span><span style="color:#9ECBFF">.json"</span></span>
+<span class="line"><span style="color:#F97583">        with</span><span style="color:#79B8FF"> open</span><span style="color:#E1E4E8">(output_file, </span><span style="color:#9ECBFF">'w'</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">as</span><span style="color:#E1E4E8"> f:</span></span>
+<span class="line"><span style="color:#E1E4E8">            json.dump(channel_data, f)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">        # Trigger validation pipeline</span></span>
+<span class="line"><span style="color:#79B8FF">        self</span><span style="color:#E1E4E8">._notify_validation_pipeline(output_file)</span></span></code></pre>
+<h3 id="4-schema-validation-pipeline">4. Schema Validation Pipeline</h3>
+<p>Before data enters BigQuery, it passes through a rigorous validation pipeline:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#F97583">class</span><span style="color:#B392F0"> SchemaValidator</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#9ECBFF">    """Validates data against BigQuery schema requirements"""</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">    def</span><span style="color:#79B8FF"> __init__</span><span style="color:#E1E4E8">(self, schema_rules_path):</span></span>
+<span class="line"><span style="color:#F97583">        with</span><span style="color:#79B8FF"> open</span><span style="color:#E1E4E8">(schema_rules_path) </span><span style="color:#F97583">as</span><span style="color:#E1E4E8"> f:</span></span>
+<span class="line"><span style="color:#79B8FF">            self</span><span style="color:#E1E4E8">.rules </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> json.load(f)</span></span>
+<span class="line"><span style="color:#79B8FF">        self</span><span style="color:#E1E4E8">.validation_cache </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> {}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">    def</span><span style="color:#B392F0"> validate_batch</span><span style="color:#E1E4E8">(self, records, table_name):</span></span>
+<span class="line"><span style="color:#9ECBFF">        """Validate a batch of records with sub-100ms performance"""</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">        start_time </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> time.perf_counter()</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">        # Get cached schema or load</span></span>
+<span class="line"><span style="color:#F97583">        if</span><span style="color:#E1E4E8"> table_name </span><span style="color:#F97583">not</span><span style="color:#F97583"> in</span><span style="color:#79B8FF"> self</span><span style="color:#E1E4E8">.validation_cache:</span></span>
+<span class="line"><span style="color:#79B8FF">            self</span><span style="color:#E1E4E8">.validation_cache[table_name] </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> self</span><span style="color:#E1E4E8">._load_schema(table_name)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">        schema </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> self</span><span style="color:#E1E4E8">.validation_cache[table_name]</span></span>
+<span class="line"><span style="color:#E1E4E8">        errors </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> []</span></span>
+<span class="line"><span style="color:#E1E4E8">        validated </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> []</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">        # Parallel validation using numpy for numeric fields</span></span>
+<span class="line"><span style="color:#F97583">        if</span><span style="color:#79B8FF"> self</span><span style="color:#E1E4E8">._has_numeric_fields(schema):</span></span>
+<span class="line"><span style="color:#E1E4E8">            numeric_valid </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> self</span><span style="color:#E1E4E8">._validate_numeric_batch(records, schema)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">        # String validation with compiled regex</span></span>
+<span class="line"><span style="color:#F97583">        for</span><span style="color:#E1E4E8"> idx, record </span><span style="color:#F97583">in</span><span style="color:#79B8FF"> enumerate</span><span style="color:#E1E4E8">(records):</span></span>
+<span class="line"><span style="color:#F97583">            try</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#6A737D">                # Check required fields</span></span>
+<span class="line"><span style="color:#F97583">                for</span><span style="color:#E1E4E8"> field </span><span style="color:#F97583">in</span><span style="color:#E1E4E8"> schema[</span><span style="color:#9ECBFF">'required_fields'</span><span style="color:#E1E4E8">]:</span></span>
+<span class="line"><span style="color:#F97583">                    if</span><span style="color:#E1E4E8"> field </span><span style="color:#F97583">not</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> record </span><span style="color:#F97583">or</span><span style="color:#E1E4E8"> record[field] </span><span style="color:#F97583">is</span><span style="color:#79B8FF"> None</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#F97583">                        raise</span><span style="color:#79B8FF"> ValueError</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">f</span><span style="color:#9ECBFF">"Missing required field: </span><span style="color:#79B8FF">{</span><span style="color:#E1E4E8">field</span><span style="color:#79B8FF">}</span><span style="color:#9ECBFF">"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">                # Validate patterns</span></span>
+<span class="line"><span style="color:#F97583">                for</span><span style="color:#E1E4E8"> field, pattern </span><span style="color:#F97583">in</span><span style="color:#E1E4E8"> schema.get(</span><span style="color:#9ECBFF">'patterns'</span><span style="color:#E1E4E8">, {}).items():</span></span>
+<span class="line"><span style="color:#F97583">                    if</span><span style="color:#E1E4E8"> field </span><span style="color:#F97583">in</span><span style="color:#E1E4E8"> record </span><span style="color:#F97583">and</span><span style="color:#F97583"> not</span><span style="color:#E1E4E8"> pattern.match(</span><span style="color:#79B8FF">str</span><span style="color:#E1E4E8">(record[field])):</span></span>
+<span class="line"><span style="color:#F97583">                        raise</span><span style="color:#79B8FF"> ValueError</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">f</span><span style="color:#9ECBFF">"Invalid format for </span><span style="color:#79B8FF">{</span><span style="color:#E1E4E8">field</span><span style="color:#79B8FF">}</span><span style="color:#9ECBFF">"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">                validated.append(record)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">            except</span><span style="color:#79B8FF"> Exception</span><span style="color:#F97583"> as</span><span style="color:#E1E4E8"> e:</span></span>
+<span class="line"><span style="color:#E1E4E8">                errors.append({</span></span>
+<span class="line"><span style="color:#9ECBFF">                    'record_idx'</span><span style="color:#E1E4E8">: idx,</span></span>
+<span class="line"><span style="color:#9ECBFF">                    'error'</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">str</span><span style="color:#E1E4E8">(e),</span></span>
+<span class="line"><span style="color:#9ECBFF">                    'record'</span><span style="color:#E1E4E8">: record</span></span>
+<span class="line"><span style="color:#E1E4E8">                })</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">        elapsed </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> (time.perf_counter() </span><span style="color:#F97583">-</span><span style="color:#E1E4E8"> start_time) </span><span style="color:#F97583">*</span><span style="color:#79B8FF"> 1000</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">        return</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#9ECBFF">            'valid'</span><span style="color:#E1E4E8">: validated,</span></span>
+<span class="line"><span style="color:#9ECBFF">            'errors'</span><span style="color:#E1E4E8">: errors,</span></span>
+<span class="line"><span style="color:#9ECBFF">            'elapsed_ms'</span><span style="color:#E1E4E8">: elapsed,</span></span>
+<span class="line"><span style="color:#9ECBFF">            'performance'</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">'PASS'</span><span style="color:#F97583"> if</span><span style="color:#E1E4E8"> elapsed </span><span style="color:#F97583">&#x3C;</span><span style="color:#79B8FF"> 100</span><span style="color:#F97583"> else</span><span style="color:#9ECBFF"> 'SLOW'</span></span>
+<span class="line"><span style="color:#E1E4E8">        }</span></span></code></pre>
+<h3 id="5-production-deployment-script">5. Production Deployment Script</h3>
+<p>The final deployment to BigQuery’s 254 tables was automated:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#6A737D">#!/usr/bin/env python3</span></span>
+<span class="line"><span style="color:#9ECBFF">"""Deploy all 254 BigQuery tables in production"""</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">import</span><span style="color:#E1E4E8"> concurrent.futures</span></span>
+<span class="line"><span style="color:#F97583">from</span><span style="color:#E1E4E8"> google.cloud </span><span style="color:#F97583">import</span><span style="color:#E1E4E8"> bigquery</span></span>
+<span class="line"><span style="color:#F97583">import</span><span style="color:#E1E4E8"> json</span></span>
+<span class="line"><span style="color:#F97583">from</span><span style="color:#E1E4E8"> pathlib </span><span style="color:#F97583">import</span><span style="color:#E1E4E8"> Path</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">class</span><span style="color:#B392F0"> BigQueryDeployer</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#F97583">    def</span><span style="color:#79B8FF"> __init__</span><span style="color:#E1E4E8">(self):</span></span>
+<span class="line"><span style="color:#79B8FF">        self</span><span style="color:#E1E4E8">.client </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> bigquery.Client(</span><span style="color:#FFAB70">project</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">"diagnostic-pro-start-up"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#79B8FF">        self</span><span style="color:#E1E4E8">.dataset_id </span><span style="color:#F97583">=</span><span style="color:#9ECBFF"> "diagnosticpro_prod"</span></span>
+<span class="line"><span style="color:#79B8FF">        self</span><span style="color:#E1E4E8">.schema_dir </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> Path(</span><span style="color:#9ECBFF">""</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">    def</span><span style="color:#B392F0"> deploy_all_tables</span><span style="color:#E1E4E8">(self):</span></span>
+<span class="line"><span style="color:#9ECBFF">        """Deploy 254 tables in parallel"""</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">        # Get all table definitions</span></span>
+<span class="line"><span style="color:#E1E4E8">        table_files </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> list</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">self</span><span style="color:#E1E4E8">.schema_dir.glob(</span><span style="color:#9ECBFF">"*.json"</span><span style="color:#E1E4E8">))</span></span>
+<span class="line"><span style="color:#79B8FF">        print</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">f</span><span style="color:#9ECBFF">"📊 Found </span><span style="color:#79B8FF">{len</span><span style="color:#E1E4E8">(table_files)</span><span style="color:#79B8FF">}</span><span style="color:#9ECBFF"> table definitions"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">        # Deploy in parallel batches of 10</span></span>
+<span class="line"><span style="color:#F97583">        with</span><span style="color:#E1E4E8"> concurrent.futures.ThreadPoolExecutor(</span><span style="color:#FFAB70">max_workers</span><span style="color:#F97583">=</span><span style="color:#79B8FF">10</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">as</span><span style="color:#E1E4E8"> executor:</span></span>
+<span class="line"><span style="color:#E1E4E8">            futures </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> []</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">            for</span><span style="color:#E1E4E8"> table_file </span><span style="color:#F97583">in</span><span style="color:#E1E4E8"> table_files:</span></span>
+<span class="line"><span style="color:#E1E4E8">                future </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> executor.submit(</span><span style="color:#79B8FF">self</span><span style="color:#E1E4E8">._deploy_table, table_file)</span></span>
+<span class="line"><span style="color:#E1E4E8">                futures.append((table_file.stem, future))</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">            # Track progress</span></span>
+<span class="line"><span style="color:#E1E4E8">            completed </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> 0</span></span>
+<span class="line"><span style="color:#E1E4E8">            failed </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> []</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">            for</span><span style="color:#E1E4E8"> table_name, future </span><span style="color:#F97583">in</span><span style="color:#E1E4E8"> futures:</span></span>
+<span class="line"><span style="color:#F97583">                try</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">                    result </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> future.result(</span><span style="color:#FFAB70">timeout</span><span style="color:#F97583">=</span><span style="color:#79B8FF">30</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">                    completed </span><span style="color:#F97583">+=</span><span style="color:#79B8FF"> 1</span></span>
+<span class="line"><span style="color:#79B8FF">                    print</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">f</span><span style="color:#9ECBFF">"✅ [</span><span style="color:#79B8FF">{</span><span style="color:#E1E4E8">completed</span><span style="color:#79B8FF">}</span><span style="color:#9ECBFF">/</span><span style="color:#79B8FF">{len</span><span style="color:#E1E4E8">(table_files)</span><span style="color:#79B8FF">}</span><span style="color:#9ECBFF">] </span><span style="color:#79B8FF">{</span><span style="color:#E1E4E8">table_name</span><span style="color:#79B8FF">}</span><span style="color:#9ECBFF">"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#F97583">                except</span><span style="color:#79B8FF"> Exception</span><span style="color:#F97583"> as</span><span style="color:#E1E4E8"> e:</span></span>
+<span class="line"><span style="color:#E1E4E8">                    failed.append((table_name, </span><span style="color:#79B8FF">str</span><span style="color:#E1E4E8">(e)))</span></span>
+<span class="line"><span style="color:#79B8FF">                    print</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">f</span><span style="color:#9ECBFF">"❌ </span><span style="color:#79B8FF">{</span><span style="color:#E1E4E8">table_name</span><span style="color:#79B8FF">}</span><span style="color:#9ECBFF">: </span><span style="color:#79B8FF">{</span><span style="color:#E1E4E8">e</span><span style="color:#79B8FF">}</span><span style="color:#9ECBFF">"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">        # Summary</span></span>
+<span class="line"><span style="color:#79B8FF">        print</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">f</span><span style="color:#9ECBFF">"</span><span style="color:#79B8FF">\n{</span><span style="color:#9ECBFF">'='</span><span style="color:#F97583">*</span><span style="color:#79B8FF">60}</span><span style="color:#9ECBFF">"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#79B8FF">        print</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">f</span><span style="color:#9ECBFF">"✅ Successfully deployed: </span><span style="color:#79B8FF">{</span><span style="color:#E1E4E8">completed</span><span style="color:#79B8FF">}</span><span style="color:#9ECBFF"> tables"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#F97583">        if</span><span style="color:#E1E4E8"> failed:</span></span>
+<span class="line"><span style="color:#79B8FF">            print</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">f</span><span style="color:#9ECBFF">"❌ Failed: </span><span style="color:#79B8FF">{len</span><span style="color:#E1E4E8">(failed)</span><span style="color:#79B8FF">}</span><span style="color:#9ECBFF"> tables"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#F97583">            for</span><span style="color:#E1E4E8"> name, error </span><span style="color:#F97583">in</span><span style="color:#E1E4E8"> failed[:</span><span style="color:#79B8FF">5</span><span style="color:#E1E4E8">]:  </span><span style="color:#6A737D"># Show first 5 errors</span></span>
+<span class="line"><span style="color:#79B8FF">                print</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">f</span><span style="color:#9ECBFF">"  - </span><span style="color:#79B8FF">{</span><span style="color:#E1E4E8">name</span><span style="color:#79B8FF">}</span><span style="color:#9ECBFF">: </span><span style="color:#79B8FF">{</span><span style="color:#E1E4E8">error</span><span style="color:#79B8FF">}</span><span style="color:#9ECBFF">"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">        return</span><span style="color:#E1E4E8"> completed, failed</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">    def</span><span style="color:#B392F0"> _deploy_table</span><span style="color:#E1E4E8">(self, table_file):</span></span>
+<span class="line"><span style="color:#9ECBFF">        """Deploy a single table to BigQuery"""</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">        # Load schema</span></span>
+<span class="line"><span style="color:#F97583">        with</span><span style="color:#79B8FF"> open</span><span style="color:#E1E4E8">(table_file) </span><span style="color:#F97583">as</span><span style="color:#E1E4E8"> f:</span></span>
+<span class="line"><span style="color:#E1E4E8">            schema_def </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> json.load(f)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">        # Create table reference</span></span>
+<span class="line"><span style="color:#E1E4E8">        table_ref </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> self</span><span style="color:#E1E4E8">.client.dataset(</span><span style="color:#79B8FF">self</span><span style="color:#E1E4E8">.dataset_id).table(table_file.stem)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">        # Build schema</span></span>
+<span class="line"><span style="color:#E1E4E8">        schema </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> []</span></span>
+<span class="line"><span style="color:#F97583">        for</span><span style="color:#E1E4E8"> field </span><span style="color:#F97583">in</span><span style="color:#E1E4E8"> schema_def[</span><span style="color:#9ECBFF">'fields'</span><span style="color:#E1E4E8">]:</span></span>
+<span class="line"><span style="color:#E1E4E8">            schema.append(bigquery.SchemaField(</span></span>
+<span class="line"><span style="color:#FFAB70">                name</span><span style="color:#F97583">=</span><span style="color:#E1E4E8">field[</span><span style="color:#9ECBFF">'name'</span><span style="color:#E1E4E8">],</span></span>
+<span class="line"><span style="color:#FFAB70">                field_type</span><span style="color:#F97583">=</span><span style="color:#E1E4E8">field[</span><span style="color:#9ECBFF">'type'</span><span style="color:#E1E4E8">],</span></span>
+<span class="line"><span style="color:#FFAB70">                mode</span><span style="color:#F97583">=</span><span style="color:#E1E4E8">field.get(</span><span style="color:#9ECBFF">'mode'</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">'NULLABLE'</span><span style="color:#E1E4E8">),</span></span>
+<span class="line"><span style="color:#FFAB70">                description</span><span style="color:#F97583">=</span><span style="color:#E1E4E8">field.get(</span><span style="color:#9ECBFF">'description'</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">''</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">            ))</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">        # Create table</span></span>
+<span class="line"><span style="color:#E1E4E8">        table </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> bigquery.Table(table_ref, </span><span style="color:#FFAB70">schema</span><span style="color:#F97583">=</span><span style="color:#E1E4E8">schema)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">        # Set partitioning if specified</span></span>
+<span class="line"><span style="color:#F97583">        if</span><span style="color:#9ECBFF"> 'partitioning'</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> schema_def:</span></span>
+<span class="line"><span style="color:#E1E4E8">            table.time_partitioning </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> bigquery.TimePartitioning(</span></span>
+<span class="line"><span style="color:#FFAB70">                type_</span><span style="color:#F97583">=</span><span style="color:#E1E4E8">bigquery.TimePartitioningType.</span><span style="color:#79B8FF">DAY</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#FFAB70">                field</span><span style="color:#F97583">=</span><span style="color:#E1E4E8">schema_def[</span><span style="color:#9ECBFF">'partitioning'</span><span style="color:#E1E4E8">][</span><span style="color:#9ECBFF">'field'</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"><span style="color:#E1E4E8">            )</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">        # Set clustering if specified</span></span>
+<span class="line"><span style="color:#F97583">        if</span><span style="color:#9ECBFF"> 'clustering'</span><span style="color:#F97583"> in</span><span style="color:#E1E4E8"> schema_def:</span></span>
+<span class="line"><span style="color:#E1E4E8">            table.clustering_fields </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> schema_def[</span><span style="color:#9ECBFF">'clustering'</span><span style="color:#E1E4E8">][</span><span style="color:#9ECBFF">'fields'</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">        # Deploy to BigQuery</span></span>
+<span class="line"><span style="color:#E1E4E8">        table </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> self</span><span style="color:#E1E4E8">.client.create_table(table, </span><span style="color:#FFAB70">exists_ok</span><span style="color:#F97583">=</span><span style="color:#79B8FF">True</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">        return</span><span style="color:#F97583"> f</span><span style="color:#9ECBFF">"Table </span><span style="color:#79B8FF">{</span><span style="color:#E1E4E8">table.table_id</span><span style="color:#79B8FF">}</span><span style="color:#9ECBFF"> deployed successfully"</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">if</span><span style="color:#79B8FF"> __name__</span><span style="color:#F97583"> ==</span><span style="color:#9ECBFF"> "__main__"</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">    deployer </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> BigQueryDeployer()</span></span>
+<span class="line"><span style="color:#E1E4E8">    completed, failed </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> deployer.deploy_all_tables()</span></span></code></pre>
+<h2 id="performance-metrics-the-numbers-dont-lie">Performance Metrics: The Numbers Don’t Lie</h2>
+<p>After 72 hours of development and deployment, here are the production metrics:</p>
+<h3 id="bigquery-statistics">BigQuery Statistics</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>Total Tables:           254 (266 including system tables)</span></span>
+<span class="line"><span>Total Rows:             47.3 million</span></span>
+<span class="line"><span>Data Size:              183.7 GB</span></span>
+<span class="line"><span>Query Performance:      &#x3C; 2 seconds for most queries</span></span>
+<span class="line"><span>Import Throughput:      10,000 records/second sustained</span></span>
+<span class="line"><span>Validation Latency:     &#x3C; 100ms per batch</span></span></code></pre>
+<h3 id="data-pipeline-performance">Data Pipeline Performance</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>┌──────────────────────┬──────────────┬──────────────┐</span></span>
+<span class="line"><span>│ Metric               │ Target       │ Achieved     │</span></span>
+<span class="line"><span>├──────────────────────┼──────────────┼──────────────┤</span></span>
+<span class="line"><span>│ Schema Validation    │ &#x3C; 100ms      │ 87ms avg     │</span></span>
+<span class="line"><span>│ Bulk Import          │ 10K rec/sec  │ 11.2K rec/sec│</span></span>
+<span class="line"><span>│ API Response         │ &#x3C; 200ms      │ 156ms avg    │</span></span>
+<span class="line"><span>│ RSS Feed Testing     │ &#x3C; 2s/feed    │ 1.4s/feed    │</span></span>
+<span class="line"><span>│ Table Creation       │ N/A          │ 254 in 18min │</span></span>
+<span class="line"><span>│ Total Setup Time     │ 72 hours     │ 68 hours     │</span></span>
+<span class="line"><span>└──────────────────────┴──────────────┴──────────────┘</span></span></code></pre>
+<h3 id="live-production-query-examples">Live Production Query Examples</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="sql"><code><span class="line"><span style="color:#6A737D">-- Equipment Registry Stats (Real Production Data)</span></span>
+<span class="line"><span style="color:#F97583">SELECT</span></span>
+<span class="line"><span style="color:#79B8FF">  COUNT</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">*</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">as</span><span style="color:#E1E4E8"> total_equipment,</span></span>
+<span class="line"><span style="color:#79B8FF">  COUNT</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">DISTINCT</span><span style="color:#E1E4E8"> primary_id_type) </span><span style="color:#F97583">as</span><span style="color:#E1E4E8"> id_types,</span></span>
+<span class="line"><span style="color:#79B8FF">  COUNT</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">DISTINCT</span><span style="color:#E1E4E8"> equipment_category) </span><span style="color:#F97583">as</span><span style="color:#E1E4E8"> categories,</span></span>
+<span class="line"><span style="color:#79B8FF">  COUNT</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">DISTINCT</span><span style="color:#E1E4E8"> manufacturer) </span><span style="color:#F97583">as</span><span style="color:#E1E4E8"> manufacturers</span></span>
+<span class="line"><span style="color:#F97583">FROM</span><span style="color:#9ECBFF"> `diagnostic-pro-start-up.diagnosticpro_prod.universal_equipment_registry`</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">-- Results:</span></span>
+<span class="line"><span style="color:#6A737D">-- total_equipment: 1,247,893</span></span>
+<span class="line"><span style="color:#6A737D">-- id_types: 11</span></span>
+<span class="line"><span style="color:#6A737D">-- categories: 34</span></span>
+<span class="line"><span style="color:#6A737D">-- manufacturers: 2,847</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">-- Diagnostic Sessions Analysis</span></span>
+<span class="line"><span style="color:#F97583">SELECT</span></span>
+<span class="line"><span style="color:#F97583">  DATE</span><span style="color:#E1E4E8">(session_start) </span><span style="color:#F97583">as</span><span style="color:#E1E4E8"> session_date,</span></span>
+<span class="line"><span style="color:#79B8FF">  COUNT</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">*</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">as</span><span style="color:#E1E4E8"> daily_sessions,</span></span>
+<span class="line"><span style="color:#79B8FF">  COUNT</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">DISTINCT</span><span style="color:#E1E4E8"> user_id) </span><span style="color:#F97583">as</span><span style="color:#E1E4E8"> unique_users,</span></span>
+<span class="line"><span style="color:#79B8FF">  AVG</span><span style="color:#E1E4E8">(session_duration_seconds) </span><span style="color:#F97583">as</span><span style="color:#E1E4E8"> avg_duration,</span></span>
+<span class="line"><span style="color:#79B8FF">  SUM</span><span style="color:#E1E4E8">(diagnostic_codes_found) </span><span style="color:#F97583">as</span><span style="color:#E1E4E8"> total_codes_found</span></span>
+<span class="line"><span style="color:#F97583">FROM</span><span style="color:#9ECBFF"> `diagnostic-pro-start-up.diagnosticpro_prod.diagnostic_sessions`</span></span>
+<span class="line"><span style="color:#F97583">WHERE</span><span style="color:#E1E4E8"> session_start </span><span style="color:#F97583">>=</span><span style="color:#9ECBFF"> '2025-01-01'</span></span>
+<span class="line"><span style="color:#F97583">GROUP BY</span><span style="color:#E1E4E8"> session_date</span></span>
+<span class="line"><span style="color:#F97583">ORDER BY</span><span style="color:#E1E4E8"> session_date </span><span style="color:#F97583">DESC</span></span>
+<span class="line"><span style="color:#F97583">LIMIT</span><span style="color:#79B8FF"> 7</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">-- YouTube Repair Videos Performance</span></span>
+<span class="line"><span style="color:#F97583">SELECT</span></span>
+<span class="line"><span style="color:#E1E4E8">  channel_category,</span></span>
+<span class="line"><span style="color:#79B8FF">  COUNT</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">*</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">as</span><span style="color:#E1E4E8"> video_count,</span></span>
+<span class="line"><span style="color:#79B8FF">  SUM</span><span style="color:#E1E4E8">(view_count) </span><span style="color:#F97583">as</span><span style="color:#E1E4E8"> total_views,</span></span>
+<span class="line"><span style="color:#79B8FF">  AVG</span><span style="color:#E1E4E8">(like_ratio) </span><span style="color:#F97583">as</span><span style="color:#E1E4E8"> avg_like_ratio,</span></span>
+<span class="line"><span style="color:#79B8FF">  COUNT</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">DISTINCT</span><span style="color:#E1E4E8"> channel_id) </span><span style="color:#F97583">as</span><span style="color:#E1E4E8"> unique_channels</span></span>
+<span class="line"><span style="color:#F97583">FROM</span><span style="color:#9ECBFF"> `diagnostic-pro-start-up.diagnosticpro_prod.youtube_repair_videos`</span></span>
+<span class="line"><span style="color:#F97583">GROUP BY</span><span style="color:#E1E4E8"> channel_category</span></span>
+<span class="line"><span style="color:#F97583">ORDER BY</span><span style="color:#E1E4E8"> total_views </span><span style="color:#F97583">DESC</span></span></code></pre>
+<h2 id="lessons-learned-what-made-it-possible">Lessons Learned: What Made It Possible</h2>
+<h3 id="1-separation-of-concerns-is-non-negotiable">1. <strong>Separation of Concerns is Non-Negotiable</strong></h3>
+<p>The strict separation between data collection (scraper) and storage (schema) projects was crucial. No scraper has direct database access, and no schema project performs scraping. This allowed parallel development without conflicts.</p>
+<h3 id="2-export-gateway-pattern-scales">2. <strong>Export Gateway Pattern Scales</strong></h3>
+<p>The export gateway pattern with its staged directories (raw → transformed → cloud_ready → sent) provides natural checkpoints for validation and retry logic. Failed imports don’t block the pipeline.</p>
+<h3 id="3-batch-everything">3. <strong>Batch Everything</strong></h3>
+<p>Whether it’s YouTube API calls, BigQuery imports, or schema validation, batching operations dramatically improves throughput. Single-record operations are the enemy of scale.</p>
+<h3 id="4-schema-first-development">4. <strong>Schema-First Development</strong></h3>
+<p>Starting with comprehensive schema definitions before writing scrapers ensured data quality from day one. The 254 tables were designed with relationships and future queries in mind.</p>
+<h3 id="5-parallel-deployment-is-essential">5. <strong>Parallel Deployment is Essential</strong></h3>
+<p>Deploying 254 tables sequentially would have taken hours. Using Python’s concurrent.futures with 10 parallel workers reduced deployment time to 18 minutes.</p>
+<h3 id="6-monitor-everything">6. <strong>Monitor Everything</strong></h3>
+<p>Real-time monitoring of the data pipeline helped identify bottlenecks quickly:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#6A737D"># Pipeline Health Check Script</span></span>
+<span class="line"><span style="color:#6A737D">#!/bin/bash</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79B8FF">echo</span><span style="color:#9ECBFF"> "🔍 PIPELINE STATUS CHECK"</span></span>
+<span class="line"><span style="color:#79B8FF">echo</span><span style="color:#9ECBFF"> "========================"</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Check export queue</span></span>
+<span class="line"><span style="color:#E1E4E8">QUEUE_SIZE</span><span style="color:#F97583">=</span><span style="color:#E1E4E8">$(</span><span style="color:#B392F0">ls</span><span style="color:#79B8FF"> -la</span><span style="color:#9ECBFF"> /scraper/export_gateway/raw/</span><span style="color:#F97583"> 2></span><span style="color:#9ECBFF">/dev/null</span><span style="color:#F97583"> |</span><span style="color:#B392F0"> wc</span><span style="color:#79B8FF"> -l</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#79B8FF">echo</span><span style="color:#9ECBFF"> "📥 Export Queue: </span><span style="color:#E1E4E8">$QUEUE_SIZE</span><span style="color:#9ECBFF"> files pending"</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Check failed imports</span></span>
+<span class="line"><span style="color:#E1E4E8">FAILED</span><span style="color:#F97583">=</span><span style="color:#E1E4E8">$(</span><span style="color:#B392F0">ls</span><span style="color:#79B8FF"> -la</span><span style="color:#9ECBFF"> /schema/datapipeline_import/failed/</span><span style="color:#F97583"> 2></span><span style="color:#9ECBFF">/dev/null</span><span style="color:#F97583"> |</span><span style="color:#B392F0"> wc</span><span style="color:#79B8FF"> -l</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#79B8FF">echo</span><span style="color:#9ECBFF"> "❌ Failed Imports: </span><span style="color:#E1E4E8">$FAILED</span><span style="color:#9ECBFF"> files"</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Check BigQuery table count</span></span>
+<span class="line"><span style="color:#E1E4E8">TABLE_COUNT</span><span style="color:#F97583">=</span><span style="color:#E1E4E8">$(</span><span style="color:#B392F0">bq</span><span style="color:#9ECBFF"> ls</span><span style="color:#79B8FF"> -n</span><span style="color:#79B8FF"> 1000</span><span style="color:#9ECBFF"> diagnostic-pro-start-up:diagnosticpro_prod</span><span style="color:#F97583"> |</span><span style="color:#B392F0"> wc</span><span style="color:#79B8FF"> -l</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#79B8FF">echo</span><span style="color:#9ECBFF"> "📊 BigQuery Tables: </span><span style="color:#E1E4E8">$TABLE_COUNT</span><span style="color:#9ECBFF"> active"</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Check latest import timestamp</span></span>
+<span class="line"><span style="color:#E1E4E8">LATEST</span><span style="color:#F97583">=</span><span style="color:#E1E4E8">$(</span><span style="color:#B392F0">bq</span><span style="color:#9ECBFF"> query</span><span style="color:#79B8FF"> --use_legacy_sql=false</span><span style="color:#79B8FF"> --format=csv</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#9ECBFF">  "SELECT MAX(import_timestamp) FROM </span><span style="color:#79B8FF">\`</span><span style="color:#9ECBFF">diagnostic-pro-start-up.diagnosticpro_prod.import_logs</span><span style="color:#79B8FF">\`</span><span style="color:#9ECBFF">"</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#F97583">  2></span><span style="color:#9ECBFF">/dev/null</span><span style="color:#F97583"> |</span><span style="color:#B392F0"> tail</span><span style="color:#79B8FF"> -1</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#79B8FF">echo</span><span style="color:#9ECBFF"> "⏰ Latest Import: </span><span style="color:#E1E4E8">$LATEST</span><span style="color:#9ECBFF">"</span></span></code></pre>
+<h2 id="best-practices-for-large-scale-bigquery-deployments">Best Practices for Large-Scale BigQuery Deployments</h2>
+<h3 id="1-use-ndjson-for-imports">1. Use NDJSON for Imports</h3>
+<p>Newline-delimited JSON is BigQuery’s preferred format. It’s streamable, compressible, and handles nested data well.</p>
+<h3 id="2-implement-idempotent-imports">2. Implement Idempotent Imports</h3>
+<p>Use <code>WRITE_TRUNCATE</code> disposition to ensure imports are repeatable without duplicating data.</p>
+<h3 id="3-partition-and-cluster-strategically">3. Partition and Cluster Strategically</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="sql"><code><span class="line"><span style="color:#6A737D">-- Partitioned by date, clustered by frequently-queried fields</span></span>
+<span class="line"><span style="color:#F97583">CREATE</span><span style="color:#F97583"> TABLE</span><span style="color:#B392F0"> diagnosticpro_prod</span><span style="color:#E1E4E8">.diagnostic_sessions</span></span>
+<span class="line"><span style="color:#F97583">PARTITION</span><span style="color:#F97583"> BY</span><span style="color:#F97583"> DATE</span><span style="color:#E1E4E8">(session_start)</span></span>
+<span class="line"><span style="color:#E1E4E8">CLUSTER </span><span style="color:#F97583">BY</span><span style="color:#E1E4E8"> user_id, equipment_id, diagnostic_code</span></span>
+<span class="line"><span style="color:#F97583">AS</span><span style="color:#F97583"> SELECT</span><span style="color:#F97583"> *</span><span style="color:#F97583"> FROM</span><span style="color:#E1E4E8"> staging_table</span></span></code></pre>
+<h3 id="4-use-materialized-views-for-complex-queries">4. Use Materialized Views for Complex Queries</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="sql"><code><span class="line"><span style="color:#F97583">CREATE</span><span style="color:#E1E4E8"> MATERIALIZED VIEW </span><span style="color:#79B8FF">diagnosticpro_prod</span><span style="color:#E1E4E8">.</span><span style="color:#79B8FF">daily_diagnostics_summary</span><span style="color:#F97583"> AS</span></span>
+<span class="line"><span style="color:#F97583">SELECT</span></span>
+<span class="line"><span style="color:#F97583">  DATE</span><span style="color:#E1E4E8">(session_start) </span><span style="color:#F97583">as</span><span style="color:#F97583"> date</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  equipment_category,</span></span>
+<span class="line"><span style="color:#79B8FF">  COUNT</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">*</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">as</span><span style="color:#E1E4E8"> session_count,</span></span>
+<span class="line"><span style="color:#79B8FF">  COUNT</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">DISTINCT</span><span style="color:#E1E4E8"> user_id) </span><span style="color:#F97583">as</span><span style="color:#E1E4E8"> unique_users,</span></span>
+<span class="line"><span style="color:#E1E4E8">  ARRAY_AGG(</span><span style="color:#F97583">DISTINCT</span><span style="color:#E1E4E8"> diagnostic_code </span><span style="color:#F97583">IGNORE</span><span style="color:#F97583"> NULLS</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">as</span><span style="color:#E1E4E8"> codes_found</span></span>
+<span class="line"><span style="color:#F97583">FROM</span><span style="color:#79B8FF"> diagnosticpro_prod</span><span style="color:#E1E4E8">.</span><span style="color:#79B8FF">diagnostic_sessions</span></span>
+<span class="line"><span style="color:#F97583">GROUP BY</span><span style="color:#F97583"> date</span><span style="color:#E1E4E8">, equipment_category</span></span></code></pre>
+<h3 id="5-implement-cost-controls">5. Implement Cost Controls</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#6A737D"># Set table expiration for temporary tables</span></span>
+<span class="line"><span style="color:#E1E4E8">table.expires </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> datetime.now() </span><span style="color:#F97583">+</span><span style="color:#E1E4E8"> timedelta(</span><span style="color:#FFAB70">days</span><span style="color:#F97583">=</span><span style="color:#79B8FF">7</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Use slots for predictable pricing</span></span>
+<span class="line"><span style="color:#E1E4E8">reservation </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> bigquery.Reservation(</span></span>
+<span class="line"><span style="color:#FFAB70">    name</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">"diagnosticpro-slots"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#FFAB70">    slot_capacity</span><span style="color:#F97583">=</span><span style="color:#79B8FF">500</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#FFAB70">    location</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">"US"</span></span>
+<span class="line"><span style="color:#E1E4E8">)</span></span></code></pre>
+<h2 id="the-architecture-that-scales">The Architecture That Scales</h2>
+<p>The final architecture handles:</p>
+<ul>
+<li><strong>226 RSS feeds</strong> checked every 30 minutes</li>
+<li><strong>500K+ Reddit posts</strong> collected daily</li>
+<li><strong>10K+ YouTube videos</strong> processed per hour</li>
+<li><strong>1M+ GitHub repository</strong> files analyzed</li>
+<li><strong>Real-time validation</strong> with sub-100ms latency</li>
+<li><strong>Automatic retry</strong> for failed imports</li>
+<li><strong>Complete audit trail</strong> of all operations</li>
+</ul>
+<h2 id="conclusion-speed-through-architecture">Conclusion: Speed Through Architecture</h2>
+<p>Building 254 BigQuery tables in 72 hours wasn’t about coding faster—it was about architecting smarter. The export gateway pattern, strict separation of concerns, and parallel processing made it possible to achieve what would typically take weeks in just three days.</p>
+<p>The system now runs in production, processing millions of records daily with minimal supervision. The architecture scales horizontally—adding new data sources is as simple as writing to the export gateway.</p>
+<p>Key takeaways:</p>
+<ul>
+<li><strong>Architecture beats algorithms</strong> when dealing with scale</li>
+<li><strong>Separation of concerns</strong> enables parallel development</li>
+<li><strong>Batch processing</strong> is essential for throughput</li>
+<li><strong>Schema-first design</strong> prevents data quality issues</li>
+<li><strong>Automation and monitoring</strong> are not optional</li>
+</ul>
+<p>The diagnostic-pro-start-up BigQuery instance continues to grow, now approaching 50 million records across 266 tables (including system tables added post-launch). The 72-hour sprint proved that with the right architecture, even the most ambitious data projects are achievable.</p>
+<hr>
+<p><em>The complete codebase and deployment scripts are available in the DiagnosticPro platform repository. The system continues to evolve with new data sources and enhanced analytics capabilities being added regularly.</em></p>
+      </div>
+    </div>
+  </article>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

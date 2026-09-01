@@ -1,0 +1,1104 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Building an Idempotent Stripe Billing Enforcement Engine for Firestore — Tons of Skills Work Diary</title>
+    <meta name="description" content="How we built a unified plan enforcement engine that handles duplicate webhooks, out-of-order events, and automatic drift correction for Stripe billing in a Firestore-backed SaaS application.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://startaitools.com/posts/building-an-idempotent-stripe-billing-enforcement-engine-for-firestore/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/building-idempotent-stripe-billing-enforcement-firestore/">
+    <meta property="og:title" content="Building an Idempotent Stripe Billing Enforcement Engine for Firestore — Tons of Skills Work Diary">
+    <meta property="og:description" content="How we built a unified plan enforcement engine that handles duplicate webhooks, out-of-order events, and automatic drift correction for Stripe billing in a Firestore-backed SaaS application.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="Building an Idempotent Stripe Billing Enforcement Engine for Firestore — Tons of Skills Work Diary">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/building-idempotent-stripe-billing-enforcement-firestore/">
+    <meta name="twitter:title" content="Building an Idempotent Stripe Billing Enforcement Engine for Firestore — Tons of Skills Work Diary">
+    <meta name="twitter:description" content="How we built a unified plan enforcement engine that handles duplicate webhooks, out-of-order events, and automatic drift correction for Stripe billing in a Firestore-backed SaaS application.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"Building an Idempotent Stripe Billing Enforcement Engine for Firestore","description":"How we built a unified plan enforcement engine that handles duplicate webhooks, out-of-order events, and automatic drift correction for Stripe billing in a Firestore-backed SaaS application.","datePublished":"2025-11-17","url":"https://tonsofskills.com/blog/undefined","author":{"@type":"Person","name":"Jeremy Longshore"},"publisher":{"@type":"Organization","name":"Tons of Skills","url":"https://tonsofskills.com"}}</script>
+  
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.post-header[data-astro-cid-7jjqptxk]{background:var(--panel);padding:4rem 1.5rem 3rem;border-bottom:1px solid var(--border)}.post-header-inner[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto}.back-link[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3);text-decoration:none;display:inline-block;margin-bottom:1.5rem;transition:color .2s}.back-link[data-astro-cid-7jjqptxk]:hover{color:var(--primary)}.post-meta[data-astro-cid-7jjqptxk]{display:flex;align-items:center;gap:.75rem;margin-bottom:1rem}time[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3)}.featured-badge[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.2rem .6rem;background:#ce114126;color:var(--red);border-radius:0;font-weight:600;text-transform:uppercase;letter-spacing:.05em}.post-header[data-astro-cid-7jjqptxk] h1[data-astro-cid-7jjqptxk]{font-family:var(--font-body);font-size:clamp(1.5rem,4vw,2.2rem);font-weight:700;color:var(--text);line-height:1.25;margin-bottom:.75rem;letter-spacing:0}.post-desc[data-astro-cid-7jjqptxk]{color:var(--text-2);font-size:1.05rem;line-height:1.6;margin-bottom:1rem}.post-tags[data-astro-cid-7jjqptxk]{display:flex;gap:.4rem;flex-wrap:wrap}.tag[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.15rem .5rem;background:var(--surface-3);color:var(--text-3);border-radius:0}.post-body[data-astro-cid-7jjqptxk]{padding:3rem 1.5rem 4rem}.prose[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto;color:var(--text-2);line-height:1.8;font-size:1rem}.prose[data-astro-cid-7jjqptxk] h2{font-family:var(--font-body);font-size:1.5rem;font-weight:700;color:var(--text);margin:2.5rem 0 1rem;letter-spacing:0}.prose[data-astro-cid-7jjqptxk] h3{font-size:1.2rem;font-weight:600;color:var(--text);margin:2rem 0 .75rem}.prose[data-astro-cid-7jjqptxk] p{margin-bottom:1rem}.prose[data-astro-cid-7jjqptxk] ul,.prose[data-astro-cid-7jjqptxk] ol{margin:.5rem 0 1rem 1.5rem}.prose[data-astro-cid-7jjqptxk] li{margin-bottom:.35rem}.prose[data-astro-cid-7jjqptxk] strong{color:var(--text);font-weight:600}.prose[data-astro-cid-7jjqptxk] code{font-family:var(--font-mono);font-size:.88em;background:var(--surface-3);padding:.15em .35em;border-radius:0;color:var(--primary)}.prose[data-astro-cid-7jjqptxk] a{color:var(--primary);text-decoration:none}.prose[data-astro-cid-7jjqptxk] a:hover{text-decoration:underline}@media(max-width:768px){.post-header[data-astro-cid-7jjqptxk]{padding:3rem 1rem 2rem}.post-body[data-astro-cid-7jjqptxk]{padding:2rem 1rem 3rem}}
+</style></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  <article class="post" data-astro-cid-7jjqptxk>
+    <header class="post-header" data-astro-cid-7jjqptxk>
+      <div class="post-header-inner" data-astro-cid-7jjqptxk>
+        <a href="/blog" class="back-link" data-astro-cid-7jjqptxk>Back to Work Diary</a>
+        <div class="post-meta" data-astro-cid-7jjqptxk>
+          <time datetime="2025-11-17" data-astro-cid-7jjqptxk>November 16, 2025</time>
+          
+        </div>
+        <h1 data-astro-cid-7jjqptxk>Building an Idempotent Stripe Billing Enforcement Engine for Firestore</h1>
+        <p class="post-desc" data-astro-cid-7jjqptxk>How we built a unified plan enforcement engine that handles duplicate webhooks, out-of-order events, and automatic drift correction for Stripe billing in a Firestore-backed SaaS application.</p>
+        <div class="post-tags" data-astro-cid-7jjqptxk>
+          <span class="tag" data-astro-cid-7jjqptxk>stripe</span><span class="tag" data-astro-cid-7jjqptxk>firebase</span><span class="tag" data-astro-cid-7jjqptxk>firestore</span><span class="tag" data-astro-cid-7jjqptxk>billing</span><span class="tag" data-astro-cid-7jjqptxk>webhooks</span><span class="tag" data-astro-cid-7jjqptxk>testing</span><span class="tag" data-astro-cid-7jjqptxk>typescript</span><span class="tag" data-astro-cid-7jjqptxk>vitest</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="post-body" data-astro-cid-7jjqptxk>
+      <div class="prose" data-astro-cid-7jjqptxk>
+        <p>When you’re building subscription billing with Stripe webhooks, you quickly discover a harsh reality: <strong>webhooks can arrive delayed, duplicated, or out of order</strong>. For a youth sports stats SaaS platform I’m building, this created a critical problem—plan and status updates were scattered across multiple handlers with no guarantee of consistency.</p>
+<p>This is the story of building a unified plan enforcement engine that solved webhook chaos, eliminated duplicate logic, and added automatic drift correction—all while maintaining a complete audit trail.</p>
+<h2 id="the-problem-webhook-drift-and-duplicate-logic">The Problem: Webhook Drift and Duplicate Logic</h2>
+<h3 id="what-we-started-with">What We Started With</h3>
+<p>Our billing system had plan/status update logic in <strong>four separate locations</strong>:</p>
+<ol>
+<li><strong>Stripe webhook handler</strong> (<code>/api/billing/webhook/route.ts</code>) - 5 event handlers</li>
+<li><strong>Event replay endpoint</strong> (<code>/api/admin/billing/replay-events/route.ts</code>) - 5 replay handlers</li>
+<li><strong>Billing auditor</strong> (<code>src/lib/stripe/auditor.ts</code>) - drift detection</li>
+<li><strong>Manual admin operations</strong> - future admin dashboard actions</li>
+</ol>
+<p>Each location had its own version of this pattern:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#6A737D">// Duplicated across 10+ handlers</span></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> plan</span><span style="color:#F97583"> =</span><span style="color:#B392F0"> getPlanForPriceId</span><span style="color:#E1E4E8">(priceId);</span></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> status</span><span style="color:#F97583"> =</span><span style="color:#B392F0"> mapStripeStatusToWorkspaceStatus</span><span style="color:#E1E4E8">(subscription.status);</span></span>
+<span class="line"><span style="color:#F97583">await</span><span style="color:#B392F0"> updateWorkspace</span><span style="color:#E1E4E8">(workspaceId, { plan, status });</span></span>
+<span class="line"><span style="color:#F97583">await</span><span style="color:#B392F0"> recordBillingEvent</span><span style="color:#E1E4E8">(workspaceId, {</span></span>
+<span class="line"><span style="color:#E1E4E8">  type: </span><span style="color:#9ECBFF">'subscription_updated'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  planBefore,</span></span>
+<span class="line"><span style="color:#E1E4E8">  planAfter: plan,</span></span>
+<span class="line"><span style="color:#6A737D">  // ... more fields</span></span>
+<span class="line"><span style="color:#E1E4E8">});</span></span></code></pre>
+<p><strong>The problems:</strong></p>
+<ul>
+<li>~180 lines of duplicated logic across handlers</li>
+<li>No guarantee of consistency if one handler was updated but not others</li>
+<li>No built-in idempotency for duplicate webhooks</li>
+<li>Drift detection couldn’t automatically fix itself</li>
+<li>Manual before/after tracking in every location</li>
+</ul>
+<h3 id="real-world-webhook-chaos">Real-World Webhook Chaos</h3>
+<p>Stripe webhooks are <strong>eventually consistent</strong>, which means:</p>
+<p><strong>Scenario 1: Duplicate Webhooks</strong></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>Webhook 1: customer.subscription.updated (plan change)</span></span>
+<span class="line"><span>Webhook 2: customer.subscription.updated (same event, redelivered)</span></span></code></pre>
+<p>Without idempotency, you’d process the same change twice and create duplicate ledger entries.</p>
+<p><strong>Scenario 2: Out-of-Order Arrival</strong></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>Event 1: subscription.updated (plan: starter → plus) sent at 14:00:01</span></span>
+<span class="line"><span>Event 2: payment.succeeded (plan: plus) sent at 14:00:05</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>But Event 2 arrives first!</span></span></code></pre>
+<p>Your workspace briefly shows the wrong plan until Event 1 catches up.</p>
+<p><strong>Scenario 3: Delayed Webhooks</strong></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>User upgrades at 14:00</span></span>
+<span class="line"><span>Webhook arrives at 14:05 (5 minutes late)</span></span>
+<span class="line"><span>Meanwhile, auditor runs at 14:03 and detects drift</span></span></code></pre>
+<p>Who wins? How do you prevent conflicting updates?</p>
+<h2 id="the-solution-unified-plan-enforcement-engine">The Solution: Unified Plan Enforcement Engine</h2>
+<h3 id="design-goals">Design Goals</h3>
+<ol>
+<li><strong>Single Source of Truth</strong>: ONE function handles ALL plan/status updates</li>
+<li><strong>Idempotent</strong>: Safe to call multiple times with same data</li>
+<li><strong>Delta Detection</strong>: Only update what changed, track before/after state</li>
+<li><strong>Audit Trail</strong>: Full ledger integration for compliance</li>
+<li><strong>Passive</strong>: Never modify Stripe data, only read and apply to workspace</li>
+</ol>
+<h3 id="core-architecture">Core Architecture</h3>
+<p><strong>File</strong>: <code>src/lib/stripe/plan-enforcement.ts</code> (264 lines)</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#F97583">export</span><span style="color:#F97583"> async</span><span style="color:#F97583"> function</span><span style="color:#B392F0"> enforceWorkspacePlan</span><span style="color:#E1E4E8">(</span></span>
+<span class="line"><span style="color:#FFAB70">  workspaceId</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> string</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#FFAB70">  input</span><span style="color:#F97583">:</span><span style="color:#B392F0"> EnforcePlanInput</span></span>
+<span class="line"><span style="color:#E1E4E8">)</span><span style="color:#F97583">:</span><span style="color:#B392F0"> Promise</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">EnforcePlanResult</span><span style="color:#E1E4E8">> {</span></span>
+<span class="line"><span style="color:#6A737D">  // 1. Validate inputs</span></span>
+<span class="line"><span style="color:#F97583">  if</span><span style="color:#E1E4E8"> (</span><span style="color:#F97583">!</span><span style="color:#E1E4E8">workspaceId </span><span style="color:#F97583">||</span><span style="color:#F97583"> typeof</span><span style="color:#E1E4E8"> workspaceId </span><span style="color:#F97583">!==</span><span style="color:#9ECBFF"> 'string'</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#F97583">    throw</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> Error</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'Invalid workspaceId: must be non-empty string'</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">  // Validate source enum</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> validSources</span><span style="color:#F97583">:</span><span style="color:#B392F0"> LedgerEventSource</span><span style="color:#E1E4E8">[] </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> [</span></span>
+<span class="line"><span style="color:#9ECBFF">    'webhook'</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">'replay'</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">'auditor'</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">'manual'</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">'enforcement'</span></span>
+<span class="line"><span style="color:#E1E4E8">  ];</span></span>
+<span class="line"><span style="color:#F97583">  if</span><span style="color:#E1E4E8"> (</span><span style="color:#F97583">!</span><span style="color:#E1E4E8">validSources.</span><span style="color:#B392F0">includes</span><span style="color:#E1E4E8">(input.source)) {</span></span>
+<span class="line"><span style="color:#F97583">    throw</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> Error</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">`Invalid source: ${</span><span style="color:#E1E4E8">input</span><span style="color:#9ECBFF">.</span><span style="color:#E1E4E8">source</span><span style="color:#9ECBFF">}`</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">  // 2. Fetch current workspace state</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> workspaceDoc</span><span style="color:#F97583"> =</span><span style="color:#F97583"> await</span><span style="color:#E1E4E8"> adminDb</span></span>
+<span class="line"><span style="color:#E1E4E8">    .</span><span style="color:#B392F0">collection</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'workspaces'</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">    .</span><span style="color:#B392F0">doc</span><span style="color:#E1E4E8">(workspaceId)</span></span>
+<span class="line"><span style="color:#E1E4E8">    .</span><span style="color:#B392F0">get</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">  if</span><span style="color:#E1E4E8"> (</span><span style="color:#F97583">!</span><span style="color:#E1E4E8">workspaceDoc.exists) {</span></span>
+<span class="line"><span style="color:#F97583">    throw</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> Error</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">`Workspace not found: ${</span><span style="color:#E1E4E8">workspaceId</span><span style="color:#9ECBFF">}`</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> workspace</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> workspaceDoc.</span><span style="color:#B392F0">data</span><span style="color:#E1E4E8">() </span><span style="color:#F97583">as</span><span style="color:#B392F0"> Workspace</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">  // 3. Map Stripe data to workspace types</span></span>
+<span class="line"><span style="color:#F97583">  let</span><span style="color:#E1E4E8"> targetPlan</span><span style="color:#F97583">:</span><span style="color:#B392F0"> WorkspacePlan</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">  let</span><span style="color:#E1E4E8"> targetStatus</span><span style="color:#F97583">:</span><span style="color:#B392F0"> WorkspaceStatus</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">  try</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">    targetPlan </span><span style="color:#F97583">=</span><span style="color:#B392F0"> getPlanForPriceId</span><span style="color:#E1E4E8">(input.stripePriceId);</span></span>
+<span class="line"><span style="color:#E1E4E8">    targetStatus </span><span style="color:#F97583">=</span><span style="color:#B392F0"> mapStripeStatusToWorkspaceStatus</span><span style="color:#E1E4E8">(input.stripeStatus);</span></span>
+<span class="line"><span style="color:#E1E4E8">  } </span><span style="color:#F97583">catch</span><span style="color:#E1E4E8"> (</span><span style="color:#FFAB70">error</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> any</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#F97583">    throw</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> Error</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">`Failed to map Stripe data: ${</span><span style="color:#E1E4E8">error</span><span style="color:#9ECBFF">.</span><span style="color:#E1E4E8">message</span><span style="color:#9ECBFF">}`</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">  // 4. Detect deltas (THIS IS KEY!)</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> planBefore</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> workspace.plan;</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> statusBefore</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> workspace.status;</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> planChanged</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> planBefore </span><span style="color:#F97583">!==</span><span style="color:#E1E4E8"> targetPlan;</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> statusChanged</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> statusBefore </span><span style="color:#F97583">!==</span><span style="color:#E1E4E8"> targetStatus;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">  console.</span><span style="color:#B392F0">log</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'[Plan Enforcement]'</span><span style="color:#E1E4E8">, {</span></span>
+<span class="line"><span style="color:#E1E4E8">    workspaceId,</span></span>
+<span class="line"><span style="color:#E1E4E8">    planChanged,</span></span>
+<span class="line"><span style="color:#E1E4E8">    statusChanged,</span></span>
+<span class="line"><span style="color:#E1E4E8">    planBefore,</span></span>
+<span class="line"><span style="color:#E1E4E8">    targetPlan,</span></span>
+<span class="line"><span style="color:#E1E4E8">    statusBefore,</span></span>
+<span class="line"><span style="color:#E1E4E8">    targetStatus,</span></span>
+<span class="line"><span style="color:#E1E4E8">  });</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">  // 5. Update workspace if mismatch detected</span></span>
+<span class="line"><span style="color:#F97583">  if</span><span style="color:#E1E4E8"> (planChanged </span><span style="color:#F97583">||</span><span style="color:#E1E4E8"> statusChanged) {</span></span>
+<span class="line"><span style="color:#F97583">    const</span><span style="color:#79B8FF"> updates</span><span style="color:#F97583">:</span><span style="color:#B392F0"> Partial</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">Workspace</span><span style="color:#E1E4E8">> </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">      updatedAt: FieldValue.</span><span style="color:#B392F0">serverTimestamp</span><span style="color:#E1E4E8">() </span><span style="color:#F97583">as</span><span style="color:#79B8FF"> any</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">    };</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">    if</span><span style="color:#E1E4E8"> (planChanged) updates.plan </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> targetPlan;</span></span>
+<span class="line"><span style="color:#F97583">    if</span><span style="color:#E1E4E8"> (statusChanged) updates.status </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> targetStatus;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">    await</span><span style="color:#E1E4E8"> adminDb</span></span>
+<span class="line"><span style="color:#E1E4E8">      .</span><span style="color:#B392F0">collection</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'workspaces'</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">      .</span><span style="color:#B392F0">doc</span><span style="color:#E1E4E8">(workspaceId)</span></span>
+<span class="line"><span style="color:#E1E4E8">      .</span><span style="color:#B392F0">update</span><span style="color:#E1E4E8">(updates);</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">    // Record delta in ledger</span></span>
+<span class="line"><span style="color:#F97583">    const</span><span style="color:#79B8FF"> ledgerEventId</span><span style="color:#F97583"> =</span><span style="color:#F97583"> await</span><span style="color:#B392F0"> recordBillingEvent</span><span style="color:#E1E4E8">(workspaceId, {</span></span>
+<span class="line"><span style="color:#E1E4E8">      type: </span><span style="color:#9ECBFF">'plan_changed'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">      stripeEventId: input.stripeEventId,</span></span>
+<span class="line"><span style="color:#E1E4E8">      statusBefore,</span></span>
+<span class="line"><span style="color:#E1E4E8">      statusAfter: statusChanged </span><span style="color:#F97583">?</span><span style="color:#E1E4E8"> targetStatus </span><span style="color:#F97583">:</span><span style="color:#E1E4E8"> statusBefore,</span></span>
+<span class="line"><span style="color:#E1E4E8">      planBefore,</span></span>
+<span class="line"><span style="color:#E1E4E8">      planAfter: planChanged </span><span style="color:#F97583">?</span><span style="color:#E1E4E8"> targetPlan </span><span style="color:#F97583">:</span><span style="color:#E1E4E8"> planBefore,</span></span>
+<span class="line"><span style="color:#E1E4E8">      source: input.source,</span></span>
+<span class="line"><span style="color:#E1E4E8">      note: </span><span style="color:#9ECBFF">`Plan enforcement: ${</span><span style="color:#E1E4E8">planChanged</span><span style="color:#F97583"> ?</span><span style="color:#9ECBFF"> `${</span><span style="color:#E1E4E8">planBefore</span><span style="color:#9ECBFF">}→${</span><span style="color:#E1E4E8">targetPlan</span><span style="color:#9ECBFF">}`</span><span style="color:#F97583"> :</span><span style="color:#9ECBFF"> 'plan unchanged'}, ${</span><span style="color:#E1E4E8">statusChanged</span><span style="color:#F97583"> ?</span><span style="color:#9ECBFF"> `${</span><span style="color:#E1E4E8">statusBefore</span><span style="color:#9ECBFF">}→${</span><span style="color:#E1E4E8">targetStatus</span><span style="color:#9ECBFF">}`</span><span style="color:#F97583"> :</span><span style="color:#9ECBFF"> 'status unchanged'}`</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">    });</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">    return</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">      workspaceId,</span></span>
+<span class="line"><span style="color:#E1E4E8">      planChanged,</span></span>
+<span class="line"><span style="color:#E1E4E8">      statusChanged,</span></span>
+<span class="line"><span style="color:#E1E4E8">      planBefore,</span></span>
+<span class="line"><span style="color:#E1E4E8">      planAfter: targetPlan,</span></span>
+<span class="line"><span style="color:#E1E4E8">      statusBefore,</span></span>
+<span class="line"><span style="color:#E1E4E8">      statusAfter: targetStatus,</span></span>
+<span class="line"><span style="color:#E1E4E8">      ledgerEventId,</span></span>
+<span class="line"><span style="color:#E1E4E8">    };</span></span>
+<span class="line"><span style="color:#E1E4E8">  } </span><span style="color:#F97583">else</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#6A737D">    // No changes needed - record noop</span></span>
+<span class="line"><span style="color:#F97583">    const</span><span style="color:#79B8FF"> ledgerEventId</span><span style="color:#F97583"> =</span><span style="color:#F97583"> await</span><span style="color:#B392F0"> recordBillingEvent</span><span style="color:#E1E4E8">(workspaceId, {</span></span>
+<span class="line"><span style="color:#E1E4E8">      type: </span><span style="color:#9ECBFF">'plan_changed'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">      stripeEventId: input.stripeEventId,</span></span>
+<span class="line"><span style="color:#E1E4E8">      statusBefore,</span></span>
+<span class="line"><span style="color:#E1E4E8">      statusAfter: statusBefore,</span></span>
+<span class="line"><span style="color:#E1E4E8">      planBefore,</span></span>
+<span class="line"><span style="color:#E1E4E8">      planAfter: planBefore,</span></span>
+<span class="line"><span style="color:#E1E4E8">      source: input.source,</span></span>
+<span class="line"><span style="color:#E1E4E8">      note: </span><span style="color:#9ECBFF">'Plan enforcement: no changes (workspace already in sync)'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">    });</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">    return</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">      workspaceId,</span></span>
+<span class="line"><span style="color:#E1E4E8">      planChanged: </span><span style="color:#79B8FF">false</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">      statusChanged: </span><span style="color:#79B8FF">false</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">      planBefore,</span></span>
+<span class="line"><span style="color:#E1E4E8">      planAfter: planBefore,</span></span>
+<span class="line"><span style="color:#E1E4E8">      statusBefore,</span></span>
+<span class="line"><span style="color:#E1E4E8">      statusAfter: statusBefore,</span></span>
+<span class="line"><span style="color:#E1E4E8">      ledgerEventId,</span></span>
+<span class="line"><span style="color:#E1E4E8">    };</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<h3 id="why-this-solves-webhook-chaos">Why This Solves Webhook Chaos</h3>
+<p><strong>Idempotency in Action:</strong></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#6A737D">// Webhook arrives twice (duplicate delivery)</span></span>
+<span class="line"><span style="color:#6A737D">// Call 1:</span></span>
+<span class="line"><span style="color:#F97583">await</span><span style="color:#B392F0"> enforceWorkspacePlan</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'workspace123'</span><span style="color:#E1E4E8">, {</span></span>
+<span class="line"><span style="color:#E1E4E8">  stripePriceId: </span><span style="color:#9ECBFF">'price_plus'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  stripeStatus: </span><span style="color:#9ECBFF">'active'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  source: </span><span style="color:#9ECBFF">'webhook'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  stripeEventId: </span><span style="color:#9ECBFF">'evt_123'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">});</span></span>
+<span class="line"><span style="color:#6A737D">// Result: planChanged=true, updates workspace, records delta</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">// Call 2 (same data):</span></span>
+<span class="line"><span style="color:#F97583">await</span><span style="color:#B392F0"> enforceWorkspacePlan</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'workspace123'</span><span style="color:#E1E4E8">, {</span></span>
+<span class="line"><span style="color:#E1E4E8">  stripePriceId: </span><span style="color:#9ECBFF">'price_plus'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  stripeStatus: </span><span style="color:#9ECBFF">'active'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  source: </span><span style="color:#9ECBFF">'webhook'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  stripeEventId: </span><span style="color:#9ECBFF">'evt_123'</span><span style="color:#E1E4E8">, </span><span style="color:#6A737D">// Same event!</span></span>
+<span class="line"><span style="color:#E1E4E8">});</span></span>
+<span class="line"><span style="color:#6A737D">// Result: planChanged=false, NO workspace update, records noop</span></span></code></pre>
+<p><strong>Out-of-Order Handling:</strong></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#6A737D">// Event 2 arrives first (payment.succeeded)</span></span>
+<span class="line"><span style="color:#F97583">await</span><span style="color:#B392F0"> enforceWorkspacePlan</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'workspace123'</span><span style="color:#E1E4E8">, {</span></span>
+<span class="line"><span style="color:#E1E4E8">  stripePriceId: </span><span style="color:#9ECBFF">'price_starter'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  stripeStatus: </span><span style="color:#9ECBFF">'active'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  source: </span><span style="color:#9ECBFF">'webhook'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  stripeEventId: </span><span style="color:#9ECBFF">'evt_payment'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">});</span></span>
+<span class="line"><span style="color:#6A737D">// Sets plan=starter, status=active</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">// Event 1 arrives later (subscription.updated, upgrade to plus)</span></span>
+<span class="line"><span style="color:#F97583">await</span><span style="color:#B392F0"> enforceWorkspacePlan</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'workspace123'</span><span style="color:#E1E4E8">, {</span></span>
+<span class="line"><span style="color:#E1E4E8">  stripePriceId: </span><span style="color:#9ECBFF">'price_plus'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  stripeStatus: </span><span style="color:#9ECBFF">'active'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  source: </span><span style="color:#9ECBFF">'webhook'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  stripeEventId: </span><span style="color:#9ECBFF">'evt_upgrade'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">});</span></span>
+<span class="line"><span style="color:#6A737D">// Detects mismatch, corrects to plan=plus</span></span>
+<span class="line"><span style="color:#6A737D">// Workspace converges to correct state!</span></span></code></pre>
+<h2 id="testing-strategy-14-comprehensive-tests">Testing Strategy: 14 Comprehensive Tests</h2>
+<p>We wrote <strong>450 lines of tests</strong> (more than the implementation!) to cover every edge case.</p>
+<h3 id="test-structure">Test Structure</h3>
+<p><strong>File</strong>: <code>src/lib/stripe/plan-enforcement.test.ts</code></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#B392F0">describe</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'Workspace Plan Enforcement'</span><span style="color:#E1E4E8">, () </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#B392F0">  beforeEach</span><span style="color:#E1E4E8">(() </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">    vi.</span><span style="color:#B392F0">clearAllMocks</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">    // Default workspace state: starter plan, active status</span></span>
+<span class="line"><span style="color:#E1E4E8">    mockGet.</span><span style="color:#B392F0">mockResolvedValue</span><span style="color:#E1E4E8">({</span></span>
+<span class="line"><span style="color:#E1E4E8">      exists: </span><span style="color:#79B8FF">true</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">      id: </span><span style="color:#9ECBFF">'workspace123'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#B392F0">      data</span><span style="color:#E1E4E8">: () </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> ({</span></span>
+<span class="line"><span style="color:#E1E4E8">        plan: </span><span style="color:#9ECBFF">'starter'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">        status: </span><span style="color:#9ECBFF">'active'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">        createdAt: { </span><span style="color:#B392F0">toDate</span><span style="color:#E1E4E8">: () </span><span style="color:#F97583">=></span><span style="color:#F97583"> new</span><span style="color:#B392F0"> Date</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'2025-01-01'</span><span style="color:#E1E4E8">) },</span></span>
+<span class="line"><span style="color:#6A737D">        // ... other fields</span></span>
+<span class="line"><span style="color:#E1E4E8">      }),</span></span>
+<span class="line"><span style="color:#E1E4E8">    });</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">    mockUpdate.</span><span style="color:#B392F0">mockResolvedValue</span><span style="color:#E1E4E8">({});</span></span>
+<span class="line"><span style="color:#E1E4E8">    mockRecordBillingEvent.</span><span style="color:#B392F0">mockResolvedValue</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'ledger123'</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#E1E4E8">  });</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">  it</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'should update plan AND status when both changed'</span><span style="color:#E1E4E8">, </span><span style="color:#F97583">async</span><span style="color:#E1E4E8"> () </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">    const</span><span style="color:#79B8FF"> result</span><span style="color:#F97583"> =</span><span style="color:#F97583"> await</span><span style="color:#B392F0"> enforceWorkspacePlan</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'workspace123'</span><span style="color:#E1E4E8">, {</span></span>
+<span class="line"><span style="color:#E1E4E8">      stripePriceId: </span><span style="color:#9ECBFF">'price_plus'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">      stripeStatus: </span><span style="color:#9ECBFF">'past_due'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">      source: </span><span style="color:#9ECBFF">'webhook'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">      stripeEventId: </span><span style="color:#9ECBFF">'evt_123'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">    });</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">    expect</span><span style="color:#E1E4E8">(result.planChanged).</span><span style="color:#B392F0">toBe</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">true</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#B392F0">    expect</span><span style="color:#E1E4E8">(result.statusChanged).</span><span style="color:#B392F0">toBe</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">true</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#B392F0">    expect</span><span style="color:#E1E4E8">(result.planBefore).</span><span style="color:#B392F0">toBe</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'starter'</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#B392F0">    expect</span><span style="color:#E1E4E8">(result.planAfter).</span><span style="color:#B392F0">toBe</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'plus'</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#B392F0">    expect</span><span style="color:#E1E4E8">(result.statusBefore).</span><span style="color:#B392F0">toBe</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'active'</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#B392F0">    expect</span><span style="color:#E1E4E8">(result.statusAfter).</span><span style="color:#B392F0">toBe</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'past_due'</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">    expect</span><span style="color:#E1E4E8">(mockUpdate).</span><span style="color:#B392F0">toHaveBeenCalledWith</span><span style="color:#E1E4E8">(</span></span>
+<span class="line"><span style="color:#E1E4E8">      expect.</span><span style="color:#B392F0">objectContaining</span><span style="color:#E1E4E8">({</span></span>
+<span class="line"><span style="color:#E1E4E8">        plan: </span><span style="color:#9ECBFF">'plus'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">        status: </span><span style="color:#9ECBFF">'past_due'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">        updatedAt: expect.</span><span style="color:#B392F0">objectContaining</span><span style="color:#E1E4E8">({</span></span>
+<span class="line"><span style="color:#E1E4E8">          _methodName: </span><span style="color:#9ECBFF">'FieldValue.serverTimestamp'</span></span>
+<span class="line"><span style="color:#E1E4E8">        }),</span></span>
+<span class="line"><span style="color:#E1E4E8">      })</span></span>
+<span class="line"><span style="color:#E1E4E8">    );</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">    expect</span><span style="color:#E1E4E8">(mockRecordBillingEvent).</span><span style="color:#B392F0">toHaveBeenCalled</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#E1E4E8">  });</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">  it</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'should record noop ledger entry when no changes'</span><span style="color:#E1E4E8">, </span><span style="color:#F97583">async</span><span style="color:#E1E4E8"> () </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">    const</span><span style="color:#79B8FF"> result</span><span style="color:#F97583"> =</span><span style="color:#F97583"> await</span><span style="color:#B392F0"> enforceWorkspacePlan</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'workspace123'</span><span style="color:#E1E4E8">, {</span></span>
+<span class="line"><span style="color:#E1E4E8">      stripePriceId: </span><span style="color:#9ECBFF">'price_starter'</span><span style="color:#E1E4E8">, </span><span style="color:#6A737D">// Same as current</span></span>
+<span class="line"><span style="color:#E1E4E8">      stripeStatus: </span><span style="color:#9ECBFF">'active'</span><span style="color:#E1E4E8">,         </span><span style="color:#6A737D">// Same as current</span></span>
+<span class="line"><span style="color:#E1E4E8">      source: </span><span style="color:#9ECBFF">'webhook'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">      stripeEventId: </span><span style="color:#9ECBFF">'evt_noop'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">    });</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">    expect</span><span style="color:#E1E4E8">(result.planChanged).</span><span style="color:#B392F0">toBe</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">false</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#B392F0">    expect</span><span style="color:#E1E4E8">(result.statusChanged).</span><span style="color:#B392F0">toBe</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">false</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">    // Verify NO workspace update</span></span>
+<span class="line"><span style="color:#B392F0">    expect</span><span style="color:#E1E4E8">(mockUpdate).not.</span><span style="color:#B392F0">toHaveBeenCalled</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">    // Verify ledger entry still recorded (noop)</span></span>
+<span class="line"><span style="color:#B392F0">    expect</span><span style="color:#E1E4E8">(mockRecordBillingEvent).</span><span style="color:#B392F0">toHaveBeenCalled</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#E1E4E8">  });</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">  it</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'should support auditor-driven enforcement (drift correction)'</span><span style="color:#E1E4E8">, </span><span style="color:#F97583">async</span><span style="color:#E1E4E8"> () </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">    const</span><span style="color:#79B8FF"> result</span><span style="color:#F97583"> =</span><span style="color:#F97583"> await</span><span style="color:#B392F0"> enforceWorkspacePlan</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'workspace123'</span><span style="color:#E1E4E8">, {</span></span>
+<span class="line"><span style="color:#E1E4E8">      stripePriceId: </span><span style="color:#9ECBFF">'price_pro'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">      stripeStatus: </span><span style="color:#9ECBFF">'past_due'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">      source: </span><span style="color:#9ECBFF">'auditor'</span><span style="color:#E1E4E8">, </span><span style="color:#6A737D">// Different source</span></span>
+<span class="line"><span style="color:#E1E4E8">      stripeEventId: </span><span style="color:#79B8FF">null</span><span style="color:#E1E4E8">, </span><span style="color:#6A737D">// No Stripe event for auditor</span></span>
+<span class="line"><span style="color:#E1E4E8">    });</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">    expect</span><span style="color:#E1E4E8">(result.planChanged).</span><span style="color:#B392F0">toBe</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">true</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#B392F0">    expect</span><span style="color:#E1E4E8">(result.statusChanged).</span><span style="color:#B392F0">toBe</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">true</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#B392F0">    expect</span><span style="color:#E1E4E8">(mockRecordBillingEvent).</span><span style="color:#B392F0">toHaveBeenCalled</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#E1E4E8">  });</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">  it</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'should never call Stripe API (passive enforcement)'</span><span style="color:#E1E4E8">, </span><span style="color:#F97583">async</span><span style="color:#E1E4E8"> () </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">    await</span><span style="color:#B392F0"> enforceWorkspacePlan</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'workspace123'</span><span style="color:#E1E4E8">, {</span></span>
+<span class="line"><span style="color:#E1E4E8">      stripePriceId: </span><span style="color:#9ECBFF">'price_plus'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">      stripeStatus: </span><span style="color:#9ECBFF">'active'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">      source: </span><span style="color:#9ECBFF">'webhook'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">      stripeEventId: </span><span style="color:#9ECBFF">'evt_123'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">    });</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">    // Enforcement should only interact with Firestore, never Stripe</span></span>
+<span class="line"><span style="color:#B392F0">    expect</span><span style="color:#E1E4E8">(mockUpdate).</span><span style="color:#B392F0">toHaveBeenCalled</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#B392F0">    expect</span><span style="color:#E1E4E8">(mockRecordBillingEvent).</span><span style="color:#B392F0">toHaveBeenCalled</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#E1E4E8">  });</span></span>
+<span class="line"><span style="color:#E1E4E8">});</span></span></code></pre>
+<h3 id="key-test-categories">Key Test Categories</h3>
+<ol>
+<li>
+<p><strong>Delta Detection</strong> (4 tests):</p>
+<ul>
+<li>Both plan and status changed</li>
+<li>Only plan changed</li>
+<li>Only status changed</li>
+<li>No changes (noop)</li>
+</ul>
+</li>
+<li>
+<p><strong>Event Sources</strong> (3 tests):</p>
+<ul>
+<li>Webhook-driven enforcement</li>
+<li>Replay-driven enforcement</li>
+<li>Auditor-driven enforcement</li>
+</ul>
+</li>
+<li>
+<p><strong>Input Validation</strong> (4 tests):</p>
+<ul>
+<li>Invalid workspaceId</li>
+<li>Invalid stripePriceId</li>
+<li>Invalid stripeStatus</li>
+<li>Invalid source enum</li>
+</ul>
+</li>
+<li>
+<p><strong>Error Handling</strong> (3 tests):</p>
+<ul>
+<li>Workspace not found</li>
+<li>Firestore update failure</li>
+<li>Unknown Stripe price ID</li>
+</ul>
+</li>
+</ol>
+<p><strong>All 229 tests passing</strong> (14 new + 215 existing)</p>
+<h2 id="integration-four-locations-one-function">Integration: Four Locations, One Function</h2>
+<h3 id="1-stripe-webhook-handler">1. Stripe Webhook Handler</h3>
+<p><strong>Before</strong> (duplicated logic):</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#F97583">async</span><span style="color:#F97583"> function</span><span style="color:#B392F0"> handleSubscriptionUpdated</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">subscription</span><span style="color:#E1E4E8">, </span><span style="color:#FFAB70">eventId</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> workspace</span><span style="color:#F97583"> =</span><span style="color:#F97583"> await</span><span style="color:#B392F0"> getWorkspaceByStripeCustomerId</span><span style="color:#E1E4E8">(customerId);</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> planBefore</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> workspace.plan;</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> statusBefore</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> workspace.status;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> priceId</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> subscription.items.data[</span><span style="color:#79B8FF">0</span><span style="color:#E1E4E8">].price.id;</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> plan</span><span style="color:#F97583"> =</span><span style="color:#B392F0"> getPlanForPriceId</span><span style="color:#E1E4E8">(priceId);</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> status</span><span style="color:#F97583"> =</span><span style="color:#B392F0"> mapStripeStatusToWorkspaceStatus</span><span style="color:#E1E4E8">(subscription.status);</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">  await</span><span style="color:#B392F0"> updateWorkspace</span><span style="color:#E1E4E8">(workspace.id, { plan, status });</span></span>
+<span class="line"><span style="color:#F97583">  await</span><span style="color:#B392F0"> updateWorkspaceBilling</span><span style="color:#E1E4E8">(workspace.id, {</span></span>
+<span class="line"><span style="color:#E1E4E8">    currentPeriodEnd: </span><span style="color:#F97583">new</span><span style="color:#B392F0"> Date</span><span style="color:#E1E4E8">(subscription.current_period_end </span><span style="color:#F97583">*</span><span style="color:#79B8FF"> 1000</span><span style="color:#E1E4E8">),</span></span>
+<span class="line"><span style="color:#E1E4E8">  });</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">  await</span><span style="color:#B392F0"> recordBillingEvent</span><span style="color:#E1E4E8">(workspace.id, {</span></span>
+<span class="line"><span style="color:#E1E4E8">    type: </span><span style="color:#9ECBFF">'subscription_updated'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">    stripeEventId: eventId,</span></span>
+<span class="line"><span style="color:#E1E4E8">    statusBefore,</span></span>
+<span class="line"><span style="color:#E1E4E8">    statusAfter: status,</span></span>
+<span class="line"><span style="color:#E1E4E8">    planBefore,</span></span>
+<span class="line"><span style="color:#E1E4E8">    planAfter: plan,</span></span>
+<span class="line"><span style="color:#E1E4E8">    source: </span><span style="color:#9ECBFF">'webhook'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">    note: </span><span style="color:#9ECBFF">`Subscription updated: ${</span><span style="color:#E1E4E8">planBefore</span><span style="color:#9ECBFF">}→${</span><span style="color:#E1E4E8">plan</span><span style="color:#9ECBFF">}`</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  });</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p><strong>After</strong> (unified enforcement):</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#F97583">async</span><span style="color:#F97583"> function</span><span style="color:#B392F0"> handleSubscriptionUpdated</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">subscription</span><span style="color:#E1E4E8">, </span><span style="color:#FFAB70">eventId</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> workspace</span><span style="color:#F97583"> =</span><span style="color:#F97583"> await</span><span style="color:#B392F0"> getWorkspaceByStripeCustomerId</span><span style="color:#E1E4E8">(customerId);</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> priceId</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> subscription.items.data[</span><span style="color:#79B8FF">0</span><span style="color:#E1E4E8">].price.id;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">  // Enforce workspace plan and status (Phase 7 Task 9)</span></span>
+<span class="line"><span style="color:#F97583">  await</span><span style="color:#B392F0"> enforceWorkspacePlan</span><span style="color:#E1E4E8">(workspace.id, {</span></span>
+<span class="line"><span style="color:#E1E4E8">    stripePriceId: priceId,</span></span>
+<span class="line"><span style="color:#E1E4E8">    stripeStatus: subscription.status,</span></span>
+<span class="line"><span style="color:#E1E4E8">    source: </span><span style="color:#9ECBFF">'webhook'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">    stripeEventId: eventId,</span></span>
+<span class="line"><span style="color:#E1E4E8">  });</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">  // Update billing information</span></span>
+<span class="line"><span style="color:#F97583">  await</span><span style="color:#B392F0"> updateWorkspaceBilling</span><span style="color:#E1E4E8">(workspace.id, {</span></span>
+<span class="line"><span style="color:#E1E4E8">    currentPeriodEnd: </span><span style="color:#F97583">new</span><span style="color:#B392F0"> Date</span><span style="color:#E1E4E8">(subscription.current_period_end </span><span style="color:#F97583">*</span><span style="color:#79B8FF"> 1000</span><span style="color:#E1E4E8">),</span></span>
+<span class="line"><span style="color:#E1E4E8">  });</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p><strong>Reduction:</strong> 15 lines → 8 lines per handler × 5 handlers = <strong>~35 lines saved</strong></p>
+<h3 id="2-event-replay-endpoint">2. Event Replay Endpoint</h3>
+<p>Same pattern, but with <code>source: 'replay'</code>:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#F97583">async</span><span style="color:#F97583"> function</span><span style="color:#B392F0"> replaySubscriptionDeleted</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">subscription</span><span style="color:#E1E4E8">, </span><span style="color:#FFAB70">customerId</span><span style="color:#E1E4E8">, </span><span style="color:#FFAB70">eventId</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> workspace</span><span style="color:#F97583"> =</span><span style="color:#F97583"> await</span><span style="color:#B392F0"> getWorkspaceByStripeCustomerId</span><span style="color:#E1E4E8">(customerId);</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> priceId</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> subscription.items.data[</span><span style="color:#79B8FF">0</span><span style="color:#E1E4E8">].price.id;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">  // Enforce workspace plan and status</span></span>
+<span class="line"><span style="color:#6A737D">  // Subscription deleted means status should be 'canceled'</span></span>
+<span class="line"><span style="color:#F97583">  await</span><span style="color:#B392F0"> enforceWorkspacePlan</span><span style="color:#E1E4E8">(workspace.id, {</span></span>
+<span class="line"><span style="color:#E1E4E8">    stripePriceId: priceId,</span></span>
+<span class="line"><span style="color:#E1E4E8">    stripeStatus: </span><span style="color:#9ECBFF">'canceled'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">    source: </span><span style="color:#9ECBFF">'replay'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">    stripeEventId: eventId,</span></span>
+<span class="line"><span style="color:#E1E4E8">  });</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">  // Keep currentPeriodEnd for grace period access</span></span>
+<span class="line"><span style="color:#F97583">  await</span><span style="color:#B392F0"> updateWorkspaceBilling</span><span style="color:#E1E4E8">(workspace.id, {</span></span>
+<span class="line"><span style="color:#E1E4E8">    currentPeriodEnd: </span><span style="color:#F97583">new</span><span style="color:#B392F0"> Date</span><span style="color:#E1E4E8">(subscription.current_period_end </span><span style="color:#F97583">*</span><span style="color:#79B8FF"> 1000</span><span style="color:#E1E4E8">),</span></span>
+<span class="line"><span style="color:#E1E4E8">  });</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p><strong>Benefit:</strong> Event source tracking in ledger allows distinguishing webhook vs. replay events</p>
+<h3 id="3-billing-auditor-auto-fix-drift">3. Billing Auditor (Auto-Fix Drift)</h3>
+<p>This is where it gets powerful:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#F97583">export</span><span style="color:#F97583"> async</span><span style="color:#F97583"> function</span><span style="color:#B392F0"> auditWorkspaceBilling</span><span style="color:#E1E4E8">(</span></span>
+<span class="line"><span style="color:#FFAB70">  workspaceId</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> string</span></span>
+<span class="line"><span style="color:#E1E4E8">)</span><span style="color:#F97583">:</span><span style="color:#B392F0"> Promise</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">BillingAuditReport</span><span style="color:#E1E4E8">> {</span></span>
+<span class="line"><span style="color:#6A737D">  // ... fetch workspace and Stripe subscription ...</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">  // Detect drift</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> expectedStatus</span><span style="color:#F97583"> =</span><span style="color:#B392F0"> mapStripeStatusToWorkspaceStatus</span><span style="color:#E1E4E8">(subscription.status);</span></span>
+<span class="line"><span style="color:#F97583">  if</span><span style="color:#E1E4E8"> (workspace.status </span><span style="color:#F97583">!==</span><span style="color:#E1E4E8"> expectedStatus) {</span></span>
+<span class="line"><span style="color:#E1E4E8">    report.drift </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> true</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">    report.driftReasons.</span><span style="color:#B392F0">push</span><span style="color:#E1E4E8">(</span></span>
+<span class="line"><span style="color:#9ECBFF">      `Status mismatch: Firestore=${</span><span style="color:#E1E4E8">workspace</span><span style="color:#9ECBFF">.</span><span style="color:#E1E4E8">status</span><span style="color:#9ECBFF">}, Stripe=${</span><span style="color:#E1E4E8">subscription</span><span style="color:#9ECBFF">.</span><span style="color:#E1E4E8">status</span><span style="color:#9ECBFF">}`</span></span>
+<span class="line"><span style="color:#E1E4E8">    );</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">  // Determine fix strategy</span></span>
+<span class="line"><span style="color:#F97583">  if</span><span style="color:#E1E4E8"> (report.drift) {</span></span>
+<span class="line"><span style="color:#F97583">    const</span><span style="color:#79B8FF"> hasOnlyStatusOrPlanDrift</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> report.driftReasons.</span><span style="color:#B392F0">every</span><span style="color:#E1E4E8">(</span></span>
+<span class="line"><span style="color:#E1E4E8">      (</span><span style="color:#FFAB70">reason</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">=></span></span>
+<span class="line"><span style="color:#E1E4E8">        reason.</span><span style="color:#B392F0">includes</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'Status mismatch'</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">||</span><span style="color:#E1E4E8"> reason.</span><span style="color:#B392F0">includes</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'Plan mismatch'</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">    );</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">    if</span><span style="color:#E1E4E8"> (hasOnlyStatusOrPlanDrift) {</span></span>
+<span class="line"><span style="color:#E1E4E8">      report.recommendedFix </span><span style="color:#F97583">=</span><span style="color:#9ECBFF"> 'run_event_replay'</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">      // 🔥 NEW: Apply automatic enforcement if drift can be fixed</span></span>
+<span class="line"><span style="color:#F97583">      if</span><span style="color:#E1E4E8"> (report.stripePriceId </span><span style="color:#F97583">&#x26;&#x26;</span><span style="color:#E1E4E8"> report.stripeStatus) {</span></span>
+<span class="line"><span style="color:#F97583">        await</span><span style="color:#B392F0"> enforceWorkspacePlan</span><span style="color:#E1E4E8">(workspaceId, {</span></span>
+<span class="line"><span style="color:#E1E4E8">          stripePriceId: report.stripePriceId,</span></span>
+<span class="line"><span style="color:#E1E4E8">          stripeStatus: report.stripeStatus,</span></span>
+<span class="line"><span style="color:#E1E4E8">          source: </span><span style="color:#9ECBFF">'auditor'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">          stripeEventId: </span><span style="color:#79B8FF">null</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">        });</span></span>
+<span class="line"><span style="color:#E1E4E8">      }</span></span>
+<span class="line"><span style="color:#E1E4E8">    } </span><span style="color:#F97583">else</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">      report.recommendedFix </span><span style="color:#F97583">=</span><span style="color:#9ECBFF"> 'manual_stripe_review'</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">    // Record drift detection in ledger</span></span>
+<span class="line"><span style="color:#F97583">    await</span><span style="color:#B392F0"> recordBillingEvent</span><span style="color:#E1E4E8">(workspaceId, {</span></span>
+<span class="line"><span style="color:#E1E4E8">      type: </span><span style="color:#9ECBFF">'drift_detected'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#6A737D">      // ... drift details ...</span></span>
+<span class="line"><span style="color:#E1E4E8">      note: </span><span style="color:#9ECBFF">`Drift detected: ${</span><span style="color:#E1E4E8">report</span><span style="color:#9ECBFF">.</span><span style="color:#E1E4E8">driftReasons</span><span style="color:#9ECBFF">.</span><span style="color:#B392F0">join</span><span style="color:#9ECBFF">(</span><span style="color:#9ECBFF">'; '</span><span style="color:#9ECBFF">)</span><span style="color:#9ECBFF">}. ${</span></span>
+<span class="line"><span style="color:#E1E4E8">        report</span><span style="color:#9ECBFF">.</span><span style="color:#E1E4E8">recommendedFix</span><span style="color:#F97583"> ===</span><span style="color:#9ECBFF"> 'run_event_replay'</span></span>
+<span class="line"><span style="color:#F97583">          ?</span><span style="color:#9ECBFF"> '(auto-applied via enforcement)'</span></span>
+<span class="line"><span style="color:#F97583">          :</span><span style="color:#9ECBFF"> ''</span></span>
+<span class="line"><span style="color:#9ECBFF">      }`</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">    });</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">  return</span><span style="color:#E1E4E8"> report;</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p><strong>Result:</strong> Auditor detects drift AND automatically fixes it!</p>
+<p><strong>Ledger Audit Trail</strong> (2 entries):</p>
+<ol>
+<li><code>drift_detected</code> (from auditor) - “Drift detected… (auto-applied)”</li>
+<li><code>plan_changed</code> (from enforcement) - “Plan enforcement: active→past_due”</li>
+</ol>
+<h2 id="real-world-scenarios">Real-World Scenarios</h2>
+<h3 id="scenario-1-payment-failure">Scenario 1: Payment Failure</h3>
+<p><strong>Event:</strong> User’s credit card declines</p>
+<p><strong>Stripe Webhook:</strong> <code>invoice.payment_failed</code></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#6A737D">// Webhook handler</span></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> subscription</span><span style="color:#F97583"> =</span><span style="color:#F97583"> await</span><span style="color:#E1E4E8"> stripe.subscriptions.</span><span style="color:#B392F0">retrieve</span><span style="color:#E1E4E8">(subscriptionId);</span></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> priceId</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> subscription.items.data[</span><span style="color:#79B8FF">0</span><span style="color:#E1E4E8">].price.id;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">await</span><span style="color:#B392F0"> enforceWorkspacePlan</span><span style="color:#E1E4E8">(workspace.id, {</span></span>
+<span class="line"><span style="color:#E1E4E8">  stripePriceId: priceId,</span></span>
+<span class="line"><span style="color:#E1E4E8">  stripeStatus: </span><span style="color:#9ECBFF">'past_due'</span><span style="color:#E1E4E8">, </span><span style="color:#6A737D">// Stripe sets this automatically</span></span>
+<span class="line"><span style="color:#E1E4E8">  source: </span><span style="color:#9ECBFF">'webhook'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  stripeEventId: </span><span style="color:#9ECBFF">'evt_payment_failed'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">});</span></span></code></pre>
+<p><strong>Result:</strong></p>
+<ul>
+<li><code>workspace.status</code> updated: <code>active</code> → <code>past_due</code></li>
+<li><code>workspace.plan</code> unchanged: <code>starter</code> → <code>starter</code></li>
+<li>Ledger entry: “Plan enforcement: plan unchanged, active→past_due”</li>
+<li>User sees grace period notice in dashboard</li>
+</ul>
+<h3 id="scenario-2-plan-downgrade">Scenario 2: Plan Downgrade</h3>
+<p><strong>Event:</strong> User downgrades from Plus to Starter</p>
+<p><strong>Stripe Webhook:</strong> <code>customer.subscription.updated</code></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#F97583">await</span><span style="color:#B392F0"> enforceWorkspacePlan</span><span style="color:#E1E4E8">(workspace.id, {</span></span>
+<span class="line"><span style="color:#E1E4E8">  stripePriceId: </span><span style="color:#9ECBFF">'price_starter'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  stripeStatus: </span><span style="color:#9ECBFF">'active'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  source: </span><span style="color:#9ECBFF">'webhook'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  stripeEventId: </span><span style="color:#9ECBFF">'evt_sub_updated'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">});</span></span></code></pre>
+<p><strong>Result:</strong></p>
+<ul>
+<li><code>workspace.plan</code> updated: <code>plus</code> → <code>starter</code></li>
+<li><code>workspace.status</code> unchanged: <code>active</code> → <code>active</code></li>
+<li>Ledger entry: “Plan enforcement: plus→starter, status unchanged”</li>
+<li>Player limits automatically enforced on next action</li>
+</ul>
+<h3 id="scenario-3-drift-correction">Scenario 3: Drift Correction</h3>
+<p><strong>Event:</strong> Periodic audit runs at 14:00, finds drift</p>
+<p><strong>Audit Report:</strong></p>
+<ul>
+<li><code>workspace.status = 'active'</code></li>
+<li><code>subscription.status = 'past_due'</code> (payment failed, but webhook delayed)</li>
+<li><code>recommendedFix = 'run_event_replay'</code></li>
+</ul>
+<p><strong>Auto-Enforcement:</strong></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#6A737D">// Auditor automatically applies enforcement</span></span>
+<span class="line"><span style="color:#F97583">await</span><span style="color:#B392F0"> enforceWorkspacePlan</span><span style="color:#E1E4E8">(workspace.id, {</span></span>
+<span class="line"><span style="color:#E1E4E8">  stripePriceId: </span><span style="color:#9ECBFF">'price_starter'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  stripeStatus: </span><span style="color:#9ECBFF">'past_due'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  source: </span><span style="color:#9ECBFF">'auditor'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  stripeEventId: </span><span style="color:#79B8FF">null</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">});</span></span></code></pre>
+<p><strong>Ledger Entries</strong> (2 entries):</p>
+<ol>
+<li><code>drift_detected</code> - “Drift detected: Status mismatch (auto-applied)”</li>
+<li><code>plan_changed</code> - “Plan enforcement: active→past_due”</li>
+</ol>
+<p><strong>Result:</strong> Drift corrected before webhook even arrives!</p>
+<h2 id="lessons-learned">Lessons Learned</h2>
+<h3 id="1-idempotency-is-not-optional">1. Idempotency Is Not Optional</h3>
+<p>Webhooks <strong>will</strong> be duplicated. Design for it from day one.</p>
+<p><strong>Key pattern:</strong></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#6A737D">// Always compare current state vs. target state</span></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> changed</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> current </span><span style="color:#F97583">!==</span><span style="color:#E1E4E8"> target;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">if</span><span style="color:#E1E4E8"> (changed) {</span></span>
+<span class="line"><span style="color:#6A737D">  // Update</span></span>
+<span class="line"><span style="color:#E1E4E8">} </span><span style="color:#F97583">else</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#6A737D">  // Noop (but still record in ledger!)</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<h3 id="2-test-more-than-you-implement">2. Test More Than You Implement</h3>
+<p>Our ratio: <strong>450 lines of tests vs. 264 lines of implementation</strong> (1.7:1)</p>
+<p>Why?</p>
+<ul>
+<li>Caught 5 bugs before they hit production</li>
+<li>Mocking Firestore requires careful setup</li>
+<li>Edge cases (workspace not found, unknown price ID) easy to miss</li>
+<li>Behavioral contracts (“never calls Stripe API”) prevent regression</li>
+</ul>
+<h3 id="3-audit-trails-are-critical">3. Audit Trails Are Critical</h3>
+<p>Every enforcement action writes to ledger with:</p>
+<ul>
+<li>Before/after state (delta tracking)</li>
+<li>Event source (webhook, replay, auditor, manual)</li>
+<li>Stripe event ID (when applicable)</li>
+<li>Human-readable note</li>
+</ul>
+<p><strong>Value:</strong></p>
+<ul>
+<li>Troubleshoot billing issues: “When did plan change?”</li>
+<li>Customer support: “Show me all billing events for this workspace”</li>
+<li>Compliance: “Prove we applied subscription correctly”</li>
+</ul>
+<h3 id="4-passive-enforcement-prevents-circular-updates">4. Passive Enforcement Prevents Circular Updates</h3>
+<p><strong>Never modify Stripe data from enforcement.</strong></p>
+<p>Why?</p>
+<ul>
+<li>Stripe is source of truth for billing</li>
+<li>Workspace is source of truth for runtime behavior</li>
+<li>Updating Stripe triggers webhook → triggers enforcement → infinite loop</li>
+</ul>
+<p><strong>The rule:</strong> Enforcement only reads Stripe, applies to workspace.</p>
+<h2 id="whats-next">What’s Next?</h2>
+<h3 id="optional-enhancements">Optional Enhancements</h3>
+<ol>
+<li>
+<p><strong>Batch Enforcement Script</strong></p>
+<ul>
+<li>Run enforcement across ALL workspaces</li>
+<li>Useful for periodic drift correction</li>
+<li>Source: <code>'enforcement'</code></li>
+</ul>
+</li>
+<li>
+<p><strong>Admin Dashboard UI</strong></p>
+<ul>
+<li>Manual “Force Sync” button</li>
+<li>Show current workspace vs. Stripe state</li>
+<li>Display enforcement result with deltas</li>
+</ul>
+</li>
+<li>
+<p><strong>Monitoring &#x26; Alerts</strong></p>
+<ul>
+<li>Track enforcement metrics (noop vs. delta ratio)</li>
+<li>Alert on high failure rate</li>
+<li>Dashboard visualization (Grafana/Cloud Monitoring)</li>
+</ul>
+</li>
+</ol>
+<h3 id="future-integration">Future Integration</h3>
+<p>The <code>'manual'</code> source is reserved for admin operations:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#6A737D">// Admin dashboard: "Force Sync with Stripe" button</span></span>
+<span class="line"><span style="color:#F97583">await</span><span style="color:#B392F0"> enforceWorkspacePlan</span><span style="color:#E1E4E8">(workspaceId, {</span></span>
+<span class="line"><span style="color:#E1E4E8">  stripePriceId: manuallyEnteredPriceId,</span></span>
+<span class="line"><span style="color:#E1E4E8">  stripeStatus: manuallyEnteredStatus,</span></span>
+<span class="line"><span style="color:#E1E4E8">  source: </span><span style="color:#9ECBFF">'manual'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  stripeEventId: </span><span style="color:#79B8FF">null</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">});</span></span></code></pre>
+<h2 id="conclusion">Conclusion</h2>
+<p>Building a unified plan enforcement engine solved three critical problems:</p>
+<ol>
+<li><strong>Eliminated duplicate logic</strong> - One function, four integration points</li>
+<li><strong>Handled webhook chaos</strong> - Idempotent design survives duplicates and out-of-order events</li>
+<li><strong>Automated drift correction</strong> - Auditor detects and fixes drift automatically</li>
+</ol>
+<p><strong>Code impact:</strong></p>
+<ul>
+<li>Removed: ~180 lines of duplicate logic</li>
+<li>Added: 264 lines of enforcement + 450 lines of tests</li>
+<li>Net: Cleaner, more maintainable codebase</li>
+</ul>
+<p><strong>Key takeaways:</strong></p>
+<ul>
+<li>Design for idempotency from day one</li>
+<li>Test more than you implement</li>
+<li>Audit trails are critical for billing</li>
+<li>Never create circular update loops</li>
+</ul>
+<p>If you’re building subscription billing with Stripe webhooks, consider whether your plan/status updates are consolidated. It’s worth the upfront investment.</p>
+<p><strong>Related posts:</strong></p>
+<ul>
+<li>Architecting Production Multi-Agent AI Platform: Technical Leadership</li>
+<li>Building Production Multi-Agent AI with Vertex AI</li>
+</ul>
+<p><em>Building Hustle, a youth sports stats platform with Firebase, Stripe, and Vertex AI. Follow along as I document the technical decisions and lessons learned.</em></p>
+      </div>
+    </div>
+  </article>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
