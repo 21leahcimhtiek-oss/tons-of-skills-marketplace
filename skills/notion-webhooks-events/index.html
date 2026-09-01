@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>notion-webhooks-events - Agent Skill</title>
+    <meta name="description" content="Build change detection and event handling for Notion workspaces using polling, native webhooks, and third-party connectors. Use when implementing real-time sync, change feeds, incremental backup, or event-driven workflows with Notion data. Trigger with phrases like &quot;notion webhook&quot;, &quot;notion events&quot;, &quot;notion change detection&quot;, &quot;notion polling&quot;, &quot;notion sync changes&quot;, &quot;notion real-time&quot;, &quot;notion watch for changes&quot;.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://tonsofskills.com/tons-of-skills-marketplace/skills/notion-webhooks-events/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/notion-webhooks-events/">
+    <meta property="og:title" content="notion-webhooks-events - Agent Skill">
+    <meta property="og:description" content="Build change detection and event handling for Notion workspaces using polling, native webhooks, and third-party connectors. Use when implementing real-time sync, change feeds, incremental backup, or event-driven workflows with Notion data. Trigger with phrases like &quot;notion webhook&quot;, &quot;notion events&quot;, &quot;notion change detection&quot;, &quot;notion polling&quot;, &quot;notion sync changes&quot;, &quot;notion real-time&quot;, &quot;notion watch for changes&quot;.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="notion-webhooks-events - Agent Skill">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/notion-webhooks-events/">
+    <meta name="twitter:title" content="notion-webhooks-events - Agent Skill">
+    <meta name="twitter:description" content="Build change detection and event handling for Notion workspaces using polling, native webhooks, and third-party connectors. Use when implementing real-time sync, change feeds, incremental backup, or event-driven workflows with Notion data. Trigger with phrases like &quot;notion webhook&quot;, &quot;notion events&quot;, &quot;notion change detection&quot;, &quot;notion polling&quot;, &quot;notion sync changes&quot;, &quot;notion real-time&quot;, &quot;notion watch for changes&quot;.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"notion-webhooks-events","description":"Build change detection and event handling for Notion workspaces using polling, native webhooks, and third-party connectors. Use when implementing real-time sync, change feeds, incremental backup, or event-driven workflows with Notion data. Trigger with phrases like \"notion webhook\", \"notion events\", \"notion change detection\", \"notion polling\", \"notion sync changes\", \"notion real-time\", \"notion watch for changes\".","version":"1.38.0","author":{"@type":"Person","name":"Jeremy Longshore"},"license":"MIT","programmingLanguage":"Claude Code Agent Skill","isPartOf":{"@type":"SoftwareApplication","name":"notion-pack","applicationCategory":"unknown"}}</script>
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.breadcrumbs[data-astro-cid-ilhxcym7]{margin-bottom:var(--space-5)}.breadcrumbs__list[data-astro-cid-ilhxcym7]{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;list-style:none;padding:0;margin:0;font-family:var(--font-mono);font-size:var(--text-sm, .8rem)}.breadcrumbs__item[data-astro-cid-ilhxcym7]{display:flex;align-items:center;gap:.375rem}.breadcrumbs__link[data-astro-cid-ilhxcym7]{color:var(--text-3);text-decoration:none;transition:color var(--duration-fast, .2s) var(--ease-out)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:hover{color:var(--primary)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:0}.breadcrumbs__sep[data-astro-cid-ilhxcym7]{color:var(--text-3);user-select:none;font-size:.7em;line-height:1}.breadcrumbs__current[data-astro-cid-ilhxcym7]{color:var(--text-2)}.detail-cta[data-astro-cid-qcigfm7x]{background:var(--surface-3, var(--brand-light-gray));border-top:1px solid var(--border, var(--brand-light-gray));border-radius:var(--radius-lg);padding:2rem 1.5rem;margin-top:2rem;text-align:center}.detail-cta__headline[data-astro-cid-qcigfm7x]{font-family:var(--font-display);font-weight:700;font-size:1.35rem;color:var(--text, var(--brand-dark));margin-bottom:1.25rem}.detail-cta__actions[data-astro-cid-qcigfm7x]{display:flex;justify-content:center;gap:.75rem;flex-wrap:wrap}.detail-cta__primary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:var(--primary);color:#0a0a0c;border:none;border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;cursor:pointer;transition:background var(--duration-fast) var(--ease-out),transform var(--duration-fast) var(--ease-out)}.detail-cta__primary[data-astro-cid-qcigfm7x]:hover{background:var(--primary-dark, var(--primary-dark));transform:translateY(-1px)}.detail-cta__primary[data-astro-cid-qcigfm7x].copied{background:var(--positive, var(--brand-green))}.detail-cta__secondary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:transparent;color:var(--text, var(--brand-dark));border:1px solid var(--border, var(--brand-mid-gray));border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;text-decoration:none;transition:border-color var(--duration-fast) var(--ease-out),color var(--duration-fast) var(--ease-out)}.detail-cta__secondary[data-astro-cid-qcigfm7x]:hover{border-color:var(--primary);color:var(--primary)}@media(max-width:480px){.detail-cta__actions[data-astro-cid-qcigfm7x]{flex-direction:column;align-items:stretch}.detail-cta__primary[data-astro-cid-qcigfm7x],.detail-cta__secondary[data-astro-cid-qcigfm7x]{justify-content:center}}
+</style>
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/_slug_@_@astro.wF9emvVq.css"></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  
+  
+
+  <div class="skill-detail" data-astro-cid-jrlgpo3w>
+    <!-- 1. Breadcrumbs -->
+    <nav aria-label="Breadcrumb" class="breadcrumbs" data-astro-cid-ilhxcym7>
+  <ol class="breadcrumbs__list" itemscope itemtype="https://schema.org/BreadcrumbList" data-astro-cid-ilhxcym7>
+    <li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Home</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="1">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/skills/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Skills</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="2">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          <span class="breadcrumbs__current" aria-current="page" itemprop="name" data-astro-cid-ilhxcym7>
+              notion-webhooks-events
+            </span>
+          <meta itemprop="position" content="3">
+        </li>
+  </ol>
+</nav>
+
+    <!-- 2. Header (enhanced) -->
+    <header class="skill-header" data-astro-cid-jrlgpo3w>
+      <h1 data-astro-cid-jrlgpo3w>notion-webhooks-events</h1>
+      <p class="skill-description" data-astro-cid-jrlgpo3w>Build change detection and event handling for Notion workspaces using polling, native webhooks, and third-party connectors. Use when implementing real-time sync, change feeds, incremental backup, or event-driven workflows with Notion data. Trigger with phrases like &quot;notion webhook&quot;, &quot;notion events&quot;, &quot;notion change detection&quot;, &quot;notion polling&quot;, &quot;notion sync changes&quot;, &quot;notion real-time&quot;, &quot;notion watch for changes&quot;.</p>
+
+      <div class="skill-metadata" data-astro-cid-jrlgpo3w>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>v1.38.0</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>Jeremy Longshore</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>MIT</span>
+        </div>
+      </div>
+
+      
+    </header>
+
+    <!-- 4. Allowed Tools -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Allowed Tools</h2>
+      <div class="tools-grid" data-astro-cid-jrlgpo3w>
+        <span class="tool-badge" data-astro-cid-jrlgpo3w>Read</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Write</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Edit</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(node:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(npx:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(npm:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(curl:*)</span>
+      </div>
+      
+    </section>
+
+    <!-- 5. Provided by Plugin -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Provided by Plugin</h2>
+      <div class="plugin-info" data-astro-cid-jrlgpo3w>
+        <div class="plugin-details" data-astro-cid-jrlgpo3w>
+          <h3 data-astro-cid-jrlgpo3w>
+            <a href="/plugins/notion-pack/" data-astro-cid-jrlgpo3w>notion-pack</a>
+          </h3>
+          <p data-astro-cid-jrlgpo3w>Claude Code skill pack for Notion (30 skills)</p>
+          <div class="plugin-meta" data-astro-cid-jrlgpo3w>
+            <span data-astro-cid-jrlgpo3w>unknown</span>
+            <span data-astro-cid-jrlgpo3w>v1.38.0</span>
+          </div>
+        </div>
+        <a href="/plugins/notion-pack/" class="btn-primary" data-astro-cid-jrlgpo3w>View Plugin</a>
+      </div>
+    </section>
+
+    <!-- 6. Installation -->
+    <section class="section-box dark" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Installation</h2>
+      <p class="install-note" style="color: var(--brand-light-gray); margin-bottom: 0.75rem;" data-astro-cid-jrlgpo3w>This skill is included in the notion-pack plugin:</p>
+      <pre class="install-command" data-copy="/plugin install notion-pack@claude-code-plugins-plus" data-astro-cid-jrlgpo3w><code data-astro-cid-jrlgpo3w>/plugin install notion-pack@claude-code-plugins-plus</code></pre>
+      <p class="install-note" data-astro-cid-jrlgpo3w>Click to copy</p>
+    </section>
+
+    <!-- 7. Skill Content (Markdown) -->
+    <section class="skill-content-section" data-astro-cid-jrlgpo3w>
+      <h2 data-astro-cid-jrlgpo3w>Instructions</h2>
+      <div class="skill-content" data-astro-cid-jrlgpo3w>
+        <div data-astro-cid-jrlgpo3w><h1>Notion Webhooks &amp; Event Handling</h1>
+<h2>Overview</h2>
+<p>Notion offers three approaches to change detection, each with different trade-offs:</p>
+<table><thead><tr>
+<th>Approach</th>
+<th>Latency</th>
+<th>Complexity</th>
+<th>Reliability</th>
+</tr></thead><tbody>
+<tr>
+<td><strong>Polling with <code>search</code> / <code>databases.query</code></strong></td>
+<td>30s-5min (your poll interval)</td>
+<td>Low</td>
+<td>High — you control timing</td>
+</tr>
+<tr>
+<td><strong>Native webhooks</strong> (API 2025-02+)</td>
+<td>Near real-time</td>
+<td>Medium</td>
+<td>Good — requires HTTPS endpoint, retry handling</td>
+</tr>
+<tr>
+<td><strong>Third-party connectors</strong> (Zapier, Make)</td>
+<td>1-15 min</td>
+<td>Low (no-code)</td>
+<td>Vendor-dependent</td>
+</tr>
+</tbody></table>
+<p><strong>Honest assessment:</strong> Notion&#39;s native webhook support arrived in mid-2025 and covers page, database, comment, and data source events. It works well for event notification but does not deliver full payloads — you still need API calls to fetch the changed data. For many use cases, especially incremental sync and backup, polling with <code>last_edited_time</code> filters remains the most battle-tested pattern.</p>
+<h2>Prerequisites</h2>
+<ul>
+<li><code>@notionhq/client</code> v2.3+ installed (<code>npm install @notionhq/client</code>)</li>
+<li>Notion integration created at &lt;https://www.notion.so/my-integrations&gt;</li>
+<li>Integration shared with target pages/databases (Connections menu in Notion)</li>
+<li><code>NOTION_TOKEN</code> environment variable set to the integration&#39;s Internal Integration Secret</li>
+<li>For native webhooks: HTTPS endpoint accessible from the internet</li>
+</ul>
+<h2>Authentication</h2>
+<p>All API calls authenticate with the integration&#39;s Internal Integration Secret, passed as a bearer token. The <code>@notionhq/client</code> handles the header when you construct the client — never hardcode the secret:</p>
+<pre data-lang="typescript"><code>
+const notion = new Client({ auth: process.env.NOTION_TOKEN });
+</code></pre>
+<p>Store <code>NOTION_TOKEN</code> in your environment (<code>.env</code>, a GitHub Actions secret, or a secrets manager) and grant the integration access to each target page/database via the Connections menu.</p>
+<p>Webhook deliveries themselves carry no bearer token — verify them with the <code>url_verification</code> handshake and treat the payload as untrusted, fetching the real data through the authenticated client rather than trusting the event body.</p>
+<h2>Instructions</h2>
+<p>Pick an approach from the Overview table, then follow the matching step. Steps 1 and 2 keep a runnable skeleton here and link to the full implementation in <code>references/</code>.</p>
+<h3>Step 1: Polling-Based Change Detection</h3>
+<p>Polling is the most reliable approach and works with every Notion API version. Use <code>notion.search()</code> to discover recently edited content across the entire workspace, or <code>notion.databases.query()</code> with a <code>last_edited_time</code> filter for targeted change detection on a single database. The database-scoped query below is the efficient default — it stays within rate limits and returns only what changed since your last poll:</p>
+<pre data-lang="typescript"><code>
+import { Client } from &#39;@notionhq/client&#39;;
+const notion = new Client({ auth: process.env.NOTION_TOKEN });
+
+// Return pages edited since the given ISO 8601 timestamp
+async function pollDatabaseChanges(databaseId: string, since: string) {
+  const { results } = await notion.databases.query({
+    database_id: databaseId,
+    filter: { timestamp: &#39;last_edited_time&#39;, last_edited_time: { after: since } },
+    sorts: [{ timestamp: &#39;last_edited_time&#39;, direction: &#39;descending&#39; }],
+  });
+  return results; // paginate on response.has_more for large result sets
+}
+</code></pre>
+<p><code>references/polling.md</code> covers the full implementation: a paginated workspace-wide change feed with a high-water-mark cursor, a property-level <code>diffChanges</code> that reports exactly which fields changed against a cache, and block-level content fingerprinting to catch edits inside a page body (not just property edits). See <a href="references/polling.md">full polling implementation</a>.</p>
+<h3>Step 2: Native Webhooks (API 2025-02+)</h3>
+<p>Notion&#39;s native webhooks deliver HTTP POST notifications when pages, databases, comments, or data sources change. They notify you that something changed — you then call the API to fetch the actual data. The receiver must first answer the one-time registration handshake, then acknowledge every event fast and process it asynchronously:</p>
+<pre data-lang="typescript"><code>
+import express from &#39;express&#39;;
+const app = express();
+app.use(express.json());
+
+app.post(&#39;/webhooks/notion&#39;, (req, res) =&gt; {
+  // Registration handshake: echo the challenge back
+  if (req.body.type === &#39;url_verification&#39;) {
+    return res.status(200).json({ challenge: req.body.challenge });
+  }
+  res.status(200).json({ ok: true }); // ack fast — process async
+  handleWebhookEvent(req.body);
+});
+
+app.listen(3000, () =&gt; console.log(&#39;Webhook receiver on :3000&#39;));
+</code></pre>
+<p><code>references/webhooks.md</code> covers the full implementation: the <code>NotionWebhookEvent</code> type, the complete list of supported event types (<code>page.*</code>, <code>database.*</code>, <code>comment.*</code>, <code>data_source.*</code>), a <code>switch</code>-based <code>handleWebhookEvent</code> router that fetches the changed resource, and the deduplication + debouncing layer that absorbs Notion&#39;s delivery retries and rapid-edit bursts. See <a href="references/webhooks.md">full webhook implementation</a>.</p>
+<h3>Step 3: Scheduled Polling with Cron / GitHub Actions</h3>
+<p>See <a href="references/scheduled-polling-and-examples.md">scheduled polling and examples</a> for Node.js cron scripts, GitHub Actions scheduled sync with persistent state, third-party connector patterns, and additional examples including minimal change watchers and hybrid webhook+polling fallback.</p>
+<h2>Output</h2>
+<ul>
+<li>Polling-based change detection for workspace-wide or per-database monitoring</li>
+<li>Property-level diff detection comparing current state against cached snapshots</li>
+<li>Block-level content fingerprinting for page body change tracking</li>
+<li>Native webhook receiver with verification handshake and event routing</li>
+<li>Deduplication and debouncing for reliable event processing</li>
+<li>Cron/GitHub Actions scheduled sync with persistent state</li>
+</ul>
+<h2>Error Handling</h2>
+<table><thead><tr>
+<th>Issue</th>
+<th>Cause</th>
+<th>Solution</th>
+</tr></thead><tbody>
+<tr>
+<td><code>search</code> returns stale results</td>
+<td>Notion indexing delay (up to 30s)</td>
+<td>Accept eventual consistency; do not poll faster than 30s</td>
+</tr>
+<tr>
+<td>Rate limited during polling</td>
+<td>Too many API calls per second</td>
+<td>Add 350ms delay between paginated requests; use <code>databases.query</code> over <code>search</code> when possible</td>
+</tr>
+<tr>
+<td>Webhook verification fails</td>
+<td>Endpoint not returning <code>{ challenge }</code></td>
+<td>Respond with <code>res.json({ challenge: req.body.challenge })</code> for <code>url_verification</code> type</td>
+</tr>
+<tr>
+<td>Duplicate webhook events</td>
+<td>Network retries from Notion</td>
+<td>Deduplicate on <code>type + data.id + timestamp</code> composite key</td>
+</tr>
+<tr>
+<td>Missed changes between polls</td>
+<td>Poll interval too wide</td>
+<td>Persist <code>lastPollTimestamp</code> to disk; use overlapping windows (poll since <code>lastSync - 60s</code>)</td>
+</tr>
+<tr>
+<td>Content changes not detected</td>
+<td><code>last_edited_time</code> only covers properties</td>
+<td>Use <code>blocks.children.list</code> fingerprinting for page body changes</td>
+</tr>
+<tr>
+<td><code>databases.query</code> filter ignored</td>
+<td>Wrong filter structure</td>
+<td>Use <code>{ timestamp: &#39;last_edited_time&#39;, last_edited_time: { after: isoString } }</code> — not a property filter</td>
+</tr>
+</tbody></table>
+<h2>Examples</h2>
+<h3>Minimal Webhook Receiver (verification + fetch on change)</h3>
+<pre data-lang="typescript"><code>
+import express from &#39;express&#39;;
+import { Client } from &#39;@notionhq/client&#39;;
+
+const notion = new Client({ auth: process.env.NOTION_TOKEN });
+const app = express();
+app.use(express.json());
+
+app.post(&#39;/webhooks/notion&#39;, async (req, res) =&gt; {
+  // Registration handshake: echo the challenge back
+  if (req.body.type === &#39;url_verification&#39;) {
+    return res.status(200).json({ challenge: req.body.challenge });
+  }
+  res.status(200).json({ ok: true }); // ack fast, process async
+
+  // Webhooks carry no payload — fetch the changed resource
+  if (req.body.type === &#39;page.properties_updated&#39;) {
+    const page = await notion.pages.retrieve({ page_id: req.body.data.id });
+    console.log(&#39;Page changed:&#39;, &#39;url&#39; in page ? page.url : page.id);
+  }
+});
+
+app.listen(3000);
+</code></pre>
+<h3>One-Database Change Watcher (polling)</h3>
+<pre data-lang="typescript"><code>
+import { Client } from &#39;@notionhq/client&#39;;
+
+const notion = new Client({ auth: process.env.NOTION_TOKEN });
+let since = new Date().toISOString();
+
+setInterval(async () =&gt; {
+  const response = await notion.databases.query({
+    database_id: process.env.NOTION_DATABASE_ID!,
+    filter: { timestamp: &#39;last_edited_time&#39;, last_edited_time: { after: since } },
+    sorts: [{ timestamp: &#39;last_edited_time&#39;, direction: &#39;descending&#39; }],
+  });
+  if (response.results.length &gt; 0) {
+    since = (response.results[0] as any).last_edited_time;
+    console.log(`${response.results.length} row(s) changed since last poll`);
+  }
+}, 60_000); // 60s interval respects the 3 req/s rate limit
+</code></pre>
+<h2>Resources</h2>
+<ul>
+<li><a href="https://developers.notion.com/reference/post-search">Notion API Search endpoint</a></li>
+<li><a href="https://developers.notion.com/reference/post-database-query-filter">Database query filters</a></li>
+<li><a href="https://developers.notion.com/reference/webhooks">Notion Webhooks Reference</a></li>
+<li><a href="https://www.notion.com/help/webhook-actions">Webhook Actions (database automations)</a></li>
+<li><a href="https://www.npmjs.com/package/@notionhq/client">@notionhq/client on npm</a></li>
+<li><a href="https://developers.notion.com/reference/request-limits">Rate limits</a></li>
+</ul>
+<h2>Next Steps</h2>
+<p>Once change detection is working, tune it for scale. For sizing poll intervals against Notion&#39;s 3 requests/second limit and avoiding 429s during bursts, see the <code>notion-rate-limits</code> skill. For caching, batching, and reducing per-poll API calls on large workspaces, see <code>notion-performance-tuning</code>. For scheduled background sync without a persistent server, follow <a href="references/scheduled-polling-and-examples.md">scheduled polling and examples</a>.</p></div>
+      </div>
+    </section>
+
+    <!-- 8. Bottom CTA -->
+    <section class="detail-cta" data-astro-cid-qcigfm7x>
+  <h2 class="detail-cta__headline" data-astro-cid-qcigfm7x>Ready to use notion-pack?</h2>
+  <div class="detail-cta__actions" data-astro-cid-qcigfm7x>
+    <button class="detail-cta__primary" data-copy-install="/plugin install notion-pack@claude-code-plugins-plus" data-astro-cid-qcigfm7x>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" data-astro-cid-qcigfm7x>
+        <rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" stroke-width="1.5" data-astro-cid-qcigfm7x></rect>
+        <path d="M3 11V3a1 1 0 011-1h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" data-astro-cid-qcigfm7x></path>
+      </svg>
+      <span class="detail-cta__btn-text" data-astro-cid-qcigfm7x>Copy Install Command</span>
+    </button>
+    
+  </div>
+</section>
+
+<script type="module">document.querySelectorAll("[data-copy-install]").forEach(t=>{t.addEventListener("click",async()=>{const a=t.dataset.copyInstall||"";await navigator.clipboard.writeText(a);const e=t.querySelector(".detail-cta__btn-text");if(e){const o=e.textContent;e.textContent="Copied!",t.classList.add("copied"),window.trackEvent&&window.trackEvent("install_copied",{plugin_name:a.split(" ").pop()||"",source:"detail_cta"}),setTimeout(()=>{e.textContent=o,t.classList.remove("copied")},2e3)}})});</script>
+
+    <!-- 9. Related Skills (6, with tool pills) -->
+    <section class="related-skills-section" data-astro-cid-jrlgpo3w>
+        <h2 class="related-skills-heading" data-astro-cid-jrlgpo3w>Related Skills</h2>
+        <div class="related-skills-grid" data-astro-cid-jrlgpo3w>
+          <a href="/skills/abridge-ci-integration/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-ci-integration</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Configure CI/CD pipeline for Abridge clinical AI integrations with GitHub Actions.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-common-errors/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-common-errors</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Diagnose and fix common Abridge clinical AI integration errors.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-a/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-a</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge ambient clinical documentation capture-to-note pipeline.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-b/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-b</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge patient-facing documentation and after-visit summary generation.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-cost-tuning/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-cost-tuning</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Optimize Abridge clinical AI costs through tier selection, session management, and usage monitoring for healthcare organizations.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-debug-bundle/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-debug-bundle</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Collect Abridge debug evidence for support tickets and troubleshooting.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a>
+        </div>
+      </section>
+
+  </div>
+
+  
+  <script>
+    document.querySelectorAll('.install-command').forEach(el => {
+      el.addEventListener('click', function() {
+        const text = this.dataset.copy || this.textContent;
+        navigator.clipboard.writeText(text).then(() => {
+          const originalText = this.textContent;
+          this.textContent = 'Copied to clipboard!';
+          this.style.color = 'var(--brand-green)';
+          setTimeout(() => {
+            this.textContent = originalText;
+            this.style.color = '';
+          }, 2000);
+        });
+      });
+    });
+  </script>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
