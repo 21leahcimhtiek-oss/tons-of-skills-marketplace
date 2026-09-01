@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manifest System + Mutation Testing: Two Ways to Find Out What Actually Works — Tons of Skills Work Diary</title>
+    <meta name="description" content="Epic 31-B lands the publish side of the bot-manifest protocol in claude-code-slack-channel. Epic 31 closes with an audit. Mutation tests and a cyclomatic gate make the test pyramid stop lying.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://startaitools.com/posts/manifest-system-mutation-testing-pyramid/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/manifest-system-mutation-testing-pyramid/">
+    <meta property="og:title" content="Manifest System + Mutation Testing: Two Ways to Find Out What Actually Works — Tons of Skills Work Diary">
+    <meta property="og:description" content="Epic 31-B lands the publish side of the bot-manifest protocol in claude-code-slack-channel. Epic 31 closes with an audit. Mutation tests and a cyclomatic gate make the test pyramid stop lying.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="Manifest System + Mutation Testing: Two Ways to Find Out What Actually Works — Tons of Skills Work Diary">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/manifest-system-mutation-testing-pyramid/">
+    <meta name="twitter:title" content="Manifest System + Mutation Testing: Two Ways to Find Out What Actually Works — Tons of Skills Work Diary">
+    <meta name="twitter:description" content="Epic 31-B lands the publish side of the bot-manifest protocol in claude-code-slack-channel. Epic 31 closes with an audit. Mutation tests and a cyclomatic gate make the test pyramid stop lying.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"Manifest System + Mutation Testing: Two Ways to Find Out What Actually Works","description":"Epic 31-B lands the publish side of the bot-manifest protocol in claude-code-slack-channel. Epic 31 closes with an audit. Mutation tests and a cyclomatic gate make the test pyramid stop lying.","datePublished":"2026-04-20","url":"https://tonsofskills.com/blog/undefined","author":{"@type":"Person","name":"Jeremy Longshore"},"publisher":{"@type":"Organization","name":"Tons of Skills","url":"https://tonsofskills.com"}}</script>
+  
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.post-header[data-astro-cid-7jjqptxk]{background:var(--panel);padding:4rem 1.5rem 3rem;border-bottom:1px solid var(--border)}.post-header-inner[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto}.back-link[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3);text-decoration:none;display:inline-block;margin-bottom:1.5rem;transition:color .2s}.back-link[data-astro-cid-7jjqptxk]:hover{color:var(--primary)}.post-meta[data-astro-cid-7jjqptxk]{display:flex;align-items:center;gap:.75rem;margin-bottom:1rem}time[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3)}.featured-badge[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.2rem .6rem;background:#ce114126;color:var(--red);border-radius:0;font-weight:600;text-transform:uppercase;letter-spacing:.05em}.post-header[data-astro-cid-7jjqptxk] h1[data-astro-cid-7jjqptxk]{font-family:var(--font-body);font-size:clamp(1.5rem,4vw,2.2rem);font-weight:700;color:var(--text);line-height:1.25;margin-bottom:.75rem;letter-spacing:0}.post-desc[data-astro-cid-7jjqptxk]{color:var(--text-2);font-size:1.05rem;line-height:1.6;margin-bottom:1rem}.post-tags[data-astro-cid-7jjqptxk]{display:flex;gap:.4rem;flex-wrap:wrap}.tag[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.15rem .5rem;background:var(--surface-3);color:var(--text-3);border-radius:0}.post-body[data-astro-cid-7jjqptxk]{padding:3rem 1.5rem 4rem}.prose[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto;color:var(--text-2);line-height:1.8;font-size:1rem}.prose[data-astro-cid-7jjqptxk] h2{font-family:var(--font-body);font-size:1.5rem;font-weight:700;color:var(--text);margin:2.5rem 0 1rem;letter-spacing:0}.prose[data-astro-cid-7jjqptxk] h3{font-size:1.2rem;font-weight:600;color:var(--text);margin:2rem 0 .75rem}.prose[data-astro-cid-7jjqptxk] p{margin-bottom:1rem}.prose[data-astro-cid-7jjqptxk] ul,.prose[data-astro-cid-7jjqptxk] ol{margin:.5rem 0 1rem 1.5rem}.prose[data-astro-cid-7jjqptxk] li{margin-bottom:.35rem}.prose[data-astro-cid-7jjqptxk] strong{color:var(--text);font-weight:600}.prose[data-astro-cid-7jjqptxk] code{font-family:var(--font-mono);font-size:.88em;background:var(--surface-3);padding:.15em .35em;border-radius:0;color:var(--primary)}.prose[data-astro-cid-7jjqptxk] a{color:var(--primary);text-decoration:none}.prose[data-astro-cid-7jjqptxk] a:hover{text-decoration:underline}@media(max-width:768px){.post-header[data-astro-cid-7jjqptxk]{padding:3rem 1rem 2rem}.post-body[data-astro-cid-7jjqptxk]{padding:2rem 1rem 3rem}}
+</style></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  <article class="post" data-astro-cid-7jjqptxk>
+    <header class="post-header" data-astro-cid-7jjqptxk>
+      <div class="post-header-inner" data-astro-cid-7jjqptxk>
+        <a href="/blog" class="back-link" data-astro-cid-7jjqptxk>Back to Work Diary</a>
+        <div class="post-meta" data-astro-cid-7jjqptxk>
+          <time datetime="2026-04-20" data-astro-cid-7jjqptxk>April 19, 2026</time>
+          
+        </div>
+        <h1 data-astro-cid-7jjqptxk>Manifest System + Mutation Testing: Two Ways to Find Out What Actually Works</h1>
+        <p class="post-desc" data-astro-cid-7jjqptxk>Epic 31-B lands the publish side of the bot-manifest protocol in claude-code-slack-channel. Epic 31 closes with an audit. Mutation tests and a cyclomatic gate make the test pyramid stop lying.</p>
+        <div class="post-tags" data-astro-cid-7jjqptxk>
+          <span class="tag" data-astro-cid-7jjqptxk>typescript</span><span class="tag" data-astro-cid-7jjqptxk>testing</span><span class="tag" data-astro-cid-7jjqptxk>ci-cd</span><span class="tag" data-astro-cid-7jjqptxk>architecture</span><span class="tag" data-astro-cid-7jjqptxk>monorepo</span><span class="tag" data-astro-cid-7jjqptxk>claude-code</span><span class="tag" data-astro-cid-7jjqptxk>release-engineering</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="post-body" data-astro-cid-7jjqptxk>
+      <div class="prose" data-astro-cid-7jjqptxk>
+        <p>You can ship a feature that looks tested and isn’t. April 20 was two coordinated answers to that problem.</p>
+<p>On one front (<code>claude-code-slack-channel</code>), the bot-manifest protocol’s <em>publish</em> side landed — the second half of a protocol whose consumer side had shipped on April 19. The same repo set a Stryker mutation baseline, killed the top-5 mutation survivors on its security primitives, and added a TypeScript-aware cyclomatic-complexity gate to CI. On another (<code>claude-code-plugins</code>), mass-publish infrastructure for the npm catalog scaffolded — scaffold-every-package-json generator, mass + incremental publish workflows, a SIGPIPE fix for the enumerate step. The narrative thread is the same across both: don’t trust that something works until an adversarial check tries to prove it doesn’t.</p>
+<h2 id="the-bot-manifest-publish-side--epic-31-b">The bot-manifest publish side — Epic 31-B</h2>
+<p>Context from the day before: <code>claude-code-slack-channel</code> is an MCP server that lets Claude Code operate inside a Slack thread. In late Epic 31-A, peer bots got the ability to <em>read</em> each other’s manifests — pinned JSON in a Slack channel announcing “here’s what tools I expose.” The read path was guarded by a 40 KB size cap, a 5-minute per-channel cache, and the hard invariant that manifest content never reaches <code>evaluate()</code> (the policy engine).</p>
+<p>Epic 31-B ships the other side: a bot can now <em>publish</em> its own manifest.</p>
+<p>Publishing sounds easier than reading. It isn’t, because the publisher controls the payload, and everything a trusted publisher emits will eventually be consumed by someone who trusts it.</p>
+<h3 id="the-publish_manifest-tool">The <code>publish_manifest</code> tool</h3>
+<p><a href="https://github.com/jeremylongshore/claude-code-slack-channel/pull/119">PR #119</a> is the headline — a new MCP tool with replace semantics. The flow:</p>
+<ol>
+<li><strong>Zod-validate input.</strong> <code>channel</code> must be a public <code>C...</code> ID, <code>caller_user_id</code> must be a <code>U...</code>, <code>manifest</code> must pass the full <code>ManifestV1</code> schema.</li>
+<li><strong><code>assertPublishAllowed(caller_user_id, access)</code></strong> — only humans in <code>access.allowFrom</code> may authorize a publish.</li>
+<li><strong><code>assertOutboundAllowed(channel)</code></strong> — the channel must be in the outbound allowlist (same gate as any other message).</li>
+<li><strong>Size cap</strong> — publish-side cap is 8 KB, not the read-side 40 KB. Postel’s Law: be conservative in what you send.</li>
+<li><strong>Rate limit</strong> — one publish per channel per hour, enforced in-memory.</li>
+<li><strong>Replace semantics</strong> — find our prior pinned manifest (filter by magic header), remove it (best-effort; flaky <code>pins.list</code> skips the sweep), then <code>chat.postMessage</code> the new manifest, then <code>pins.add</code>, then journal the event.</li>
+</ol>
+<p>Replace semantics shipped together with the base tool (<a href="https://github.com/jeremylongshore/claude-code-slack-channel/pull/123">PRs #119 + #123</a>) because without them, every publish call would pile another pinned manifest in the channel. They are one correctness unit, not two features.</p>
+<h3 id="why-8-kb-when-the-read-cap-is-40-kb">Why 8 KB when the read cap is 40 KB</h3>
+<p><a href="https://github.com/jeremylongshore/claude-code-slack-channel/pull/120">PR #120</a> is the 8 KB publish-side cap. The asymmetry is deliberate. A publisher writes content <em>it controls</em>. Tightening the cap catches operator mistakes at publish time — an accidentally pasted API payload, a <code>toString()</code> of the wrong object — rather than letting oversized content travel out and get caught by every reader separately. Be conservative in what you send, liberal in what you receive.</p>
+<h3 id="rate-limiting-the-publisher">Rate-limiting the publisher</h3>
+<p><a href="https://github.com/jeremylongshore/claude-code-slack-channel/pull/121">PR #121</a> caps publishing to one per channel per hour. In-memory only, resets on process restart, same posture as the read cache. The factory:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="ts"><code><span class="line"><span style="color:#B392F0">createPublishRateLimiter</span><span style="color:#E1E4E8">({</span></span>
+<span class="line"><span style="color:#B392F0">  now</span><span style="color:#E1E4E8">: () </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> Date.</span><span style="color:#B392F0">now</span><span style="color:#E1E4E8">(),</span></span>
+<span class="line"><span style="color:#E1E4E8">  windowMs: </span><span style="color:#79B8FF">60</span><span style="color:#F97583"> *</span><span style="color:#79B8FF"> 60</span><span style="color:#F97583"> *</span><span style="color:#79B8FF"> 1000</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  maxEntries: </span><span style="color:#79B8FF">256</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">})</span></span></code></pre>
+<p>Factory with injected time source so tests can fast-forward. Soft LRU at 256 entries so a single long-running server doesn’t leak memory across thousands of channels. Rejection error includes “how long ago the last publish was” and “approximate minutes remaining” so the caller can back off instead of retry-looping.</p>
+<h3 id="round-trip-testing">Round-trip testing</h3>
+<p><a href="https://github.com/jeremylongshore/claude-code-slack-channel/pull/123">PR #123</a> is the test that catches “we forgot to serialize a field”:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="ts"><code><span class="line"><span style="color:#6A737D">// publisher chain: assertPublishSizeAndSerialize → JSON</span></span>
+<span class="line"><span style="color:#6A737D">// reader chain:    JSON → extractManifests</span></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> published</span><span style="color:#F97583"> =</span><span style="color:#B392F0"> assertPublishSizeAndSerialize</span><span style="color:#E1E4E8">(manifest)</span></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> readBack</span><span style="color:#F97583"> =</span><span style="color:#B392F0"> extractManifests</span><span style="color:#E1E4E8">(published)</span></span>
+<span class="line"><span style="color:#B392F0">expect</span><span style="color:#E1E4E8">(readBack).</span><span style="color:#B392F0">toEqual</span><span style="color:#E1E4E8">(manifest)  </span><span style="color:#6A737D">// byte-for-field</span></span></code></pre>
+<p>Three cases — minimal manifest, fully-populated manifest with every optional field, a 1000-char-description fixture pinning the Postel-Law safety margin (publish body fits read cap with ~5× headroom). If anyone adds a new optional field to the schema and forgets to include it in the publisher’s serialization, round-trip fails immediately.</p>
+<h3 id="a2a-alignment">A2A alignment</h3>
+<p><a href="https://github.com/jeremylongshore/claude-code-slack-channel/pull/122">PR #122</a> adds an optional <code>agentCard</code> field for interop with Google’s Agent-to-Agent protocol’s <code>/.well-known/agent-card.json</code> shape. Nothing in the Slack path consumes it. It exists so a future HTTP-transport publisher can reuse the same manifest field verbatim. Schema-level interop is cheap today and expensive to retrofit. The <a href="https://github.com/jeremylongshore/claude-code-slack-channel/pull/118">PR #118</a> docs update includes a field-by-field mapping table between <code>ManifestV1</code> and the A2A agent card: <code>name/description/version</code> → vendor, <code>tools</code> → skills.</p>
+<h2 id="epic-31-closes--the-audit-pass">Epic 31 closes — the audit pass</h2>
+<p><a href="https://github.com/jeremylongshore/claude-code-slack-channel/pull/125">PR #125</a> is a <code>/audit-tests</code> run that closes Epic 31. Headline: <strong>no P0 findings</strong>.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Metric</th><th>Value</th></tr></thead><tbody><tr><td>Tests passing</td><td>594</td></tr><tr><td>Skips / only / todo</td><td>0 / 0 / 0</td></tr><tr><td>Line coverage</td><td>98.37%</td></tr><tr><td>Function coverage</td><td>98.75%</td></tr><tr><td>Assertions per test</td><td>2.47</td></tr><tr><td>Negative-path <code>.toThrow()</code> assertions</td><td>104</td></tr></tbody></table>
+<p>The 31-A.4 invariant — manifest never reaches <code>evaluate()</code> — is enforced three ways (architecture config, compile-time <code>@ts-expect-error</code>, runtime test) and all three are present in the audit evidence. Strict TypeScript, typecheck-required CI, CodeQL SAST, OpenSSF Scorecard. The audit produced <code>000-docs/TEST_AUDIT.md</code> which is how the next epic will know what shape the test suite was in when it started.</p>
+<h2 id="mutation-testing-baseline--adversarial-testing-on-the-security-primitives">Mutation testing baseline — adversarial testing on the security primitives</h2>
+<p>Coverage numbers lie. A test that calls a function but asserts nothing about its output contributes to line coverage and contributes nothing to confidence. <a href="https://github.com/jeremylongshore/claude-code-slack-channel/pull/128">PR #128</a> set up Stryker mutation testing as an adversarial-testing baseline and captured the first score.</p>
+<p>Mutation testing flips operators, deletes statements, negates conditionals, and re-runs the suite. A <em>surviving</em> mutant is a change that didn’t break any test — evidence that the test suite doesn’t actually exercise the mutated code. A <em>killed</em> mutant is a test earning its keep.</p>
+<p><a href="https://github.com/jeremylongshore/claude-code-slack-channel/pull/133">PR #133</a> took the top-5 survivors on security primitives and killed them. That’s the right next move after a baseline: don’t try to drive the global score, drive the survivors on code you cannot afford to regress.</p>
+<p><a href="https://github.com/jeremylongshore/claude-code-slack-channel/pull/137">PR #137</a> expanded the Stryker scope to <code>policy + manifest + journal</code> — the three subsystems from the April 19 security sprint. Mutation coverage on the code that enforces trust boundaries matters more than mutation coverage on glue code.</p>
+<h2 id="typescript-aware-cyclomatic-complexity-gate">TypeScript-aware cyclomatic-complexity gate</h2>
+<p><a href="https://github.com/jeremylongshore/claude-code-slack-channel/pull/135">PR #135</a> landed a cyclomatic complexity gate that understands TypeScript — union types, type guards, discriminated unions. The threshold is intentionally loose at introduction (the goal is “catch new 30+ complexity functions,” not “rewrite existing code”), with the expectation that the threshold tightens over time as the codebase refactors.</p>
+<p>Complexity gates are one of those tools that teams install and then quietly turn off. The trick is to set the threshold <em>above</em> the current worst-case and decrement it monthly. That way the gate never blocks merges on day one and never rubber-stamps regressions on day thirty.</p>
+<h2 id="gherkin-runner-wired">Gherkin runner wired</h2>
+<p><a href="https://github.com/jeremylongshore/claude-code-slack-channel/pull/134">PR #134</a> wired the Gherkin runner to actually execute <code>features/*.feature</code> files instead of just linting them. A BDD test suite that lints but never runs is worse than no BDD test suite — it creates the illusion of executable specs without any of the coverage.</p>
+<h2 id="the-npm-catalog--mass-publish--stats">The npm catalog — mass publish + stats</h2>
+<p><code>claude-code-plugins</code> got the other half of April 20’s delivery. The plugin hub ships <code>cc</code> plugins as an npm catalog, and the mass-publish infrastructure was scaffolded across three PRs:</p>
+<ul>
+<li><strong><a href="https://github.com/jeremylongshore/claude-code-plugins/pull/541">PR A/D</a></strong> — scaffold <code>package.json</code> for every catalog plugin (hundreds of entries). One template, one generator, one PR that touches a lot of files but contains exactly zero decisions.</li>
+<li><strong><a href="https://github.com/jeremylongshore/claude-code-plugins/pull/542">PR B/C of D</a></strong> — mass + incremental publish workflows. Mass publishes the whole catalog on demand; incremental publishes only what changed since the last tag.</li>
+<li><strong><a href="https://github.com/jeremylongshore/claude-code-plugins/pull/544">PR #544</a></strong> — fix a SIGPIPE abort in the mass-publish enumerate step. Piping <code>npm search</code> output into a downstream process that closed early caused the whole publish to abort; the fix swallows SIGPIPE and continues.</li>
+</ul>
+<p>On top of publishing, <a href="https://github.com/jeremylongshore/claude-code-plugins/commit/ac28a233b">the stats aggregator</a> lands — daily cron collects npm download counts, posts a Slack digest, and drives a new marquee surface on the marketplace page. Turning download counts into visible social proof is a one-time investment that keeps paying off.</p>
+<h2 id="also-shipped">Also shipped</h2>
+<ul>
+<li><strong>braves</strong> — per-panel error boundaries so a single broken panel can’t blank the whole dashboard. Fault-isolation is the same defensive posture as process-level invariants: assume any sub-unit can fail, and make the failure contained.</li>
+<li><strong>claude-code-plugins v4.26.0</strong> — cut after the publish infra landed. Marketplace got the agent37 partner restored in the hero marquee and an awesome-list-style TOC generated directly from the catalog.</li>
+</ul>
+<h2 id="what-the-three-moves-have-in-common">What the three moves have in common</h2>
+<p>The manifest publish side, the npm mass-publish infrastructure, and the Stryker baseline are the same move at different altitudes.</p>
+<ul>
+<li><strong>Round-trip tests</strong> on the manifest publisher prove it serializes everything the schema declares. Adversarial check against the serializer.</li>
+<li><strong>Incremental publish + mass publish workflows</strong> on the npm catalog diff the last-published state against the current state and only ship what changed. Adversarial check against “did I remember to bump this package.”</li>
+<li><strong>Mutation tests</strong> on the security primitives prove the test suite kills the mutants that would matter. Adversarial check against the tests themselves.</li>
+<li><strong>Cyclomatic gate</strong> proves nobody silently dropped a 40-branch monster into the dispatcher. Adversarial check against complexity creep.</li>
+</ul>
+<p>Coverage, clean builds, and passing suites are the floor. Adversarial checks are the ceiling. April 20 raised both across both repos.</p>
+<h2 id="related-posts">Related posts</h2>
+<ul>
+<li><a href="/blog/ccsc-five-releases-one-day-security-sprint/">Four Releases in One Day — CCSC Security Sprint</a> — yesterday’s security sprint that this day’s 31-B work extended</li>
+<li><a href="/blog/twelve-prs-security-sprint-pregame-overhaul/">Twelve PRs Security Sprint + Pregame Overhaul</a> — earlier ccsc security batch with the same batching discipline</li>
+<li><a href="https://startaitools.com/posts/collaboratively-shaped-roadmap/">Collaboratively Shaped Roadmap</a> — where the Epic 31 plan came from</li>
+</ul>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "Manifest System + Mutation Testing: Two Ways to Find Out What Actually Works",
+  "description": "Epic 31-B lands the publish side of the bot-manifest protocol in claude-code-slack-channel. Mutation tests and a cyclomatic gate make the test pyramid stop lying.",
+  "datePublished": "2026-04-20T09:00:00-05:00",
+  "author": {
+    "@type": "Person",
+    "name": "Jeremy Longshore",
+    "url": "https://startaitools.com/about/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "StartAITools",
+    "url": "https://startaitools.com"
+  },
+  "articleSection": "Technical Deep-Dive",
+  "keywords": "typescript, testing, ci-cd, architecture, monorepo, claude-code, release-engineering",
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "https://startaitools.com/posts/manifest-system-mutation-testing-pyramid/"
+  }
+}
+</script>
+<hr>
+<p>Jeremy made me do it
+-claude</p>
+      </div>
+    </div>
+  </article>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
