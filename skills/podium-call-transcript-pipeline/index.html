@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>podium-call-transcript-pipeline - Agent Skill</title>
+    <meta name="description" content="Durable, idempotent ingest pipeline for Podium call transcripts — the layer between Podium's transcript webhook and a downstream RAG/LLM queue. Survives minutes-to-hours transcript latency, partial-then-final overwrites, non-English callers, PII leakage to downstream consumers, queue-write failures, and speaker-diarization loss. Use when wiring Podium phone-call transcripts into an AI-assist queue, hardening an existing ingest against transcript drift, redacting PII before transcripts reach an LLM, or building the durable ack/replay layer that feeds podium-rag-context-bridge. Trigger with &quot;podium call transcripts&quot;, &quot;podium transcript webhook&quot;, &quot;podium transcript ingest&quot;, &quot;podium transcript pii redact&quot;, &quot;podium transcript chunking&quot;, &quot;podium transcript queue&quot;.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://tonsofskills.com/tons-of-skills-marketplace/skills/podium-call-transcript-pipeline/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/podium-call-transcript-pipeline/">
+    <meta property="og:title" content="podium-call-transcript-pipeline - Agent Skill">
+    <meta property="og:description" content="Durable, idempotent ingest pipeline for Podium call transcripts — the layer between Podium's transcript webhook and a downstream RAG/LLM queue. Survives minutes-to-hours transcript latency, partial-then-final overwrites, non-English callers, PII leakage to downstream consumers, queue-write failures, and speaker-diarization loss. Use when wiring Podium phone-call transcripts into an AI-assist queue, hardening an existing ingest against transcript drift, redacting PII before transcripts reach an LLM, or building the durable ack/replay layer that feeds podium-rag-context-bridge. Trigger with &quot;podium call transcripts&quot;, &quot;podium transcript webhook&quot;, &quot;podium transcript ingest&quot;, &quot;podium transcript pii redact&quot;, &quot;podium transcript chunking&quot;, &quot;podium transcript queue&quot;.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="podium-call-transcript-pipeline - Agent Skill">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/podium-call-transcript-pipeline/">
+    <meta name="twitter:title" content="podium-call-transcript-pipeline - Agent Skill">
+    <meta name="twitter:description" content="Durable, idempotent ingest pipeline for Podium call transcripts — the layer between Podium's transcript webhook and a downstream RAG/LLM queue. Survives minutes-to-hours transcript latency, partial-then-final overwrites, non-English callers, PII leakage to downstream consumers, queue-write failures, and speaker-diarization loss. Use when wiring Podium phone-call transcripts into an AI-assist queue, hardening an existing ingest against transcript drift, redacting PII before transcripts reach an LLM, or building the durable ack/replay layer that feeds podium-rag-context-bridge. Trigger with &quot;podium call transcripts&quot;, &quot;podium transcript webhook&quot;, &quot;podium transcript ingest&quot;, &quot;podium transcript pii redact&quot;, &quot;podium transcript chunking&quot;, &quot;podium transcript queue&quot;.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"podium-call-transcript-pipeline","description":"Durable, idempotent ingest pipeline for Podium call transcripts — the layer between Podium's transcript webhook and a downstream RAG/LLM queue. Survives minutes-to-hours transcript latency, partial-then-final overwrites, non-English callers, PII leakage to downstream consumers, queue-write failures, and speaker-diarization loss. Use when wiring Podium phone-call transcripts into an AI-assist queue, hardening an existing ingest against transcript drift, redacting PII before transcripts reach an LLM, or building the durable ack/replay layer that feeds podium-rag-context-bridge. Trigger with \"podium call transcripts\", \"podium transcript webhook\", \"podium transcript ingest\", \"podium transcript pii redact\", \"podium transcript chunking\", \"podium transcript queue\".","version":"2.9.0","author":{"@type":"Person","name":"Jeremy Longshore"},"license":"MIT","programmingLanguage":"Claude Code Agent Skill","isPartOf":{"@type":"SoftwareApplication","name":"podium-pack","applicationCategory":"unknown"}}</script>
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.breadcrumbs[data-astro-cid-ilhxcym7]{margin-bottom:var(--space-5)}.breadcrumbs__list[data-astro-cid-ilhxcym7]{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;list-style:none;padding:0;margin:0;font-family:var(--font-mono);font-size:var(--text-sm, .8rem)}.breadcrumbs__item[data-astro-cid-ilhxcym7]{display:flex;align-items:center;gap:.375rem}.breadcrumbs__link[data-astro-cid-ilhxcym7]{color:var(--text-3);text-decoration:none;transition:color var(--duration-fast, .2s) var(--ease-out)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:hover{color:var(--primary)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:0}.breadcrumbs__sep[data-astro-cid-ilhxcym7]{color:var(--text-3);user-select:none;font-size:.7em;line-height:1}.breadcrumbs__current[data-astro-cid-ilhxcym7]{color:var(--text-2)}.detail-cta[data-astro-cid-qcigfm7x]{background:var(--surface-3, var(--brand-light-gray));border-top:1px solid var(--border, var(--brand-light-gray));border-radius:var(--radius-lg);padding:2rem 1.5rem;margin-top:2rem;text-align:center}.detail-cta__headline[data-astro-cid-qcigfm7x]{font-family:var(--font-display);font-weight:700;font-size:1.35rem;color:var(--text, var(--brand-dark));margin-bottom:1.25rem}.detail-cta__actions[data-astro-cid-qcigfm7x]{display:flex;justify-content:center;gap:.75rem;flex-wrap:wrap}.detail-cta__primary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:var(--primary);color:#0a0a0c;border:none;border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;cursor:pointer;transition:background var(--duration-fast) var(--ease-out),transform var(--duration-fast) var(--ease-out)}.detail-cta__primary[data-astro-cid-qcigfm7x]:hover{background:var(--primary-dark, var(--primary-dark));transform:translateY(-1px)}.detail-cta__primary[data-astro-cid-qcigfm7x].copied{background:var(--positive, var(--brand-green))}.detail-cta__secondary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:transparent;color:var(--text, var(--brand-dark));border:1px solid var(--border, var(--brand-mid-gray));border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;text-decoration:none;transition:border-color var(--duration-fast) var(--ease-out),color var(--duration-fast) var(--ease-out)}.detail-cta__secondary[data-astro-cid-qcigfm7x]:hover{border-color:var(--primary);color:var(--primary)}@media(max-width:480px){.detail-cta__actions[data-astro-cid-qcigfm7x]{flex-direction:column;align-items:stretch}.detail-cta__primary[data-astro-cid-qcigfm7x],.detail-cta__secondary[data-astro-cid-qcigfm7x]{justify-content:center}}
+</style>
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/_slug_@_@astro.wF9emvVq.css"></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  
+  
+
+  <div class="skill-detail" data-astro-cid-jrlgpo3w>
+    <!-- 1. Breadcrumbs -->
+    <nav aria-label="Breadcrumb" class="breadcrumbs" data-astro-cid-ilhxcym7>
+  <ol class="breadcrumbs__list" itemscope itemtype="https://schema.org/BreadcrumbList" data-astro-cid-ilhxcym7>
+    <li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Home</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="1">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/skills/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Skills</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="2">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          <span class="breadcrumbs__current" aria-current="page" itemprop="name" data-astro-cid-ilhxcym7>
+              podium-call-transcript-pipeline
+            </span>
+          <meta itemprop="position" content="3">
+        </li>
+  </ol>
+</nav>
+
+    <!-- 2. Header (enhanced) -->
+    <header class="skill-header" data-astro-cid-jrlgpo3w>
+      <h1 data-astro-cid-jrlgpo3w>podium-call-transcript-pipeline</h1>
+      <p class="skill-description" data-astro-cid-jrlgpo3w>Durable, idempotent ingest pipeline for Podium call transcripts — the layer between Podium&#39;s transcript webhook and a downstream RAG/LLM queue. Survives minutes-to-hours transcript latency, partial-then-final overwrites, non-English callers, PII leakage to downstream consumers, queue-write failures, and speaker-diarization loss. Use when wiring Podium phone-call transcripts into an AI-assist queue, hardening an existing ingest against transcript drift, redacting PII before transcripts reach an LLM, or building the durable ack/replay layer that feeds podium-rag-context-bridge. Trigger with &quot;podium call transcripts&quot;, &quot;podium transcript webhook&quot;, &quot;podium transcript ingest&quot;, &quot;podium transcript pii redact&quot;, &quot;podium transcript chunking&quot;, &quot;podium transcript queue&quot;.</p>
+
+      <div class="skill-metadata" data-astro-cid-jrlgpo3w>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>v2.9.0</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>Jeremy Longshore</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>MIT</span>
+        </div>
+      </div>
+
+      
+    </header>
+
+    <!-- 4. Allowed Tools -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Allowed Tools</h2>
+      <div class="tools-grid" data-astro-cid-jrlgpo3w>
+        <span class="tool-badge" data-astro-cid-jrlgpo3w>Read</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Write</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Edit</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(curl:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(jq:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(python3:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(redis-cli:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Grep</span>
+      </div>
+      
+    </section>
+
+    <!-- 5. Provided by Plugin -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Provided by Plugin</h2>
+      <div class="plugin-info" data-astro-cid-jrlgpo3w>
+        <div class="plugin-details" data-astro-cid-jrlgpo3w>
+          <h3 data-astro-cid-jrlgpo3w>
+            <a href="/plugins/podium-pack/" data-astro-cid-jrlgpo3w>podium-pack</a>
+          </h3>
+          <p data-astro-cid-jrlgpo3w>Claude Code skill pack for Podium (10 production-engineer skills)</p>
+          <div class="plugin-meta" data-astro-cid-jrlgpo3w>
+            <span data-astro-cid-jrlgpo3w>unknown</span>
+            <span data-astro-cid-jrlgpo3w>v2.9.0</span>
+          </div>
+        </div>
+        <a href="/plugins/podium-pack/" class="btn-primary" data-astro-cid-jrlgpo3w>View Plugin</a>
+      </div>
+    </section>
+
+    <!-- 6. Installation -->
+    <section class="section-box dark" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Installation</h2>
+      <p class="install-note" style="color: var(--brand-light-gray); margin-bottom: 0.75rem;" data-astro-cid-jrlgpo3w>This skill is included in the podium-pack plugin:</p>
+      <pre class="install-command" data-copy="/plugin install podium-pack@claude-code-plugins-plus" data-astro-cid-jrlgpo3w><code data-astro-cid-jrlgpo3w>/plugin install podium-pack@claude-code-plugins-plus</code></pre>
+      <p class="install-note" data-astro-cid-jrlgpo3w>Click to copy</p>
+    </section>
+
+    <!-- 7. Skill Content (Markdown) -->
+    <section class="skill-content-section" data-astro-cid-jrlgpo3w>
+      <h2 data-astro-cid-jrlgpo3w>Instructions</h2>
+      <div class="skill-content" data-astro-cid-jrlgpo3w>
+        <div data-astro-cid-jrlgpo3w><h1>Podium Call Transcript Pipeline</h1>
+<h2>Overview</h2>
+<p>Ingest Podium phone-call transcripts and stage them on a downstream queue so an LLM (with RAG context) can assist the team answering the phone. This is not a real-time transcription tool — Podium emits transcripts on a webhook minutes-to-hours after the call ends, and the design assumes that asynchrony. The skill is the durable layer between Podium and the RAG bridge: webhook lands, transcript is verified and de-duplicated, PII is redacted on ingest, speaker structure is preserved, language is detected, and a chunked record is enqueued for the next stage.</p>
+<p>The six production failures this skill prevents:</p>
+<ol>
+<li><strong>Assuming transcripts arrive in real-time</strong> — they don&#39;t. Transcripts land on the webhook minutes to hours after the call ends. Pipelines designed around the call-ended event blocking until transcript availability either time out or hold an HTTP request open for hours. The ingest must be webhook-driven and ack-decoupled.</li>
+<li><strong>Partial-transcript update events overwrite the final transcript</strong> — Podium can emit <code>call.transcript.partial</code> before <code>call.transcript.completed</code>. Naive handlers store the partial as final, and the LLM downstream sees a truncated transcript. The ingest must key on <code>(transcript_id, event_type)</code> and only promote a record to &quot;final&quot; on a <code>completed</code> event.</li>
+<li><strong>No language detection on ingest</strong> — non-English transcripts sent to an English-only LLM produce nonsense answers that the on-phone agent reads to the customer. Detection on ingest routes non-English transcripts to a separate handling path before they reach the RAG layer.</li>
+<li><strong>PII leakage to downstream consumers</strong> — call transcripts contain credit card numbers, full phone numbers, addresses, and dates of birth. Once these reach a third-party LLM or RAG vector store they are effectively un-redactable. Redaction must happen on ingest, before the queue write, with an auditable per-redaction log.</li>
+<li><strong>Queueing failures lose transcripts permanently</strong> — the webhook handler returns 200 to Podium but the downstream queue write fails. The transcript is gone with no replay path. The ingest must persist the raw transcript to a local durable store <strong>before</strong> acking the webhook; the queue write happens from that durable store with retries.</li>
+<li><strong>Missing speaker diarization fields</strong> — Podium&#39;s transcript JSON tags each segment with a speaker role (caller vs agent). Flat ingest that concatenates segments destroys the structure the LLM needs. The chunker must be speaker-aware and never split a segment across speakers.</li>
+</ol>
+<h2>Authentication</h2>
+<p>This skill does not authenticate to Podium directly. Two distinct auth paths are involved and <strong>both are consumed by reference</strong> from sibling skills — never re-implemented:</p>
+<ul>
+<li><strong>Inbound webhook auth</strong> — HMAC signature verification is delegated to <code>podium-webhook-reliability::verify_webhook(raw, signature)</code>. The webhook secret lives in the verifier&#39;s config. The handler fails closed if the verifier is not importable.</li>
+<li><strong>Outbound Podium API auth</strong> — the fallback poller acquires an OAuth bearer token via <code>podium-auth::PodiumAuth.get_token()</code>. Credentials live in <code>podium-auth</code>&#39;s secret store.</li>
+</ul>
+<p>The pipeline inherits the auth posture of both skills. Operator checklist when installing:</p>
+<ol>
+<li>Verify that <code>podium-auth</code> and <code>podium-webhook-reliability</code> are both installed and configured.</li>
+<li>Configure <code>.gitignore</code> to exclude the inbox database (<code>*.db</code>) and the redaction audit log (<code>redactions.jsonl</code>).</li>
+<li>Run a regex grep across the host repo for Podium client-secret formats and Stripe-style live keys (the canonical patterns are listed in <code>references/implementation.md</code>) to confirm no inline credentials leaked.</li>
+<li>Set <code>PODIUM_TRANSCRIPT_INBOX_PATH</code> to a writable path with mode 0600 ownership.</li>
+<li>Configure the downstream queue backend (Redis Streams, SQS, or SQLite-as-queue) before enabling webhook traffic.</li>
+</ol>
+<h2>Prerequisites</h2>
+<ul>
+<li>Python 3.10+</li>
+<li><code>podium-auth</code> skill installed (consumed for outbound API auth)</li>
+<li><code>podium-webhook-reliability</code> skill installed (consumed for HMAC verification)</li>
+<li><code>podium-rate-limit-survival</code> skill installed (consumed by the fallback poller)</li>
+<li>A durable inbox store — SQLite default; Postgres or DynamoDB are drop-in replacements</li>
+<li>A downstream queue — Redis Streams (default), AWS SQS, or local SQLite-as-queue for dev</li>
+<li><code>langdetect</code> (default) or <code>fasttext-langdetect</code> for language detection</li>
+<li><code>presidio-analyzer</code> + <code>presidio-anonymizer</code> for high-recall PII, or the bundled regex layer alone</li>
+</ul>
+<h2>Instructions</h2>
+<p>Build in this order. Each section neutralizes one production failure mode.</p>
+<h3>1. Webhook-driven, ack-decoupled ingest</h3>
+<p>The webhook handler returns 200 fast and does all transcript work asynchronously. The handler&#39;s only synchronous job is verify-and-store-raw; everything else happens out-of-band in the processor.</p>
+<pre data-lang="python"><code>
+import json, time
+from fastapi import FastAPI, Request, HTTPException
+from podium_webhook_reliability import verify_webhook   # consumed by reference
+from podium_call_transcript_pipeline import inbox
+
+app = FastAPI()
+
+@app.post(&quot;/podium/transcripts&quot;)
+async def transcript_webhook(request: Request):
+    raw = await request.body()
+    sig = request.headers.get(&quot;podium-signature&quot;, &quot;&quot;)
+    if not verify_webhook(raw, sig):
+        raise HTTPException(401, &quot;invalid signature&quot;)
+    event = json.loads(raw)
+    if not event.get(&quot;type&quot;, &quot;&quot;).startswith(&quot;call.transcript.&quot;):
+        return {&quot;status&quot;: &quot;ignored&quot;}
+
+    # Durable write happens BEFORE returning 200. If this fails, return 5xx so Podium retries.
+    inbox.insert(
+        transcript_id=event[&quot;data&quot;][&quot;transcript_id&quot;],
+        event_type=event[&quot;type&quot;],
+        received_at=time.time(),
+        raw_payload=raw,
+    )
+    return {&quot;status&quot;: &quot;accepted&quot;}
+</code></pre>
+<h3>2. Partial-vs-completed de-duplication</h3>
+<p>Podium emits these event types on a single call:</p>
+<table><thead><tr>
+<th>Event type</th>
+<th>Meaning</th>
+<th>Handling</th>
+</tr></thead><tbody>
+<tr>
+<td><code>call.ended</code></td>
+<td>Audio capture complete</td>
+<td>Note arrival; no transcript yet</td>
+</tr>
+<tr>
+<td><code>call.transcript.partial</code></td>
+<td>Best-effort transcript while final generates</td>
+<td>Store as partial; never promote to final</td>
+</tr>
+<tr>
+<td><code>call.transcript.completed</code></td>
+<td>Final transcript ready</td>
+<td>Promote to final; supersedes any partial</td>
+</tr>
+<tr>
+<td><code>call.transcript.failed</code></td>
+<td>Transcription failed</td>
+<td>Record failure; alert if call duration was material</td>
+</tr>
+</tbody></table>
+<p>The inbox table is keyed on <code>(transcript_id, event_type)</code>. A separate <code>transcripts</code> table is keyed on <code>transcript_id</code> alone. A <code>completed</code> event always supersedes a <code>partial</code> for the same <code>transcript_id</code>. A late-arriving <code>partial</code> after <code>completed</code> is ignored — the processor checks current status before writing.</p>
+<h3>3. Language detection on ingest</h3>
+<p>Detect language before redaction (redaction patterns are language-aware downstream). The default policy: English transcripts proceed to the standard RAG queue; non-English transcripts go to a separate queue with a translation step inserted.</p>
+<pre data-lang="python"><code>
+from langdetect import detect_langs, DetectorFactory
+DetectorFactory.seed = 0   # deterministic detection across runs
+
+def detect_transcript_language(text: str) -&gt; tuple[str, float]:
+    if len(text.strip()) &lt; 20:
+        return (&quot;und&quot;, 0.0)   # too short to detect reliably
+    try:
+        top = detect_langs(text)[0]
+        return (top.lang, top.prob)
+    except Exception:
+        return (&quot;und&quot;, 0.0)
+</code></pre>
+<p>Routing rule: English with confidence ≥ 0.85 → <code>queue:rag.transcripts.en</code>; confidence &lt; 0.50 → <code>queue:rag.transcripts.review</code> (human review); otherwise → per-language queue.</p>
+<h3>4. PII redaction on ingest</h3>
+<p>Redaction is <strong>non-optional</strong> and happens before the transcript is written to the outbound queue. The redaction is auditable — for every redaction the system records category, character offsets, and the rule&#39;s id. Conservative regex layer for high-precision categories; presidio/spaCy for lower-precision recall categories (names, addresses).</p>
+<pre data-lang="python"><code>
+import re
+from dataclasses import dataclass
+
+@dataclass
+class Redaction:
+    category: str
+    rule_id: str
+    start: int
+    end: int
+
+PATTERNS = [
+    (&quot;CREDIT_CARD&quot;, &quot;card_luhn_16&quot;, re.compile(r&quot;\b(?:\d[ -]?){13,19}\b&quot;)),
+    (&quot;PHONE&quot;,       &quot;phone_intl&quot;,   re.compile(r&quot;\+?\d{1,3}[ -]?\(?\d{2,4}\)?[ -]?\d{3,4}[ -]?\d{3,4}&quot;)),
+    (&quot;EMAIL&quot;,       &quot;email_basic&quot;,  re.compile(r&quot;[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}&quot;)),
+    (&quot;SSN_US&quot;,      &quot;ssn_us&quot;,       re.compile(r&quot;\b\d{3}-\d{2}-\d{4}\b&quot;)),
+]
+
+def luhn_valid(s: str) -&gt; bool:
+    digits = [int(c) for c in s if c.isdigit()]
+    if not 13 &lt;= len(digits) &lt;= 19: return False
+    checksum = 0
+    for pos, d in enumerate(reversed(digits)):
+        if pos % 2 == 1:
+            d *= 2
+            if d &gt; 9: d -= 9
+        checksum += d
+    return checksum % 10 == 0
+</code></pre>
+<p>Wire presidio after the regex pass and union both result lists into one audit log keyed by <code>transcript_id</code>. Never ship a redaction module that silently swallows detections — every detection must either redact-and-log or pass-through-and-log with a documented reason.</p>
+<h3>5. Durable inbox + queue write with replay</h3>
+<p>The webhook writes to a durable store (SQLite default) before acking. A separate processor moves records from the inbox to the outbound queue. Failed queue writes stay in the inbox with <code>attempt_count</code> and <code>next_attempt_at</code> — the processor&#39;s next scan picks them up.</p>
+<pre data-lang="python"><code>
+SCHEMA = &quot;&quot;&quot;
+CREATE TABLE IF NOT EXISTS inbox (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    transcript_id TEXT NOT NULL,
+    event_type    TEXT NOT NULL,
+    received_at   REAL NOT NULL,
+    raw_payload   BLOB NOT NULL,
+    processed_at  REAL,
+    enqueued_at   REAL,
+    attempt_count INTEGER NOT NULL DEFAULT 0,
+    next_attempt_at REAL,
+    last_error    TEXT,
+    UNIQUE(transcript_id, event_type)
+);
+&quot;&quot;&quot;
+# UNIQUE(transcript_id, event_type) makes webhook redelivery idempotent.
+# 3600 seconds = 1h cap on exponential backoff; 12-attempt budget = ~4 days before dead-letter.
+</code></pre>
+<p>Failed queue writes increment <code>attempt_count</code>, set <code>next_attempt_at = now + min(2^attempts, 3600)</code>. After 12 attempts the row moves to <code>inbox_deadletter</code> and pages on-call.</p>
+<h3>6. Speaker-aware chunking</h3>
+<p>Podium&#39;s transcript JSON has a <code>segments[]</code> array with <code>{speaker_role, start_ms, end_ms, text}</code> per utterance. Two rules:</p>
+<ol>
+<li><strong>Never split a segment across speakers.</strong> A chunk boundary always lands at a segment boundary.</li>
+<li><strong>Mark every chunk with its speaker turn-set.</strong> A chunk carries <code>speakers: [...]</code>.</li>
+</ol>
+<pre data-lang="python"><code>
+# target_tokens=1500 fits a chunk inside a 4k context with room for RAG-retrieved
+# companion chunks plus prompt scaffolding. overlap_tokens=200 preserves cross-chunk
+# context without doubling the token budget.
+def chunk_transcript(segments, target_tokens=1500, overlap_tokens=200):
+    chunks, current = [], Chunk(chunk_index=0)
+    for seg in segments:
+        seg_tokens = estimate_tokens(seg.text)
+        if current.token_count + seg_tokens &gt; target_tokens and current.segments:
+            chunks.append(current)
+            overlap = build_overlap(current.segments, overlap_tokens)
+            current = Chunk(chunk_index=len(chunks), segments=list(overlap),
+                            token_count=sum(estimate_tokens(s.text) for s in overlap))
+        current.segments.append(seg)
+        current.token_count += seg_tokens
+        if seg.speaker_role not in current.speakers:
+            current.speakers.append(seg.speaker_role)
+    if current.segments:
+        chunks.append(current)
+    return chunks
+</code></pre>
+<p>The outbound record consumed by <code>podium-rag-context-bridge</code> carries <code>transcript_id</code>, <code>call_id</code>, <code>location_uid</code>, <code>detected_language</code>, <code>language_confidence</code>, <code>redaction_count</code>, and <code>chunks[]</code> with per-chunk <code>speakers</code> and <code>segments</code>.</p>
+<h2>Error Handling</h2>
+<table><thead><tr>
+<th>Code</th>
+<th>Source</th>
+<th>Root Cause</th>
+<th>Action</th>
+</tr></thead><tbody>
+<tr>
+<td><code>401</code> on webhook</td>
+<td>Handler</td>
+<td>Signature verification failed</td>
+<td>Reject; verifier config wrong</td>
+</tr>
+<tr>
+<td><code>5xx</code> to Podium</td>
+<td>Inbox write failed</td>
+<td>SQLite unwritable</td>
+<td>Return 5xx so Podium retries; page on-call</td>
+</tr>
+<tr>
+<td><code>ERR_TXP_001</code></td>
+<td>Reconciler</td>
+<td><code>partial</code> after <code>completed</code></td>
+<td>Ignored by design; logged</td>
+</tr>
+<tr>
+<td><code>ERR_TXP_002</code></td>
+<td>Reconciler</td>
+<td>No transcript within N hours</td>
+<td>Fallback poller fetches directly</td>
+</tr>
+<tr>
+<td><code>ERR_TXP_003</code></td>
+<td>Language detector</td>
+<td>Transcript &lt; 20 chars</td>
+<td>Route to review queue</td>
+</tr>
+<tr>
+<td><code>ERR_TXP_004</code></td>
+<td>Redactor</td>
+<td>Presidio unavailable</td>
+<td>Regex-only mode active; warn per transcript</td>
+</tr>
+<tr>
+<td><code>ERR_TXP_005</code></td>
+<td>Queue write</td>
+<td>Redis/SQS error</td>
+<td>Increment attempts; exponential backoff</td>
+</tr>
+<tr>
+<td><code>ERR_TXP_006</code></td>
+<td>Chunker</td>
+<td>Single segment &gt; target_tokens</td>
+<td>Allow oversize chunk; warn</td>
+</tr>
+<tr>
+<td><code>ERR_TXP_007</code></td>
+<td>Processor</td>
+<td>attempts &gt; 12</td>
+<td>Move to dead-letter; page on-call</td>
+</tr>
+</tbody></table>
+<h2>Examples</h2>
+<h3>Minimal end-to-end ingest</h3>
+<pre data-lang="bash"><code>
+uvicorn podium_call_transcript_pipeline.webhook_ingest:app --host 0.0.0.0 --port 8080 &amp;
+python3 scripts/transcript_chunker.py --process-loop --interval 5
+sqlite3 podium_transcripts.db &quot;SELECT transcript_id, event_type, processed_at FROM inbox ORDER BY received_at DESC LIMIT 10;&quot;
+</code></pre>
+<h3>Redact a transcript via the CLI</h3>
+<pre data-lang="bash"><code>
+python3 scripts/pii_redact.py --input transcript-raw.json --output transcript-redacted.json --audit-log redactions.jsonl
+</code></pre>
+<h3>Fallback poller for missing webhooks</h3>
+<pre data-lang="bash"><code>
+python3 scripts/transcript_poller.py --since-hours 12 --max-age-hours 4 --location-uid &quot;{location-uid}&quot;
+</code></pre>
+<h3>Chunk with speaker-preserving overlap</h3>
+<pre data-lang="bash"><code>
+python3 scripts/transcript_chunker.py --input transcript-redacted.json --output chunks.json --target-tokens 1500 --overlap-tokens 200
+</code></pre>
+<h2>Output</h2>
+<ul>
+<li>Webhook handler that verifies + durably stores transcript events before acking</li>
+<li>Inbox table with UNIQUE constraint making webhook redelivery idempotent</li>
+<li>Reconciler that promotes <code>completed</code> over <code>partial</code> and never the inverse</li>
+<li>Language detector with deterministic seeding and confidence thresholds</li>
+<li>PII redactor with auditable per-redaction log, Luhn-validated card detection</li>
+<li>Speaker-aware chunker (1500-token target, 200-token overlap, never splits across speakers)</li>
+<li>Fallback poller for missing-webhook recovery</li>
+<li>Outbound record shape consumed directly by <code>podium-rag-context-bridge</code></li>
+</ul>
+<h2>Resources</h2>
+<ul>
+<li><a href="https://docs.podium.com/reference/conversations">Podium API docs — Conversations &amp; Transcripts</a></li>
+<li><a href="https://docs.podium.com/reference/webhooks">Podium Webhooks reference</a></li>
+<li><a href="config/settings.yaml">config/settings.yaml</a> — chunk size, redaction policy, queue backend, language routing</li>
+<li><a href="references/errors.md">references/errors.md</a> — <code>ERR_TXP_*</code> codes with cause + solution</li>
+<li><a href="references/examples.md">references/examples.md</a> — 10 worked examples (multi-location, presidio, SQS, AU PII)</li>
+<li><a href="references/implementation.md">references/implementation.md</a> — Node port, presidio wiring, queue backend tradeoffs, dead-letter handling</li>
+<li><a href="scripts/webhook_ingest.py">scripts/webhook_ingest.py</a> — FastAPI handler (verify + inbox insert + 200)</li>
+<li><a href="scripts/transcript_poller.py">scripts/transcript_poller.py</a> — CLI: poll conversations API when webhook missed</li>
+<li><a href="scripts/pii_redact.py">scripts/pii_redact.py</a> — CLI: redact a transcript JSON + audit log</li>
+<li><a href="scripts/transcript_chunker.py">scripts/transcript_chunker.py</a> — CLI: chunk with speaker-preserving overlap</li>
+</ul></div>
+      </div>
+    </section>
+
+    <!-- 8. Bottom CTA -->
+    <section class="detail-cta" data-astro-cid-qcigfm7x>
+  <h2 class="detail-cta__headline" data-astro-cid-qcigfm7x>Ready to use podium-pack?</h2>
+  <div class="detail-cta__actions" data-astro-cid-qcigfm7x>
+    <button class="detail-cta__primary" data-copy-install="/plugin install podium-pack@claude-code-plugins-plus" data-astro-cid-qcigfm7x>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" data-astro-cid-qcigfm7x>
+        <rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" stroke-width="1.5" data-astro-cid-qcigfm7x></rect>
+        <path d="M3 11V3a1 1 0 011-1h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" data-astro-cid-qcigfm7x></path>
+      </svg>
+      <span class="detail-cta__btn-text" data-astro-cid-qcigfm7x>Copy Install Command</span>
+    </button>
+    
+  </div>
+</section>
+
+<script type="module">document.querySelectorAll("[data-copy-install]").forEach(t=>{t.addEventListener("click",async()=>{const a=t.dataset.copyInstall||"";await navigator.clipboard.writeText(a);const e=t.querySelector(".detail-cta__btn-text");if(e){const o=e.textContent;e.textContent="Copied!",t.classList.add("copied"),window.trackEvent&&window.trackEvent("install_copied",{plugin_name:a.split(" ").pop()||"",source:"detail_cta"}),setTimeout(()=>{e.textContent=o,t.classList.remove("copied")},2e3)}})});</script>
+
+    <!-- 9. Related Skills (6, with tool pills) -->
+    <section class="related-skills-section" data-astro-cid-jrlgpo3w>
+        <h2 class="related-skills-heading" data-astro-cid-jrlgpo3w>Related Skills</h2>
+        <div class="related-skills-grid" data-astro-cid-jrlgpo3w>
+          <a href="/skills/abridge-ci-integration/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-ci-integration</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Configure CI/CD pipeline for Abridge clinical AI integrations with GitHub Actions.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-common-errors/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-common-errors</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Diagnose and fix common Abridge clinical AI integration errors.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-a/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-a</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge ambient clinical documentation capture-to-note pipeline.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-b/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-b</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge patient-facing documentation and after-visit summary generation.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-cost-tuning/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-cost-tuning</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Optimize Abridge clinical AI costs through tier selection, session management, and usage monitoring for healthcare organizations.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-debug-bundle/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-debug-bundle</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Collect Abridge debug evidence for support tickets and troubleshooting.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a>
+        </div>
+      </section>
+
+  </div>
+
+  
+  <script>
+    document.querySelectorAll('.install-command').forEach(el => {
+      el.addEventListener('click', function() {
+        const text = this.dataset.copy || this.textContent;
+        navigator.clipboard.writeText(text).then(() => {
+          const originalText = this.textContent;
+          this.textContent = 'Copied to clipboard!';
+          this.style.color = 'var(--brand-green)';
+          setTimeout(() => {
+            this.textContent = originalText;
+            this.style.color = '';
+          }, 2000);
+        });
+      });
+    });
+  </script>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

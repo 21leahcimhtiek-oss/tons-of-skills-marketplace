@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>langchain-langgraph-streaming - Agent Skill</title>
+    <meta name="description" content="Pick the correct LangGraph 1.0 stream_mode (&quot;messages&quot; vs &quot;updates&quot; vs &quot;values&quot;), wire it into SSE or WebSocket without proxy-buffering gotchas, and filter astream_events(v2) server-side before forwarding to the browser. Use when building a live-token chat UI, a per-node progress bar, a debug/time-travel view, or diagnosing a LangGraph stream that hangs over a production proxy. Trigger with &quot;langgraph streaming&quot;, &quot;stream_mode messages&quot;, &quot;stream_mode updates&quot;, &quot;stream_mode values&quot;, &quot;langgraph SSE&quot;, &quot;langgraph astream_events&quot;, &quot;SSE hangs behind nginx&quot;, &quot;cloud run streaming&quot;.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://tonsofskills.com/tons-of-skills-marketplace/skills/langchain-langgraph-streaming/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/langchain-langgraph-streaming/">
+    <meta property="og:title" content="langchain-langgraph-streaming - Agent Skill">
+    <meta property="og:description" content="Pick the correct LangGraph 1.0 stream_mode (&quot;messages&quot; vs &quot;updates&quot; vs &quot;values&quot;), wire it into SSE or WebSocket without proxy-buffering gotchas, and filter astream_events(v2) server-side before forwarding to the browser. Use when building a live-token chat UI, a per-node progress bar, a debug/time-travel view, or diagnosing a LangGraph stream that hangs over a production proxy. Trigger with &quot;langgraph streaming&quot;, &quot;stream_mode messages&quot;, &quot;stream_mode updates&quot;, &quot;stream_mode values&quot;, &quot;langgraph SSE&quot;, &quot;langgraph astream_events&quot;, &quot;SSE hangs behind nginx&quot;, &quot;cloud run streaming&quot;.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="langchain-langgraph-streaming - Agent Skill">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/langchain-langgraph-streaming/">
+    <meta name="twitter:title" content="langchain-langgraph-streaming - Agent Skill">
+    <meta name="twitter:description" content="Pick the correct LangGraph 1.0 stream_mode (&quot;messages&quot; vs &quot;updates&quot; vs &quot;values&quot;), wire it into SSE or WebSocket without proxy-buffering gotchas, and filter astream_events(v2) server-side before forwarding to the browser. Use when building a live-token chat UI, a per-node progress bar, a debug/time-travel view, or diagnosing a LangGraph stream that hangs over a production proxy. Trigger with &quot;langgraph streaming&quot;, &quot;stream_mode messages&quot;, &quot;stream_mode updates&quot;, &quot;stream_mode values&quot;, &quot;langgraph SSE&quot;, &quot;langgraph astream_events&quot;, &quot;SSE hangs behind nginx&quot;, &quot;cloud run streaming&quot;.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"langchain-langgraph-streaming","description":"Pick the correct LangGraph 1.0 stream_mode (\"messages\" vs \"updates\" vs \"values\"), wire it into SSE or WebSocket without proxy-buffering gotchas, and filter astream_events(v2) server-side before forwarding to the browser. Use when building a live-token chat UI, a per-node progress bar, a debug/time-travel view, or diagnosing a LangGraph stream that hangs over a production proxy. Trigger with \"langgraph streaming\", \"stream_mode messages\", \"stream_mode updates\", \"stream_mode values\", \"langgraph SSE\", \"langgraph astream_events\", \"SSE hangs behind nginx\", \"cloud run streaming\".","version":"2.5.0","author":{"@type":"Person","name":"Jeremy Longshore"},"license":"MIT","programmingLanguage":"Claude Code Agent Skill","isPartOf":{"@type":"SoftwareApplication","name":"langchain-py-pack","applicationCategory":"unknown"}}</script>
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.breadcrumbs[data-astro-cid-ilhxcym7]{margin-bottom:var(--space-5)}.breadcrumbs__list[data-astro-cid-ilhxcym7]{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;list-style:none;padding:0;margin:0;font-family:var(--font-mono);font-size:var(--text-sm, .8rem)}.breadcrumbs__item[data-astro-cid-ilhxcym7]{display:flex;align-items:center;gap:.375rem}.breadcrumbs__link[data-astro-cid-ilhxcym7]{color:var(--text-3);text-decoration:none;transition:color var(--duration-fast, .2s) var(--ease-out)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:hover{color:var(--primary)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:0}.breadcrumbs__sep[data-astro-cid-ilhxcym7]{color:var(--text-3);user-select:none;font-size:.7em;line-height:1}.breadcrumbs__current[data-astro-cid-ilhxcym7]{color:var(--text-2)}.detail-cta[data-astro-cid-qcigfm7x]{background:var(--surface-3, var(--brand-light-gray));border-top:1px solid var(--border, var(--brand-light-gray));border-radius:var(--radius-lg);padding:2rem 1.5rem;margin-top:2rem;text-align:center}.detail-cta__headline[data-astro-cid-qcigfm7x]{font-family:var(--font-display);font-weight:700;font-size:1.35rem;color:var(--text, var(--brand-dark));margin-bottom:1.25rem}.detail-cta__actions[data-astro-cid-qcigfm7x]{display:flex;justify-content:center;gap:.75rem;flex-wrap:wrap}.detail-cta__primary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:var(--primary);color:#0a0a0c;border:none;border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;cursor:pointer;transition:background var(--duration-fast) var(--ease-out),transform var(--duration-fast) var(--ease-out)}.detail-cta__primary[data-astro-cid-qcigfm7x]:hover{background:var(--primary-dark, var(--primary-dark));transform:translateY(-1px)}.detail-cta__primary[data-astro-cid-qcigfm7x].copied{background:var(--positive, var(--brand-green))}.detail-cta__secondary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:transparent;color:var(--text, var(--brand-dark));border:1px solid var(--border, var(--brand-mid-gray));border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;text-decoration:none;transition:border-color var(--duration-fast) var(--ease-out),color var(--duration-fast) var(--ease-out)}.detail-cta__secondary[data-astro-cid-qcigfm7x]:hover{border-color:var(--primary);color:var(--primary)}@media(max-width:480px){.detail-cta__actions[data-astro-cid-qcigfm7x]{flex-direction:column;align-items:stretch}.detail-cta__primary[data-astro-cid-qcigfm7x],.detail-cta__secondary[data-astro-cid-qcigfm7x]{justify-content:center}}
+</style>
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/_slug_@_@astro.wF9emvVq.css"></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  
+  
+
+  <div class="skill-detail" data-astro-cid-jrlgpo3w>
+    <!-- 1. Breadcrumbs -->
+    <nav aria-label="Breadcrumb" class="breadcrumbs" data-astro-cid-ilhxcym7>
+  <ol class="breadcrumbs__list" itemscope itemtype="https://schema.org/BreadcrumbList" data-astro-cid-ilhxcym7>
+    <li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Home</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="1">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/skills/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Skills</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="2">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          <span class="breadcrumbs__current" aria-current="page" itemprop="name" data-astro-cid-ilhxcym7>
+              langchain-langgraph-streaming
+            </span>
+          <meta itemprop="position" content="3">
+        </li>
+  </ol>
+</nav>
+
+    <!-- 2. Header (enhanced) -->
+    <header class="skill-header" data-astro-cid-jrlgpo3w>
+      <h1 data-astro-cid-jrlgpo3w>langchain-langgraph-streaming</h1>
+      <p class="skill-description" data-astro-cid-jrlgpo3w>Pick the correct LangGraph 1.0 stream_mode (&quot;messages&quot; vs &quot;updates&quot; vs &quot;values&quot;), wire it into SSE or WebSocket without proxy-buffering gotchas, and filter astream_events(v2) server-side before forwarding to the browser. Use when building a live-token chat UI, a per-node progress bar, a debug/time-travel view, or diagnosing a LangGraph stream that hangs over a production proxy. Trigger with &quot;langgraph streaming&quot;, &quot;stream_mode messages&quot;, &quot;stream_mode updates&quot;, &quot;stream_mode values&quot;, &quot;langgraph SSE&quot;, &quot;langgraph astream_events&quot;, &quot;SSE hangs behind nginx&quot;, &quot;cloud run streaming&quot;.</p>
+
+      <div class="skill-metadata" data-astro-cid-jrlgpo3w>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>v2.5.0</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>Jeremy Longshore</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>MIT</span>
+        </div>
+      </div>
+
+      
+    </header>
+
+    <!-- 4. Allowed Tools -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Allowed Tools</h2>
+      <div class="tools-grid" data-astro-cid-jrlgpo3w>
+        <span class="tool-badge" data-astro-cid-jrlgpo3w>Read</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Write</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Edit</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(python:*)</span>
+      </div>
+      
+    </section>
+
+    <!-- 5. Provided by Plugin -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Provided by Plugin</h2>
+      <div class="plugin-info" data-astro-cid-jrlgpo3w>
+        <div class="plugin-details" data-astro-cid-jrlgpo3w>
+          <h3 data-astro-cid-jrlgpo3w>
+            <a href="/plugins/langchain-py-pack/" data-astro-cid-jrlgpo3w>langchain-py-pack</a>
+          </h3>
+          <p data-astro-cid-jrlgpo3w>Claude Code skill pack for LangChain 1.0 + LangGraph 1.0 (Python) - 34 skills covering chains, agents, RAG, middleware, checkpointing, HITL, streaming, and production patterns</p>
+          <div class="plugin-meta" data-astro-cid-jrlgpo3w>
+            <span data-astro-cid-jrlgpo3w>unknown</span>
+            <span data-astro-cid-jrlgpo3w>v2.5.0</span>
+          </div>
+        </div>
+        <a href="/plugins/langchain-py-pack/" class="btn-primary" data-astro-cid-jrlgpo3w>View Plugin</a>
+      </div>
+    </section>
+
+    <!-- 6. Installation -->
+    <section class="section-box dark" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Installation</h2>
+      <p class="install-note" style="color: var(--brand-light-gray); margin-bottom: 0.75rem;" data-astro-cid-jrlgpo3w>This skill is included in the langchain-py-pack plugin:</p>
+      <pre class="install-command" data-copy="/plugin install langchain-py-pack@claude-code-plugins-plus" data-astro-cid-jrlgpo3w><code data-astro-cid-jrlgpo3w>/plugin install langchain-py-pack@claude-code-plugins-plus</code></pre>
+      <p class="install-note" data-astro-cid-jrlgpo3w>Click to copy</p>
+    </section>
+
+    <!-- 7. Skill Content (Markdown) -->
+    <section class="skill-content-section" data-astro-cid-jrlgpo3w>
+      <h2 data-astro-cid-jrlgpo3w>Instructions</h2>
+      <div class="skill-content" data-astro-cid-jrlgpo3w>
+        <div data-astro-cid-jrlgpo3w><h1>LangGraph Streaming (Python)</h1>
+<h2>Overview</h2>
+<p>An engineer ships <code>stream_mode=&quot;values&quot;</code> to a token-level chat UI because it &quot;seemed the most complete.&quot; Every single token causes the full graph state — message history, scratchpad, plan — to be re-sent and re-rendered. At ~60 tokens/sec the browser overdraws, the React reconciler can&#39;t keep up, the tab freezes, and users blame the model. The correct answer was <code>stream_mode=&quot;messages&quot;</code>, which emits an <code>AIMessageChunk</code> delta per token (typically 5-50 bytes) — one token&#39;s worth of DOM work. This is pain-catalog entry <strong>P19</strong> and it is the #1 LangGraph integration mistake in the 1.0 generation.</p>
+<p>Then the same UI ships to Cloud Run and hangs forever. No error. No logs. The server is emitting tokens; they just never reach the browser. Default proxy buffering (Nginx, Cloud Run&#39;s HTTP/1.1 path, Cloudflare Free) holds the last chunk waiting for more bytes. This is <strong>P46</strong> — SSE streams from LangGraph drop the final <code>end</code> event over proxies that buffer — and the fix is three headers: <code>X-Accel-Buffering: no</code>, <code>Cache-Control: no-cache</code>, <code>Connection: keep-alive</code>.</p>
+<p>And then the debug view starts crashing browser tabs on long runs. The engineer forwarded <code>astream_events(version=&quot;v2&quot;)</code> raw to the client because &quot;it has more detail&quot; — but v2 emits thousands of events per invocation (per-token, per-node, per-runnable lifecycle), and a 60-second agent run easily hits 3,000 events. Browsers freeze on the JSON deserialize queue. This is <strong>P47</strong> — filter server-side, forward only <code>on_chat_model_stream</code> tokens (and optionally <code>on_tool_start</code> / <code>on_tool_end</code>).</p>
+<p>This skill ships the decision matrix, a production-grade FastAPI SSE endpoint with the anti-buffering headers and a 15-second heartbeat, a server-side v2 event filter that drops ~90% of noise, and a WebSocket variant with reconnect-by-<code>thread_id</code> that resumes from the LangGraph checkpointer. Pin: <code>langgraph 1.0.x</code>, <code>langchain-core 1.0.x</code>. Pain-catalog anchors: <strong>P19, P46, P47, P48, P67</strong>, plus P16 for the <code>thread_id</code> rule and P22 for checkpointer persistence.</p>
+<h2>Prerequisites</h2>
+<ul>
+<li>Python 3.10+</li>
+<li><code>langgraph &gt;= 1.0, &lt; 2.0</code>, <code>langchain-core &gt;= 1.0, &lt; 2.0</code></li>
+<li><code>fastapi &gt;= 0.110</code>, <code>uvicorn[standard]</code> (for SSE/WebSocket hosting)</li>
+<li>A checkpointer: <code>langgraph.checkpoint.memory.MemorySaver</code> for dev, or <code>langgraph.checkpoint.postgres.PostgresSaver</code> for prod</li>
+<li>Access to deploy behind your actual proxy (Nginx / Cloud Run / Cloudflare) — localhost does not reproduce the buffering class of bugs</li>
+</ul>
+<h2>Instructions</h2>
+<h3>Step 1 — Pick the right <code>stream_mode</code> for your UI</h3>
+<p>The three modes emit fundamentally different payloads. Match the mode to the UI shape <strong>before</strong> writing any server code.</p>
+<table><thead><tr>
+<th>UI type</th>
+<th><code>stream_mode</code></th>
+<th>Payload each tick</th>
+<th>Emit rate</th>
+<th>Overdraw risk</th>
+<th>Typical bandwidth per 5s run</th>
+</tr></thead><tbody>
+<tr>
+<td>Live-token chat</td>
+<td><code>&quot;messages&quot;</code></td>
+<td><code>(AIMessageChunk, metadata)</code> delta</td>
+<td>~30-80 tokens/sec</td>
+<td>Low</td>
+<td>~5-15 KB</td>
+</tr>
+<tr>
+<td>Per-node progress bar / status line</td>
+<td><code>&quot;updates&quot;</code></td>
+<td><code>{node_name: state_diff}</code></td>
+<td>1 per node (~2-20 per run)</td>
+<td>Low</td>
+<td>~1-5 KB</td>
+</tr>
+<tr>
+<td>Debug / time-travel / state replay</td>
+<td><code>&quot;values&quot;</code></td>
+<td>Entire graph state dict</td>
+<td>1 per node (~2-20 per run)</td>
+<td><strong>High</strong> (state size × steps)</td>
+<td>~20 KB to MBs</td>
+</tr>
+<tr>
+<td>Hybrid (progress + tokens)</td>
+<td><code>[&quot;updates&quot;, &quot;messages&quot;]</code></td>
+<td><code>(mode, payload)</code> interleaved</td>
+<td>Sum of above</td>
+<td>Depends on inner modes</td>
+<td>Sum</td>
+</tr>
+<tr>
+<td>Non-browser observability</td>
+<td><code>astream_events(v2)</code> + filter</td>
+<td>Filtered dicts</td>
+<td>Depends on filter</td>
+<td>Low (server-controlled)</td>
+<td>Controlled</td>
+</tr>
+</tbody></table>
+<p>Decision tree:</p>
+<pre><code>
+Do you need LLM tokens rendered live in the UI?
+├── Yes → stream_mode=&quot;messages&quot;
+│         (add &quot;updates&quot; to the list if you also want per-node progress)
+└── No, I need per-step progress
+    ├── Full state for debug/replay? → stream_mode=&quot;values&quot;
+    └── Just what changed (most UIs)  → stream_mode=&quot;updates&quot;
+</code></pre>
+<p>Full payload samples and combined-mode examples are in <a href="references/stream-mode-comparison.md">Stream Mode Comparison</a>.</p>
+<h3>Step 2 — Wire a minimal SSE endpoint</h3>
+<pre data-lang="python"><code>
+import asyncio, json
+from fastapi import FastAPI
+from fastapi.responses import StreamingResponse
+from langchain_core.messages import HumanMessage
+from langgraph.checkpoint.memory import MemorySaver
+from app.graph import build_graph
+
+app = FastAPI()
+graph = build_graph(checkpointer=MemorySaver())
+
+
+def sse(event: str, data: dict) -&gt; str:
+    return f&quot;event: {event}\ndata: {json.dumps(data, default=str)}\n\n&quot;
+
+
+async def stream_tokens(thread_id: str, user_input: str):
+    config = {&quot;configurable&quot;: {&quot;thread_id&quot;: thread_id}}
+    async for chunk, metadata in graph.astream(
+        {&quot;messages&quot;: [HumanMessage(user_input)]},
+        config=config,
+        stream_mode=&quot;messages&quot;,
+    ):
+        # chunk.content may be list[dict] on Claude tool-use turns (P02)
+        text = chunk.text if hasattr(chunk, &quot;text&quot;) else (
+            chunk.content if isinstance(chunk.content, str) else None
+        )
+        if text:
+            yield sse(&quot;token&quot;, {&quot;text&quot;: text, &quot;node&quot;: metadata.get(&quot;langgraph_node&quot;)})
+    yield sse(&quot;done&quot;, {&quot;thread_id&quot;: thread_id})
+</code></pre>
+<p>Always use <code>graph.astream(...)</code> (async). Never call <code>graph.stream(...)</code> (sync) from inside an async handler — it blocks the event loop and one slow request blocks every other connection (P48).</p>
+<h3>Step 3 — Set the anti-buffering headers</h3>
+<pre data-lang="python"><code>
+@app.get(&quot;/stream&quot;)
+async def stream(thread_id: str, q: str):
+    return StreamingResponse(
+        stream_tokens(thread_id, q),
+        media_type=&quot;text/event-stream&quot;,
+        headers={
+            &quot;X-Accel-Buffering&quot;: &quot;no&quot;,    # Nginx / Cloud Run / Cloudflare
+            &quot;Cache-Control&quot;: &quot;no-cache&quot;,  # Block intermediate caches
+            &quot;Connection&quot;: &quot;keep-alive&quot;,   # Hold the TCP connection
+        },
+    )
+</code></pre>
+<p>These three headers are non-negotiable in production. Without them, your stream works on localhost and hangs on Cloud Run. See <a href="references/sse-endpoint-template.md">SSE Endpoint Template</a> for the full template with a 15-second heartbeat (required to survive Cloud Run&#39;s 60s idle timeout and corporate-proxy timeouts) plus reverse-proxy snippets for Nginx, Traefik, and Cloud Run.</p>
+<h3>Step 4 — Filter <code>astream_events(version=&quot;v2&quot;)</code> server-side</h3>
+<p>If your UI needs richer events than <code>&quot;messages&quot;</code> provides — tool start/end, progress markers, retrieval events — do <strong>not</strong> forward <code>astream_events</code> raw. A single 60-second agent run can emit 3,000+ events. Filter on the server and forward only what the browser uses.</p>
+<pre data-lang="python"><code>
+FORWARD = {&quot;on_chat_model_stream&quot;, &quot;on_tool_start&quot;, &quot;on_tool_end&quot;}
+
+async def filtered(graph, inputs, config):
+    async for event in graph.astream_events(inputs, config=config, version=&quot;v2&quot;):
+        kind = event[&quot;event&quot;]
+        if kind == &quot;on_chat_model_stream&quot;:
+            chunk = event[&quot;data&quot;][&quot;chunk&quot;]
+            text = chunk.text if hasattr(chunk, &quot;text&quot;) else None
+            if text:
+                yield {&quot;type&quot;: &quot;token&quot;, &quot;text&quot;: text,
+                       &quot;node&quot;: event[&quot;metadata&quot;].get(&quot;langgraph_node&quot;)}
+        elif kind == &quot;on_tool_start&quot;:
+            yield {&quot;type&quot;: &quot;tool_start&quot;, &quot;tool&quot;: event[&quot;name&quot;]}
+        elif kind == &quot;on_tool_end&quot;:
+            yield {&quot;type&quot;: &quot;tool_end&quot;, &quot;tool&quot;: event[&quot;name&quot;]}
+        # Drop: on_chain_*, on_parser_*, on_prompt_*, on_retriever_* (P47)
+</code></pre>
+<p>Never use <code>astream_log()</code> in new code — soft-deprecated in 1.0 (P67), scheduled for removal in 2.0. Use <code>astream_events(version=&quot;v2&quot;)</code> instead. Full event taxonomy and compression/backpressure patterns in <a href="references/astream-events-filtering.md">Astream Events Filtering</a>.</p>
+<h3>Step 5 — WebSocket variant with reconnect</h3>
+<p>Use WebSocket instead of SSE when the user may cancel, interrupt, or send follow-up messages mid-stream. WebSocket also sidesteps Cloudflare Free&#39;s default response buffering.</p>
+<pre data-lang="python"><code>
+from fastapi import WebSocket, WebSocketDisconnect
+
+@app.websocket(&quot;/ws/{thread_id}&quot;)
+async def ws(websocket: WebSocket, thread_id: str):
+    await websocket.accept()
+    config = {&quot;configurable&quot;: {&quot;thread_id&quot;: thread_id}}  # P16 — always
+    try:
+        while True:
+            msg = json.loads(await websocket.receive_text())
+            if msg[&quot;type&quot;] == &quot;user_message&quot;:
+                async for chunk, metadata in graph.astream(
+                    {&quot;messages&quot;: [HumanMessage(msg[&quot;text&quot;])]},
+                    config=config,
+                    stream_mode=&quot;messages&quot;,
+                ):
+                    text = chunk.text if hasattr(chunk, &quot;text&quot;) else None
+                    if text:
+                        await websocket.send_json({&quot;type&quot;: &quot;token&quot;, &quot;text&quot;: text})
+                await websocket.send_json({&quot;type&quot;: &quot;done&quot;})
+    except WebSocketDisconnect:
+        pass  # Checkpointer persists state; reconnect with same thread_id resumes
+</code></pre>
+<p>Because LangGraph checkpointers persist state per <code>thread_id</code>, a client that reconnects to <code>/ws/{same-thread-id}</code> automatically sees the prior conversation history on the next turn — no special &quot;resume&quot; handshake required for between-turn reconnects. For mid-stream reconnects and cancellation handling, see <a href="references/websocket-and-reconnect.md">WebSocket &amp; Reconnect</a>.</p>
+<h3>Step 6 — Run the proxy-readiness checklist before shipping</h3>
+<p>A stream that works on <code>uvicorn --reload main:app</code> on your laptop will hang behind Cloud Run. Before you ship, walk this checklist:</p>
+<ul>
+<li>[ ] Deployed endpoint returns <code>Content-Type: text/event-stream</code> (or <code>101 Switching Protocols</code> for WebSocket)</li>
+<li>[ ] Deployed endpoint returns <code>X-Accel-Buffering: no</code> and <code>Cache-Control: no-cache</code></li>
+<li>[ ] <code>curl -N https://your.app/stream?...</code> shows tokens arriving incrementally — NOT all at once at the end</li>
+<li>[ ] Cloud Run deployed with <code>--use-http2</code> (HTTP/2 end-to-end flushes chunks reliably)</li>
+<li>[ ] If behind Cloudflare: Free plan may buffer — test on Pro or use a paid page rule to disable response buffering (or switch to WebSocket)</li>
+<li>[ ] 15-second heartbeat configured (<code>: heartbeat\n\n</code> SSE comment every 15s) so idle streams don&#39;t get killed by the 60s timeout</li>
+<li>[ ] Long-idle load test: run a tool-using agent that waits 45s on an API call; stream should stay alive</li>
+</ul>
+<p>Test behind your actual proxy, not just localhost.</p>
+<h2>Output</h2>
+<ul>
+<li><code>stream_mode</code> chosen deliberately from the decision matrix (<code>&quot;messages&quot;</code> for tokens, <code>&quot;updates&quot;</code> for progress, <code>&quot;values&quot;</code> for debug)</li>
+<li>Minimal FastAPI SSE endpoint using <code>graph.astream(..., stream_mode=&quot;messages&quot;)</code> in an async handler</li>
+<li>Required anti-buffering headers (<code>X-Accel-Buffering</code>, <code>Cache-Control</code>, <code>Connection</code>) on the <code>StreamingResponse</code></li>
+<li>Server-side <code>astream_events(version=&quot;v2&quot;)</code> filter that forwards only <code>on_chat_model_stream</code> + <code>on_tool_start</code> + <code>on_tool_end</code></li>
+<li>Optional WebSocket variant with <code>thread_id</code> required at the route and checkpointer-backed resume</li>
+<li>Proxy-readiness checklist walked end-to-end before shipping past localhost</li>
+</ul>
+<h2>Error Handling</h2>
+<table><thead><tr>
+<th>Symptom</th>
+<th>Cause</th>
+<th>Fix</th>
+</tr></thead><tbody>
+<tr>
+<td>Browser tab freezes on token stream</td>
+<td>Shipped <code>stream_mode=&quot;values&quot;</code> to a token UI; full state on every tick (P19)</td>
+<td>Switch to <code>stream_mode=&quot;messages&quot;</code> — emits per-token deltas only</td>
+</tr>
+<tr>
+<td>Per-node progress bar never advances</td>
+<td>Shipped <code>stream_mode=&quot;messages&quot;</code> to a per-node UI; no node-boundary events (P19)</td>
+<td>Switch to <code>stream_mode=&quot;updates&quot;</code></td>
+</tr>
+<tr>
+<td>Stream works on localhost, hangs on Cloud Run</td>
+<td>Proxy buffering holds last chunk (P46)</td>
+<td>Add <code>X-Accel-Buffering: no</code>, <code>Cache-Control: no-cache</code> headers; deploy Cloud Run with <code>--use-http2</code></td>
+</tr>
+<tr>
+<td>Stream closes after ~60s with no data</td>
+<td>Idle-connection timeout on proxy</td>
+<td>Send <code>: heartbeat\n\n</code> SSE comment every 15s</td>
+</tr>
+<tr>
+<td>Browser tab freezes on long <code>astream_events</code> run</td>
+<td>Forwarded unfiltered v2 events; 3,000+ events per run (P47)</td>
+<td>Filter server-side: forward only <code>on_chat_model_stream</code> + optional tool events</td>
+</tr>
+<tr>
+<td><code>DeprecationWarning: astream_log is deprecated</code></td>
+<td>Using soft-deprecated API (P67)</td>
+<td>Migrate to <code>astream_events(version=&quot;v2&quot;)</code></td>
+</tr>
+<tr>
+<td>Agent has amnesia on every WebSocket message</td>
+<td>Missing <code>thread_id</code> in config (P16)</td>
+<td>Require <code>thread_id</code> at route; assert in middleware</td>
+</tr>
+<tr>
+<td><code>AttributeError: &#39;list&#39; object has no attribute &#39;lower&#39;</code> on chunk.content</td>
+<td>Claude streams content blocks, not plain strings on tool-use turns (P02)</td>
+<td>Use <code>chunk.text</code> (1.0+) or check <code>isinstance(chunk.content, str)</code> before calling string methods</td>
+</tr>
+<tr>
+<td>One slow request blocks all other WebSocket clients</td>
+<td>Sync <code>graph.stream()</code> or <code>graph.invoke()</code> inside async handler (P48)</td>
+<td>Always use <code>graph.astream()</code> / <code>graph.ainvoke()</code> in async contexts</td>
+</tr>
+<tr>
+<td>Cloudflare Free plan buffers SSE</td>
+<td>Free-tier response buffering</td>
+<td>Upgrade plan with page rule to disable buffering, or switch endpoint to WebSocket</td>
+</tr>
+</tbody></table>
+<h2>Examples</h2>
+<h3>Live-token chat UI (the default case)</h3>
+<p><code>stream_mode=&quot;messages&quot;</code> plus SSE plus the three anti-buffering headers. One token per SSE frame (~5-50 bytes each), 30-80 frames/sec during active model generation, heartbeat every 15s during tool waits. See <a href="references/sse-endpoint-template.md">SSE Endpoint Template</a> for the complete FastAPI example including heartbeat, reverse-proxy config, and the client <code>EventSource</code> code.</p>
+<h3>Per-node progress bar for a multi-step agent</h3>
+<p><code>stream_mode=&quot;updates&quot;</code> yields one event per node (typically 2-20 per invocation). Render as discrete status ticks: &quot;Planning...&quot; → &quot;Searching...&quot; → &quot;Summarizing...&quot; → &quot;Done.&quot; Payload is tiny (~100 bytes per tick). Combine with <code>&quot;messages&quot;</code> (<code>stream_mode=[&quot;updates&quot;, &quot;messages&quot;]</code>) to show both progress ticks and streaming tokens in the active node&#39;s pane. Full payload samples in <a href="references/stream-mode-comparison.md">Stream Mode Comparison</a>.</p>
+<h3>Debug / time-travel view with <code>&quot;values&quot;</code></h3>
+<p><code>stream_mode=&quot;values&quot;</code> yields the entire graph state after each node. Useful for state replay, test recording, observability pipelines — <strong>not</strong> for browser UIs where state size × steps × re-render quickly freezes the tab. Pipe to a server-side log (or LangSmith), not to the browser. Example and caveats in <a href="references/stream-mode-comparison.md">Stream Mode Comparison</a>.</p>
+<h3>WebSocket with reconnect-by-<code>thread_id</code></h3>
+<p>When users can cancel mid-stream or send follow-up messages before the previous turn finishes. The <code>thread_id</code> is required at the route; the checkpointer persists history; reconnecting with the same <code>thread_id</code> automatically sees prior turns. Cancellation is implemented via <code>asyncio.Task.cancel()</code> on the active <code>astream</code> iteration. Worked example with half-open connection detection in <a href="references/websocket-and-reconnect.md">WebSocket &amp; Reconnect</a>.</p>
+<h2>Resources</h2>
+<ul>
+<li><a href="https://langchain-ai.github.io/langgraph/how-tos/streaming/">LangGraph streaming how-to</a></li>
+<li><a href="https://langchain-ai.github.io/langgraph/concepts/streaming/">LangGraph streaming concepts</a></li>
+<li><a href="https://python.langchain.com/docs/how_to/streaming/#using-stream-events">LangChain <code>astream_events</code> v2</a></li>
+<li><a href="https://fastapi.tiangolo.com/advanced/custom-response/#streamingresponse">FastAPI <code>StreamingResponse</code></a></li>
+<li><a href="https://fastapi.tiangolo.com/advanced/websockets/">FastAPI WebSockets</a></li>
+<li><a href="https://cloud.google.com/run/docs/configuring/http2">Cloud Run HTTP/2 end-to-end</a></li>
+<li><a href="https://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_buffering">Nginx <code>proxy_buffering</code> directive</a></li>
+<li>Pack pain catalog: <code>docs/pain-catalog.md</code> (entries P16, P19, P22, P46, P47, P48, P67)</li>
+</ul></div>
+      </div>
+    </section>
+
+    <!-- 8. Bottom CTA -->
+    <section class="detail-cta" data-astro-cid-qcigfm7x>
+  <h2 class="detail-cta__headline" data-astro-cid-qcigfm7x>Ready to use langchain-py-pack?</h2>
+  <div class="detail-cta__actions" data-astro-cid-qcigfm7x>
+    <button class="detail-cta__primary" data-copy-install="/plugin install langchain-py-pack@claude-code-plugins-plus" data-astro-cid-qcigfm7x>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" data-astro-cid-qcigfm7x>
+        <rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" stroke-width="1.5" data-astro-cid-qcigfm7x></rect>
+        <path d="M3 11V3a1 1 0 011-1h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" data-astro-cid-qcigfm7x></path>
+      </svg>
+      <span class="detail-cta__btn-text" data-astro-cid-qcigfm7x>Copy Install Command</span>
+    </button>
+    
+  </div>
+</section>
+
+<script type="module">document.querySelectorAll("[data-copy-install]").forEach(t=>{t.addEventListener("click",async()=>{const a=t.dataset.copyInstall||"";await navigator.clipboard.writeText(a);const e=t.querySelector(".detail-cta__btn-text");if(e){const o=e.textContent;e.textContent="Copied!",t.classList.add("copied"),window.trackEvent&&window.trackEvent("install_copied",{plugin_name:a.split(" ").pop()||"",source:"detail_cta"}),setTimeout(()=>{e.textContent=o,t.classList.remove("copied")},2e3)}})});</script>
+
+    <!-- 9. Related Skills (6, with tool pills) -->
+    <section class="related-skills-section" data-astro-cid-jrlgpo3w>
+        <h2 class="related-skills-heading" data-astro-cid-jrlgpo3w>Related Skills</h2>
+        <div class="related-skills-grid" data-astro-cid-jrlgpo3w>
+          <a href="/skills/abridge-ci-integration/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-ci-integration</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Configure CI/CD pipeline for Abridge clinical AI integrations with GitHub Actions.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-common-errors/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-common-errors</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Diagnose and fix common Abridge clinical AI integration errors.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-a/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-a</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge ambient clinical documentation capture-to-note pipeline.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-b/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-b</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge patient-facing documentation and after-visit summary generation.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-cost-tuning/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-cost-tuning</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Optimize Abridge clinical AI costs through tier selection, session management, and usage monitoring for healthcare organizations.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-debug-bundle/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-debug-bundle</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Collect Abridge debug evidence for support tickets and troubleshooting.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a>
+        </div>
+      </section>
+
+  </div>
+
+  
+  <script>
+    document.querySelectorAll('.install-command').forEach(el => {
+      el.addEventListener('click', function() {
+        const text = this.dataset.copy || this.textContent;
+        navigator.clipboard.writeText(text).then(() => {
+          const originalText = this.textContent;
+          this.textContent = 'Copied to clipboard!';
+          this.style.color = 'var(--brand-green)';
+          setTimeout(() => {
+            this.textContent = originalText;
+            this.style.color = '';
+          }, 2000);
+        });
+      });
+    });
+  </script>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

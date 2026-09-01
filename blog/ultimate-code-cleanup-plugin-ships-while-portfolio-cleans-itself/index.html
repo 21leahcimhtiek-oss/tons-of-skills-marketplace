@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Day the Cleanup Plugin Shipped — and Everything Else Got Cleaned Up in Parallel — Tons of Skills Work Diary</title>
+    <meta name="description" content="Shipping an 11-dimension, 11-agent code-cleanup plugin while the rest of the portfolio earns the same grade — 24,884 net lines deleted from the marketplace, a 35x FLOPs figure corrected in a pre-filing patent, cosign+SLSA provenance for an edge daemon, and three back-to-back IOS releases.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://tonsofskills.com/tons-of-skills-marketplace/blog/ultimate-code-cleanup-plugin-ships-while-portfolio-cleans-itself/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/ultimate-code-cleanup-plugin-ships-while-portfolio-cleans-itself/">
+    <meta property="og:title" content="The Day the Cleanup Plugin Shipped — and Everything Else Got Cleaned Up in Parallel — Tons of Skills Work Diary">
+    <meta property="og:description" content="Shipping an 11-dimension, 11-agent code-cleanup plugin while the rest of the portfolio earns the same grade — 24,884 net lines deleted from the marketplace, a 35x FLOPs figure corrected in a pre-filing patent, cosign+SLSA provenance for an edge daemon, and three back-to-back IOS releases.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="The Day the Cleanup Plugin Shipped — and Everything Else Got Cleaned Up in Parallel — Tons of Skills Work Diary">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/ultimate-code-cleanup-plugin-ships-while-portfolio-cleans-itself/">
+    <meta name="twitter:title" content="The Day the Cleanup Plugin Shipped — and Everything Else Got Cleaned Up in Parallel — Tons of Skills Work Diary">
+    <meta name="twitter:description" content="Shipping an 11-dimension, 11-agent code-cleanup plugin while the rest of the portfolio earns the same grade — 24,884 net lines deleted from the marketplace, a 35x FLOPs figure corrected in a pre-filing patent, cosign+SLSA provenance for an edge daemon, and three back-to-back IOS releases.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"The Day the Cleanup Plugin Shipped — and Everything Else Got Cleaned Up in Parallel","description":"Shipping an 11-dimension, 11-agent code-cleanup plugin while the rest of the portfolio earns the same grade — 24,884 net lines deleted from the marketplace, a 35x FLOPs figure corrected in a pre-filing patent, cosign+SLSA provenance for an edge daemon, and three back-to-back IOS releases.","datePublished":"2026-04-15","url":"https://tonsofskills.com/blog/undefined","author":{"@type":"Person","name":"Jeremy Longshore"},"publisher":{"@type":"Organization","name":"Tons of Skills","url":"https://tonsofskills.com"}}</script>
+  
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.post-header[data-astro-cid-7jjqptxk]{background:var(--panel);padding:4rem 1.5rem 3rem;border-bottom:1px solid var(--border)}.post-header-inner[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto}.back-link[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3);text-decoration:none;display:inline-block;margin-bottom:1.5rem;transition:color .2s}.back-link[data-astro-cid-7jjqptxk]:hover{color:var(--primary)}.post-meta[data-astro-cid-7jjqptxk]{display:flex;align-items:center;gap:.75rem;margin-bottom:1rem}time[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3)}.featured-badge[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.2rem .6rem;background:#ce114126;color:var(--red);border-radius:0;font-weight:600;text-transform:uppercase;letter-spacing:.05em}.post-header[data-astro-cid-7jjqptxk] h1[data-astro-cid-7jjqptxk]{font-family:var(--font-body);font-size:clamp(1.5rem,4vw,2.2rem);font-weight:700;color:var(--text);line-height:1.25;margin-bottom:.75rem;letter-spacing:0}.post-desc[data-astro-cid-7jjqptxk]{color:var(--text-2);font-size:1.05rem;line-height:1.6;margin-bottom:1rem}.post-tags[data-astro-cid-7jjqptxk]{display:flex;gap:.4rem;flex-wrap:wrap}.tag[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.15rem .5rem;background:var(--surface-3);color:var(--text-3);border-radius:0}.post-body[data-astro-cid-7jjqptxk]{padding:3rem 1.5rem 4rem}.prose[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto;color:var(--text-2);line-height:1.8;font-size:1rem}.prose[data-astro-cid-7jjqptxk] h2{font-family:var(--font-body);font-size:1.5rem;font-weight:700;color:var(--text);margin:2.5rem 0 1rem;letter-spacing:0}.prose[data-astro-cid-7jjqptxk] h3{font-size:1.2rem;font-weight:600;color:var(--text);margin:2rem 0 .75rem}.prose[data-astro-cid-7jjqptxk] p{margin-bottom:1rem}.prose[data-astro-cid-7jjqptxk] ul,.prose[data-astro-cid-7jjqptxk] ol{margin:.5rem 0 1rem 1.5rem}.prose[data-astro-cid-7jjqptxk] li{margin-bottom:.35rem}.prose[data-astro-cid-7jjqptxk] strong{color:var(--text);font-weight:600}.prose[data-astro-cid-7jjqptxk] code{font-family:var(--font-mono);font-size:.88em;background:var(--surface-3);padding:.15em .35em;border-radius:0;color:var(--primary)}.prose[data-astro-cid-7jjqptxk] a{color:var(--primary);text-decoration:none}.prose[data-astro-cid-7jjqptxk] a:hover{text-decoration:underline}@media(max-width:768px){.post-header[data-astro-cid-7jjqptxk]{padding:3rem 1rem 2rem}.post-body[data-astro-cid-7jjqptxk]{padding:2rem 1rem 3rem}}
+</style></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  <article class="post" data-astro-cid-7jjqptxk>
+    <header class="post-header" data-astro-cid-7jjqptxk>
+      <div class="post-header-inner" data-astro-cid-7jjqptxk>
+        <a href="/blog" class="back-link" data-astro-cid-7jjqptxk>Back to Work Diary</a>
+        <div class="post-meta" data-astro-cid-7jjqptxk>
+          <time datetime="2026-04-15" data-astro-cid-7jjqptxk>April 14, 2026</time>
+          
+        </div>
+        <h1 data-astro-cid-7jjqptxk>The Day the Cleanup Plugin Shipped — and Everything Else Got Cleaned Up in Parallel</h1>
+        <p class="post-desc" data-astro-cid-7jjqptxk>Shipping an 11-dimension, 11-agent code-cleanup plugin while the rest of the portfolio earns the same grade — 24,884 net lines deleted from the marketplace, a 35x FLOPs figure corrected in a pre-filing patent, cosign+SLSA provenance for an edge daemon, and three back-to-back IOS releases.</p>
+        <div class="post-tags" data-astro-cid-7jjqptxk>
+          <span class="tag" data-astro-cid-7jjqptxk>code-quality</span><span class="tag" data-astro-cid-7jjqptxk>refactoring</span><span class="tag" data-astro-cid-7jjqptxk>release-engineering</span><span class="tag" data-astro-cid-7jjqptxk>architecture</span><span class="tag" data-astro-cid-7jjqptxk>ai-agents</span><span class="tag" data-astro-cid-7jjqptxk>claude-code</span><span class="tag" data-astro-cid-7jjqptxk>automation</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="post-body" data-astro-cid-7jjqptxk>
+      <div class="prose" data-astro-cid-7jjqptxk>
+        <p>The Ultimate Code Cleanup plugin shipped on April 15. It scored 98/100 on the enterprise validator rubric. The thing that makes this post worth writing is not the score. It is that in the same 24-hour window, every other active repo in the portfolio earned that same grade through parallel work — a 24,884-line deletion across the marketplace toolchain, a quality sweep across an edge-daemon monorepo that removed dead code, defensive try/catch, weak types, and legacy agents by the dozen, an OpenAPI 3.1 spec emitted from source, cosign keyless signing with SLSA provenance, and a 35x numerical error caught in a pre-filing patent <em>exactly</em> because the peer review predicted that specific failure mode.</p>
+<p>Ship the rubric. Earn the rubric. Same day.</p>
+<h2 id="what-the-plugin-is">What the Plugin Is</h2>
+<p>The Ultimate Code Cleanup plugin lives at <code>plugins/code-quality/code-cleanup/</code> in the claude-code-plugins repo. It is one skill (<code>cleanup-code</code>) that orchestrates eleven specialized agents, each responsible for one axis of code quality. The axes are ordered by risk:</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>#</th><th>Dimension</th><th>Agent</th><th>Risk</th><th>Auto-apply</th></tr></thead><tbody><tr><td>1</td><td>Dead code removal</td><td><code>dead-code-hunter</code></td><td>LOW</td><td>Yes (after build)</td></tr><tr><td>2</td><td>AI slop removal</td><td><code>slop-remover</code></td><td>LOW</td><td>Comments only</td></tr><tr><td>3</td><td>Weak type elimination</td><td><code>weak-type-eliminator</code></td><td>MED</td><td>Yes (after typecheck)</td></tr><tr><td>4</td><td>Security cleanup</td><td><code>security-scanner</code></td><td>MED</td><td>Flag only</td></tr><tr><td>5</td><td>Legacy code removal</td><td><code>legacy-code-remover</code></td><td>MED</td><td>With confirmation</td></tr><tr><td>6</td><td>Type consolidation</td><td><code>type-consolidator</code></td><td>MED</td><td>Yes (after typecheck)</td></tr><tr><td>7</td><td>Defensive code cleanup</td><td><code>defensive-code-cleaner</code></td><td>MED</td><td>Flag only</td></tr><tr><td>8</td><td>Performance optimization</td><td><code>performance-optimizer</code></td><td>MED</td><td>Flag only</td></tr><tr><td>9</td><td>DRY deduplication</td><td><code>dry-deduplicator</code></td><td>HIGH</td><td>Flag only (≥10 lines)</td></tr><tr><td>10</td><td>Async pattern fixes</td><td><code>async-pattern-fixer</code></td><td>HIGH</td><td>Flag only</td></tr><tr><td>11</td><td>Circular dep untangling</td><td><code>circular-dep-untangler</code></td><td>HIGH</td><td>Flag only</td></tr></tbody></table>
+<p>Every finding gets a confidence score — HIGH, MEDIUM, or LOW. Auto-apply is gated by build and test verification between dimensions. If the typecheck fails after a weak-type elimination pass, the dimension reverts. You do not get dead code back because you deleted something that wasn’t actually dead.</p>
+<p>The whole package is 25 new files, 4,081 lines added. The enterprise validator — a 100-point rubric that checks SKILL.md structure, agent definitions, references, argument hints, examples, and failure handling — gave it 98/100 (A+). The missing two points were on CI integration and marketplace-example coverage. Real issues, not ceremony.</p>
+<h2 id="the-11-dimensions-ordered-by-risk">The 11 Dimensions, Ordered by Risk</h2>
+<p>Ordering by risk is the part worth defending. Other cleanup tools bundle dimensions in arbitrary order or leave the sequencing to the user. This one doesn’t.</p>
+<p><strong>Dead code removal is first because it is the safest.</strong> An unreferenced function that compiles out cleanly cannot break anything. The only failure mode is a reflection-based caller the tool can’t see, which is why the verification gate exists — if the build or tests fail after removal, revert.</p>
+<p><strong>AI slop removal is second because it touches comments, not logic.</strong> Lines like <code>// TODO: implement this later</code> from three years ago, or <code>// Added by Cursor on 2024-06-12</code> artifacts. No behavior change is possible. The cost is zero and the readability gain compounds.</p>
+<p><strong>DRY deduplication and circular dep untangling are last because they are the most dangerous.</strong> Extracting shared logic can collapse code paths that look identical but aren’t. Untangling a cycle can mean rewriting ownership across modules. These are the dimensions where the agent defaults to flag-only, and the human has to decide.</p>
+<p>The ordering matters because each dimension’s cleanup creates cleaner inputs for the next one. Dead code removed first makes DRY deduplication detection more accurate — you are not finding false duplicates in unreachable branches. Weak types eliminated before type consolidation means the consolidator works with accurate signatures.</p>
+<h2 id="meanwhile-in-the-same-repo">Meanwhile, in the Same Repo</h2>
+<p>The plugin shipped at <code>2ca7720e0</code>. Four commits later, <code>f61853026</code> was a commit titled <em>“refactor: comprehensive codebase cleanup — 8 parallel agents.”</em></p>
+<p>That commit changed 126 files. 423 insertions. <strong>25,307 deletions.</strong></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>scripts/overnight-skill-fix.py                 | 978 ---------------------</span></span>
+<span class="line"><span>scripts/skill-batch-fixer.py                   | 483 ----------</span></span>
+<span class="line"><span>scripts/skill-gap-report.py                    | 577 ------------</span></span>
+<span class="line"><span>scripts/skills-enhancer-batch.py               | 651 --------------</span></span>
+<span class="line"><span>scripts/skills-generate-vertex-safe.py         | 740 ----------------</span></span>
+<span class="line"><span>scripts/skills-generate-vertex.py              | 386 --------</span></span>
+<span class="line"><span>scripts/validate-plugin.js                     | 807 -----------------</span></span></code></pre>
+<p>Seven files alone account for over 4,600 lines of deletion. These were migration scripts, skill-generation experiments, validator prototypes, batch fixers — tools that had done their job months ago and never got removed. The cleanup plugin’s first real customer was the repo that shipped it.</p>
+<p><strong>That is not a coincidence. It is the right order of operations.</strong> Dogfooding a cleanup tool on the repo that built it is the only way to find the edge cases before external users hit them. The 8-agent run exposed places where the dead-code detector needed to distinguish “never imported” from “imported only by a test fixture that is itself unused.” That fix landed the same day.</p>
+<p>Also in the same repo, <code>4e07649fe</code> resolved 27 validation errors across 3,874 skill files: <code>disallowedTools</code> fields that were strings instead of arrays, <code>repository</code> fields that were objects instead of strings, and cross-skill relative links that reached outside their own package. <code>11f7b5b94</code> split thirteen oversized <code>SKILL.md</code> files — four in notion-pack, eight in supabase-pack, one in sentry-pack — moving code examples and CI configs into <code>references/</code> subdirectories so the main files stay under the 500-line limit. <code>b2debbdf8</code> removed XML angle brackets from four skill descriptions because the validator’s XML-tag check interpreted <code>-></code> as a tag opener.</p>
+<p>Small, load-bearing fixes. Every one of them is the kind of thing a cleanup framework should surface automatically, and several of them informed how the plugin’s agents detect similar issues.</p>
+<h2 id="the-qmd-team-intent-kb-v040-story">The qmd-team-intent-kb v0.4.0 Story</h2>
+<p>Across the same 24 hours, <code>qmd-team-intent-kb</code> cut v0.4.0 with cosign keyless signing plus SLSA provenance for the edge-daemon container image (<code>#82</code>), emitted an OpenAPI 3.1 spec with a bundled Swagger <code>/docs</code> UI (<code>#84</code>), and added <code>publishConfig</code> metadata so internal packages can publish to a private registry as reusable libraries (<code>#83</code>).</p>
+<p><strong>Cosign keyless signing plus SLSA provenance</strong> is the piece worth explaining. Traditional container signing uses a long-lived signing key, which is an operational liability — if the key leaks, every image ever signed is retroactively suspect. Keyless signing binds each signature to a short-lived OIDC token from the CI environment, verified by the public Sigstore transparency log. There is no key to leak. The signature proves which GitHub Actions workflow, which commit SHA, and which runner produced the image.</p>
+<p>SLSA (Supply-chain Levels for Software Artifacts) provenance is the companion: a signed attestation describing how the artifact was built — the source commit, the builder identity, the build inputs, and the isolation environment. For a daemon that is going to run inside customer environments, that attestation is what lets the customer verify “this image was built from the commit I see in GitHub, by the workflow I can inspect, and no one inserted a build step I did not approve.”</p>
+<p>The v0.4.0 release wired this into the existing CI pipeline without requiring a separate signing step. The workflow that builds the edge-daemon image also signs it and publishes the provenance attestation. Consumers can verify with:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">cosign</span><span style="color:#9ECBFF"> verify</span><span style="color:#9ECBFF"> ghcr.io/qmd-team-intent-kb/edge-daemon:v0.4.0</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --certificate-identity-regexp</span><span style="color:#9ECBFF"> "https://github.com/jeremylongshore/qmd-team-intent-kb"</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --certificate-oidc-issuer</span><span style="color:#9ECBFF"> "https://token.actions.githubusercontent.com"</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">cosign</span><span style="color:#9ECBFF"> verify-attestation</span><span style="color:#9ECBFF"> ghcr.io/qmd-team-intent-kb/edge-daemon:v0.4.0</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --type</span><span style="color:#9ECBFF"> slsaprovenance</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --certificate-identity-regexp</span><span style="color:#9ECBFF"> ".*"</span></span></code></pre>
+<p>That is the whole interface. For a project that had been running unsigned images a week earlier, that is a meaningful security posture shift delivered without friction.</p>
+<p>But the interesting part is the dozen quality PRs that landed underneath those headline features.</p>
+<p><strong><code>#58</code> — DRY sweep on fixture factories and spool JSONL writer.</strong> Consolidated duplicate test-fixture helpers across three packages into a shared <code>@qmd-team-intent-kb/test-fixtures</code> package. The spool JSONL writer had two nearly-identical implementations for retry-on-full-disk behavior; those collapsed to one.</p>
+<p><strong><code>#54</code> — Removed AI slop and unhelpful comments.</strong> Lines like <code>// Check if the item is valid before processing</code> sitting above <code>if (!isValid(item)) return</code>. Explaining what instead of why. Gone.</p>
+<p><strong><code>#53</code> — Removed <code>ConsoleDaemonLogger</code>, <code>NullLogger</code>, and vestigial public re-exports.</strong> The daemon had standardized on pino structured logging weeks earlier (PR <code>#45</code>). The legacy console logger and the null logger used during that migration were still exported. Removed.</p>
+<p><strong><code>#56</code> — Removed unused code identified by knip sweep.</strong> Everything knip flagged with zero callers.</p>
+<p><strong><code>#57</code> — Replaced weak types with strong types.</strong> <code>Record&#x3C;string, unknown></code> where a typed interface existed. <code>any</code> on function parameters. Adjacent PRs did the same for data-at-rest: <code>#73</code> replaced repository casts with Zod-on-read validation; <code>#78</code> replaced the <code>as Record&#x3C;string, unknown></code> delete pattern with rest-destructure in schema tests.</p>
+<p><strong><code>#55</code> — Untangled <code>mcp-server</code> → <code>edge-daemon</code> peer-level import.</strong> An import that reached across package boundaries to pull an implementation detail. Replaced with a proper interface in a shared package.</p>
+<p><strong><code>#51</code> — Consolidated <code>SensitivityLevel</code> into the schema Sensitivity type.</strong> Two type names for the same concept. Merged.</p>
+<p><strong><code>#52</code> — Removed defensive try/catch hiding fast-glob errors in <code>importFiles</code>.</strong> The catch was swallowing errors and returning empty arrays, which made “zero matches” indistinguishable from “fast-glob crashed.” Removed the catch; the error propagates; the caller decides what to do.</p>
+<p>Before:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#F97583">async</span><span style="color:#F97583"> function</span><span style="color:#B392F0"> importFiles</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">patterns</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> string</span><span style="color:#E1E4E8">[])</span><span style="color:#F97583">:</span><span style="color:#B392F0"> Promise</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#79B8FF">string</span><span style="color:#E1E4E8">[]> {</span></span>
+<span class="line"><span style="color:#F97583">  try</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">    return</span><span style="color:#F97583"> await</span><span style="color:#B392F0"> fastGlob</span><span style="color:#E1E4E8">(patterns, { dot: </span><span style="color:#79B8FF">true</span><span style="color:#E1E4E8"> });</span></span>
+<span class="line"><span style="color:#E1E4E8">  } </span><span style="color:#F97583">catch</span><span style="color:#E1E4E8"> (err) {</span></span>
+<span class="line"><span style="color:#E1E4E8">    logger.</span><span style="color:#B392F0">warn</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'glob failed'</span><span style="color:#E1E4E8">, { err });</span></span>
+<span class="line"><span style="color:#F97583">    return</span><span style="color:#E1E4E8"> [];</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>After:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#F97583">async</span><span style="color:#F97583"> function</span><span style="color:#B392F0"> importFiles</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">patterns</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> string</span><span style="color:#E1E4E8">[])</span><span style="color:#F97583">:</span><span style="color:#B392F0"> Promise</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#79B8FF">string</span><span style="color:#E1E4E8">[]> {</span></span>
+<span class="line"><span style="color:#F97583">  return</span><span style="color:#F97583"> await</span><span style="color:#B392F0"> fastGlob</span><span style="color:#E1E4E8">(patterns, { dot: </span><span style="color:#79B8FF">true</span><span style="color:#E1E4E8"> });</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>Three lines removed. The caller — <code>edge-daemon/src/capture.ts</code> — already had its own error handling that distinguished “no files matched” from “filesystem unavailable.” The defensive catch was erasing that distinction before the caller could act on it. The cleanup dimension that catches this pattern is <code>defensive-code-cleaner</code> — dimension 7 in the plugin.</p>
+<p>That is seven of the eleven cleanup dimensions applied in a single day by a different team working on a different codebase. Not because they were using the plugin. Because the dimensions are the actual axes of code quality, and anyone running a mature cleanup sweep converges on them.</p>
+<h2 id="intentional-cognition-os-the-agent-chain-completes">Intentional Cognition OS: The Agent Chain Completes</h2>
+<p>Intentional Cognition OS shipped three releases on April 15: v0.9.1, v0.9.2, and v0.9.3. The headline is v0.9.1.</p>
+<p>The compiler component had been building up an agent chain for episodic research over the previous weeks: collector (B02), summarizer (B03), skeptic (B04), integrator (B05). Each one a separate release (v0.6.0 through v0.9.0). April 15 shipped <strong>B06 — the research orchestrator with recoverable failure states</strong>, which is the piece that makes the chain actually usable.</p>
+<p>Without the orchestrator, a failure in the skeptic agent (say, a malformed LLM response) would propagate up and kill the whole research cycle. You would lose the collector’s output and have to start over. With the orchestrator, failures are classified as transient or permanent. Transient failures (network timeouts, rate limits, malformed JSON) trigger a bounded retry with backoff. Permanent failures (schema mismatches, auth errors) fail fast and surface the error to the caller.</p>
+<p>Recoverable failure state is not a novel concept. But implementing it as a dedicated orchestrator around a multi-agent chain means the orchestrator owns the retry policy, the circuit breaker, and the dead-letter handling — not each individual agent. That cleanly separates the agent’s job (produce a specific output) from the orchestrator’s job (keep the pipeline alive).</p>
+<p>v0.9.2 and v0.9.3 were dependency bumps (typescript-eslint, eslint-plugin-simple-import-sort) with full release artifacts — small, but the release cadence itself is the signal. The project treats point releases as cheap.</p>
+<h2 id="the-flops-correction">The FLOPs Correction</h2>
+<p>The most instructive story of the day is the one that almost did not get caught.</p>
+<p>Semantic-flux is a search-architecture project with a pre-filing patent. One of its core figures — the FLOPs cost per query for the reference architecture — had been listed as 19M across the paper draft, the formal specification, and the design document.</p>
+<p>On April 15, commit <code>6c07680</code> corrected that figure to 679M. Thirty-five times higher.</p>
+<p>The original number came from an unchecked derivation — someone had computed FLOPs for a single operator application and not multiplied by the number of applications per query. Peer review, weeks earlier, had specifically flagged “unchecked-derivation failure modes” as the riskiest class of error in this kind of quantitative analysis. The FLOPs figure was exactly that failure mode.</p>
+<p>The fix was not a one-character change. The design document’s gap analysis (§7) was revised. The attorney package’s formal specification got rewritten to claim a range (33K to 679M FLOPs depending on configuration) rather than a point value — a stronger patent posture that covers more implementations. The paper draft was updated with the new throughput implication. A permanent entry landed in DECISIONS.md explaining the correction so it cannot be silently re-introduced.</p>
+<p>Downstream impact: the 50K-passages-per-second throughput gate is now sitting on the edge rather than comfortably above it. Phase 1 of the evaluation plan must preregister a d=96 dimensional fallback in case the d=128 configuration can’t hit that throughput under the corrected FLOPs budget.</p>
+<p><strong>This is what honest engineering response looks like.</strong> The finding was uncomfortable — a 35x error in a published derivation is embarrassing. The response was not to downplay it. It was to widen the claim, tighten the evaluation plan, and document the correction permanently. Peer review caught a failure mode. The team responded like peer review matters.</p>
+<p>This would have been Tier 4 material on its own. In the context of the day, it’s one of five major threads.</p>
+<h2 id="the-permanent-correction-record-pattern">The Permanent Correction Record Pattern</h2>
+<p>The DECISIONS.md entry that landed with the FLOPs fix is worth isolating as a transferable pattern. It is a technique any engineering team can adopt, and the semantic-flux correction is a textbook example of what the pattern is for.</p>
+<p>The entry looked approximately like this:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="markdown"><code><span class="line"><span style="color:#79B8FF;font-weight:bold">## 2026-04-15 — FLOPs figure correction (Architecture C)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8;font-weight:bold">**Previous value:**</span><span style="color:#E1E4E8"> 19M FLOPs per query</span></span>
+<span class="line"><span style="color:#E1E4E8;font-weight:bold">**Corrected value:**</span><span style="color:#E1E4E8"> 33K–679M FLOPs (range, configuration-dependent)</span></span>
+<span class="line"><span style="color:#E1E4E8;font-weight:bold">**Error class:**</span><span style="color:#E1E4E8"> unchecked derivation — missed multiplication by query-operator applications</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79B8FF;font-weight:bold">### What changed</span></span>
+<span class="line"><span style="color:#FFAB70">-</span><span style="color:#E1E4E8"> paper/QCSS-paper-draft.md §4.1: point value → range</span></span>
+<span class="line"><span style="color:#FFAB70">-</span><span style="color:#E1E4E8"> attorney-package/04-formal-specification.md: claims a range, not a point</span></span>
+<span class="line"><span style="color:#FFAB70">-</span><span style="color:#E1E4E8"> DESIGN.md §7: gap analysis revised with corrected throughput model</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79B8FF;font-weight:bold">### Downstream impact</span></span>
+<span class="line"><span style="color:#FFAB70">-</span><span style="color:#E1E4E8"> 50K passages/sec throughput gate moves from comfortable to on-edge</span></span>
+<span class="line"><span style="color:#FFAB70">-</span><span style="color:#E1E4E8"> Phase 1 evaluation must preregister d=96 fallback</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79B8FF;font-weight:bold">### Why this won't recur</span></span>
+<span class="line"><span style="color:#FFAB70">-</span><span style="color:#E1E4E8"> Derivation verification step added to the publication checklist</span></span>
+<span class="line"><span style="color:#FFAB70">-</span><span style="color:#E1E4E8"> Claim-range approach adopted for all quantitative claims pre-filing</span></span></code></pre>
+<p>The pattern is three parts: <strong>the correction itself</strong> (what was wrong, what is right), <strong>the downstream impact</strong> (what else has to change because of this), and <strong>the mitigation</strong> (what changed about the process to prevent recurrence).</p>
+<p>Without this pattern, the correction is invisible six months later. Someone reading the paper finds the new FLOPs figure and doesn’t know why it changed. Someone reviewing the attorney package finds the claim range and doesn’t know it started as a point value. The context — <em>this was specifically flagged by peer review as the class of error to watch for</em> — gets lost.</p>
+<p>With this pattern, the correction becomes a part of the project’s epistemic record. It reads to future-you or to a future collaborator as: “we made this mistake, we caught it this way, here is what it cost, here is how we stopped ourselves from repeating it.”</p>
+<p>The cleanup plugin’s safety protocol uses a similar structure — every applied cleanup generates a report entry with the finding, the confidence level, the file:line, and the verification result. It is the same principle: permanent, auditable records of changes that would otherwise be invisible after the commit lands.</p>
+<h2 id="ccsc-v031-security-hardening">CCSC v0.3.1: Security Hardening</h2>
+<p>claude-code-slack-channel cut v0.3.1 (PR <code>#23</code>) with a Scorecard-driven workflow hardening pass (<code>#26</code>): pinning actions to SHAs, removing unneeded permissions, hardening the Dockerfile. The release also landed deduplication for duplicate event delivery from <code>message</code> + <code>app_mention</code> events (<code>#8</code>), clean MCP server termination on client disconnect (<code>#7</code>), and governance scaffolding (<code>#10</code>).</p>
+<p>Plus the smaller quality fixes: the CLAUDE.md line counts and dependency counts updated to match reality (<code>#22</code>), npm removed from dependabot because the project has no npm dependencies (<code>#20</code>), actions/upload-artifact bumped to v7.0.1 (<code>#21</code>), actions/checkout to v6 (<code>#17</code>), github/codeql-action to v4.35.2 (<code>#14</code>), and contributor credits corrected (<code>#24</code>). And <code>#9</code> enabled Gemini PR review joining the wild-ecosystem shared GCP project.</p>
+<p>Nothing in that list is glamorous. The collective effect is a release that passes Scorecard at a higher grade than any previous release of the project. Quality is the sum of many small decisions.</p>
+<h2 id="why-velocity-and-quality-werent-in-tension">Why Velocity and Quality Weren’t in Tension</h2>
+<p>A normal framing of this day would be: “a lot shipped, so corners must have been cut.” That framing is wrong for this day, and the reason why is worth explaining.</p>
+<p>The work on the cleanup plugin, the marketplace cleanup, the qmd quality sweep, and the CCSC hardening pass all share a structure: <strong>each dimension has a specific detection pattern, a verification gate, and an auto-apply or flag-only default.</strong> That structure means “cleanup” is not a vibe. It is a checklist with a risk-ordered execution plan.</p>
+<p>When cleanup is a checklist, the work parallelizes. Three different projects can run their own dead-code-removal passes independently without coordination. The qmd team found <code>ConsoleDaemonLogger</code> still exported because they ran knip. The marketplace team found 978-line migration scripts because they grepped for files that nothing imported. Different codebases. Same pattern.</p>
+<p><strong>Velocity comes from removing ambiguity about what “good” looks like.</strong> The 11 dimensions are not opinions — they are observable properties. Something is either dead code or it is live code. A type is either strong or weak. A comment is either explanatory or noise. Arguing about whether to clean up is replaced with “run the dimension and check the confidence score.”</p>
+<p>The FLOPs correction is the same principle applied to research. Peer review said “this is the class of error most likely to hurt you.” The team treated that as a checklist item, not a suggestion. When the error was found, the response was mechanical: update the sources, widen the claim, preregister a fallback. No ambiguity, no handwringing.</p>
+<h2 id="where-this-fits">Where This Fits</h2>
+<p>The broader arc is that AI-assisted development is producing more code, faster, than human review alone can catch. The Ultimate Code Cleanup plugin is one answer to that — a checklist framework an agent can run against its own output, with confidence scoring and build verification gates so the cleanup itself is accountable.</p>
+<p>The plugin sits at <code>plugins/code-quality/code-cleanup/</code> in the claude-code-plugins marketplace. Installation is a standard plugin install. Once installed, <code>/cleanup-code</code> runs the full 11-dimension sweep with sensible defaults, and <code>--dimensions &#x3C;list></code> narrows to a subset. <code>--changed</code> scopes to the last 10 commits’ files. Output is a structured report: summary table per dimension, applied changes with file:line references, flagged items with reasoning.</p>
+<p>Typical invocations:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>/cleanup-code                                       # full sweep</span></span>
+<span class="line"><span>/cleanup-code --dimensions dead,types,security     # security-focused</span></span>
+<span class="line"><span>/cleanup-code src/api/ --changed                   # only changed files in one dir</span></span>
+<span class="line"><span>/cleanup-code --dimensions dry                     # single-dimension deep-dive</span></span></code></pre>
+<p>The safety checkpoint runs before any of this. If the git working tree is dirty, the tool refuses to start — it records the current commit SHA as a rollback point so an entire sweep can be reverted with one <code>git reset</code>. After each dimension that auto-applies, it runs the project’s build and test commands. If either fails, only that dimension’s changes revert. The other dimensions’ changes persist.</p>
+<p>That structure is load-bearing. It means you can run a full 11-dimension sweep on an unfamiliar codebase without fear that one bad detection poisons the rest of the cleanup. Each dimension is independent, verified, and revertable in isolation.</p>
+<p>Every project in the portfolio is a candidate. The 24-hour window of April 15 was the proof that the portfolio is ready to start running this sweep at scale.</p>
+<h2 id="related-posts">Related Posts</h2>
+<ul>
+<li><a href="/blog/qcss-research-corpus-twenty-one-documents/">QCSS Research Corpus: Twenty-One Documents and a Weak Reject</a> — the research-corpus arc that flagged the FLOPs class of error in its peer-review document.</li>
+<li><a href="/blog/repo-resolver-adr-to-integration-one-day/">Repo-Resolver in a Day: ADR to Integration</a> — the April 14 post on the same portfolio, different lens.</li>
+<li><a href="https://startaitools.com/posts/wild-deep-dive-4-tech-lead/">The Wild Ecosystem Deep Dive #4: Tech Lead</a> — the design philosophy behind risk-ordered execution plans, applied earlier in the wild ecosystem.</li>
+</ul>
+      </div>
+    </div>
+  </article>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

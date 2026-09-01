@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Making a Fire-and-Forget Writer Safe Under Failure — Tons of Skills Work Diary</title>
+    <meta name="description" content="Five properties an unattended capture hook needs before you turn it on: idempotent intake, durable outbox, backpressure, atomic receipts, consent gate.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://startaitools.com/posts/making-fire-and-forget-capture-safe-under-failure/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/making-fire-and-forget-capture-safe-under-failure/">
+    <meta property="og:title" content="Making a Fire-and-Forget Writer Safe Under Failure — Tons of Skills Work Diary">
+    <meta property="og:description" content="Five properties an unattended capture hook needs before you turn it on: idempotent intake, durable outbox, backpressure, atomic receipts, consent gate.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="Making a Fire-and-Forget Writer Safe Under Failure — Tons of Skills Work Diary">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/making-fire-and-forget-capture-safe-under-failure/">
+    <meta name="twitter:title" content="Making a Fire-and-Forget Writer Safe Under Failure — Tons of Skills Work Diary">
+    <meta name="twitter:description" content="Five properties an unattended capture hook needs before you turn it on: idempotent intake, durable outbox, backpressure, atomic receipts, consent gate.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"Making a Fire-and-Forget Writer Safe Under Failure","description":"Five properties an unattended capture hook needs before you turn it on: idempotent intake, durable outbox, backpressure, atomic receipts, consent gate.","datePublished":"2026-07-11","url":"https://tonsofskills.com/blog/undefined","author":{"@type":"Person","name":"Jeremy Longshore"},"publisher":{"@type":"Organization","name":"Tons of Skills","url":"https://tonsofskills.com"}}</script>
+  
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.post-header[data-astro-cid-7jjqptxk]{background:var(--panel);padding:4rem 1.5rem 3rem;border-bottom:1px solid var(--border)}.post-header-inner[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto}.back-link[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3);text-decoration:none;display:inline-block;margin-bottom:1.5rem;transition:color .2s}.back-link[data-astro-cid-7jjqptxk]:hover{color:var(--primary)}.post-meta[data-astro-cid-7jjqptxk]{display:flex;align-items:center;gap:.75rem;margin-bottom:1rem}time[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3)}.featured-badge[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.2rem .6rem;background:#ce114126;color:var(--red);border-radius:0;font-weight:600;text-transform:uppercase;letter-spacing:.05em}.post-header[data-astro-cid-7jjqptxk] h1[data-astro-cid-7jjqptxk]{font-family:var(--font-body);font-size:clamp(1.5rem,4vw,2.2rem);font-weight:700;color:var(--text);line-height:1.25;margin-bottom:.75rem;letter-spacing:0}.post-desc[data-astro-cid-7jjqptxk]{color:var(--text-2);font-size:1.05rem;line-height:1.6;margin-bottom:1rem}.post-tags[data-astro-cid-7jjqptxk]{display:flex;gap:.4rem;flex-wrap:wrap}.tag[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.15rem .5rem;background:var(--surface-3);color:var(--text-3);border-radius:0}.post-body[data-astro-cid-7jjqptxk]{padding:3rem 1.5rem 4rem}.prose[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto;color:var(--text-2);line-height:1.8;font-size:1rem}.prose[data-astro-cid-7jjqptxk] h2{font-family:var(--font-body);font-size:1.5rem;font-weight:700;color:var(--text);margin:2.5rem 0 1rem;letter-spacing:0}.prose[data-astro-cid-7jjqptxk] h3{font-size:1.2rem;font-weight:600;color:var(--text);margin:2rem 0 .75rem}.prose[data-astro-cid-7jjqptxk] p{margin-bottom:1rem}.prose[data-astro-cid-7jjqptxk] ul,.prose[data-astro-cid-7jjqptxk] ol{margin:.5rem 0 1rem 1.5rem}.prose[data-astro-cid-7jjqptxk] li{margin-bottom:.35rem}.prose[data-astro-cid-7jjqptxk] strong{color:var(--text);font-weight:600}.prose[data-astro-cid-7jjqptxk] code{font-family:var(--font-mono);font-size:.88em;background:var(--surface-3);padding:.15em .35em;border-radius:0;color:var(--primary)}.prose[data-astro-cid-7jjqptxk] a{color:var(--primary);text-decoration:none}.prose[data-astro-cid-7jjqptxk] a:hover{text-decoration:underline}@media(max-width:768px){.post-header[data-astro-cid-7jjqptxk]{padding:3rem 1rem 2rem}.post-body[data-astro-cid-7jjqptxk]{padding:2rem 1rem 3rem}}
+</style></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  <article class="post" data-astro-cid-7jjqptxk>
+    <header class="post-header" data-astro-cid-7jjqptxk>
+      <div class="post-header-inner" data-astro-cid-7jjqptxk>
+        <a href="/blog" class="back-link" data-astro-cid-7jjqptxk>Back to Work Diary</a>
+        <div class="post-meta" data-astro-cid-7jjqptxk>
+          <time datetime="2026-07-11" data-astro-cid-7jjqptxk>July 10, 2026</time>
+          
+        </div>
+        <h1 data-astro-cid-7jjqptxk>Making a Fire-and-Forget Writer Safe Under Failure</h1>
+        <p class="post-desc" data-astro-cid-7jjqptxk>Five properties an unattended capture hook needs before you turn it on: idempotent intake, durable outbox, backpressure, atomic receipts, consent gate.</p>
+        <div class="post-tags" data-astro-cid-7jjqptxk>
+          <span class="tag" data-astro-cid-7jjqptxk>architecture</span><span class="tag" data-astro-cid-7jjqptxk>idempotency</span><span class="tag" data-astro-cid-7jjqptxk>ai-agents</span><span class="tag" data-astro-cid-7jjqptxk>claude-code</span><span class="tag" data-astro-cid-7jjqptxk>distributed-systems</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="post-body" data-astro-cid-7jjqptxk>
+      <div class="prose" data-astro-cid-7jjqptxk>
+        <p>There is a hook that distills a finished Claude Code session into a few durable learnings and proposes them to a shared team brain. It runs on <code>SessionEnd</code>. Nobody watches it. That last sentence is the entire problem.</p>
+<p>The manual counterpart — a <code>/brain-save</code> command a teammate types when they want to keep something — has been safe for months. Not because the write path was safe, but because a human was standing over it. A human notices when a capture fails. A human doesn’t hit save twice in a panic. A human sees the error toast and shrugs. The forgiving hands were attached to a person, and the person was the safety system.</p>
+<p>An unattended hook has no hands. It fires when the session ends, whether or not the network is up, whether or not the same session already fired, whether or not one teammate’s token has gone berserk. So the hook could not ship until the write path underneath it earned five properties. Skip any one and “convenient automation” becomes silent data loss, a duplicate flood, or governance drift nobody can see. Here is each property, why the obvious version of it was wrong, and the fifth one that governs the on-switch itself.</p>
+<h2 id="the-five-properties">The five properties</h2>
+<p>Before an unattended capture hook is safe to turn on, its write path needs all five:</p>
+<ol>
+<li><strong>Idempotent intake</strong> — retries collapse into a single record, never a duplicate flood.</li>
+<li><strong>Durable outbox</strong> — a network blip queues the write instead of losing it.</li>
+<li><strong>Per-actor backpressure</strong> — one runaway identity can’t flood the queue.</li>
+<li><strong>Atomic governance receipts</strong> — a state flip and its audit record commit together or not at all.</li>
+<li><strong>Consent-gated opt-in</strong> — the on-switch stays a deliberate human decision.</li>
+</ol>
+<h2 id="property-1--idempotent-intake">Property 1 — Idempotent intake</h2>
+<p>A retry must not fan out into duplicates. This has two halves, because the client and the server can each betray you.</p>
+<p>The client half was the id. Team mode was minting candidate ids with <code>randomUUID()</code>. A re-send — a flaky network retry, a hook that fires twice, a drained backlog item going back out — arrived as a brand-new row every time. The fix is to make the id a pure function of the content:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="ts"><code><span class="line"><span style="color:#F97583">import</span><span style="color:#E1E4E8"> { createHash } </span><span style="color:#F97583">from</span><span style="color:#9ECBFF"> "node:crypto"</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">// UUIDv5 over (tenant, title, content) — same input, same id, forever.</span></span>
+<span class="line"><span style="color:#F97583">function</span><span style="color:#B392F0"> deriveCandidateId</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">tenant</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> string</span><span style="color:#E1E4E8">, </span><span style="color:#FFAB70">title</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> string</span><span style="color:#E1E4E8">, </span><span style="color:#FFAB70">content</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> string</span><span style="color:#E1E4E8">)</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> string</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> NS</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "6ba7b810-9dad-11d1-80b4-00c04fd430c8"</span><span style="color:#E1E4E8">; </span><span style="color:#6A737D">// DNS namespace</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> hash</span><span style="color:#F97583"> =</span><span style="color:#B392F0"> createHash</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"sha1"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">    .</span><span style="color:#B392F0">update</span><span style="color:#E1E4E8">(Buffer.</span><span style="color:#B392F0">from</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">NS</span><span style="color:#E1E4E8">.</span><span style="color:#B392F0">replace</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">/</span><span style="color:#DBEDFF">-</span><span style="color:#9ECBFF">/</span><span style="color:#F97583">g</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">""</span><span style="color:#E1E4E8">), </span><span style="color:#9ECBFF">"hex"</span><span style="color:#E1E4E8">))</span></span>
+<span class="line"><span style="color:#E1E4E8">    .</span><span style="color:#B392F0">update</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">`${</span><span style="color:#E1E4E8">tenant</span><span style="color:#9ECBFF">}</span><span style="color:#79B8FF">\n</span><span style="color:#9ECBFF">${</span><span style="color:#E1E4E8">title</span><span style="color:#9ECBFF">}</span><span style="color:#79B8FF">\n</span><span style="color:#9ECBFF">${</span><span style="color:#E1E4E8">content</span><span style="color:#9ECBFF">}`</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">    .</span><span style="color:#B392F0">digest</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#E1E4E8">  hash[</span><span style="color:#79B8FF">6</span><span style="color:#E1E4E8">] </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> (hash[</span><span style="color:#79B8FF">6</span><span style="color:#E1E4E8">] </span><span style="color:#F97583">&#x26;</span><span style="color:#79B8FF"> 0x0f</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">|</span><span style="color:#79B8FF"> 0x50</span><span style="color:#E1E4E8">; </span><span style="color:#6A737D">// version 5</span></span>
+<span class="line"><span style="color:#E1E4E8">  hash[</span><span style="color:#79B8FF">8</span><span style="color:#E1E4E8">] </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> (hash[</span><span style="color:#79B8FF">8</span><span style="color:#E1E4E8">] </span><span style="color:#F97583">&#x26;</span><span style="color:#79B8FF"> 0x3f</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">|</span><span style="color:#79B8FF"> 0x80</span><span style="color:#E1E4E8">; </span><span style="color:#6A737D">// RFC 4122 variant</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> h</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> hash.</span><span style="color:#B392F0">toString</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"hex"</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#F97583">  return</span><span style="color:#9ECBFF"> `${</span><span style="color:#E1E4E8">h</span><span style="color:#9ECBFF">.</span><span style="color:#B392F0">slice</span><span style="color:#9ECBFF">(</span><span style="color:#79B8FF">0</span><span style="color:#9ECBFF">,</span><span style="color:#79B8FF">8</span><span style="color:#9ECBFF">)</span><span style="color:#9ECBFF">}-${</span><span style="color:#E1E4E8">h</span><span style="color:#9ECBFF">.</span><span style="color:#B392F0">slice</span><span style="color:#9ECBFF">(</span><span style="color:#79B8FF">8</span><span style="color:#9ECBFF">,</span><span style="color:#79B8FF">12</span><span style="color:#9ECBFF">)</span><span style="color:#9ECBFF">}-${</span><span style="color:#E1E4E8">h</span><span style="color:#9ECBFF">.</span><span style="color:#B392F0">slice</span><span style="color:#9ECBFF">(</span><span style="color:#79B8FF">12</span><span style="color:#9ECBFF">,</span><span style="color:#79B8FF">16</span><span style="color:#9ECBFF">)</span><span style="color:#9ECBFF">}-${</span><span style="color:#E1E4E8">h</span><span style="color:#9ECBFF">.</span><span style="color:#B392F0">slice</span><span style="color:#9ECBFF">(</span><span style="color:#79B8FF">16</span><span style="color:#9ECBFF">,</span><span style="color:#79B8FF">20</span><span style="color:#9ECBFF">)</span><span style="color:#9ECBFF">}-${</span><span style="color:#E1E4E8">h</span><span style="color:#9ECBFF">.</span><span style="color:#B392F0">slice</span><span style="color:#9ECBFF">(</span><span style="color:#79B8FF">20</span><span style="color:#9ECBFF">,</span><span style="color:#79B8FF">32</span><span style="color:#9ECBFF">)</span><span style="color:#9ECBFF">}`</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>Deriving from <code>node:crypto</code> SHA-1 keeps team mode dependency-free — no <code>uuid</code> package pulled in for one function. The handler was extracted into an exported <code>capture()</code> alongside <code>deriveCandidateId</code>, <code>outboxDir</code>, and <code>drainOutbox</code>, so the whole path is unit-testable instead of buried in a request handler.</p>
+<p>The server half is the guard behind the id. <code>CandidateService.intake</code> now calls <code>findByContentHashAndTenant(contentHash, tenantId)</code> before it inserts. On a hit it returns the existing candidate and skips writing a second <code>proposed</code> receipt, instead of inserting a duplicate row. The id and the server’s content hash are two layers, not one key: the UUIDv5 guarantees a <em>retry</em> re-sends the byte-identical row, while the tenant-scoped content-hash lookup is the server’s own backstop, collapsing same-content proposals within a tenant even if two ids ever diverged. The id dedups retries; the hash dedups content.</p>
+<p>Why not reuse the repo’s existing <code>findByContentHash</code>? Because that one is cross-tenant — <code>WHERE content_hash = ? LIMIT 1</code>, no tenant clause. Dedup against it and tenant A’s re-send matches tenant B’s identical row, leaking cross-tenant state and deduping to the wrong record. The new lookup is tenant-scoped on purpose. The behavior change is intended and narrow: a same-content re-send <strong>within</strong> a tenant returns the existing candidate (201); identical content across two tenants stays two independent rows. The old test that asserted “POST accepts duplicate candidates” was rewritten to assert the new idempotent contract. store 224 and api 323 tests pass.</p>
+<h2 id="property-2--a-durable-outbox">Property 2 — A durable outbox</h2>
+<p>A network blip must not silently lose the write. Team mode had no spool fallback. Local mode already wrote to a spool via <code>writeToSpool</code>; team mode, under an unattended hook, would throw on a dropped connection and the capture would evaporate. That was the one true “captures lost” blocker — a hard prerequisite for turning the hook on.</p>
+<p>Now a <code>fetch</code> throw or a 5xx queues the candidate to a flat <code>~/.teamkb-outbox/</code> directory (mode 700, override with <code>TEAMKB_OUTBOX_DIR</code>) and reports <code>queued</code> rather than an error. The next successful capture drains the backlog:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="ts"><code><span class="line"><span style="color:#F97583">async</span><span style="color:#F97583"> function</span><span style="color:#B392F0"> capture</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">candidate</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#F97583">  try</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">    const</span><span style="color:#79B8FF"> res</span><span style="color:#F97583"> =</span><span style="color:#F97583"> await</span><span style="color:#B392F0"> postCandidate</span><span style="color:#E1E4E8">(candidate);</span></span>
+<span class="line"><span style="color:#F97583">    if</span><span style="color:#E1E4E8"> (res.status </span><span style="color:#F97583">>=</span><span style="color:#79B8FF"> 500</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">return</span><span style="color:#B392F0"> queue</span><span style="color:#E1E4E8">(candidate, </span><span style="color:#9ECBFF">"server-5xx"</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#F97583">    if</span><span style="color:#E1E4E8"> (</span><span style="color:#F97583">!</span><span style="color:#E1E4E8">res.ok) </span><span style="color:#F97583">throw</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> HttpError</span><span style="color:#E1E4E8">(res.status);   </span><span style="color:#6A737D">// 4xx: real rejection, surface it</span></span>
+<span class="line"><span style="color:#F97583">    await</span><span style="color:#B392F0"> drainOutbox</span><span style="color:#E1E4E8">();                             </span><span style="color:#6A737D">// success → flush the backlog</span></span>
+<span class="line"><span style="color:#F97583">    return</span><span style="color:#E1E4E8"> res.</span><span style="color:#B392F0">json</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#E1E4E8">  } </span><span style="color:#F97583">catch</span><span style="color:#E1E4E8"> (err) {</span></span>
+<span class="line"><span style="color:#F97583">    if</span><span style="color:#E1E4E8"> (err </span><span style="color:#F97583">instanceof</span><span style="color:#B392F0"> HttpError</span><span style="color:#F97583"> &#x26;&#x26;</span><span style="color:#E1E4E8"> err.status </span><span style="color:#F97583">&#x3C;</span><span style="color:#79B8FF"> 500</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">throw</span><span style="color:#E1E4E8"> err; </span><span style="color:#6A737D">// never queue a 4xx</span></span>
+<span class="line"><span style="color:#F97583">    return</span><span style="color:#B392F0"> queue</span><span style="color:#E1E4E8">(candidate, </span><span style="color:#9ECBFF">"network"</span><span style="color:#E1E4E8">);             </span><span style="color:#6A737D">// throw / 5xx → durable spool</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>The direction of the split is the whole design. A 5xx or a thrown socket is transient — keep it and retry. A 4xx is a real validation, auth, or disclosure rejection — queuing it would loop forever against a request that will never be accepted, so it is surfaced immediately. Drop-on-4xx, keep-on-5xx. A permanently-invalid item can never wedge the outbox, and a transient outage never loses a capture.</p>
+<p>The two properties compose because of the id. Since the queued row carries its UUIDv5, the drain re-sends the <em>exact same</em> row — same id — and Property 1’s server guard collapses it back to one candidate. The outbox can retry as aggressively as it likes and never manufactures a near-duplicate. Six new tests in <code>remote-server.test.ts</code> pin it down: id determinism and format, same-id-on-retry, outbox-on-throw, queue-on-5xx-not-4xx, drain-on-next-success, drain-stops-while-down. Full suite: 69 pass.</p>
+<h2 id="property-3--per-actor-backpressure">Property 3 — Per-actor backpressure</h2>
+<p>One runaway identity must not flood the queue. A new capture-quota middleware — an <code>onRequest</code> hook registered after auth on the intake path — caps how many candidates a single token identity (<code>request.actor</code>) may POST to <code>/api/candidates</code> per window. Default 60 per 60s, tunable via <code>captureQuotaMax</code> and <code>captureQuotaWindowMs</code>. Intake only; promote and reject stay admin-gated and uncapped; reads are untouched.</p>
+<p>The obvious answer is “there’s already a rate limiter, use that.” The existing limiter is per-source-IP, and on a tailnet that is worthless. Every teammate device is its own <code>100.x</code> address, so a per-IP cap gives every token effectively its own private quota — there was no real per-token limit at all. One compromised token, one runaway loop, or one over-eager auto-capture hook could bury the inbox, and the only tripwire was a DB-size canary that doesn’t warn until 200 rows.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="ts"><code><span class="line"><span style="color:#E1E4E8">app.</span><span style="color:#B392F0">addHook</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"onRequest"</span><span style="color:#E1E4E8">, </span><span style="color:#F97583">async</span><span style="color:#E1E4E8"> (</span><span style="color:#FFAB70">req</span><span style="color:#E1E4E8">, </span><span style="color:#FFAB70">reply</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">  if</span><span style="color:#E1E4E8"> (req.method </span><span style="color:#F97583">!==</span><span style="color:#9ECBFF"> "POST"</span><span style="color:#F97583"> ||</span><span style="color:#E1E4E8"> req.url </span><span style="color:#F97583">!==</span><span style="color:#9ECBFF"> "/api/candidates"</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">return</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> key</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> req.actor;                         </span><span style="color:#6A737D">// follows the TOKEN, not the IP</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> now</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> Date.</span><span style="color:#B392F0">now</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> bucket</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> quota.</span><span style="color:#B392F0">get</span><span style="color:#E1E4E8">(key)?.</span><span style="color:#B392F0">filter</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">t</span><span style="color:#F97583"> =></span><span style="color:#E1E4E8"> now </span><span style="color:#F97583">-</span><span style="color:#E1E4E8"> t </span><span style="color:#F97583">&#x3C;</span><span style="color:#E1E4E8"> windowMs) </span><span style="color:#F97583">??</span><span style="color:#E1E4E8"> [];</span></span>
+<span class="line"><span style="color:#F97583">  if</span><span style="color:#E1E4E8"> (bucket.</span><span style="color:#79B8FF">length</span><span style="color:#F97583"> >=</span><span style="color:#E1E4E8"> max) </span><span style="color:#F97583">return</span><span style="color:#E1E4E8"> reply.</span><span style="color:#B392F0">code</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">429</span><span style="color:#E1E4E8">).</span><span style="color:#B392F0">send</span><span style="color:#E1E4E8">({ error: </span><span style="color:#9ECBFF">"capture quota"</span><span style="color:#E1E4E8"> });</span></span>
+<span class="line"><span style="color:#E1E4E8">  bucket.</span><span style="color:#B392F0">push</span><span style="color:#E1E4E8">(now);</span></span>
+<span class="line"><span style="color:#E1E4E8">  quota.</span><span style="color:#B392F0">set</span><span style="color:#E1E4E8">(key, bucket);</span></span>
+<span class="line"><span style="color:#E1E4E8">});</span></span></code></pre>
+<p>Making the limit follow the token instead of the network address is the fix. The test proves the (N+1)th intake gets a 429 while reads and other paths never touch the counter.</p>
+<h2 id="property-4--atomic-governance-receipts">Property 4 — Atomic governance receipts</h2>
+<p>A state flip and its audit record must commit together or not at all. The nightly auto-govern sweep writes a single batch <code>governed</code> receipt covering the candidates it processes. Some of those flips — <code>quarantine</code> and <code>duplicate</code> — have no individual receipt; the batch event is the <em>only</em> on-chain record they exist. And they were autocommitting inside the loop, while the batch receipt got inserted afterward in a try/catch that logged to stderr on failure.</p>
+<p>Walk that failure through. The loop flips a candidate to <code>quarantine</code> and commits. The batch receipt insert throws. The catch logs a line to stderr. Now the candidate is out of the inbox with no on-chain record of why it left. That is chain-invisible governance — silent drift, discoverable only by noticing something is missing.</p>
+<p>The fix defers the receipt-less flips and applies them in one non-swallowing transaction with the receipt insert:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="ts"><code><span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> deferred</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> [];</span></span>
+<span class="line"><span style="color:#F97583">for</span><span style="color:#E1E4E8"> (</span><span style="color:#F97583">const</span><span style="color:#79B8FF"> c</span><span style="color:#F97583"> of</span><span style="color:#E1E4E8"> batch) {</span></span>
+<span class="line"><span style="color:#F97583">  if</span><span style="color:#E1E4E8"> (c.decision </span><span style="color:#F97583">===</span><span style="color:#9ECBFF"> "promoted"</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#B392F0">    applyPromotion</span><span style="color:#E1E4E8">(c);            </span><span style="color:#6A737D">// already carries its own transactional receipt + memory</span></span>
+<span class="line"><span style="color:#E1E4E8">  } </span><span style="color:#F97583">else</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">    deferred.</span><span style="color:#B392F0">push</span><span style="color:#E1E4E8">(c);             </span><span style="color:#6A737D">// quarantine / duplicate — no individual receipt</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"><span style="color:#E1E4E8">db.</span><span style="color:#B392F0">transaction</span><span style="color:#E1E4E8">(() </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#B392F0">  insertGovernedReceipt</span><span style="color:#E1E4E8">(batchEvent);          </span><span style="color:#6A737D">// the ONLY record of the deferred flips</span></span>
+<span class="line"><span style="color:#F97583">  for</span><span style="color:#E1E4E8"> (</span><span style="color:#F97583">const</span><span style="color:#79B8FF"> c</span><span style="color:#F97583"> of</span><span style="color:#E1E4E8"> deferred) </span><span style="color:#B392F0">applyFlip</span><span style="color:#E1E4E8">(c);      </span><span style="color:#6A737D">// commit them WITH the receipt</span></span>
+<span class="line"><span style="color:#E1E4E8">})();                                          </span><span style="color:#6A737D">// throws → everything rolls back, error propagates</span></span></code></pre>
+<p><code>promoted</code> stays in-loop deliberately, because a promoted row already writes its own transactional <code>promoted</code> receipt and curated memory — it is never chain-invisible. On a receipt failure the quarantine and duplicate flips roll back, those candidates stay <code>inbox</code> and get retried idempotently on the next run, the promoted rows persist with their receipts, and the error propagates so <code>runGovern</code> surfaces it and the nightly wrapper’s fail-loud path alerts. Atomic rollback over best-effort retry: a governance action you can’t record is a governance action you don’t take.</p>
+<h2 id="property-5--consent-gated-opt-in">Property 5 — Consent-gated opt-in</h2>
+<p>Four properties made the write path safe. The fifth governs the switch, and it is the one thing you cannot automate.</p>
+<p>The hook (<code>hooks/session-end-capture.mjs</code>) is the automatic twin of manual <code>/brain-save</code>. It carries three hard guards, and any unmet guard is a silent no-op: an opt-in marker file <code>~/.teamkb/autocapture.enabled</code>, team mode configured, and not a recursive child. It runs the distiller detached — it never blocks or fails the session — and the distiller holds a <strong>member</strong> token, so it can only propose to the inbox, never write durable state.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="js"><code><span class="line"><span style="color:#F97583">if</span><span style="color:#E1E4E8"> (</span><span style="color:#F97583">!</span><span style="color:#E1E4E8">fs.</span><span style="color:#B392F0">existsSync</span><span style="color:#E1E4E8">(</span><span style="color:#B392F0">markerPath</span><span style="color:#E1E4E8">())) </span><span style="color:#F97583">return</span><span style="color:#E1E4E8">;        </span><span style="color:#6A737D">// (a) opt-in marker absent → no-op</span></span>
+<span class="line"><span style="color:#F97583">if</span><span style="color:#E1E4E8"> (</span><span style="color:#F97583">!</span><span style="color:#B392F0">teamModeConfigured</span><span style="color:#E1E4E8">()) </span><span style="color:#F97583">return</span><span style="color:#E1E4E8">;               </span><span style="color:#6A737D">// (b) team mode off → no-op</span></span>
+<span class="line"><span style="color:#F97583">if</span><span style="color:#E1E4E8"> (process.env.</span><span style="color:#79B8FF">TEAMKB_RECURSIVE</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">return</span><span style="color:#E1E4E8">;        </span><span style="color:#6A737D">// (c) recursive child → no-op</span></span>
+<span class="line"><span style="color:#B392F0">spawnDetached</span><span style="color:#E1E4E8">(distiller, { env: </span><span style="color:#B392F0">memberTokenEnv</span><span style="color:#E1E4E8">() }); </span><span style="color:#6A737D">// detached, member-scoped, never blocks</span></span></code></pre>
+<p><strong>Why isn’t this just a <code>plugin.json</code> hooks entry?</strong> Because a <code>plugin.json</code>-declared hook auto-installs the instant the plugin installs. That is exactly the silent push that was forbidden — a teammate updates the plugin and their sessions start shipping distilled learnings to a shared brain they never agreed to feed. The constraint that shaped the design was blunt: <em>“I don’t want them to ship it and be like wtf.”</em> So the hook is deliberately not plugin-declared. Installing the plugin enables nothing.</p>
+<p>The only way to turn it on is a consent-gated enable script (<code>hooks/enable-autocapture.mjs</code>) that prints the full disclosure — what it does, what it does not do, how to pause, how to purge, and why — then requires typing <code>I CONSENT</code>. Only then does it register the hook in the teammate’s own <code>~/.claude/settings.json</code> (backing the file up first) and write the marker. <code>--off</code> pauses, <code>--off --purge</code> deletes local logs, <code>--status</code> shows state.</p>
+<p>Consent is the property you cannot make idempotent or durable. It has to be a deliberate human act, performed once, by the person whose sessions will be read. Even then the hook stays a silent no-op unless all three guards pass — and the distiller it spawns only does real work on a real transcript, so a hook that fires on an empty session burns nothing. A 5/5 hook-guard smoke test pins that whole no-op envelope against a stub <code>claude</code> on PATH, with zero model invocation. Verification across the change: <code>node --check</code> on both scripts, typecheck + lint + build exit 0, and <code>remote-server.test.ts</code>’s 69 tests green — with store 224 / api 323 still clean.</p>
+<h2 id="the-boring-bugs-that-would-have-eaten-the-captures-anyway">The boring bugs that would have eaten the captures anyway</h2>
+<p>Two footguns fixed the same day, both the kind that lose data quietly:</p>
+<ul>
+<li><strong>Default DB path drift.</strong> The API defaulted to <code>~/.teamkb/data/teamkb.db</code> while the plugin and brain used <code>~/.teamkb/teamkb.db</code>. A no-override deploy would write every teammate capture to a database the govern sweep never reads. Aligned the default via <code>resolveTeamKbPath('teamkb.db')</code> — chosen over assert-and-warn, because a warning still loses the capture. The live deploy already overrides <code>TEAMKB_DB_PATH</code>, so it was never hit; the next fresh deploy would have been.</li>
+<li><strong>No-op anchor skip.</strong> <code>appendAnchor</code> now returns the last record unchanged when both the chain head and the row count match the last anchor. A nightly run that changed nothing was still appending to the tamper-evidence log and to git history for zero evidentiary gain. A real new head still anchors — the never-rehash-the-chain rule holds.</li>
+</ul>
+<h2 id="also-shipped">Also shipped</h2>
+<p>The same “make an unattended watcher safe to cron” theme ran through the secondary repos. <strong>agent-governance-plane</strong> got a release-watcher meaningfulness filter (draft and prerelease releases dropped by default, <code>includePrereleases</code> to opt in — the skip runs <em>before</em> tag validation, so a tagless GitHub draft is skipped rather than crashing the watcher), a notify-mode one-way webhook that needs no human in the loop, and a one-command installer plus an extraction-readiness ADR, with three irreversible doors — public flip, npm publish, external reply — kept explicitly human-gated. <strong>intentsolutions-vps-runbook</strong> and <strong>intent-os</strong> got a torn-datadir backup fix: consistent DB dumps plus a restore-verification drill, correcting an over-optimistic single-host restore claim.</p>
+<h2 id="the-pattern-behind-safe-unattended-writes">The pattern behind safe unattended writes</h2>
+<p>A best-effort, fire-and-forget writer is a distributed system wearing a convenience costume. The moment the human leaves the loop, every property the human was silently providing has to be built into the write path: dedup so retries collapse, a spool so blips don’t vanish, a per-actor cap so one identity can’t flood, atomic receipts so governance can’t drift invisibly, and a consent gate so the on-switch stays a human decision. Four of those you can engineer. The fifth you have to refuse to engineer.</p>
+<h2 id="related-posts">Related Posts</h2>
+<ul>
+<li><a href="/blog/adversarial-review-before-team-rollout/">Adversarial Review: The Six Lenses That Halted a Rollout</a> — the governance review that gated this same team-brain rollout.</li>
+<li><a href="/blog/every-safety-gate-has-a-failure-direction/">Every Safety Gate Has a Failure Direction</a> — why drop-on-4xx / keep-on-5xx is a direction choice, not a detail.</li>
+<li><a href="/blog/liveness-without-health-is-theater/">Liveness Without Health Is Theater</a> — the sibling lesson for unattended systems: running is not the same as working.</li>
+</ul>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "Making a Fire-and-Forget Writer Safe Under Failure",
+  "description": "Five properties an unattended capture hook needs before you turn it on: idempotent intake, durable outbox, backpressure, atomic receipts, consent gate.",
+  "author": {
+    "@type": "Person",
+    "name": "Jeremy Longshore"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Start AI Tools"
+  },
+  "datePublished": "2026-07-11T10:00:00-05:00",
+  "dateModified": "2026-07-11T10:00:00-05:00",
+  "url": "https://startaitools.com/posts/making-fire-and-forget-capture-safe-under-failure/",
+  "keywords": ["architecture", "idempotency", "ai-agents", "claude-code", "distributed-systems"],
+  "articleSection": "Technical Deep-Dive"
+}
+</script>
+      </div>
+    </div>
+  </article>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>langchain-langgraph-human-in-loop - Agent Skill</title>
+    <meta name="description" content="Build LangGraph 1.0 human-in-the-loop approval flows with interrupt_before / interrupt_after and Command(resume=...) — JSON-serializable state, clean resume semantics, and UI wiring for approval decisions. Use when adding an approval gate before an expensive tool call, wiring a Slack/web UI for agent approvals, or debugging a graph that crashes on interrupt. Trigger with &quot;langgraph human in loop&quot;, &quot;langgraph interrupt_before&quot;, &quot;langgraph approval flow&quot;, &quot;Command resume&quot;, &quot;langgraph HITL&quot;.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://tonsofskills.com/tons-of-skills-marketplace/skills/langchain-langgraph-human-in-loop/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/langchain-langgraph-human-in-loop/">
+    <meta property="og:title" content="langchain-langgraph-human-in-loop - Agent Skill">
+    <meta property="og:description" content="Build LangGraph 1.0 human-in-the-loop approval flows with interrupt_before / interrupt_after and Command(resume=...) — JSON-serializable state, clean resume semantics, and UI wiring for approval decisions. Use when adding an approval gate before an expensive tool call, wiring a Slack/web UI for agent approvals, or debugging a graph that crashes on interrupt. Trigger with &quot;langgraph human in loop&quot;, &quot;langgraph interrupt_before&quot;, &quot;langgraph approval flow&quot;, &quot;Command resume&quot;, &quot;langgraph HITL&quot;.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="langchain-langgraph-human-in-loop - Agent Skill">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/langchain-langgraph-human-in-loop/">
+    <meta name="twitter:title" content="langchain-langgraph-human-in-loop - Agent Skill">
+    <meta name="twitter:description" content="Build LangGraph 1.0 human-in-the-loop approval flows with interrupt_before / interrupt_after and Command(resume=...) — JSON-serializable state, clean resume semantics, and UI wiring for approval decisions. Use when adding an approval gate before an expensive tool call, wiring a Slack/web UI for agent approvals, or debugging a graph that crashes on interrupt. Trigger with &quot;langgraph human in loop&quot;, &quot;langgraph interrupt_before&quot;, &quot;langgraph approval flow&quot;, &quot;Command resume&quot;, &quot;langgraph HITL&quot;.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"langchain-langgraph-human-in-loop","description":"Build LangGraph 1.0 human-in-the-loop approval flows with interrupt_before / interrupt_after and Command(resume=...) — JSON-serializable state, clean resume semantics, and UI wiring for approval decisions. Use when adding an approval gate before an expensive tool call, wiring a Slack/web UI for agent approvals, or debugging a graph that crashes on interrupt. Trigger with \"langgraph human in loop\", \"langgraph interrupt_before\", \"langgraph approval flow\", \"Command resume\", \"langgraph HITL\".","version":"2.5.0","author":{"@type":"Person","name":"Jeremy Longshore"},"license":"MIT","programmingLanguage":"Claude Code Agent Skill","isPartOf":{"@type":"SoftwareApplication","name":"langchain-py-pack","applicationCategory":"unknown"}}</script>
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.breadcrumbs[data-astro-cid-ilhxcym7]{margin-bottom:var(--space-5)}.breadcrumbs__list[data-astro-cid-ilhxcym7]{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;list-style:none;padding:0;margin:0;font-family:var(--font-mono);font-size:var(--text-sm, .8rem)}.breadcrumbs__item[data-astro-cid-ilhxcym7]{display:flex;align-items:center;gap:.375rem}.breadcrumbs__link[data-astro-cid-ilhxcym7]{color:var(--text-3);text-decoration:none;transition:color var(--duration-fast, .2s) var(--ease-out)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:hover{color:var(--primary)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:0}.breadcrumbs__sep[data-astro-cid-ilhxcym7]{color:var(--text-3);user-select:none;font-size:.7em;line-height:1}.breadcrumbs__current[data-astro-cid-ilhxcym7]{color:var(--text-2)}.detail-cta[data-astro-cid-qcigfm7x]{background:var(--surface-3, var(--brand-light-gray));border-top:1px solid var(--border, var(--brand-light-gray));border-radius:var(--radius-lg);padding:2rem 1.5rem;margin-top:2rem;text-align:center}.detail-cta__headline[data-astro-cid-qcigfm7x]{font-family:var(--font-display);font-weight:700;font-size:1.35rem;color:var(--text, var(--brand-dark));margin-bottom:1.25rem}.detail-cta__actions[data-astro-cid-qcigfm7x]{display:flex;justify-content:center;gap:.75rem;flex-wrap:wrap}.detail-cta__primary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:var(--primary);color:#0a0a0c;border:none;border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;cursor:pointer;transition:background var(--duration-fast) var(--ease-out),transform var(--duration-fast) var(--ease-out)}.detail-cta__primary[data-astro-cid-qcigfm7x]:hover{background:var(--primary-dark, var(--primary-dark));transform:translateY(-1px)}.detail-cta__primary[data-astro-cid-qcigfm7x].copied{background:var(--positive, var(--brand-green))}.detail-cta__secondary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:transparent;color:var(--text, var(--brand-dark));border:1px solid var(--border, var(--brand-mid-gray));border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;text-decoration:none;transition:border-color var(--duration-fast) var(--ease-out),color var(--duration-fast) var(--ease-out)}.detail-cta__secondary[data-astro-cid-qcigfm7x]:hover{border-color:var(--primary);color:var(--primary)}@media(max-width:480px){.detail-cta__actions[data-astro-cid-qcigfm7x]{flex-direction:column;align-items:stretch}.detail-cta__primary[data-astro-cid-qcigfm7x],.detail-cta__secondary[data-astro-cid-qcigfm7x]{justify-content:center}}
+</style>
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/_slug_@_@astro.wF9emvVq.css"></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  
+  
+
+  <div class="skill-detail" data-astro-cid-jrlgpo3w>
+    <!-- 1. Breadcrumbs -->
+    <nav aria-label="Breadcrumb" class="breadcrumbs" data-astro-cid-ilhxcym7>
+  <ol class="breadcrumbs__list" itemscope itemtype="https://schema.org/BreadcrumbList" data-astro-cid-ilhxcym7>
+    <li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Home</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="1">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/skills/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Skills</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="2">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          <span class="breadcrumbs__current" aria-current="page" itemprop="name" data-astro-cid-ilhxcym7>
+              langchain-langgraph-human-in-loop
+            </span>
+          <meta itemprop="position" content="3">
+        </li>
+  </ol>
+</nav>
+
+    <!-- 2. Header (enhanced) -->
+    <header class="skill-header" data-astro-cid-jrlgpo3w>
+      <h1 data-astro-cid-jrlgpo3w>langchain-langgraph-human-in-loop</h1>
+      <p class="skill-description" data-astro-cid-jrlgpo3w>Build LangGraph 1.0 human-in-the-loop approval flows with interrupt_before / interrupt_after and Command(resume=...) — JSON-serializable state, clean resume semantics, and UI wiring for approval decisions. Use when adding an approval gate before an expensive tool call, wiring a Slack/web UI for agent approvals, or debugging a graph that crashes on interrupt. Trigger with &quot;langgraph human in loop&quot;, &quot;langgraph interrupt_before&quot;, &quot;langgraph approval flow&quot;, &quot;Command resume&quot;, &quot;langgraph HITL&quot;.</p>
+
+      <div class="skill-metadata" data-astro-cid-jrlgpo3w>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>v2.5.0</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>Jeremy Longshore</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>MIT</span>
+        </div>
+      </div>
+
+      
+    </header>
+
+    <!-- 4. Allowed Tools -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Allowed Tools</h2>
+      <div class="tools-grid" data-astro-cid-jrlgpo3w>
+        <span class="tool-badge" data-astro-cid-jrlgpo3w>Read</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Write</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Edit</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(python:*)</span>
+      </div>
+      
+    </section>
+
+    <!-- 5. Provided by Plugin -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Provided by Plugin</h2>
+      <div class="plugin-info" data-astro-cid-jrlgpo3w>
+        <div class="plugin-details" data-astro-cid-jrlgpo3w>
+          <h3 data-astro-cid-jrlgpo3w>
+            <a href="/plugins/langchain-py-pack/" data-astro-cid-jrlgpo3w>langchain-py-pack</a>
+          </h3>
+          <p data-astro-cid-jrlgpo3w>Claude Code skill pack for LangChain 1.0 + LangGraph 1.0 (Python) - 34 skills covering chains, agents, RAG, middleware, checkpointing, HITL, streaming, and production patterns</p>
+          <div class="plugin-meta" data-astro-cid-jrlgpo3w>
+            <span data-astro-cid-jrlgpo3w>unknown</span>
+            <span data-astro-cid-jrlgpo3w>v2.5.0</span>
+          </div>
+        </div>
+        <a href="/plugins/langchain-py-pack/" class="btn-primary" data-astro-cid-jrlgpo3w>View Plugin</a>
+      </div>
+    </section>
+
+    <!-- 6. Installation -->
+    <section class="section-box dark" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Installation</h2>
+      <p class="install-note" style="color: var(--brand-light-gray); margin-bottom: 0.75rem;" data-astro-cid-jrlgpo3w>This skill is included in the langchain-py-pack plugin:</p>
+      <pre class="install-command" data-copy="/plugin install langchain-py-pack@claude-code-plugins-plus" data-astro-cid-jrlgpo3w><code data-astro-cid-jrlgpo3w>/plugin install langchain-py-pack@claude-code-plugins-plus</code></pre>
+      <p class="install-note" data-astro-cid-jrlgpo3w>Click to copy</p>
+    </section>
+
+    <!-- 7. Skill Content (Markdown) -->
+    <section class="skill-content-section" data-astro-cid-jrlgpo3w>
+      <h2 data-astro-cid-jrlgpo3w>Instructions</h2>
+      <div class="skill-content" data-astro-cid-jrlgpo3w>
+        <div data-astro-cid-jrlgpo3w><h1>LangChain LangGraph Human-in-the-Loop (Python)</h1>
+<h2>Overview</h2>
+<p>A team adds <code>interrupt_before=[&quot;send_email&quot;]</code> to require a human approval before the email goes out. First integration test crashes at the interrupt boundary with:</p>
+<pre><code>
+TypeError: Object of type datetime is not JSON serializable
+</code></pre>
+<p>The culprit is two nodes upstream: a <code>classify</code> node stashed <code>&quot;received_at&quot;: datetime.utcnow()</code> into state. Every node-level unit test passed because node completion does not serialize state — only the checkpointer does, and only at supersteps that include an interrupt. The failure is invisible until interrupt time (P17).</p>
+<p>A week later the resume path ships. The human reviews the draft, clicks &quot;approve with edits,&quot; and the backend runs:</p>
+<pre data-lang="python"><code>
+graph.invoke(Command(update={&quot;messages&quot;: [corrected_msg]}, resume=&quot;approved&quot;), config)
+</code></pre>
+<p>The prior 47 messages vanish. <code>messages</code> was typed as plain <code>list[AnyMessage]</code> with no reducer, so <code>update</code> replaces the field instead of appending (P18).</p>
+<p>This skill covers: three interrupt styles (<code>interrupt_before</code>, <code>interrupt_after</code>, inline <code>interrupt()</code>), the JSON-only state invariant with a pre-interrupt scanner, the <code>Command(resume=...)</code> / <code>Command(update=..., resume=...)</code> contract, an approval UI wire format (GET pending / POST decision with optimistic concurrency), safe-cancellation routing to <code>END</code>, and the tradeoff between native interrupts and a separate approval service. Pin: <code>langgraph 1.0.x</code>, <code>langgraph-checkpoint 2.0.x</code>. Pain-catalog anchors: <strong>P17</strong>, <strong>P18</strong> (adjacent: P16, P20).</p>
+<h2>Prerequisites</h2>
+<ul>
+<li>Python 3.10+</li>
+<li><code>langgraph &gt;= 1.0, &lt; 2.0</code></li>
+<li>A checkpointer: <code>MemorySaver</code> (dev), <code>PostgresSaver</code> (prod), or <code>SqliteSaver</code> (single-box)</li>
+<li>A <code>thread_id</code> contract at the app boundary (see <code>langchain-langgraph-checkpointing</code>)</li>
+<li>Familiarity with <code>langchain-langgraph-basics</code> — nodes, edges, <code>TypedDict</code> state with reducers</li>
+</ul>
+<h2>Instructions</h2>
+<h3>Step 1 — Choose the interrupt style</h3>
+<p>LangGraph 1.0 exposes three interrupt mechanisms. They are not interchangeable.</p>
+<table><thead><tr>
+<th>Style</th>
+<th>Syntax</th>
+<th>Use when</th>
+</tr></thead><tbody>
+<tr>
+<td><code>interrupt_before=[node]</code></td>
+<td><code>compile(interrupt_before=[&quot;send_email&quot;])</code></td>
+<td>Review inputs before an irreversible tool. Graph pauses <em>before</em> node runs. State shown is the input.</td>
+</tr>
+<tr>
+<td><code>interrupt_after=[node]</code></td>
+<td><code>compile(interrupt_after=[&quot;draft_email&quot;])</code></td>
+<td>Review output of a node (e.g., an LLM draft). Graph pauses <em>after</em> node completes.</td>
+</tr>
+<tr>
+<td>Inline <code>interrupt()</code></td>
+<td>Inside a node: <code>decision = interrupt({&quot;kind&quot;: &quot;...&quot;})</code></td>
+<td>Structured prompt mid-node with custom payload. Most flexible; lives in node code.</td>
+</tr>
+</tbody></table>
+<p>Rule of thumb: prefer <code>interrupt_before</code> for hard gates (tool must not run without approval). Use <code>interrupt_after</code> for review loops (draft → approve → send). Use inline <code>interrupt()</code> when the prompt varies on intermediate computation.</p>
+<p>Typical interrupt round-trip latency in production is <strong>50-300 ms</strong> from pause to checkpoint write (local Postgres) plus UI time; budget <strong>1-5 s</strong> total for a Slack-based approval. Checkpoint row sizes average <strong>2-20 KB</strong> on small graphs and cap at <strong>~1 MB</strong> on <code>PostgresSaver</code> before historical checkpoints need pruning.</p>
+<p>See <a href="references/interrupt-decision-tree.md">Interrupt Decision Tree</a> for full criteria, multiple-interrupt-per-graph patterns, and the interrupt-vs-tool comparison.</p>
+<h3>Step 2 — Enforce the JSON-serializable state invariant (P17)</h3>
+<p>Checkpointers serialize state to JSON on every superstep. Any non-JSON type raises <code>TypeError</code> at the interrupt boundary — not at the offending node. Canonical offenders:</p>
+<table><thead><tr>
+<th>Type</th>
+<th>Fix</th>
+</tr></thead><tbody>
+<tr>
+<td><code>datetime</code> / <code>date</code></td>
+<td><code>dt.isoformat()</code> — ISO 8601 string</td>
+</tr>
+<tr>
+<td><code>bytes</code></td>
+<td><code>base64.b64encode(b).decode()</code></td>
+</tr>
+<tr>
+<td><code>set</code></td>
+<td><code>sorted(s)</code></td>
+</tr>
+<tr>
+<td>Pydantic <code>BaseModel</code> with non-primitive fields</td>
+<td><code>.model_dump(mode=&quot;json&quot;)</code></td>
+</tr>
+<tr>
+<td>Custom classes</td>
+<td><code>dataclasses.asdict(obj)</code> or <code>vars(obj)</code></td>
+</tr>
+<tr>
+<td><code>numpy.ndarray</code></td>
+<td><code>.tolist()</code></td>
+</tr>
+<tr>
+<td><code>decimal.Decimal</code></td>
+<td><code>str(d)</code> or <code>float(d)</code> (lossy)</td>
+</tr>
+<tr>
+<td><code>float(&quot;nan&quot;)</code> / <code>float(&quot;inf&quot;)</code></td>
+<td><code>None</code> (JSON forbids them; some savers crash on <code>allow_nan=False</code>)</td>
+</tr>
+</tbody></table>
+<p>Ship a pre-interrupt scanner in dev and CI:</p>
+<pre data-lang="python"><code>
+import json
+from typing import Any
+
+class NonSerializableStateError(TypeError):
+    &quot;&quot;&quot;Raised when state contains values the checkpointer cannot serialize.&quot;&quot;&quot;
+
+def assert_state_is_json_serializable(state: dict[str, Any], *, path: str = &quot;state&quot;) -&gt; None:
+    &quot;&quot;&quot;Walk state depth-first and raise a typed error naming the offending key path.&quot;&quot;&quot;
+    _walk(state, path)
+
+def _walk(v: Any, path: str) -&gt; None:
+    if v is None or isinstance(v, (bool, int, float, str)):
+        return
+    if isinstance(v, list):
+        for i, item in enumerate(v):
+            _walk(item, f&quot;{path}[{i}]&quot;)
+        return
+    if isinstance(v, dict):
+        for k, val in v.items():
+            _walk(val, f&quot;{path}.{k}&quot;)
+        return
+    raise NonSerializableStateError(
+        f&quot;{path} is {type(v).__name__}, not JSON-serializable. &quot;
+        f&quot;Convert at node boundary.&quot;
+    )
+</code></pre>
+<p>Call <code>assert_state_is_json_serializable(state)</code> at the end of every node preceding an interrupt-flagged node, or attach as LangGraph middleware. In CI, run the full graph to interrupt against a fixture that exercises every branch — the only way to catch P17 before prod.</p>
+<p>See <a href="references/state-serialization-for-interrupts.md">State Serialization for Interrupts</a> for the full forbidden-types list, the Pydantic-in-state pattern, and the integration-test harness.</p>
+<h3>Step 3 — The resume contract</h3>
+<p>Two shapes. They are not equivalent.</p>
+<pre data-lang="python"><code>
+from langgraph.types import Command
+
+# Shape A — resume only: human approved as-is
+graph.invoke(Command(resume=&quot;approved&quot;), config)
+
+# Shape B — update + resume: human edited state mid-graph
+graph.invoke(
+    Command(update={&quot;recipient&quot;: &quot;new@example.com&quot;}, resume=&quot;approved&quot;),
+    config,
+)
+</code></pre>
+<p><code>resume=&quot;...&quot;</code> is the value returned from inline <code>interrupt()</code> inside the node (if any). For <code>interrupt_before</code> / <code>interrupt_after</code>, no node reads <code>resume</code>, but the checkpoint records it for audit.</p>
+<p><code>update={...}</code> merges into state via the reducer declared in the <code>TypedDict</code>. <strong>Without a reducer, <code>update</code> replaces the field</strong> (P18). Always annotate list and dict state:</p>
+<pre data-lang="python"><code>
+from typing import Annotated, TypedDict
+from langchain_core.messages import AnyMessage
+from langgraph.graph.message import add_messages
+
+class AgentState(TypedDict):
+    messages: Annotated[list[AnyMessage], add_messages]      # append, not replace
+    approvals: Annotated[list[dict], lambda l, r: l + r]     # custom append reducer
+    draft: Annotated[dict, lambda l, r: {**l, **r}]          # dict merge reducer
+    last_decision: str                                        # scalar: replace is fine
+</code></pre>
+<p>See <a href="references/resume-patterns.md">Resume Patterns</a> for the five canonical resume shapes (plain approve, approve with edits, reject to <code>END</code>, partial approval, inline-interrupt structured return), the reducer cookbook, and the audit-log write order.</p>
+<h3>Step 4 — Wire the approval UI</h3>
+<p>Two HTTP endpoints. Keep them boring.</p>
+<p><strong>GET <code>/approvals/pending</code></strong> lists paused threads:</p>
+<pre data-lang="json"><code>
+[
+  {
+    &quot;thread_id&quot;: &quot;conv-abc123&quot;,
+    &quot;checkpoint_id&quot;: &quot;01JABC...&quot;,
+    &quot;interrupted_at&quot;: &quot;2026-04-21T15:32:11Z&quot;,
+    &quot;node&quot;: &quot;send_email&quot;,
+    &quot;state_diff&quot;: {&quot;draft&quot;: {&quot;to&quot;: &quot;user@example.com&quot;, &quot;subject&quot;: &quot;Welcome&quot;}}
+  }
+]
+</code></pre>
+<p><strong>POST <code>/approvals/&lt;thread-id&gt;/decision</code></strong> applies the decision:</p>
+<pre data-lang="json"><code>
+{
+  &quot;decision&quot;: &quot;approve&quot; | &quot;reject&quot; | &quot;edit&quot;,
+  &quot;edits&quot;: {&quot;recipient&quot;: &quot;corrected@example.com&quot;},
+  &quot;approver&quot;: &quot;jeremy@intentsolutions.io&quot;,
+  &quot;reason&quot;: &quot;Verified against ticket INT-4821&quot;,
+  &quot;expected_checkpoint_id&quot;: &quot;01JABC...&quot;,
+  &quot;idempotency_key&quot;: &quot;c2f5e8a0-...&quot;
+}
+</code></pre>
+<p>Optimistic concurrency (the <code>expected_checkpoint_id</code> check) matters the moment two approvers open the same thread in two browser tabs. Without it, the second click silently overwrites the first. Return <code>409 Conflict</code> on mismatch; UI refreshes.</p>
+<p>Server-side flow: authz → idempotency dedupe → checkpoint check → audit-log write (BEFORE mutation) → build <code>Command</code> → <code>graph.ainvoke(cmd, config)</code> → audit-log finalize.</p>
+<p>See <a href="references/approval-ui-wiring.md">Approval UI Wiring</a> for the full HTTP contract with status codes, FastAPI implementation, Slack Block Kit mapping, state-diff redaction, and an audit-log schema compatible with SOC2 evidence requirements.</p>
+<h3>Step 5 — Safe cancellation: route to <code>END</code> on reject</h3>
+<p>When the human rejects, the gated node must NOT execute. Two clean patterns:</p>
+<p><strong>Pattern A — conditional edge after the interrupted node (preferred):</strong></p>
+<pre data-lang="python"><code>
+from langgraph.graph import END
+
+def route_after_approval(state: AgentState) -&gt; str:
+    if state.get(&quot;last_decision&quot;) == &quot;rejected&quot;:
+        return END
+    return &quot;send_email&quot;
+
+builder.add_conditional_edges(&quot;await_approval&quot;, route_after_approval, {
+    &quot;send_email&quot;: &quot;send_email&quot;,
+    END: END,
+})
+</code></pre>
+<p><strong>Pattern B — <code>Command(goto=END)</code> at resume:</strong></p>
+<pre data-lang="python"><code>
+graph.invoke(Command(resume=&quot;rejected&quot;, goto=END), config)
+</code></pre>
+<p>Prefer Pattern A in production: graph topology stays the source of truth, audit replays work without the UI. Always log the rejection to the checkpoint via <code>Command(update={&quot;last_decision&quot;: &quot;rejected&quot;, &quot;reject_reason&quot;: ...})</code> BEFORE routing to END — otherwise the audit trail lives only in the UI DB.</p>
+<h3>Step 6 — Native interrupts vs a separate approval service</h3>
+<table><thead><tr>
+<th>Dimension</th>
+<th>LangGraph interrupts</th>
+<th>Separate approval service</th>
+</tr></thead><tbody>
+<tr>
+<td><strong>Latency</strong></td>
+<td>50-300 ms pause + human time</td>
+<td>Human time + queue latency</td>
+</tr>
+<tr>
+<td><strong>State coherence</strong></td>
+<td>Single source of truth (checkpoint)</td>
+<td>Two systems to reconcile</td>
+</tr>
+<tr>
+<td><strong>Concurrency</strong></td>
+<td>Checkpoint-based optimistic locking</td>
+<td>Whatever the queue provides</td>
+</tr>
+<tr>
+<td><strong>Multi-graph</strong></td>
+<td>Per-graph, per-thread</td>
+<td>Centralized policy engine</td>
+</tr>
+<tr>
+<td><strong>Observability</strong></td>
+<td><code>get_state()</code> + checkpoint history</td>
+<td>Separate audit system</td>
+</tr>
+<tr>
+<td><strong>Failure mode</strong></td>
+<td>JSON-serialization at interrupt (P17)</td>
+<td>Network partition between services</td>
+</tr>
+<tr>
+<td><strong>Best for</strong></td>
+<td>Single LangGraph app, 1-10 approval types, &lt;1k/day</td>
+<td>Multi-app enterprise, complex RBAC, 10k+/day</td>
+</tr>
+</tbody></table>
+<p>Single LangGraph app with fewer than a dozen approval types: native interrupts are simpler and more reliable. Cross-app approval platform with escalations, delegations, and SLAs: run a dedicated service and call it from a tool, not from an interrupt.</p>
+<h2>Output</h2>
+<ul>
+<li>Graph compiled with explicit <code>interrupt_before</code> / <code>interrupt_after</code> lists, or inline <code>interrupt()</code> calls where payload structure matters</li>
+<li>JSON-only state: <code>datetime</code> → ISO strings, <code>bytes</code> → base64, Pydantic → <code>.model_dump(mode=&quot;json&quot;)</code>, custom classes → dicts</li>
+<li><code>TypedDict</code> state with explicit reducers on every list and dict field</li>
+<li>Pre-interrupt state scanner attached as middleware or called at node exits; raises <code>NonSerializableStateError</code> with a key path</li>
+<li>Approval HTTP endpoints: GET pending with state diffs, POST decision with <code>expected_checkpoint_id</code> optimistic-concurrency check and <code>idempotency_key</code> dedupe</li>
+<li>Rejection routes to <code>END</code> via conditional edge (Pattern A) with <code>last_decision</code> recorded in state for audit</li>
+<li>Audit log written BEFORE state mutation with <code>approver</code>, <code>reason</code>, <code>thread_id</code>, <code>checkpoint_id_before</code>, <code>checkpoint_id_after</code></li>
+</ul>
+<h2>Error Handling</h2>
+<table><thead><tr>
+<th>Error</th>
+<th>Cause</th>
+<th>Fix</th>
+</tr></thead><tbody>
+<tr>
+<td><code>TypeError: Object of type datetime is not JSON serializable</code> at interrupt</td>
+<td>Non-JSON value in state (P17)</td>
+<td>Convert at node boundary; add pre-interrupt scanner in CI</td>
+</tr>
+<tr>
+<td>Resume with <code>Command(update={&quot;messages&quot;: [new]})</code> loses history</td>
+<td><code>messages</code> field missing reducer (P18)</td>
+<td>Annotate as <code>Annotated[list[AnyMessage], add_messages]</code></td>
+</tr>
+<tr>
+<td><code>ValueError: Thread ... has no interrupted nodes</code> on resume</td>
+<td>Graph already ran to completion, or <code>thread_id</code> mismatch</td>
+<td>Call <code>graph.get_state(config)</code> first; assert <code>snapshot.next</code> is non-empty</td>
+</tr>
+<tr>
+<td>Human clicks approve, nothing happens</td>
+<td>Missing checkpointer on <code>compile()</code> — interrupts require persistence</td>
+<td><code>graph.compile(checkpointer=MemorySaver() or PostgresSaver(...))</code></td>
+</tr>
+<tr>
+<td>Two approvers both click approve, second one&#39;s edits win silently</td>
+<td>No optimistic concurrency</td>
+<td>Include <code>expected_checkpoint_id</code> in POST body; return 409 on mismatch</td>
+</tr>
+<tr>
+<td><code>KeyError: &#39;configurable&#39;</code> at resume</td>
+<td><code>config</code> dict missing <code>thread_id</code></td>
+<td><code>config = {&quot;configurable&quot;: {&quot;thread_id&quot;: tid}}</code> — required by every checkpointer</td>
+</tr>
+<tr>
+<td>Approval UI shows stale state after another approver acted</td>
+<td>Cached GET /pending response</td>
+<td><code>Cache-Control: no-store</code> on the pending endpoint</td>
+</tr>
+<tr>
+<td>Graph halts silently after reject</td>
+<td>Conditional edge router returned value not in <code>path_map</code></td>
+<td>Include <code>END</code> in <code>path_map</code>; assert router output in keyset</td>
+</tr>
+</tbody></table>
+<h2>Examples</h2>
+<h3>Approval gate before an expensive tool</h3>
+<p>Email-sending agent that must not send without approval. State carries <code>draft: {to, subject, body}</code>, graph compiles with <code>interrupt_before=[&quot;send_email&quot;]</code>, resume either invokes the send tool or routes to <code>END</code> on reject. See <a href="references/resume-patterns.md">Resume Patterns</a> for the full worked example including audit-log write order.</p>
+<h3>Partial approval — approve one argument, edit another</h3>
+<p>Human accepts the recipient but rewrites the subject. Resume is <code>Command(update={&quot;draft&quot;: {**state[&quot;draft&quot;], &quot;subject&quot;: new_subject}}, resume=&quot;approved&quot;)</code>. Note the spread — without it the draft is replaced. Scalar dicts replace by default; declare a dict reducer to merge partials cleanly. See <a href="references/resume-patterns.md">Resume Patterns</a>.</p>
+<h3>Inline <code>interrupt()</code> with a custom payload</h3>
+<p>Inside a <code>validate_purchase</code> node, the model has decided to buy three items at USD 450 total. The node calls <code>decision = interrupt({&quot;kind&quot;: &quot;confirm_purchase&quot;, &quot;items&quot;: items, &quot;total&quot;: 450})</code> and the UI reads the payload to render a rich confirmation dialog. On resume, <code>decision</code> is whatever the UI sent via <code>Command(resume={&quot;approved&quot;: True, &quot;notes&quot;: &quot;...&quot;})</code>. See <a href="references/interrupt-decision-tree.md">Interrupt Decision Tree</a>.</p>
+<h3>Slack-driven approval</h3>
+<p>GET /pending feeds a cron that posts Block Kit messages with approve/reject buttons. Button callback POSTs to /decision. Slack&#39;s interaction payload carries <code>user.id</code>, which becomes <code>approver</code> in the audit log. See <a href="references/approval-ui-wiring.md">Approval UI Wiring</a> for the Block Kit template and signing-secret validation.</p>
+<h2>Resources</h2>
+<ul>
+<li><a href="https://langchain-ai.github.io/langgraph/concepts/human_in_the_loop/">LangGraph: Human-in-the-loop (concepts)</a></li>
+<li>LangGraph: How to add human-in-the-loop</li>
+<li><a href="https://langchain-ai.github.io/langgraph/reference/types/#langgraph.types.Command">LangGraph: <code>Command</code> type reference</a></li>
+<li><a href="https://langchain-ai.github.io/langgraph/reference/types/#langgraph.types.interrupt">LangGraph: <code>interrupt</code> function reference</a></li>
+<li><a href="https://langchain-ai.github.io/langgraph/concepts/persistence/">LangGraph: Persistence and checkpointers</a></li>
+<li><a href="https://blog.langchain.com/langchain-langgraph-1dot0/">LangGraph 1.0 release notes</a></li>
+<li>Pack pain catalog: <code>docs/pain-catalog.md</code> (entries P16, P17, P18, P20)</li>
+<li>Related skills: <code>langchain-langgraph-basics</code>, <code>langchain-langgraph-checkpointing</code>, <code>langchain-middleware-patterns</code></li>
+</ul></div>
+      </div>
+    </section>
+
+    <!-- 8. Bottom CTA -->
+    <section class="detail-cta" data-astro-cid-qcigfm7x>
+  <h2 class="detail-cta__headline" data-astro-cid-qcigfm7x>Ready to use langchain-py-pack?</h2>
+  <div class="detail-cta__actions" data-astro-cid-qcigfm7x>
+    <button class="detail-cta__primary" data-copy-install="/plugin install langchain-py-pack@claude-code-plugins-plus" data-astro-cid-qcigfm7x>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" data-astro-cid-qcigfm7x>
+        <rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" stroke-width="1.5" data-astro-cid-qcigfm7x></rect>
+        <path d="M3 11V3a1 1 0 011-1h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" data-astro-cid-qcigfm7x></path>
+      </svg>
+      <span class="detail-cta__btn-text" data-astro-cid-qcigfm7x>Copy Install Command</span>
+    </button>
+    
+  </div>
+</section>
+
+<script type="module">document.querySelectorAll("[data-copy-install]").forEach(t=>{t.addEventListener("click",async()=>{const a=t.dataset.copyInstall||"";await navigator.clipboard.writeText(a);const e=t.querySelector(".detail-cta__btn-text");if(e){const o=e.textContent;e.textContent="Copied!",t.classList.add("copied"),window.trackEvent&&window.trackEvent("install_copied",{plugin_name:a.split(" ").pop()||"",source:"detail_cta"}),setTimeout(()=>{e.textContent=o,t.classList.remove("copied")},2e3)}})});</script>
+
+    <!-- 9. Related Skills (6, with tool pills) -->
+    <section class="related-skills-section" data-astro-cid-jrlgpo3w>
+        <h2 class="related-skills-heading" data-astro-cid-jrlgpo3w>Related Skills</h2>
+        <div class="related-skills-grid" data-astro-cid-jrlgpo3w>
+          <a href="/skills/abridge-ci-integration/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-ci-integration</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Configure CI/CD pipeline for Abridge clinical AI integrations with GitHub Actions.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-common-errors/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-common-errors</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Diagnose and fix common Abridge clinical AI integration errors.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-a/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-a</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge ambient clinical documentation capture-to-note pipeline.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-b/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-b</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge patient-facing documentation and after-visit summary generation.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-cost-tuning/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-cost-tuning</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Optimize Abridge clinical AI costs through tier selection, session management, and usage monitoring for healthcare organizations.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-debug-bundle/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-debug-bundle</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Collect Abridge debug evidence for support tickets and troubleshooting.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a>
+        </div>
+      </section>
+
+  </div>
+
+  
+  <script>
+    document.querySelectorAll('.install-command').forEach(el => {
+      el.addEventListener('click', function() {
+        const text = this.dataset.copy || this.textContent;
+        navigator.clipboard.writeText(text).then(() => {
+          const originalText = this.textContent;
+          this.textContent = 'Copied to clipboard!';
+          this.style.color = 'var(--brand-green)';
+          setTimeout(() => {
+            this.textContent = originalText;
+            this.style.color = '';
+          }, 2000);
+        });
+      });
+    });
+  </script>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Building a Multi-Brand RSS Validation System: Testing 97 Feeds, Learning Hard Lessons — Tons of Skills Work Diary</title>
+    <meta name="description" content="A complete walkthrough of building and validating an RSS feed distribution system - including the failures, the surprises, and the hard lessons learned when testing 97 feeds across 16 categories.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://startaitools.com/posts/building-a-multi-brand-rss-validation-system-testing-97-feeds-learning-hard-lessons/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/building-multi-brand-rss-validation-system-97-feeds-tested/">
+    <meta property="og:title" content="Building a Multi-Brand RSS Validation System: Testing 97 Feeds, Learning Hard Lessons — Tons of Skills Work Diary">
+    <meta property="og:description" content="A complete walkthrough of building and validating an RSS feed distribution system - including the failures, the surprises, and the hard lessons learned when testing 97 feeds across 16 categories.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="Building a Multi-Brand RSS Validation System: Testing 97 Feeds, Learning Hard Lessons — Tons of Skills Work Diary">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/building-multi-brand-rss-validation-system-97-feeds-tested/">
+    <meta name="twitter:title" content="Building a Multi-Brand RSS Validation System: Testing 97 Feeds, Learning Hard Lessons — Tons of Skills Work Diary">
+    <meta name="twitter:description" content="A complete walkthrough of building and validating an RSS feed distribution system - including the failures, the surprises, and the hard lessons learned when testing 97 feeds across 16 categories.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"Building a Multi-Brand RSS Validation System: Testing 97 Feeds, Learning Hard Lessons","description":"A complete walkthrough of building and validating an RSS feed distribution system - including the failures, the surprises, and the hard lessons learned when testing 97 feeds across 16 categories.","datePublished":"2025-10-03","url":"https://tonsofskills.com/blog/undefined","author":{"@type":"Person","name":"Jeremy Longshore"},"publisher":{"@type":"Organization","name":"Tons of Skills","url":"https://tonsofskills.com"}}</script>
+  
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.post-header[data-astro-cid-7jjqptxk]{background:var(--panel);padding:4rem 1.5rem 3rem;border-bottom:1px solid var(--border)}.post-header-inner[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto}.back-link[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3);text-decoration:none;display:inline-block;margin-bottom:1.5rem;transition:color .2s}.back-link[data-astro-cid-7jjqptxk]:hover{color:var(--primary)}.post-meta[data-astro-cid-7jjqptxk]{display:flex;align-items:center;gap:.75rem;margin-bottom:1rem}time[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3)}.featured-badge[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.2rem .6rem;background:#ce114126;color:var(--red);border-radius:0;font-weight:600;text-transform:uppercase;letter-spacing:.05em}.post-header[data-astro-cid-7jjqptxk] h1[data-astro-cid-7jjqptxk]{font-family:var(--font-body);font-size:clamp(1.5rem,4vw,2.2rem);font-weight:700;color:var(--text);line-height:1.25;margin-bottom:.75rem;letter-spacing:0}.post-desc[data-astro-cid-7jjqptxk]{color:var(--text-2);font-size:1.05rem;line-height:1.6;margin-bottom:1rem}.post-tags[data-astro-cid-7jjqptxk]{display:flex;gap:.4rem;flex-wrap:wrap}.tag[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.15rem .5rem;background:var(--surface-3);color:var(--text-3);border-radius:0}.post-body[data-astro-cid-7jjqptxk]{padding:3rem 1.5rem 4rem}.prose[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto;color:var(--text-2);line-height:1.8;font-size:1rem}.prose[data-astro-cid-7jjqptxk] h2{font-family:var(--font-body);font-size:1.5rem;font-weight:700;color:var(--text);margin:2.5rem 0 1rem;letter-spacing:0}.prose[data-astro-cid-7jjqptxk] h3{font-size:1.2rem;font-weight:600;color:var(--text);margin:2rem 0 .75rem}.prose[data-astro-cid-7jjqptxk] p{margin-bottom:1rem}.prose[data-astro-cid-7jjqptxk] ul,.prose[data-astro-cid-7jjqptxk] ol{margin:.5rem 0 1rem 1.5rem}.prose[data-astro-cid-7jjqptxk] li{margin-bottom:.35rem}.prose[data-astro-cid-7jjqptxk] strong{color:var(--text);font-weight:600}.prose[data-astro-cid-7jjqptxk] code{font-family:var(--font-mono);font-size:.88em;background:var(--surface-3);padding:.15em .35em;border-radius:0;color:var(--primary)}.prose[data-astro-cid-7jjqptxk] a{color:var(--primary);text-decoration:none}.prose[data-astro-cid-7jjqptxk] a:hover{text-decoration:underline}@media(max-width:768px){.post-header[data-astro-cid-7jjqptxk]{padding:3rem 1rem 2rem}.post-body[data-astro-cid-7jjqptxk]{padding:2rem 1rem 3rem}}
+</style></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  <article class="post" data-astro-cid-7jjqptxk>
+    <header class="post-header" data-astro-cid-7jjqptxk>
+      <div class="post-header-inner" data-astro-cid-7jjqptxk>
+        <a href="/blog" class="back-link" data-astro-cid-7jjqptxk>Back to Work Diary</a>
+        <div class="post-meta" data-astro-cid-7jjqptxk>
+          <time datetime="2025-10-03" data-astro-cid-7jjqptxk>October 2, 2025</time>
+          
+        </div>
+        <h1 data-astro-cid-7jjqptxk>Building a Multi-Brand RSS Validation System: Testing 97 Feeds, Learning Hard Lessons</h1>
+        <p class="post-desc" data-astro-cid-7jjqptxk>A complete walkthrough of building and validating an RSS feed distribution system - including the failures, the surprises, and the hard lessons learned when testing 97 feeds across 16 categories.</p>
+        <div class="post-tags" data-astro-cid-7jjqptxk>
+          <span class="tag" data-astro-cid-7jjqptxk>rss-feeds</span><span class="tag" data-astro-cid-7jjqptxk>automation</span><span class="tag" data-astro-cid-7jjqptxk>data-validation</span><span class="tag" data-astro-cid-7jjqptxk>bash-scripting</span><span class="tag" data-astro-cid-7jjqptxk>content-distribution</span><span class="tag" data-astro-cid-7jjqptxk>n8n</span><span class="tag" data-astro-cid-7jjqptxk>system-architecture</span><span class="tag" data-astro-cid-7jjqptxk>problem-solving</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="post-body" data-astro-cid-7jjqptxk>
+      <div class="prose" data-astro-cid-7jjqptxk>
+        <h2 id="the-problem-building-content-distribution-without-data-validation">The Problem: Building Content Distribution Without Data Validation</h2>
+<p>Here’s a mistake I made this week: I proposed 33 RSS feeds for an automated content distribution system without testing a single one first.</p>
+<p>The user’s response? “did u try the new feeds to ensure they match criteria for tier 1”</p>
+<p>Ouch. But also - absolutely correct. What’s the point of designing an elegant multi-brand content routing system if half your data sources are broken?</p>
+<p>This is the story of how I built an RSS feed validation system, tested 97 feeds across 16 categories, and learned that <strong>validation-first architecture</strong> isn’t just best practice - it’s survival.</p>
+<h2 id="what-i-was-trying-to-build">What I Was Trying to Build</h2>
+<p>The goal was straightforward: create an automated content distribution system for three brands:</p>
+<ol>
+<li><strong>Intent Solutions</strong> (intentsolutions.io) - AI agency, high-authority content, score 4+ only</li>
+<li><strong>StartAITools</strong> (startaitools.com) - Developer-focused tech blog, score 3+</li>
+<li><strong>DixieRoad</strong> (dixieroad.org) - Repair/survival/homestead niche, score 3+</li>
+</ol>
+<p>Each brand needed different content from different RSS feeds, all running through n8n workflows with AI quality scoring and automated distribution to LinkedIn, X, Discord, and Slack.</p>
+<p>Simple, right? Just gather some RSS feeds and route them appropriately.</p>
+<p><strong>Wrong.</strong></p>
+<h2 id="the-journey-from-scattered-data-to-systematic-validation">The Journey: From Scattered Data to Systematic Validation</h2>
+<h3 id="discovery-phase-finding-the-mess">Discovery Phase: Finding the Mess</h3>
+<p>When I started digging into existing feed lists, I found chaos:</p>
+<ul>
+<li>5+ different locations with RSS feed lists</li>
+<li><code>comprehensive-news-feeds.json</code> with 45 feeds (never validated)</li>
+<li><code>tech-ai-feeds.json</code> with 12 feeds (some working, some not)</li>
+<li>Various markdown files with proposed feeds</li>
+<li>No single source of truth</li>
+<li>No validation status anywhere</li>
+</ul>
+<p>The first lesson hit immediately: <strong>scattered data is a symptom of a larger problem</strong>. You can’t build reliable automation on top of organizational chaos.</p>
+<h3 id="first-attempt-proposing-feeds-without-testing">First Attempt: Proposing Feeds Without Testing</h3>
+<p>I made my first mistake here. I analyzed the comprehensive-news-feeds.json, organized feeds by category, and proposed them for the workflow.</p>
+<p>33 feeds across:</p>
+<ul>
+<li>AI Research &#x26; Industry (8 feeds)</li>
+<li>Tech News (7 feeds)</li>
+<li>Home Repair &#x26; DIY (3 feeds)</li>
+<li>Automotive (2 feeds)</li>
+<li>Survival &#x26; Prepping (4 feeds)</li>
+<li>Homesteading (3 feeds)</li>
+<li>Firearms (4 feeds)</li>
+<li>Hunting (2 feeds)</li>
+</ul>
+<p>Looked good on paper. I documented everything beautifully in <code>RSS-FEEDS.md</code>.</p>
+<p>Then came the reality check: “did u try the new feeds to ensure they match criteria for tier 1”</p>
+<p><strong>Lesson learned:</strong> Documentation without validation is fiction, not fact.</p>
+<h3 id="building-the-validation-system">Building the Validation System</h3>
+<p>I needed to test feeds systematically. Here’s the validation script I built:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#6A737D">#!/bin/bash</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># RSS Feed Validation Script</span></span>
+<span class="line"><span style="color:#B392F0">test_feed</span><span style="color:#E1E4E8">() {</span></span>
+<span class="line"><span style="color:#F97583">    local</span><span style="color:#E1E4E8"> name</span><span style="color:#F97583">=</span><span style="color:#FFAB70">$1</span></span>
+<span class="line"><span style="color:#F97583">    local</span><span style="color:#E1E4E8"> url</span><span style="color:#F97583">=</span><span style="color:#FFAB70">$2</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79B8FF">    echo</span><span style="color:#79B8FF"> -n</span><span style="color:#9ECBFF"> "Testing </span><span style="color:#E1E4E8">$name</span><span style="color:#9ECBFF">... "</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">    # Test with timeout</span></span>
+<span class="line"><span style="color:#E1E4E8">    response</span><span style="color:#F97583">=</span><span style="color:#E1E4E8">$(</span><span style="color:#B392F0">curl</span><span style="color:#79B8FF"> -s</span><span style="color:#79B8FF"> -o</span><span style="color:#9ECBFF"> /dev/null</span><span style="color:#79B8FF"> -w</span><span style="color:#9ECBFF"> "%{http_code}"</span><span style="color:#79B8FF"> --max-time</span><span style="color:#79B8FF"> 10</span><span style="color:#9ECBFF"> "</span><span style="color:#E1E4E8">$url</span><span style="color:#9ECBFF">"</span><span style="color:#F97583"> 2></span><span style="color:#9ECBFF">/dev/null</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">    if</span><span style="color:#E1E4E8"> [ </span><span style="color:#9ECBFF">"</span><span style="color:#E1E4E8">$response</span><span style="color:#9ECBFF">"</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "200"</span><span style="color:#E1E4E8"> ]; </span><span style="color:#F97583">then</span></span>
+<span class="line"><span style="color:#6A737D">        # Verify it's actually XML/RSS</span></span>
+<span class="line"><span style="color:#E1E4E8">        content_type</span><span style="color:#F97583">=</span><span style="color:#E1E4E8">$(</span><span style="color:#B392F0">curl</span><span style="color:#79B8FF"> -s</span><span style="color:#79B8FF"> -I</span><span style="color:#79B8FF"> --max-time</span><span style="color:#79B8FF"> 10</span><span style="color:#9ECBFF"> "</span><span style="color:#E1E4E8">$url</span><span style="color:#9ECBFF">"</span><span style="color:#F97583"> 2></span><span style="color:#9ECBFF">/dev/null</span><span style="color:#F97583"> |</span><span style="color:#B392F0"> grep</span><span style="color:#79B8FF"> -i</span><span style="color:#9ECBFF"> "content-type"</span><span style="color:#F97583"> |</span><span style="color:#B392F0"> head</span><span style="color:#79B8FF"> -1</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#F97583">        if</span><span style="color:#79B8FF"> echo</span><span style="color:#9ECBFF"> "</span><span style="color:#E1E4E8">$content_type</span><span style="color:#9ECBFF">"</span><span style="color:#F97583"> |</span><span style="color:#B392F0"> grep</span><span style="color:#79B8FF"> -qi</span><span style="color:#9ECBFF"> "xml\|rss\|atom"</span><span style="color:#E1E4E8">; </span><span style="color:#F97583">then</span></span>
+<span class="line"><span style="color:#79B8FF">            echo</span><span style="color:#9ECBFF"> "✅ PASS (HTTP </span><span style="color:#E1E4E8">$response</span><span style="color:#9ECBFF">)"</span></span>
+<span class="line"><span style="color:#F97583">            return</span><span style="color:#79B8FF"> 0</span></span>
+<span class="line"><span style="color:#F97583">        else</span></span>
+<span class="line"><span style="color:#79B8FF">            echo</span><span style="color:#9ECBFF"> "❌ FAIL (Not XML/RSS: </span><span style="color:#E1E4E8">$content_type</span><span style="color:#9ECBFF">)"</span></span>
+<span class="line"><span style="color:#F97583">            return</span><span style="color:#79B8FF"> 1</span></span>
+<span class="line"><span style="color:#F97583">        fi</span></span>
+<span class="line"><span style="color:#F97583">    else</span></span>
+<span class="line"><span style="color:#79B8FF">        echo</span><span style="color:#9ECBFF"> "❌ FAIL (HTTP </span><span style="color:#E1E4E8">$response</span><span style="color:#9ECBFF">)"</span></span>
+<span class="line"><span style="color:#F97583">        return</span><span style="color:#79B8FF"> 1</span></span>
+<span class="line"><span style="color:#F97583">    fi</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Counter</span></span>
+<span class="line"><span style="color:#E1E4E8">pass</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">0</span></span>
+<span class="line"><span style="color:#E1E4E8">fail</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">0</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Test all feeds</span></span>
+<span class="line"><span style="color:#B392F0">test_feed</span><span style="color:#9ECBFF"> "OpenAI News"</span><span style="color:#9ECBFF"> "https://openai.com/news/rss.xml"</span><span style="color:#E1E4E8"> &#x26;&#x26; ((pass</span><span style="color:#F97583">++</span><span style="color:#E1E4E8">)) </span><span style="color:#F97583">||</span><span style="color:#E1E4E8"> ((fail</span><span style="color:#F97583">++</span><span style="color:#E1E4E8">))</span></span>
+<span class="line"><span style="color:#6A737D"># ... more feeds ...</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79B8FF">echo</span><span style="color:#9ECBFF"> "✅ PASSED: </span><span style="color:#E1E4E8">$pass</span><span style="color:#9ECBFF">"</span></span>
+<span class="line"><span style="color:#79B8FF">echo</span><span style="color:#9ECBFF"> "❌ FAILED: </span><span style="color:#E1E4E8">$fail</span><span style="color:#9ECBFF">"</span></span>
+<span class="line"><span style="color:#79B8FF">echo</span><span style="color:#9ECBFF"> "TOTAL: $((</span><span style="color:#B392F0">pass</span><span style="color:#9ECBFF"> + fail))"</span></span></code></pre>
+<p><strong>Key validation criteria:</strong></p>
+<ul>
+<li>HTTP 200 status code (not redirects, not errors)</li>
+<li>Valid XML/RSS/Atom content-type header</li>
+<li>Response within 10 seconds</li>
+<li>Active and maintained (later added)</li>
+</ul>
+<h3 id="the-first-validation-run-humbling-results">The First Validation Run: Humbling Results</h3>
+<p>I ran the script on my 33 proposed feeds:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>=== AI RESEARCH &#x26; INDUSTRY ===</span></span>
+<span class="line"><span>Testing OpenAI News... ❌ FAIL (HTTP 307)</span></span>
+<span class="line"><span>Testing Google AI Blog... ❌ FAIL (HTTP 404)</span></span>
+<span class="line"><span>Testing DeepMind Blog... ❌ FAIL (HTTP 302)</span></span>
+<span class="line"><span>Testing Anthropic Blog... ❌ FAIL (HTTP 404)</span></span>
+<span class="line"><span>Testing Hugging Face Blog... ✅ PASS (HTTP 200)</span></span>
+<span class="line"><span>Testing Machine Learning Mastery... ✅ PASS (HTTP 200)</span></span>
+<span class="line"><span>Testing The Gradient... ✅ PASS (HTTP 200)</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>...</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>=========================================</span></span>
+<span class="line"><span>RESULTS:</span></span>
+<span class="line"><span>✅ PASSED: 20</span></span>
+<span class="line"><span>❌ FAILED: 13</span></span>
+<span class="line"><span>TOTAL: 33</span></span>
+<span class="line"><span>=========================================</span></span></code></pre>
+<p><strong>60.6% success rate.</strong></p>
+<p>Only 20 of my 33 “carefully selected” feeds actually worked.</p>
+<h3 id="the-surprises-and-discoveries">The Surprises and Discoveries</h3>
+<p><strong>OpenAI Blog Changed URLs:</strong></p>
+<ul>
+<li>Old URL: <code>https://openai.com/blog/rss.xml</code> → 307 redirect (failed)</li>
+<li>New URL: <code>https://openai.com/news/rss.xml</code> → 200 OK (works)</li>
+</ul>
+<p>Found this by searching OpenAI’s site and testing variations.</p>
+<p><strong>Anthropic Has No RSS Feed:</strong>
+Despite being a major AI company, Anthropic simply doesn’t provide an RSS feed. The URL <code>https://www.anthropic.com/rss.xml</code> returns 404.</p>
+<p><strong>VentureBeat is Unreliable:</strong>
+Returns 308 redirect and often serves HTML instead of RSS/XML. Removed from tier-1 list.</p>
+<p><strong>IEEE Spectrum Moved:</strong>
+Old URL returns 301 redirect. After following redirects, found it still doesn’t work reliably.</p>
+<h3 id="expanding-to-repairmaintenance-feeds">Expanding to Repair/Maintenance Feeds</h3>
+<p>Next challenge: validate repair and maintenance feeds for DixieRoad brand.</p>
+<p>I created a new test script for:</p>
+<ul>
+<li>RV repair &#x26; maintenance (5 feeds tested)</li>
+<li>Motorcycle repair (5 feeds tested)</li>
+<li>Boat repair &#x26; maintenance (5 feeds tested)</li>
+<li>Car/auto repair (5 feeds tested)</li>
+<li>Truck repair (5 feeds tested)</li>
+<li>General auto DIY (5 feeds tested)</li>
+</ul>
+<p><strong>Total tested: 31 repair/maintenance feeds</strong></p>
+<p>Results were worse:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>=========================================</span></span>
+<span class="line"><span>RESULTS:</span></span>
+<span class="line"><span>✅ PASSED: 7</span></span>
+<span class="line"><span>❌ FAILED: 24</span></span>
+<span class="line"><span>TOTAL: 31</span></span>
+<span class="line"><span>=========================================</span></span></code></pre>
+<p><strong>23% success rate</strong> for repair/maintenance feeds.</p>
+<h3 id="why-such-low-success-rates">Why Such Low Success Rates?</h3>
+<p><strong>Common failure patterns:</strong></p>
+<ol>
+<li>
+<p><strong>Redirects (301/302/307/308):</strong> 13 feeds</p>
+<ul>
+<li>Sites changed URLs but old ones redirect</li>
+<li>Redirects often unreliable for automated systems</li>
+<li>Examples: Cycle World, Boating Magazine, Truck Trend</li>
+</ul>
+</li>
+<li>
+<p><strong>404 Not Found (discontinued):</strong> 8 feeds</p>
+<ul>
+<li>Feed simply doesn’t exist anymore</li>
+<li>Examples: Motorcyclist, The Drive, Popular Mechanics Auto</li>
+</ul>
+</li>
+<li>
+<p><strong>403 Forbidden (blocked automation):</strong> 7 feeds</p>
+<ul>
+<li>Sites actively block automated access</li>
+<li>Examples: RV Travel, Boats.com, Autoblog</li>
+</ul>
+</li>
+<li>
+<p><strong>Connection failures (timeout/000):</strong> 5 feeds</p>
+<ul>
+<li>Site down or network issues</li>
+<li>Examples: Reuters Technology, CoinDesk</li>
+</ul>
+</li>
+<li>
+<p><strong>Other errors:</strong> 2 feeds</p>
+<ul>
+<li>405 Method Not Allowed (RV Repair Club)</li>
+<li>500 Server Error (The Car Connection)</li>
+</ul>
+</li>
+</ol>
+<p><strong>Key insight:</strong> Feed reliability varies dramatically by industry. Tech feeds (75% success) are much more reliable than repair/maintenance feeds (23% success).</p>
+<h2 id="the-consolidation-challenge">The Consolidation Challenge</h2>
+<p>At this point I had:</p>
+<ul>
+<li>20 validated tech/AI feeds</li>
+<li>7 validated repair/maintenance feeds</li>
+<li>Multiple scattered documentation files</li>
+<li>No single source of truth</li>
+</ul>
+<p>The user feedback: “we have fifty lists scattered… put the main list in rss atoms and sym link it to brainstorm”</p>
+<p>This was the organizational architecture challenge. I needed:</p>
+<ol>
+<li><strong>Single master list</strong> with all validated feeds</li>
+<li><strong>All failed feeds documented</strong> with reasons</li>
+<li><strong>Accessible from multiple projects</strong> via symlinks</li>
+<li><strong>Multiple formats</strong> (markdown for docs, CSV for automation)</li>
+</ol>
+<h3 id="creating-the-master-architecture">Creating the Master Architecture</h3>
+<p>**File: `</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="markdown"><code><span class="line"><span style="color:#79B8FF;font-weight:bold"># MASTER RSS FEED COLLECTION - ALL SYSTEMS</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8;font-weight:bold">**Total Tested**</span><span style="color:#E1E4E8">: 97 feeds</span></span>
+<span class="line"><span style="color:#E1E4E8">✅ </span><span style="color:#E1E4E8;font-weight:bold">**Validated Tier-1**</span><span style="color:#E1E4E8">: 52 feeds (53.6%)</span></span>
+<span class="line"><span style="color:#E1E4E8">❌ </span><span style="color:#E1E4E8;font-weight:bold">**Failed/Disqualified**</span><span style="color:#E1E4E8">: 45 feeds (46.4%)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79B8FF;font-weight:bold">## ✅ TIER-1 VALIDATED FEEDS (52 Total)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79B8FF;font-weight:bold">### AI Research &#x26; Machine Learning (6 feeds)</span></span>
+<span class="line"><span style="color:#E1E4E8">| Feed Name | URL | Brand Assignment |</span></span>
+<span class="line"><span style="color:#E1E4E8">|-----------|-----|------------------|</span></span>
+<span class="line"><span style="color:#E1E4E8">| OpenAI News | https://openai.com/news/rss.xml | Intent Solutions (4+), StartAITools (3+) |</span></span>
+<span class="line"><span style="color:#E1E4E8">| Hugging Face | https://huggingface.co/blog/feed.xml | StartAITools (3+) |</span></span>
+<span class="line"><span style="color:#E1E4E8">...</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79B8FF;font-weight:bold">## ❌ FAILED/DISQUALIFIED FEEDS (45 Total)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79B8FF;font-weight:bold">### Reason: 404 Not Found</span></span>
+<span class="line"><span style="color:#FFAB70">-</span><span style="color:#E1E4E8"> Google AI Blog (discontinued)</span></span>
+<span class="line"><span style="color:#FFAB70">-</span><span style="color:#E1E4E8"> Anthropic Blog (no RSS feed exists)</span></span>
+<span class="line"><span style="color:#E1E4E8">...</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79B8FF;font-weight:bold">### Reason: Redirects (301/302/307/308)</span></span>
+<span class="line"><span style="color:#FFAB70">-</span><span style="color:#E1E4E8"> VentureBeat (308 redirect)</span></span>
+<span class="line"><span style="color:#FFAB70">-</span><span style="color:#E1E4E8"> IEEE Spectrum (301 redirect)</span></span>
+<span class="line"><span style="color:#E1E4E8">...</span></span></code></pre>
+<p><strong>Symlink for n8n workflows:</strong></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">ln</span><span style="color:#79B8FF"> -sf</span><span style="color:#79B8FF">  \</span></span>
+<span class="line"></span></code></pre>
+<h3 id="csv-version-for-automation">CSV Version for Automation</h3>
+<p>Created `</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="csv"><code><span class="line"><span style="color:#E1E4E8">Category,</span><span style="color:#F97583">Name,</span><span style="color:#B392F0">URL,</span><span style="color:#6A737D">Score,</span><span style="color:#9ECBFF">Quality Tier,</span><span style="color:#FFAB70">Status,</span><span style="color:#79B8FF">Posting Frequency,</span><span style="color:#B392F0">Tested</span></span>
+<span class="line"><span style="color:#E1E4E8">Tech News &#x26; Analysis,</span><span style="color:#F97583">TechCrunch,</span><span style="color:#B392F0">https://techcrunch.com/feed/,</span><span style="color:#6A737D">100,</span><span style="color:#9ECBFF">TIER 1: High Value,</span><span style="color:#FFAB70">200,</span><span style="color:#79B8FF">Daily/Weekly,</span><span style="color:#B392F0">2025-10-03</span></span>
+<span class="line"><span style="color:#E1E4E8">Tech News &#x26; Analysis,</span><span style="color:#F97583">The Verge,</span><span style="color:#B392F0">https://www.theverge.com/rss/index.xml,</span><span style="color:#6A737D">95,</span><span style="color:#9ECBFF">TIER 1: High Value,</span><span style="color:#FFAB70">200,</span><span style="color:#79B8FF">Daily/Weekly,</span><span style="color:#B392F0">2025-10-03</span></span>
+<span class="line"><span style="color:#E1E4E8">...</span></span></code></pre>
+<p>Added 40 new validated feeds to existing 98, bringing total to <strong>138 tier-1 feeds</strong>.</p>
+<p>Pushed to GitHub: rssatoms-tier1-feeds</p>
+<h2 id="the-architecture-multi-brand-routing">The Architecture: Multi-Brand Routing</h2>
+<p>With validated feeds, I could finally design the routing system:</p>
+<h3 id="intent-solutions-ai-agency---professional-authority">Intent Solutions (AI Agency - Professional Authority)</h3>
+<p><strong>Criteria:</strong> AI/Tech content, Quality Score 4+</p>
+<p><strong>Assigned Feeds (11):</strong></p>
+<ul>
+<li>OpenAI News, The Gradient, AI News, MIT News AI</li>
+<li>TechCrunch, The Verge, Ars Technica, Wired</li>
+<li>MIT Technology Review, Bloomberg Tech, WSJ Tech</li>
+</ul>
+<p><strong>Expected:</strong> 200-250 articles/day → 15-25 curated</p>
+<h3 id="startaitools-tech-blog---developer-focus">StartAITools (Tech Blog - Developer Focus)</h3>
+<p><strong>Criteria:</strong> AI/Tech/Dev content, Quality Score 3+</p>
+<p><strong>Assigned Feeds (23):</strong></p>
+<ul>
+<li>All Intent Solutions feeds (11)</li>
+<li>Plus: Hugging Face, ML Mastery, Engadget, Hacker News</li>
+<li>GitHub Blog, Stack Overflow, InfoQ, KrebsOnSecurity</li>
+<li>The Hacker News, Cointelegraph, Android Police, 9to5Mac</li>
+</ul>
+<p><strong>Expected:</strong> 350-400 articles/day → 30-50 curated</p>
+<h3 id="dixieroad-repairsurvivalhomestead">DixieRoad (Repair/Survival/Homestead)</h3>
+<p><strong>Criteria:</strong> Repair/Survival/Homestead, Quality Score 3+</p>
+<p><strong>Assigned Feeds (18):</strong></p>
+<ul>
+<li>Family Handyman, Bob Vila</li>
+<li>Car and Driver, Road &#x26; Track, Diesel World, Auto Service World</li>
+<li>RV Life, Do It Yourself RV, Camper Report</li>
+<li>Backdoor Survival, Survival Blog, Urban Survival Site</li>
+<li>The Prairie Homestead</li>
+<li>The Truth About Guns, Shooting Illustrated, The Firearm Blog</li>
+<li>Outdoor Life</li>
+</ul>
+<p><strong>Expected:</strong> 100-150 articles/day → 25-40 curated</p>
+<h3 id="n8n-workflow-configuration">n8n Workflow Configuration</h3>
+<p>Each feed gets an HTTP Request node:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="json"><code><span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#79B8FF">  "parameters"</span><span style="color:#E1E4E8">: {</span></span>
+<span class="line"><span style="color:#79B8FF">    "url"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"={{$json.feed_url}}"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">    "options"</span><span style="color:#E1E4E8">: {</span></span>
+<span class="line"><span style="color:#79B8FF">      "timeout"</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">10000</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">      "redirect"</span><span style="color:#E1E4E8">: {</span></span>
+<span class="line"><span style="color:#79B8FF">        "followRedirects"</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">true</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">        "maxRedirects"</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">3</span></span>
+<span class="line"><span style="color:#E1E4E8">      }</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#E1E4E8">  },</span></span>
+<span class="line"><span style="color:#79B8FF">  "name"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"Fetch_RSS_{{$json.source_name}}"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">  "type"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"n8n-nodes-base.httpRequest"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">  "typeVersion"</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">4.2</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p><strong>Critical settings:</strong></p>
+<ul>
+<li>10-second timeout (validated in testing)</li>
+<li>Follow redirects (max 3) for feeds that moved</li>
+<li>Error Continue: true (don’t stop workflow on single feed failure)</li>
+</ul>
+<h2 id="what-i-learned-the-hard-way">What I Learned (The Hard Way)</h2>
+<h3 id="1-validate-before-you-architect">1. Validate Before You Architect</h3>
+<p>I spent hours designing beautiful routing systems before testing if the data sources actually worked. <strong>Wrong order.</strong></p>
+<p>The right approach:</p>
+<ol>
+<li>Test data sources first</li>
+<li>Document what works</li>
+<li>Design architecture around validated data</li>
+<li>Build automation</li>
+</ol>
+<p>Not the other way around.</p>
+<h3 id="2-real-world-data-is-messy">2. Real-World Data is Messy</h3>
+<p><strong>Assumptions I made that were wrong:</strong></p>
+<ul>
+<li>“Tech companies always have RSS feeds” (Anthropic doesn’t)</li>
+<li>“Redirects mean the feed still works” (often they don’t)</li>
+<li>“Industry leaders maintain feeds” (they discontinue them)</li>
+<li>“All categories have equal feed quality” (23% vs 75% success rate)</li>
+</ul>
+<p><strong>Reality check:</strong> Always assume data sources are unreliable until proven otherwise.</p>
+<h3 id="3-failure-documentation-is-as-valuable-as-success">3. Failure Documentation is as Valuable as Success</h3>
+<p>Documenting the 45 failed feeds with specific reasons saved future work:</p>
+<ul>
+<li>No one will waste time trying Anthropic’s non-existent feed</li>
+<li>We know VentureBeat redirects are unreliable</li>
+<li>IEEE Spectrum moved and we have the failure documented</li>
+<li>403 errors tell us which sites block automation</li>
+</ul>
+<p>This becomes institutional knowledge.</p>
+<h3 id="4-category-specific-validation-matters">4. Category-Specific Validation Matters</h3>
+<p>The 52% difference in success rates between tech (75%) and repair (23%) feeds taught me:</p>
+<ul>
+<li>Different industries have different RSS maturity</li>
+<li>Validation criteria may need to be category-specific</li>
+<li>Volume expectations should account for category reliability</li>
+<li>Backup sources are critical for low-reliability categories</li>
+</ul>
+<h3 id="5-consolidation-before-scaling">5. Consolidation Before Scaling</h3>
+<p>Finding feeds scattered across 5+ locations was a red flag. I should have consolidated before testing.</p>
+<p><strong>New rule:</strong> Single source of truth is non-negotiable for automation systems.</p>
+<h3 id="6-automation-reveals-data-quality-issues">6. Automation Reveals Data Quality Issues</h3>
+<p>Manual checking of a few feeds? They might work.</p>
+<p>Automated checking of 97 feeds? You discover:</p>
+<ul>
+<li>13 with redirect issues</li>
+<li>8 discontinued</li>
+<li>7 blocking automation</li>
+<li>5 with connection problems</li>
+<li>2 with server errors</li>
+</ul>
+<p><strong>Automation is a quality audit tool</strong>, not just a productivity tool.</p>
+<h2 id="the-results-production-ready-feed-system">The Results: Production-Ready Feed System</h2>
+<h3 id="final-metrics">Final Metrics</h3>
+<ul>
+<li><strong>97 feeds tested</strong> across 16 categories</li>
+<li><strong>52 tier-1 validated</strong> (53.6% success rate)</li>
+<li><strong>45 failed feeds</strong> documented with specific reasons</li>
+<li><strong>3 brand routing systems</strong> designed</li>
+<li><strong>138 total feeds</strong> in master CSV (including pre-existing)</li>
+</ul>
+<h3 id="validation-scripts-created">Validation Scripts Created</h3>
+<ol>
+<li><code>test-comprehensive-feeds.sh</code> - Tech/AI/general feeds (45 tested)</li>
+<li><code>test-repair-feeds.sh</code> - Repair/maintenance feeds (31 tested)</li>
+<li><code>test-rss-feeds.sh</code> - Original tier-1 validation (33 tested)</li>
+</ol>
+<h3 id="documentation-artifacts">Documentation Artifacts</h3>
+<ul>
+<li><code>MASTER-RSS-FEEDS.md</code> - Single source of truth</li>
+<li><code>TIER1_BEST_FEEDS.csv</code> - Automation-ready format</li>
+<li>Symlinks across projects for access</li>
+<li>GitHub repo for version control</li>
+</ul>
+<h3 id="expected-daily-volume-after-validation">Expected Daily Volume (After Validation)</h3>
+<ul>
+<li><strong>Before filtering:</strong> 650-800 articles/day across all feeds</li>
+<li><strong>After quality filtering:</strong> 70-115 curated articles/day</li>
+<li><strong>Per brand:</strong>
+<ul>
+<li>Intent Solutions: 15-25 articles</li>
+<li>StartAITools: 30-50 articles</li>
+<li>DixieRoad: 25-40 articles</li>
+</ul>
+</li>
+</ul>
+<h2 id="whats-next">What’s Next</h2>
+<h3 id="immediate-automated-health-monitoring">Immediate: Automated Health Monitoring</h3>
+<p>The validation scripts should run weekly:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#6A737D"># Cron job</span></span>
+<span class="line"><span style="color:#B392F0">0</span><span style="color:#79B8FF"> 2</span><span style="color:#79B8FF"> *</span><span style="color:#79B8FF"> *</span><span style="color:#79B8FF"> 0</span><span style="color:#F97583">  >></span><span style="color:#9ECBFF"> /var/log/rss-validation.log</span></span></code></pre>
+<p>Alert on:</p>
+<ul>
+<li>Feed failures (new 404s, timeouts)</li>
+<li>Success rate drops below threshold</li>
+<li>New redirect patterns</li>
+</ul>
+<h3 id="future-enhanced-validation">Future: Enhanced Validation</h3>
+<p>Add checks for:</p>
+<ul>
+<li>Content freshness (posts within 30 days)</li>
+<li>Feed update frequency (daily/weekly/monthly)</li>
+<li>Average quality scores over time</li>
+<li>Automatic category detection with AI</li>
+</ul>
+<h3 id="advanced-multi-source-aggregation">Advanced: Multi-Source Aggregation</h3>
+<p>Extend validation framework to:</p>
+<ul>
+<li>API-based content sources (Twitter, Reddit, etc.)</li>
+<li>Newsletter parsing systems</li>
+<li>Social media monitoring feeds</li>
+</ul>
+<h2 id="related-posts">Related Posts</h2>
+<ul>
+<li>
+<p><strong><a href="https://startaitools.com/posts/when-commands-dont-work-debugging-journey-through-automated-content-systems/">When Commands Don’t Work: A Debugging Journey Through Automated Content Systems</a></strong> - Debugging automation systems when they silently fail</p>
+</li>
+<li>
+<p><strong><a href="/blog/debugging-claude-code-slash-commands-silent-deployment-failures/">Debugging Claude Code Slash Commands: When Your Blog Automation Silently Fails</a></strong> - How we fixed blog deployment automation that was creating files but never pushing to production</p>
+</li>
+<li>
+<p><strong><a href="/blog/waygate-mcp-v2-1-0-forensic-analysis-to-production-enterprise-server/">Waygate MCP v2.1.0: From Forensic Analysis to Production Enterprise Server</a></strong> - Another example of validation-first architecture saving time and preventing production issues</p>
+</li>
+</ul>
+<h2 id="key-takeaways">Key Takeaways</h2>
+<ol>
+<li><strong>Validate data sources before building automation</strong> - saves massive amounts of rework</li>
+<li><strong>Real-world success rates are lower than expected</strong> - plan for 50-75% reliability</li>
+<li><strong>Document failures as thoroughly as successes</strong> - institutional knowledge</li>
+<li><strong>Category-specific validation matters</strong> - different industries have different RSS maturity</li>
+<li><strong>Consolidation before scaling</strong> - scattered data means unreliable automation</li>
+<li><strong>Automation reveals quality issues</strong> - use it as an audit tool</li>
+</ol>
+<p>The most important lesson? <strong>When someone asks “did you test it first?” - the answer should always be yes.</strong></p>
+<p>Design follows validation. Architecture follows data quality. Automation follows both.</p>
+<p><strong>Code Repository:</strong> rssatoms-tier1-feeds</p>
+<p><strong>Final Stats:</strong></p>
+<ul>
+<li>97 feeds tested</li>
+<li>52 validated (53.6%)</li>
+<li>16 categories</li>
+<li>3 brands</li>
+<li>138 total tier-1 feeds in production</li>
+</ul>
+      </div>
+    </div>
+  </article>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

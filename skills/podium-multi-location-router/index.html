@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>podium-multi-location-router - Agent Skill</title>
+    <meta name="description" content="Route Podium API calls across multiple physical locations with strict per-location credential isolation, pre-flight location-ID verification, an immutable audit trail of every write, idempotent bulk onboarding, and per-location rate-limit budgets that cannot starve each other. Use when running Podium for more than one physical store (an agency operator managing 50+ accounts, a multi-store SMB with 2+ locations, or a compliance team that needs to prove which location received which write). Trigger with &quot;podium multi-location&quot;, &quot;podium location router&quot;, &quot;podium per-location&quot;, &quot;podium location audit&quot;, &quot;podium bulk onboarding&quot;, &quot;podium location_uid verification&quot;.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://tonsofskills.com/tons-of-skills-marketplace/skills/podium-multi-location-router/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/podium-multi-location-router/">
+    <meta property="og:title" content="podium-multi-location-router - Agent Skill">
+    <meta property="og:description" content="Route Podium API calls across multiple physical locations with strict per-location credential isolation, pre-flight location-ID verification, an immutable audit trail of every write, idempotent bulk onboarding, and per-location rate-limit budgets that cannot starve each other. Use when running Podium for more than one physical store (an agency operator managing 50+ accounts, a multi-store SMB with 2+ locations, or a compliance team that needs to prove which location received which write). Trigger with &quot;podium multi-location&quot;, &quot;podium location router&quot;, &quot;podium per-location&quot;, &quot;podium location audit&quot;, &quot;podium bulk onboarding&quot;, &quot;podium location_uid verification&quot;.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="podium-multi-location-router - Agent Skill">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/podium-multi-location-router/">
+    <meta name="twitter:title" content="podium-multi-location-router - Agent Skill">
+    <meta name="twitter:description" content="Route Podium API calls across multiple physical locations with strict per-location credential isolation, pre-flight location-ID verification, an immutable audit trail of every write, idempotent bulk onboarding, and per-location rate-limit budgets that cannot starve each other. Use when running Podium for more than one physical store (an agency operator managing 50+ accounts, a multi-store SMB with 2+ locations, or a compliance team that needs to prove which location received which write). Trigger with &quot;podium multi-location&quot;, &quot;podium location router&quot;, &quot;podium per-location&quot;, &quot;podium location audit&quot;, &quot;podium bulk onboarding&quot;, &quot;podium location_uid verification&quot;.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"podium-multi-location-router","description":"Route Podium API calls across multiple physical locations with strict per-location credential isolation, pre-flight location-ID verification, an immutable audit trail of every write, idempotent bulk onboarding, and per-location rate-limit budgets that cannot starve each other. Use when running Podium for more than one physical store (an agency operator managing 50+ accounts, a multi-store SMB with 2+ locations, or a compliance team that needs to prove which location received which write). Trigger with \"podium multi-location\", \"podium location router\", \"podium per-location\", \"podium location audit\", \"podium bulk onboarding\", \"podium location_uid verification\".","version":"2.9.0","author":{"@type":"Person","name":"Jeremy Longshore"},"license":"MIT","programmingLanguage":"Claude Code Agent Skill","isPartOf":{"@type":"SoftwareApplication","name":"podium-pack","applicationCategory":"unknown"}}</script>
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.breadcrumbs[data-astro-cid-ilhxcym7]{margin-bottom:var(--space-5)}.breadcrumbs__list[data-astro-cid-ilhxcym7]{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;list-style:none;padding:0;margin:0;font-family:var(--font-mono);font-size:var(--text-sm, .8rem)}.breadcrumbs__item[data-astro-cid-ilhxcym7]{display:flex;align-items:center;gap:.375rem}.breadcrumbs__link[data-astro-cid-ilhxcym7]{color:var(--text-3);text-decoration:none;transition:color var(--duration-fast, .2s) var(--ease-out)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:hover{color:var(--primary)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:0}.breadcrumbs__sep[data-astro-cid-ilhxcym7]{color:var(--text-3);user-select:none;font-size:.7em;line-height:1}.breadcrumbs__current[data-astro-cid-ilhxcym7]{color:var(--text-2)}.detail-cta[data-astro-cid-qcigfm7x]{background:var(--surface-3, var(--brand-light-gray));border-top:1px solid var(--border, var(--brand-light-gray));border-radius:var(--radius-lg);padding:2rem 1.5rem;margin-top:2rem;text-align:center}.detail-cta__headline[data-astro-cid-qcigfm7x]{font-family:var(--font-display);font-weight:700;font-size:1.35rem;color:var(--text, var(--brand-dark));margin-bottom:1.25rem}.detail-cta__actions[data-astro-cid-qcigfm7x]{display:flex;justify-content:center;gap:.75rem;flex-wrap:wrap}.detail-cta__primary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:var(--primary);color:#0a0a0c;border:none;border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;cursor:pointer;transition:background var(--duration-fast) var(--ease-out),transform var(--duration-fast) var(--ease-out)}.detail-cta__primary[data-astro-cid-qcigfm7x]:hover{background:var(--primary-dark, var(--primary-dark));transform:translateY(-1px)}.detail-cta__primary[data-astro-cid-qcigfm7x].copied{background:var(--positive, var(--brand-green))}.detail-cta__secondary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:transparent;color:var(--text, var(--brand-dark));border:1px solid var(--border, var(--brand-mid-gray));border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;text-decoration:none;transition:border-color var(--duration-fast) var(--ease-out),color var(--duration-fast) var(--ease-out)}.detail-cta__secondary[data-astro-cid-qcigfm7x]:hover{border-color:var(--primary);color:var(--primary)}@media(max-width:480px){.detail-cta__actions[data-astro-cid-qcigfm7x]{flex-direction:column;align-items:stretch}.detail-cta__primary[data-astro-cid-qcigfm7x],.detail-cta__secondary[data-astro-cid-qcigfm7x]{justify-content:center}}
+</style>
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/_slug_@_@astro.wF9emvVq.css"></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  
+  
+
+  <div class="skill-detail" data-astro-cid-jrlgpo3w>
+    <!-- 1. Breadcrumbs -->
+    <nav aria-label="Breadcrumb" class="breadcrumbs" data-astro-cid-ilhxcym7>
+  <ol class="breadcrumbs__list" itemscope itemtype="https://schema.org/BreadcrumbList" data-astro-cid-ilhxcym7>
+    <li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Home</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="1">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/skills/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Skills</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="2">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          <span class="breadcrumbs__current" aria-current="page" itemprop="name" data-astro-cid-ilhxcym7>
+              podium-multi-location-router
+            </span>
+          <meta itemprop="position" content="3">
+        </li>
+  </ol>
+</nav>
+
+    <!-- 2. Header (enhanced) -->
+    <header class="skill-header" data-astro-cid-jrlgpo3w>
+      <h1 data-astro-cid-jrlgpo3w>podium-multi-location-router</h1>
+      <p class="skill-description" data-astro-cid-jrlgpo3w>Route Podium API calls across multiple physical locations with strict per-location credential isolation, pre-flight location-ID verification, an immutable audit trail of every write, idempotent bulk onboarding, and per-location rate-limit budgets that cannot starve each other. Use when running Podium for more than one physical store (an agency operator managing 50+ accounts, a multi-store SMB with 2+ locations, or a compliance team that needs to prove which location received which write). Trigger with &quot;podium multi-location&quot;, &quot;podium location router&quot;, &quot;podium per-location&quot;, &quot;podium location audit&quot;, &quot;podium bulk onboarding&quot;, &quot;podium location_uid verification&quot;.</p>
+
+      <div class="skill-metadata" data-astro-cid-jrlgpo3w>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>v2.9.0</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>Jeremy Longshore</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>MIT</span>
+        </div>
+      </div>
+
+      
+    </header>
+
+    <!-- 4. Allowed Tools -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Allowed Tools</h2>
+      <div class="tools-grid" data-astro-cid-jrlgpo3w>
+        <span class="tool-badge" data-astro-cid-jrlgpo3w>Read</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Write</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Edit</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(curl:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(jq:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(python3:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(sqlite3:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Grep</span>
+      </div>
+      
+    </section>
+
+    <!-- 5. Provided by Plugin -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Provided by Plugin</h2>
+      <div class="plugin-info" data-astro-cid-jrlgpo3w>
+        <div class="plugin-details" data-astro-cid-jrlgpo3w>
+          <h3 data-astro-cid-jrlgpo3w>
+            <a href="/plugins/podium-pack/" data-astro-cid-jrlgpo3w>podium-pack</a>
+          </h3>
+          <p data-astro-cid-jrlgpo3w>Claude Code skill pack for Podium (10 production-engineer skills)</p>
+          <div class="plugin-meta" data-astro-cid-jrlgpo3w>
+            <span data-astro-cid-jrlgpo3w>unknown</span>
+            <span data-astro-cid-jrlgpo3w>v2.9.0</span>
+          </div>
+        </div>
+        <a href="/plugins/podium-pack/" class="btn-primary" data-astro-cid-jrlgpo3w>View Plugin</a>
+      </div>
+    </section>
+
+    <!-- 6. Installation -->
+    <section class="section-box dark" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Installation</h2>
+      <p class="install-note" style="color: var(--brand-light-gray); margin-bottom: 0.75rem;" data-astro-cid-jrlgpo3w>This skill is included in the podium-pack plugin:</p>
+      <pre class="install-command" data-copy="/plugin install podium-pack@claude-code-plugins-plus" data-astro-cid-jrlgpo3w><code data-astro-cid-jrlgpo3w>/plugin install podium-pack@claude-code-plugins-plus</code></pre>
+      <p class="install-note" data-astro-cid-jrlgpo3w>Click to copy</p>
+    </section>
+
+    <!-- 7. Skill Content (Markdown) -->
+    <section class="skill-content-section" data-astro-cid-jrlgpo3w>
+      <h2 data-astro-cid-jrlgpo3w>Instructions</h2>
+      <div class="skill-content" data-astro-cid-jrlgpo3w>
+        <div data-astro-cid-jrlgpo3w><h1>Podium Multi-Location Router</h1>
+<h2>Overview</h2>
+<p>Route Podium API calls across multiple physical locations and operate the routing layer in production. This is not a tutorial on Podium&#39;s location model — it is the per-location dispatch code your integration runs when Sydney and Burleigh Heads share a single OAuth app, when an agency onboards five new stores in one afternoon, and when a compliance auditor walks in and asks &quot;which location&#39;s webchat received that contact write at 14:07 UTC last Tuesday.&quot;</p>
+<p>The six production failures this skill prevents:</p>
+<ol>
+<li><strong>Writes to wrong location silently</strong> — Sydney&#39;s contact write lands on Burleigh Heads&#39; contact list because the calling code resolved <code>location_uid</code> from a stale lookup or hard-coded the wrong UID. The Podium API accepts it, returns 200, and the data sits in the wrong location with no error surface. Naive integrations discover this when a customer reports &quot;I&#39;m getting review requests for a store I&#39;ve never been to.&quot;</li>
+<li><strong>Credential cross-contamination</strong> — Sydney&#39;s OAuth token gets reused for a write to Burleigh Heads. The Podium API does not reject this because the OAuth app is org-scoped and both locations live under the same org. The write succeeds; the audit trail attributes it to Sydney&#39;s credential; post-incident forensics cannot tell whether the write was authorized by Sydney&#39;s operator or by a bug.</li>
+<li><strong>Audit trail missing location-ID</strong> — log lines say <code>wrote contact name=Jane Doe</code> without saying which <code>location_uid</code> received the write. When a compliance question lands months later, the integration cannot answer &quot;which location received this customer&#39;s data?&quot; The answer determines GDPR data-subject scope and PCI cardholder-data exposure.</li>
+<li><strong>Bulk onboarding race condition</strong> — onboarding 5 new locations in one operation spawns 5 OAuth authorization flows. One fails partway (a user closed the consent tab, a redirect URI mismatched), the orchestrator continues with the rest, and the credentials map ends up with 4 valid entries + 1 dangling half-record. Subsequent operations against the half-onboarded location either crash or, worse, fall through to a default credential and write to the wrong place.</li>
+<li><strong>Location-ID verification skipped on write</strong> — the application code passes an arbitrary <code>location_uid</code> into the Podium call. Podium accepts any well-formed UID and returns 403 only if the current token genuinely has no access. The 403 is swallowed by an upstack handler (&quot;just a stale auth, will retry&quot;), and the integration silently stops working for one location while the rest keep flowing.</li>
+<li><strong>Rate-limits not isolated per location</strong> — the integration uses a single shared token bucket. Sydney runs a holiday review-request burst at 2pm and burns the org-wide quota; Burleigh Heads&#39; webchats start returning 429 with no explanation visible to the Burleigh Heads operator who has done nothing wrong.</li>
+</ol>
+<h2>Prerequisites</h2>
+<ul>
+<li>Python 3.10+</li>
+<li><code>podium-auth</code> skill installed; this skill consumes its <code>PodiumAuth</code> and <code>PodiumOrgRouter</code> classes</li>
+<li><code>podium-rate-limit-survival</code> skill installed; this skill consumes its per-bucket budget primitive</li>
+<li>Podium OAuth app with <code>locations.read</code> scope granted (verifying a <code>location_uid</code> requires <code>GET /v4/locations</code>)</li>
+<li>A writable directory for the audit log (default <code>./audit-log/podium-router.jsonl</code>)</li>
+<li>A persistent location-credential map (file, AWS Secrets Manager, GCP Secret Manager, or SOPS-encrypted YAML)</li>
+</ul>
+<h2>Instructions</h2>
+<p>Build in this order. Each section neutralizes one production failure mode.</p>
+<h3>1. Per-location credential isolation (neutralizes cross-contamination)</h3>
+<p>The router holds one <code>PodiumAuth</code> instance per <code>location_uid</code>, never per org. Two locations under the same org get two separate auth instances because the audit trail must attribute every call to a specific location and a specific credential record — even if the underlying OAuth refresh token happens to be shared at the org level.</p>
+<pre data-lang="python"><code>
+import asyncio, time
+from dataclasses import dataclass, field
+from typing import Optional
+from podium_auth import PodiumAuth, PodiumOrgRouter, PodiumAuthError
+
+@dataclass
+class LocationCredential:
+    location_uid: str
+    org_slug: str
+    client_id: str
+    client_secret: str
+    refresh_token_file: str
+    verified_at: float = 0.0   # unix seconds; 0 = never verified
+
+class LocationRouter:
+    def __init__(self, credentials: list[LocationCredential], audit_log_path: str):
+        self._creds: dict[str, LocationCredential] = {c.location_uid: c for c in credentials}
+        self._auths: dict[str, PodiumAuth] = {}
+        self._audit_log_path = audit_log_path
+        self._verify_lock = asyncio.Lock()
+
+    def get_client(self, location_uid: str) -&gt; &quot;PodiumLocationClient&quot;:
+        cred = self._creds.get(location_uid)
+        if not cred:
+            raise UnknownLocationError(location_uid)
+        if location_uid not in self._auths:
+            self._auths[location_uid] = PodiumAuth(
+                client_id=cred.client_id,
+                client_secret=cred.client_secret,
+                refresh_token=load_refresh_token(cred.refresh_token_file),
+            )
+        return PodiumLocationClient(
+            location_uid=location_uid,
+            auth=self._auths[location_uid],
+            router=self,
+        )
+</code></pre>
+<p>The map key is <code>location_uid</code>, never <code>org_slug</code>. Two locations under the same org get two map entries with the same <code>client_id</code>/<code>client_secret</code> but distinct <code>refresh_token_file</code> paths. This is the line that prevents Sydney&#39;s token from being reused for a Burleigh Heads write — the router has no syntactic path from a <code>location_uid</code> to a different location&#39;s auth.</p>
+<h3>2. Pre-flight location-ID verification (neutralizes silent wrong-location writes)</h3>
+<p>Before any write, the router confirms the <code>location_uid</code> exists in the set returned by <code>GET /v4/locations</code> for the current credential. Cache the verification with a short TTL — typically 1 hour — so a re-org of locations on the Podium side eventually propagates without re-verifying every call.</p>
+<pre data-lang="python"><code>
+VERIFY_TTL_SECONDS = 3600
+
+async def ensure_location_verified(self, location_uid: str) -&gt; None:
+    cred = self._creds[location_uid]
+    if time.time() - cred.verified_at &lt; VERIFY_TTL_SECONDS:
+        return
+    async with self._verify_lock:
+        if time.time() - cred.verified_at &lt; VERIFY_TTL_SECONDS:
+            return
+        auth = self._auths[location_uid]
+        token = await auth.get_token()
+        async with httpx.AsyncClient(timeout=10) as c:
+            r = await c.get(
+                &quot;https://api.podium.com/v4/locations&quot;,
+                headers={&quot;Authorization&quot;: f&quot;Bearer {token}&quot;},
+            )
+        if r.status_code != 200:
+            raise LocationVerificationError(location_uid, r.status_code, r.text)
+        ids = {loc[&quot;uid&quot;] for loc in r.json().get(&quot;locations&quot;, [])}
+        if location_uid not in ids:
+            raise LocationNotInScopeError(location_uid, sorted(ids))
+        cred.verified_at = time.time()
+</code></pre>
+<p><code>LocationNotInScopeError</code> is the loud version of &quot;Podium returned 403 silently.&quot; It fires before the call is made, so the caller cannot accidentally write to a location their token does not own. The 1-hour TTL keeps the verification cost negligible while bounding the staleness window.</p>
+<h3>3. Structured audit log on every call (neutralizes audit-trail gaps)</h3>
+<p>Every API call routed through this skill emits one JSON line to the audit log. The fields are fixed: <code>{ts, location_uid, org_slug, endpoint, method, status, request_id, latency_ms}</code>. No tokens, no request bodies, no PII — just the routing fingerprint.</p>
+<pre data-lang="python"><code>
+import json, os, time, uuid
+
+def emit_audit(self, *, location_uid: str, endpoint: str, method: str,
+               status: int, latency_ms: float, request_id: str) -&gt; None:
+    cred = self._creds[location_uid]
+    record = {
+        &quot;ts&quot;: time.time(),
+        &quot;location_uid&quot;: location_uid,
+        &quot;org_slug&quot;: cred.org_slug,
+        &quot;endpoint&quot;: endpoint,
+        &quot;method&quot;: method,
+        &quot;status&quot;: status,
+        &quot;request_id&quot;: request_id,
+        &quot;latency_ms&quot;: round(latency_ms, 2),
+    }
+    # Append-only; one line per call. Operators rotate with logrotate, not in-process.
+    os.makedirs(os.path.dirname(self._audit_log_path), exist_ok=True)
+    with open(self._audit_log_path, &quot;a&quot;) as f:
+        f.write(json.dumps(record) + &quot;\n&quot;)
+</code></pre>
+<p>The <code>request_id</code> is generated by the client wrapper (<code>uuid.uuid4().hex</code>) and also returned in any error so the operator can correlate a customer complaint to a single audit-log line. Six months later, when compliance asks &quot;which location received this write?&quot;, <code>audit_log_query.py</code> answers in one second.</p>
+<h3>4. Idempotent bulk onboarding orchestrator (neutralizes partial-failure races)</h3>
+<p>Onboarding multiple locations in one operation must be resumable. The orchestrator processes one location at a time, writes each location&#39;s credential record to the map atomically, and is safe to re-run after partial failure — already-onboarded locations are detected and skipped.</p>
+<pre data-lang="python"><code>
+@dataclass
+class OnboardingResult:
+    location_uid: str
+    status: str          # &quot;onboarded&quot; | &quot;skipped_existing&quot; | &quot;failed&quot;
+    error: Optional[str] = None
+
+async def onboard_locations(self, new: list[LocationCredential]) -&gt; list[OnboardingResult]:
+    results: list[OnboardingResult] = []
+    for cred in new:
+        if cred.location_uid in self._creds:
+            results.append(OnboardingResult(cred.location_uid, &quot;skipped_existing&quot;))
+            continue
+        try:
+            # 1. Persist credential record atomically BEFORE adding to in-memory map
+            self._persist_credential(cred)
+            # 2. Build auth + verify location_uid is reachable
+            self._auths[cred.location_uid] = PodiumAuth(
+                client_id=cred.client_id,
+                client_secret=cred.client_secret,
+                refresh_token=load_refresh_token(cred.refresh_token_file),
+            )
+            self._creds[cred.location_uid] = cred
+            await self.ensure_location_verified(cred.location_uid)
+            results.append(OnboardingResult(cred.location_uid, &quot;onboarded&quot;))
+        except Exception as e:
+            # Roll back the half-written entry so a re-run doesn&#39;t see a phantom location
+            self._creds.pop(cred.location_uid, None)
+            self._auths.pop(cred.location_uid, None)
+            results.append(OnboardingResult(cred.location_uid, &quot;failed&quot;, str(e)))
+    return results
+</code></pre>
+<p>The critical invariant: a location is either fully onboarded (credential persisted + auth instantiated + verification passed) or fully absent. There is no third state. A re-run after partial failure picks up exactly where the previous run left off.</p>
+<h3>5. Per-location rate-limit budgets (neutralizes shared-quota starvation)</h3>
+<p>This skill stacks on top of <code>podium-rate-limit-survival</code>. Each location gets its own token bucket; one location&#39;s burst cannot starve another. The default budget per location is conservative — read it from <code>config/settings.yaml</code> and tune per-deployment.</p>
+<pre data-lang="python"><code>
+from podium_rate_limit import TokenBucket   # from podium-rate-limit-survival
+
+class PodiumLocationClient:
+    def __init__(self, location_uid: str, auth: PodiumAuth, router: LocationRouter):
+        self._location_uid = location_uid
+        self._auth = auth
+        self._router = router
+        # One bucket per location — sized to the per-location plan, NOT the org-wide quota.
+        self._bucket = router.bucket_for(location_uid)
+
+    async def call(self, method: str, path: str, **kwargs) -&gt; httpx.Response:
+        await self._router.ensure_location_verified(self._location_uid)
+        await self._bucket.acquire()
+        request_id = uuid.uuid4().hex
+        token = await self._auth.get_token()
+        start = time.monotonic()
+        async with httpx.AsyncClient(timeout=10) as c:
+            r = await c.request(
+                method,
+                f&quot;https://api.podium.com{path}&quot;,
+                headers={
+                    &quot;Authorization&quot;: f&quot;Bearer {token}&quot;,
+                    &quot;X-Request-ID&quot;: request_id,
+                },
+                **kwargs,
+            )
+        self._router.emit_audit(
+            location_uid=self._location_uid,
+            endpoint=path,
+            method=method,
+            status=r.status_code,
+            latency_ms=(time.monotonic() - start) * 1000,
+            request_id=request_id,
+        )
+        return r
+</code></pre>
+<p>A burst from Sydney drains Sydney&#39;s bucket and only Sydney&#39;s bucket. Burleigh Heads has its own bucket with its own refill timer and remains operational regardless.</p>
+<h3>6. Unknown-location refusal (neutralizes silent fall-through)</h3>
+<p>Asking for a client for an unknown <code>location_uid</code> raises immediately. There is no default credential, no &quot;best guess&quot; routing, no fallback to the first registered location. This is the single line that prevents &quot;5 fails, the 6th call falls through to wherever&quot; from being a viable failure mode.</p>
+<pre data-lang="python"><code>
+class UnknownLocationError(KeyError):
+    def __init__(self, location_uid: str):
+        super().__init__(
+            f&quot;No credentials for location_uid={location_uid}. &quot;
+            f&quot;Run onboard_location.py to register, then reload the router.&quot;
+        )
+
+class LocationNotInScopeError(PodiumAuthError):
+    def __init__(self, location_uid: str, scope: list[str]):
+        super().__init__(
+            403,
+            f&quot;location_uid={location_uid} not in /v4/locations scope. &quot;
+            f&quot;Token sees {len(scope)} locations; this UID is not one of them. &quot;
+            f&quot;Verify with verify_location.py.&quot;
+        )
+</code></pre>
+<h2>Error Handling</h2>
+<table><thead><tr>
+<th>HTTP Status</th>
+<th>Error</th>
+<th>Root Cause</th>
+<th>Action</th>
+</tr></thead><tbody>
+<tr>
+<td><code>403 Forbidden</code></td>
+<td><code>LocationNotInScopeError</code></td>
+<td><code>location_uid</code> not in token&#39;s <code>/v4/locations</code> set</td>
+<td>Run <code>verify_location.py</code>; confirm the credential is for the right org</td>
+</tr>
+<tr>
+<td><code>404 Not Found</code></td>
+<td><code>LocationDeletedError</code></td>
+<td>Location was deleted on the Podium side</td>
+<td>Remove from credentials map; alert the operator</td>
+</tr>
+<tr>
+<td>N/A</td>
+<td><code>UnknownLocationError</code></td>
+<td>Caller asked for a <code>location_uid</code> not in the map</td>
+<td>Re-run <code>onboard_location.py</code> for the missing UID</td>
+</tr>
+<tr>
+<td>N/A</td>
+<td><code>OnboardingPartialFailure</code></td>
+<td>Bulk onboarding completed N-1 of N locations</td>
+<td>Re-run; idempotent — already-onboarded are skipped</td>
+</tr>
+<tr>
+<td><code>429 Too Many Requests</code></td>
+<td><code>LocationRateLimitExceeded</code></td>
+<td>Per-location bucket exhausted</td>
+<td>Bucket auto-refills; respect <code>Retry-After</code>; tune bucket in <code>config/settings.yaml</code></td>
+</tr>
+<tr>
+<td><code>401 Unauthorized</code></td>
+<td>underlying <code>PodiumAuthError</code></td>
+<td>Token refresh failed for this specific location</td>
+<td>Surface to ops; auth-side recovery is <code>podium-auth</code>&#39;s domain</td>
+</tr>
+</tbody></table>
+<h2>Examples</h2>
+<h3>Pre-flight verify a location_uid before a write</h3>
+<pre data-lang="bash"><code>
+python3 scripts/verify_location.py \
+  --location-uid {your-location-uid} \
+  --credentials-file ./config/locations.json
+</code></pre>
+<p>Exit code 0 = the UID is in scope; exit code 1 = not in scope (silent 403 prevented); exit code 2 = config or network error.</p>
+<h3>Onboard a new location idempotently</h3>
+<pre data-lang="bash"><code>
+python3 scripts/onboard_location.py \
+  --location-uid {your-new-location-uid} \
+  --org-slug acme-rv-sydney \
+  --client-id-env PODIUM_CLIENT_ID \
+  --client-secret-env PODIUM_CLIENT_SECRET \
+  --refresh-token-file ./secrets/sydney-refresh.json \
+  --credentials-file ./config/locations.json
+</code></pre>
+<p>Re-running with the same <code>--location-uid</code> is safe — already-onboarded locations are detected and the script exits 0 with status <code>skipped_existing</code>.</p>
+<h3>Query the audit log for a specific location and date range</h3>
+<pre data-lang="bash"><code>
+python3 scripts/audit_log_query.py \
+  --audit-log ./audit-log/podium-router.jsonl \
+  --location-uid {your-location-uid} \
+  --since 2026-05-01 \
+  --until 2026-05-12 \
+  --output json
+</code></pre>
+<p>Output: one JSON record per matching call, including <code>request_id</code> for cross-correlation with downstream systems.</p>
+<h3>Programmatic use — write a contact to a specific location</h3>
+<pre data-lang="python"><code>
+router = LocationRouter.from_credentials_file(&quot;./config/locations.json&quot;,
+                                              audit_log_path=&quot;./audit-log/podium-router.jsonl&quot;)
+client = router.get_client(location_uid=&quot;{your-location-uid}&quot;)
+r = await client.call(&quot;POST&quot;, &quot;/v4/contacts&quot;, json={
+    &quot;first_name&quot;: &quot;Jane&quot;,
+    &quot;last_name&quot;: &quot;Doe&quot;,
+    &quot;phone&quot;: &quot;+15555550100&quot;,
+    &quot;location_uid&quot;: &quot;{your-location-uid}&quot;,
+})
+r.raise_for_status()
+</code></pre>
+<p>Every call produces exactly one audit-log line. The <code>location_uid</code> argument is verified against <code>/v4/locations</code> before the request is sent.</p>
+<h2>Output</h2>
+<ul>
+<li><code>LocationRouter</code> library with one <code>PodiumAuth</code> instance per <code>location_uid</code> (never per org)</li>
+<li>Pre-flight <code>ensure_location_verified()</code> against <code>GET /v4/locations</code> with a 1-hour TTL</li>
+<li>Append-only JSONL audit log: one line per call with <code>{ts, location_uid, org_slug, endpoint, method, status, request_id, latency_ms}</code></li>
+<li>Idempotent <code>onboard_locations()</code> orchestrator — safe to re-run after partial failure</li>
+<li>Per-location token bucket sized independently of org-wide quota</li>
+<li><code>UnknownLocationError</code> and <code>LocationNotInScopeError</code> to make silent wrong-location writes impossible</li>
+</ul>
+<h2>Resources</h2>
+<ul>
+<li><a href="https://docs.podium.com/reference/locations">Podium API docs — Locations</a></li>
+<li><a href="https://docs.podium.com/reference/contacts">Podium API docs — Contacts</a></li>
+<li><a href="config/settings.yaml">config/settings.yaml</a> — verification TTL, audit-log path, per-location bucket defaults, onboarding concurrency</li>
+<li><a href="references/errors.md">references/errors.md</a> — ERR_LOC_* codes with cause + solution</li>
+<li><a href="references/examples.md">references/examples.md</a> — 10 worked examples (single-location, agency, onboarding, audit query)</li>
+<li><a href="references/implementation.md">references/implementation.md</a> — Node.js port, audit-log retention, SQLite query layer</li>
+<li><a href="scripts/location_router.py">scripts/location_router.py</a> — library: <code>LocationRouter.get_client(location_uid)</code></li>
+<li><a href="scripts/verify_location.py">scripts/verify_location.py</a> — CLI: confirm a <code>location_uid</code> is reachable</li>
+<li><a href="scripts/onboard_location.py">scripts/onboard_location.py</a> — CLI: idempotently onboard a new location</li>
+<li><a href="scripts/audit_log_query.py">scripts/audit_log_query.py</a> — CLI: query the audit log by location_uid + date range</li>
+</ul></div>
+      </div>
+    </section>
+
+    <!-- 8. Bottom CTA -->
+    <section class="detail-cta" data-astro-cid-qcigfm7x>
+  <h2 class="detail-cta__headline" data-astro-cid-qcigfm7x>Ready to use podium-pack?</h2>
+  <div class="detail-cta__actions" data-astro-cid-qcigfm7x>
+    <button class="detail-cta__primary" data-copy-install="/plugin install podium-pack@claude-code-plugins-plus" data-astro-cid-qcigfm7x>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" data-astro-cid-qcigfm7x>
+        <rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" stroke-width="1.5" data-astro-cid-qcigfm7x></rect>
+        <path d="M3 11V3a1 1 0 011-1h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" data-astro-cid-qcigfm7x></path>
+      </svg>
+      <span class="detail-cta__btn-text" data-astro-cid-qcigfm7x>Copy Install Command</span>
+    </button>
+    
+  </div>
+</section>
+
+<script type="module">document.querySelectorAll("[data-copy-install]").forEach(t=>{t.addEventListener("click",async()=>{const a=t.dataset.copyInstall||"";await navigator.clipboard.writeText(a);const e=t.querySelector(".detail-cta__btn-text");if(e){const o=e.textContent;e.textContent="Copied!",t.classList.add("copied"),window.trackEvent&&window.trackEvent("install_copied",{plugin_name:a.split(" ").pop()||"",source:"detail_cta"}),setTimeout(()=>{e.textContent=o,t.classList.remove("copied")},2e3)}})});</script>
+
+    <!-- 9. Related Skills (6, with tool pills) -->
+    <section class="related-skills-section" data-astro-cid-jrlgpo3w>
+        <h2 class="related-skills-heading" data-astro-cid-jrlgpo3w>Related Skills</h2>
+        <div class="related-skills-grid" data-astro-cid-jrlgpo3w>
+          <a href="/skills/abridge-ci-integration/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-ci-integration</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Configure CI/CD pipeline for Abridge clinical AI integrations with GitHub Actions.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-common-errors/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-common-errors</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Diagnose and fix common Abridge clinical AI integration errors.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-a/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-a</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge ambient clinical documentation capture-to-note pipeline.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-b/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-b</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge patient-facing documentation and after-visit summary generation.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-cost-tuning/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-cost-tuning</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Optimize Abridge clinical AI costs through tier selection, session management, and usage monitoring for healthcare organizations.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-debug-bundle/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-debug-bundle</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Collect Abridge debug evidence for support tickets and troubleshooting.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a>
+        </div>
+      </section>
+
+  </div>
+
+  
+  <script>
+    document.querySelectorAll('.install-command').forEach(el => {
+      el.addEventListener('click', function() {
+        const text = this.dataset.copy || this.textContent;
+        navigator.clipboard.writeText(text).then(() => {
+          const originalText = this.textContent;
+          this.textContent = 'Copied to clipboard!';
+          this.style.color = 'var(--brand-green)';
+          setTimeout(() => {
+            this.textContent = originalText;
+            this.style.color = '';
+          }, 2000);
+        });
+      });
+    });
+  </script>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

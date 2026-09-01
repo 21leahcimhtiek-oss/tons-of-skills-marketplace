@@ -1,0 +1,1094 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>sentry-rate-limits - Agent Skill</title>
+    <meta name="description" content="Manage Sentry rate limits, quotas, and event volume optimization. Use when hitting 429 errors, tuning sampleRate/tracesSampleRate, filtering noisy browser errors with beforeSend, configuring inbound data filters, setting per-key rate limits, or monitoring quota usage via the Sentry stats API. Trigger: &quot;sentry rate limit&quot;, &quot;sentry quota&quot;, &quot;reduce sentry events&quot;, &quot;sentry 429&quot;, &quot;sentry spike protection&quot;, &quot;sentry sampling&quot;.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://tonsofskills.com/tons-of-skills-marketplace/skills/sentry-rate-limits/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/sentry-rate-limits/">
+    <meta property="og:title" content="sentry-rate-limits - Agent Skill">
+    <meta property="og:description" content="Manage Sentry rate limits, quotas, and event volume optimization. Use when hitting 429 errors, tuning sampleRate/tracesSampleRate, filtering noisy browser errors with beforeSend, configuring inbound data filters, setting per-key rate limits, or monitoring quota usage via the Sentry stats API. Trigger: &quot;sentry rate limit&quot;, &quot;sentry quota&quot;, &quot;reduce sentry events&quot;, &quot;sentry 429&quot;, &quot;sentry spike protection&quot;, &quot;sentry sampling&quot;.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="sentry-rate-limits - Agent Skill">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/sentry-rate-limits/">
+    <meta name="twitter:title" content="sentry-rate-limits - Agent Skill">
+    <meta name="twitter:description" content="Manage Sentry rate limits, quotas, and event volume optimization. Use when hitting 429 errors, tuning sampleRate/tracesSampleRate, filtering noisy browser errors with beforeSend, configuring inbound data filters, setting per-key rate limits, or monitoring quota usage via the Sentry stats API. Trigger: &quot;sentry rate limit&quot;, &quot;sentry quota&quot;, &quot;reduce sentry events&quot;, &quot;sentry 429&quot;, &quot;sentry spike protection&quot;, &quot;sentry sampling&quot;.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"sentry-rate-limits","description":"Manage Sentry rate limits, quotas, and event volume optimization. Use when hitting 429 errors, tuning sampleRate/tracesSampleRate, filtering noisy browser errors with beforeSend, configuring inbound data filters, setting per-key rate limits, or monitoring quota usage via the Sentry stats API. Trigger: \"sentry rate limit\", \"sentry quota\", \"reduce sentry events\", \"sentry 429\", \"sentry spike protection\", \"sentry sampling\".","version":"1.51.0","author":{"@type":"Person","name":"Jeremy Longshore"},"license":"MIT","programmingLanguage":"Claude Code Agent Skill","isPartOf":{"@type":"SoftwareApplication","name":"sentry-pack","applicationCategory":"unknown"}}</script>
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.breadcrumbs[data-astro-cid-ilhxcym7]{margin-bottom:var(--space-5)}.breadcrumbs__list[data-astro-cid-ilhxcym7]{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;list-style:none;padding:0;margin:0;font-family:var(--font-mono);font-size:var(--text-sm, .8rem)}.breadcrumbs__item[data-astro-cid-ilhxcym7]{display:flex;align-items:center;gap:.375rem}.breadcrumbs__link[data-astro-cid-ilhxcym7]{color:var(--text-3);text-decoration:none;transition:color var(--duration-fast, .2s) var(--ease-out)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:hover{color:var(--primary)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:0}.breadcrumbs__sep[data-astro-cid-ilhxcym7]{color:var(--text-3);user-select:none;font-size:.7em;line-height:1}.breadcrumbs__current[data-astro-cid-ilhxcym7]{color:var(--text-2)}.detail-cta[data-astro-cid-qcigfm7x]{background:var(--surface-3, var(--brand-light-gray));border-top:1px solid var(--border, var(--brand-light-gray));border-radius:var(--radius-lg);padding:2rem 1.5rem;margin-top:2rem;text-align:center}.detail-cta__headline[data-astro-cid-qcigfm7x]{font-family:var(--font-display);font-weight:700;font-size:1.35rem;color:var(--text, var(--brand-dark));margin-bottom:1.25rem}.detail-cta__actions[data-astro-cid-qcigfm7x]{display:flex;justify-content:center;gap:.75rem;flex-wrap:wrap}.detail-cta__primary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:var(--primary);color:#0a0a0c;border:none;border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;cursor:pointer;transition:background var(--duration-fast) var(--ease-out),transform var(--duration-fast) var(--ease-out)}.detail-cta__primary[data-astro-cid-qcigfm7x]:hover{background:var(--primary-dark, var(--primary-dark));transform:translateY(-1px)}.detail-cta__primary[data-astro-cid-qcigfm7x].copied{background:var(--positive, var(--brand-green))}.detail-cta__secondary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:transparent;color:var(--text, var(--brand-dark));border:1px solid var(--border, var(--brand-mid-gray));border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;text-decoration:none;transition:border-color var(--duration-fast) var(--ease-out),color var(--duration-fast) var(--ease-out)}.detail-cta__secondary[data-astro-cid-qcigfm7x]:hover{border-color:var(--primary);color:var(--primary)}@media(max-width:480px){.detail-cta__actions[data-astro-cid-qcigfm7x]{flex-direction:column;align-items:stretch}.detail-cta__primary[data-astro-cid-qcigfm7x],.detail-cta__secondary[data-astro-cid-qcigfm7x]{justify-content:center}}
+</style>
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/_slug_@_@astro.wF9emvVq.css"></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  
+  
+
+  <div class="skill-detail" data-astro-cid-jrlgpo3w>
+    <!-- 1. Breadcrumbs -->
+    <nav aria-label="Breadcrumb" class="breadcrumbs" data-astro-cid-ilhxcym7>
+  <ol class="breadcrumbs__list" itemscope itemtype="https://schema.org/BreadcrumbList" data-astro-cid-ilhxcym7>
+    <li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Home</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="1">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/skills/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Skills</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="2">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          <span class="breadcrumbs__current" aria-current="page" itemprop="name" data-astro-cid-ilhxcym7>
+              sentry-rate-limits
+            </span>
+          <meta itemprop="position" content="3">
+        </li>
+  </ol>
+</nav>
+
+    <!-- 2. Header (enhanced) -->
+    <header class="skill-header" data-astro-cid-jrlgpo3w>
+      <h1 data-astro-cid-jrlgpo3w>sentry-rate-limits</h1>
+      <p class="skill-description" data-astro-cid-jrlgpo3w>Manage Sentry rate limits, quotas, and event volume optimization. Use when hitting 429 errors, tuning sampleRate/tracesSampleRate, filtering noisy browser errors with beforeSend, configuring inbound data filters, setting per-key rate limits, or monitoring quota usage via the Sentry stats API. Trigger: &quot;sentry rate limit&quot;, &quot;sentry quota&quot;, &quot;reduce sentry events&quot;, &quot;sentry 429&quot;, &quot;sentry spike protection&quot;, &quot;sentry sampling&quot;.</p>
+
+      <div class="skill-metadata" data-astro-cid-jrlgpo3w>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>v1.51.0</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>Jeremy Longshore</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>MIT</span>
+        </div>
+      </div>
+
+      
+    </header>
+
+    <!-- 4. Allowed Tools -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Allowed Tools</h2>
+      <div class="tools-grid" data-astro-cid-jrlgpo3w>
+        <span class="tool-badge" data-astro-cid-jrlgpo3w>Read</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Write</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Edit</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Grep</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Glob</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(curl:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(node:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(python3:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(pip:*)</span>
+      </div>
+      
+    </section>
+
+    <!-- 5. Provided by Plugin -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Provided by Plugin</h2>
+      <div class="plugin-info" data-astro-cid-jrlgpo3w>
+        <div class="plugin-details" data-astro-cid-jrlgpo3w>
+          <h3 data-astro-cid-jrlgpo3w>
+            <a href="/plugins/sentry-pack/" data-astro-cid-jrlgpo3w>sentry-pack</a>
+          </h3>
+          <p data-astro-cid-jrlgpo3w>Claude Code skill pack for Sentry (30 skills)</p>
+          <div class="plugin-meta" data-astro-cid-jrlgpo3w>
+            <span data-astro-cid-jrlgpo3w>unknown</span>
+            <span data-astro-cid-jrlgpo3w>v1.51.0</span>
+          </div>
+        </div>
+        <a href="/plugins/sentry-pack/" class="btn-primary" data-astro-cid-jrlgpo3w>View Plugin</a>
+      </div>
+    </section>
+
+    <!-- 6. Installation -->
+    <section class="section-box dark" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Installation</h2>
+      <p class="install-note" style="color: var(--brand-light-gray); margin-bottom: 0.75rem;" data-astro-cid-jrlgpo3w>This skill is included in the sentry-pack plugin:</p>
+      <pre class="install-command" data-copy="/plugin install sentry-pack@claude-code-plugins-plus" data-astro-cid-jrlgpo3w><code data-astro-cid-jrlgpo3w>/plugin install sentry-pack@claude-code-plugins-plus</code></pre>
+      <p class="install-note" data-astro-cid-jrlgpo3w>Click to copy</p>
+    </section>
+
+    <!-- 7. Skill Content (Markdown) -->
+    <section class="skill-content-section" data-astro-cid-jrlgpo3w>
+      <h2 data-astro-cid-jrlgpo3w>Instructions</h2>
+      <div class="skill-content" data-astro-cid-jrlgpo3w>
+        <div data-astro-cid-jrlgpo3w><h1>Sentry Rate Limits &amp; Quota Optimization</h1>
+<h2>Overview</h2>
+<p>Manage Sentry rate limits, sampling strategies, and quota usage to control costs without losing visibility into critical errors. Covers client-side sampling, <code>beforeSend</code> filtering, server-side inbound filters, per-key rate limits, spike protection, and the usage stats API.</p>
+<h2>Prerequisites</h2>
+<ul>
+<li>Sentry account with a project DSN configured</li>
+<li><code>SENTRY_AUTH_TOKEN</code> with <code>org:read</code> and <code>project:write</code> scopes (Settings &gt; Auth Tokens)</li>
+<li><code>SENTRY_ORG</code> and <code>SENTRY_PROJECT</code> slugs known</li>
+<li>SDK installed: <code>@sentry/node</code> (npm) or <code>sentry-sdk</code> (pip)</li>
+<li>Current event volume visible at <code>sentry.io/stats/</code></li>
+</ul>
+<h2>Instructions</h2>
+<h3>Step 1 — Understand Rate Limit Behavior</h3>
+<p>When your project exceeds its quota, Sentry returns <code>429 Too Many Requests</code> with a <code>Retry-After</code> header. The SDK automatically stops sending events until the cooldown expires. Events generated during this window are permanently lost — there is no replay mechanism.</p>
+<p><strong>Rate limit tiers by plan:</strong></p>
+<table><thead><tr>
+<th>Plan</th>
+<th>API Rate Limit</th>
+<th>Notes</th>
+</tr></thead><tbody>
+<tr>
+<td>Developer</td>
+<td>50 RPM</td>
+<td>Shared quota, no reserved volume</td>
+</tr>
+<tr>
+<td>Team</td>
+<td>1,000 RPM</td>
+<td>Per-organization, includes spike protection</td>
+</tr>
+<tr>
+<td>Business</td>
+<td>10,000 RPM</td>
+<td>Per-organization, custom quotas available</td>
+</tr>
+<tr>
+<td>Enterprise</td>
+<td>Custom</td>
+<td>Negotiated per contract</td>
+</tr>
+</tbody></table>
+<p><strong>Quota categories (billed separately):</strong></p>
+<ul>
+<li><strong>Errors</strong> — exceptions and log messages</li>
+<li><strong>Transactions</strong> — performance monitoring spans</li>
+<li><strong>Replays</strong> — session replay recordings</li>
+<li><strong>Attachments</strong> — file uploads (crash dumps, minidumps)</li>
+<li><strong>Profiles</strong> — continuous profiling data</li>
+<li><strong>Cron monitors</strong> — scheduled job check-ins</li>
+</ul>
+<p>Rate limit headers returned on 429:</p>
+<pre><code>
+HTTP/1.1 429 Too Many Requests
+Retry-After: 60
+X-Sentry-Rate-Limit-Limit: 50
+X-Sentry-Rate-Limit-Remaining: 0
+X-Sentry-Rate-Limit-Reset: 1711324800
+</code></pre>
+<h3>Step 2 — Configure Client-Side Sampling</h3>
+<p>Sampling is the first line of defense. Set <code>sampleRate</code> for errors and <code>tracesSampleRate</code> for performance transactions.</p>
+<p><strong>TypeScript / Node.js:</strong></p>
+<pre data-lang="typescript"><code>
+import * as Sentry from &#39;@sentry/node&#39;;
+
+Sentry.init({
+  dsn: process.env.SENTRY_DSN,
+
+  // Error sampling: 0.0 (drop all) to 1.0 (capture all)
+  sampleRate: 0.25, // Capture 25% of errors
+
+  // Transaction sampling: 0.0 to 1.0
+  tracesSampleRate: 0.1, // Capture 10% of transactions
+
+  // Dynamic transaction sampling — route-aware cost control
+  tracesSampler: (samplingContext) =&gt; {
+    const { name, parentSampled } = samplingContext;
+
+    // Respect parent sampling decision in distributed traces
+    if (parentSampled !== undefined) return parentSampled;
+
+    // Drop health checks and readiness probes entirely
+    if (name === &#39;GET /health&#39; || name === &#39;GET /readiness&#39;) return 0;
+    if (name?.includes(&#39;/health&#39;)) return 0;
+
+    // High-value: payment and auth flows at 100%
+    if (name?.includes(&#39;/api/payment&#39;) || name?.includes(&#39;/api/auth&#39;)) return 1.0;
+
+    // Medium-value: API routes at 20%
+    if (name?.startsWith(&#39;GET /api/&#39;) || name?.startsWith(&#39;POST /api/&#39;)) return 0.2;
+
+    // Low-value: static assets — never trace
+    if (name?.startsWith(&#39;GET /static/&#39;) || name?.startsWith(&#39;GET /assets/&#39;)) return 0;
+
+    // Default fallback: 5%
+    return 0.05;
+  },
+});
+</code></pre>
+<p><strong>Python:</strong></p>
+<pre data-lang="python"><code>
+import sentry_sdk
+
+def traces_sampler(sampling_context):
+    tx_name = sampling_context.get(&quot;transaction_context&quot;, {}).get(&quot;name&quot;, &quot;&quot;)
+
+    # Drop health checks
+    if &quot;/health&quot; in tx_name or &quot;/readiness&quot; in tx_name:
+        return 0
+
+    # High-value flows
+    if &quot;/api/payment&quot; in tx_name or &quot;/api/auth&quot; in tx_name:
+        return 1.0
+
+    # API routes
+    if tx_name.startswith((&quot;GET /api/&quot;, &quot;POST /api/&quot;)):
+        return 0.2
+
+    # Static assets
+    if tx_name.startswith((&quot;GET /static/&quot;, &quot;GET /assets/&quot;)):
+        return 0
+
+    return 0.05
+
+sentry_sdk.init(
+    dsn=os.environ[&quot;SENTRY_DSN&quot;],
+    sample_rate=0.25,          # 25% of errors
+    traces_sample_rate=0.1,    # 10% of transactions (fallback if no sampler)
+    traces_sampler=traces_sampler,
+)
+</code></pre>
+<h3>Step 3 — Filter Noisy Errors with beforeSend</h3>
+<p>Use <code>beforeSend</code> to drop events before they count against your quota. This runs client-side, so filtered events never reach Sentry.</p>
+<p><strong>TypeScript / Node.js:</strong></p>
+<pre data-lang="typescript"><code>
+Sentry.init({
+  dsn: process.env.SENTRY_DSN,
+
+  beforeSend(event, hint) {
+    const error = hint?.originalException as Error | undefined;
+
+    // Drop browser extension errors (common in frontend SDKs)
+    if (event.exception?.values?.some(e =&gt;
+      e.stacktrace?.frames?.some(f =&gt;
+        f.filename?.includes(&#39;extensions://&#39;) ||
+        f.filename?.includes(&#39;moz-extension://&#39;) ||
+        f.filename?.includes(&#39;chrome-extension://&#39;)
+      )
+    )) {
+      return null; // Drop the event
+    }
+
+    // Drop known noisy browser errors
+    if (error?.message?.match(/ResizeObserver loop/)) return null;
+    if (error?.message?.match(/Non-Error promise rejection/)) return null;
+    if (error?.name === &#39;AbortError&#39;) return null;
+    if (error?.message?.match(/Load failed/)) return null;
+
+    // CRITICAL: Always capture payment errors regardless of sampleRate
+    if (error?.message?.includes(&#39;PaymentError&#39;) ||
+        event.tags?.[&#39;transaction.type&#39;] === &#39;payment&#39;) {
+      return event; // Force capture
+    }
+
+    return event;
+  },
+
+  // Pattern-based error filtering (faster than beforeSend for known strings)
+  ignoreErrors: [
+    &#39;ResizeObserver loop completed with undelivered notifications&#39;,
+    &#39;Non-Error promise rejection captured&#39;,
+    /Loading chunk \d+ failed/,
+    &#39;Network request failed&#39;,
+    &#39;Failed to fetch&#39;,
+    &#39;AbortError&#39;,
+    /^Script error\.?$/,
+    &#39;TypeError: cancelled&#39;,
+    &#39;TypeError: NetworkError when attempting to fetch resource&#39;,
+  ],
+
+  // Block errors originating from third-party scripts
+  denyUrls: [
+    /extensions\//i,
+    /^chrome:\/\//i,
+    /^chrome-extension:\/\//i,
+    /^moz-extension:\/\//i,
+    /hotjar\.com/,
+    /google-analytics\.com/,
+    /googletagmanager\.com/,
+    /intercom\.io/,
+  ],
+});
+</code></pre>
+<p><strong>Python:</strong></p>
+<pre data-lang="python"><code>
+def before_send(event, hint):
+    if &quot;exc_info&quot; in hint:
+        exc_type, exc_value, _ = hint[&quot;exc_info&quot;]
+
+        # Drop known noisy exceptions
+        if exc_type.__name__ in (&quot;ConnectionResetError&quot;, &quot;BrokenPipeError&quot;):
+            return None
+
+        # Drop health check 404s
+        msg = str(exc_value)
+        if &quot;health&quot; in msg.lower() and &quot;404&quot; in msg:
+            return None
+
+    # Always capture payment errors
+    if event.get(&quot;tags&quot;, {}).get(&quot;transaction.type&quot;) == &quot;payment&quot;:
+        return event
+
+    return event
+
+sentry_sdk.init(
+    dsn=os.environ[&quot;SENTRY_DSN&quot;],
+    before_send=before_send,
+    ignore_errors=[
+        &quot;ConnectionResetError&quot;,
+        &quot;BrokenPipeError&quot;,
+    ],
+)
+</code></pre>
+<h3>Step 4 — Enable Server-Side Inbound Data Filters</h3>
+<p>Inbound filters run on Sentry&#39;s servers before quota counting. Filtered events do not consume quota — this is free filtering.</p>
+<p>Configure at <strong>Project Settings &gt; Inbound Filters</strong>:</p>
+<table><thead><tr>
+<th>Filter</th>
+<th>What it blocks</th>
+<th>Recommended</th>
+</tr></thead><tbody>
+<tr>
+<td>Legacy browsers</td>
+<td>IE 9/10, old Safari, old Android</td>
+<td>Enable</td>
+</tr>
+<tr>
+<td>Browser extensions</td>
+<td>Errors from browser extension code</td>
+<td>Enable</td>
+</tr>
+<tr>
+<td>Localhost events</td>
+<td>Events from localhost / 127.0.0.1</td>
+<td>Enable for production projects</td>
+</tr>
+<tr>
+<td>Web crawlers</td>
+<td>Bot-generated errors (Googlebot, etc.)</td>
+<td>Enable</td>
+</tr>
+<tr>
+<td>Filtered releases</td>
+<td>Specific release versions</td>
+<td>Use for deprecated releases</td>
+</tr>
+<tr>
+<td>Error message patterns</td>
+<td>Custom regex patterns</td>
+<td>Add known false-positive patterns</td>
+</tr>
+</tbody></table>
+<p><strong>Configure via API:</strong></p>
+<pre data-lang="bash"><code>
+# Enable legacy browser filter
+curl -X PUT \
+  -H &quot;Authorization: Bearer $SENTRY_AUTH_TOKEN&quot; \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{&quot;active&quot;: true}&#39; \
+  &quot;https://sentry.io/api/0/projects/$SENTRY_ORG/$SENTRY_PROJECT/filters/legacy-browsers/&quot;
+
+# Enable browser extension filter
+curl -X PUT \
+  -H &quot;Authorization: Bearer $SENTRY_AUTH_TOKEN&quot; \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{&quot;active&quot;: true}&#39; \
+  &quot;https://sentry.io/api/0/projects/$SENTRY_ORG/$SENTRY_PROJECT/filters/browser-extensions/&quot;
+
+# Enable web crawler filter
+curl -X PUT \
+  -H &quot;Authorization: Bearer $SENTRY_AUTH_TOKEN&quot; \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{&quot;active&quot;: true}&#39; \
+  &quot;https://sentry.io/api/0/projects/$SENTRY_ORG/$SENTRY_PROJECT/filters/web-crawlers/&quot;
+</code></pre>
+<h3>Step 5 — Set Per-Key Rate Limits</h3>
+<p>Each DSN (Client Key) can have its own rate limit. This prevents a single project from exhausting the organization&#39;s entire quota.</p>
+<p>Configure at <strong>Project Settings &gt; Client Keys &gt; Configure &gt; Rate Limiting</strong>.</p>
+<pre data-lang="bash"><code>
+# Set rate limit to 1000 events per hour on a specific client key
+# First, list client keys to find the key ID
+curl -s -H &quot;Authorization: Bearer $SENTRY_AUTH_TOKEN&quot; \
+  &quot;https://sentry.io/api/0/projects/$SENTRY_ORG/$SENTRY_PROJECT/keys/&quot; \
+  | python3 -m json.tool
+
+# Then set the rate limit
+curl -X PUT \
+  -H &quot;Authorization: Bearer $SENTRY_AUTH_TOKEN&quot; \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{&quot;rateLimit&quot;: {&quot;window&quot;: 3600, &quot;count&quot;: 1000}}&#39; \
+  &quot;https://sentry.io/api/0/projects/$SENTRY_ORG/$SENTRY_PROJECT/keys/$KEY_ID/&quot;
+</code></pre>
+<p><strong>Strategy for multi-environment setups:</strong></p>
+<ul>
+<li>Production DSN: 5,000 events/hour (critical errors matter)</li>
+<li>Staging DSN: 500 events/hour (only need representative sample)</li>
+<li>Development DSN: 100 events/hour (prevent local debugging floods)</li>
+</ul>
+<h3>Step 6 — Enable Spike Protection</h3>
+<p>Spike protection is auto-enabled on Team and Business plans. It detects sudden event volume increases and temporarily rate-limits the project to prevent quota exhaustion from error storms.</p>
+<p>Configure at <strong>Organization Settings &gt; Spike Protection</strong>.</p>
+<p>When spike protection triggers:</p>
+<ol>
+<li>Sentry detects volume exceeding 10x normal baseline</li>
+<li>Events are temporarily dropped (429 returned to SDK)</li>
+<li>An email notification is sent to organization owners</li>
+<li>Protection auto-disables after the spike subsides</li>
+</ol>
+<p>For programmatic spike alerts, set up a Sentry alert rule:</p>
+<ul>
+<li><strong>Condition:</strong> Number of events in project exceeds threshold</li>
+<li><strong>Action:</strong> Send notification to Slack/PagerDuty/email</li>
+<li><strong>Frequency:</strong> Alert once per hour</li>
+</ul>
+<h3>Step 7 — Monitor Quota Usage via API</h3>
+<pre data-lang="bash"><code>
+# Organization-wide usage stats for the last 7 days, grouped by category
+curl -s -H &quot;Authorization: Bearer $SENTRY_AUTH_TOKEN&quot; \
+  &quot;https://sentry.io/api/0/organizations/$SENTRY_ORG/stats_v2/?field=sum(quantity)&amp;groupBy=category&amp;interval=1d&amp;statsPeriod=7d&quot; \
+  | python3 -m json.tool
+
+# Per-project usage breakdown
+curl -s -H &quot;Authorization: Bearer $SENTRY_AUTH_TOKEN&quot; \
+  &quot;https://sentry.io/api/0/organizations/$SENTRY_ORG/stats_v2/?field=sum(quantity)&amp;groupBy=project&amp;category=error&amp;interval=1d&amp;statsPeriod=7d&quot; \
+  | python3 -m json.tool
+
+# Outcome-based stats (accepted, filtered, rate_limited, invalid)
+curl -s -H &quot;Authorization: Bearer $SENTRY_AUTH_TOKEN&quot; \
+  &quot;https://sentry.io/api/0/organizations/$SENTRY_ORG/stats_v2/?field=sum(quantity)&amp;groupBy=outcome&amp;category=error&amp;interval=1d&amp;statsPeriod=24h&quot; \
+  | python3 -m json.tool
+</code></pre>
+<h3>Step 8 — Reduce Payload Size and Deduplicate</h3>
+<p>Reduce event size and improve grouping to lower quota consumption:</p>
+<pre data-lang="typescript"><code>
+Sentry.init({
+  dsn: process.env.SENTRY_DSN,
+  maxBreadcrumbs: 30,   // Default: 100
+  maxValueLength: 500,   // Default: 250
+
+  beforeSend(event) {
+    // Truncate large request bodies
+    if (event.request?.data &amp;&amp; typeof event.request.data === &#39;string&#39;) {
+      event.request.data = event.request.data.substring(0, 1000);
+    }
+    // Remove cookies
+    if (event.request?.cookies) delete event.request.cookies;
+
+    // Custom fingerprinting: normalize dynamic values for better grouping
+    if (event.exception?.values?.[0]) {
+      const { type, value } = event.exception.values[0];
+      const normalized = value
+        ?.replace(/\b[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}\b/gi, &#39;&lt;UUID&gt;&#39;)
+        ?.replace(/\b\d+\b/g, &#39;&lt;N&gt;&#39;) || &#39;&#39;;
+      event.fingerprint = [type || &#39;unknown&#39;, normalized];
+    }
+    return event;
+  },
+});
+</code></pre>
+<h2>Output</h2>
+<p>After completing these steps, you will have:</p>
+<ul>
+<li>Sampling rates configured (<code>sampleRate</code>, <code>tracesSampleRate</code>, <code>tracesSampler</code>) to reduce event volume while preserving visibility into critical paths</li>
+<li><code>beforeSend</code> filtering dropping noisy browser errors (ResizeObserver, AbortError, extension errors) before they count against quota</li>
+<li><code>ignoreErrors</code> and <code>denyUrls</code> patterns blocking known false positives</li>
+<li>Server-side inbound filters enabled for free pre-quota filtering</li>
+<li>Per-key rate limits set to prevent single-project quota exhaustion</li>
+<li>Spike protection enabled and alert rules configured</li>
+<li>Quota monitoring via the <code>/stats_v2/</code> API endpoint</li>
+<li>Custom fingerprinting reducing event duplication</li>
+</ul>
+<h2>Error Handling</h2>
+<table><thead><tr>
+<th>Error</th>
+<th>Cause</th>
+<th>Solution</th>
+</tr></thead><tbody>
+<tr>
+<td><code>429 Too Many Requests</code></td>
+<td>Quota exhausted for current billing period</td>
+<td>Lower <code>sampleRate</code> and <code>tracesSampleRate</code>, add patterns to <code>ignoreErrors</code>, enable per-key rate limits</td>
+</tr>
+<tr>
+<td>Events silently dropped</td>
+<td>Client SDK respecting <code>Retry-After</code> header</td>
+<td>Reduce volume at source; SDK auto-recovers after cooldown expires</td>
+</tr>
+<tr>
+<td>Critical errors missed</td>
+<td><code>sampleRate</code> too low</td>
+<td>Use <code>beforeSend</code> to force-return critical errors regardless of sampling; never filter payment/auth errors</td>
+</tr>
+<tr>
+<td>Quota exhausted early in period</td>
+<td>No per-project rate limits</td>
+<td>Set hourly rate limits per client key to spread quota evenly across the billing period</td>
+</tr>
+<tr>
+<td>Spike consuming entire quota</td>
+<td>Spike protection not enabled or threshold too high</td>
+<td>Enable spike protection in organization settings; set up volume alert rules</td>
+</tr>
+<tr>
+<td><code>401 Unauthorized</code> on stats API</td>
+<td>Invalid or expired auth token</td>
+<td>Regenerate token at Settings &gt; Auth Tokens with <code>org:read</code> scope</td>
+</tr>
+<tr>
+<td>Inbound filter not reducing volume</td>
+<td>Filter configured but wrong error type</td>
+<td>Verify filter targets correct category; browser extension filter only works for JS SDK errors</td>
+</tr>
+<tr>
+<td><code>tracesSampler</code> not called</td>
+<td><code>tracesSampleRate</code> takes precedence in some SDK versions</td>
+<td>Remove <code>tracesSampleRate</code> when using <code>tracesSampler</code> — they conflict</td>
+</tr>
+</tbody></table>
+<h2>Examples</h2>
+<h3>Example 1 — Quota Monitoring Bash Script</h3>
+<pre data-lang="bash"><code>
+#!/usr/bin/env bash
+# Monitor Sentry quota usage and alert if approaching limit
+set -euo pipefail
+
+ORG=&quot;${SENTRY_ORG:?Set SENTRY_ORG}&quot;
+TOKEN=&quot;${SENTRY_AUTH_TOKEN:?Set SENTRY_AUTH_TOKEN}&quot;
+THRESHOLD=${QUOTA_THRESHOLD:-80}  # Alert at 80% usage
+
+accepted=$(curl -s -H &quot;Authorization: Bearer $TOKEN&quot; \
+  &quot;https://sentry.io/api/0/organizations/$ORG/stats_v2/?field=sum(quantity)&amp;groupBy=outcome&amp;category=error&amp;statsPeriod=1h&amp;interval=1h&quot; \
+  | python3 -c &quot;
+import json, sys
+data = json.load(sys.stdin)
+for g in data.get(&#39;groups&#39;, []):
+    if g[&#39;by&#39;].get(&#39;outcome&#39;) == &#39;accepted&#39;:
+        print(g[&#39;totals&#39;][&#39;sum(quantity)&#39;]); break
+else: print(0)&quot;)
+
+echo &quot;Accepted events (last hour): $accepted&quot;
+[ &quot;$accepted&quot; -gt &quot;$THRESHOLD&quot; ] &amp;&amp; echo &quot;WARNING: volume $accepted &gt; threshold $THRESHOLD&quot;
+</code></pre>
+<h3>Example 2 — Enable All Inbound Filters via API</h3>
+<pre data-lang="bash"><code>
+#!/usr/bin/env bash
+set -euo pipefail
+BASE=&quot;https://sentry.io/api/0/projects/$SENTRY_ORG/$SENTRY_PROJECT/filters&quot;
+AUTH=&quot;Authorization: Bearer $SENTRY_AUTH_TOKEN&quot;
+
+for filter in legacy-browsers browser-extensions web-crawlers; do
+  curl -s -X PUT -H &quot;$AUTH&quot; -H &quot;Content-Type: application/json&quot; \
+    -d &#39;{&quot;active&quot;: true}&#39; &quot;$BASE/$filter/&quot; &amp;&amp; echo &quot;Enabled: $filter&quot;
+done
+</code></pre>
+<h2>Resources</h2>
+<ul>
+<li><a href="https://docs.sentry.io/pricing/quotas/">Quota Management</a> — billing categories, quota limits, and overage handling</li>
+<li><a href="https://docs.sentry.io/pricing/quotas/manage-event-stream-guide/">Manage Your Event Stream</a> — step-by-step cost reduction guide</li>
+<li><a href="https://docs.sentry.io/platforms/javascript/configuration/sampling/">Sampling Configuration</a> — <code>sampleRate</code>, <code>tracesSampleRate</code>, <code>tracesSampler</code></li>
+<li><a href="https://docs.sentry.io/platforms/javascript/configuration/filtering/">Filtering Events</a> — <code>beforeSend</code>, <code>ignoreErrors</code>, <code>denyUrls</code></li>
+<li><a href="https://docs.sentry.io/concepts/data-management/filtering/">Inbound Data Filters</a> — server-side free filtering</li>
+<li><a href="https://docs.sentry.io/api/projects/update-a-client-key/">Rate Limiting API</a> — per-key rate limit configuration</li>
+<li><a href="https://docs.sentry.io/api/organizations/retrieve-event-counts-for-an-organization-v2/">Stats API v2</a> — usage monitoring endpoint</li>
+</ul>
+<h2>Next Steps</h2>
+<ul>
+<li><strong>Cost review</strong>: Query <code>/stats_v2/</code> weekly to track spend trends by category</li>
+<li><strong>Alert rules</strong>: Create Sentry alerts for volume spikes per project</li>
+<li><strong>Replay sampling</strong>: Apply <code>replaysSessionSampleRate</code> and <code>replaysOnErrorSampleRate</code> for session replay cost control</li>
+<li><strong>Server-side sampling</strong>: Explore Sentry Dynamic Sampling (server-side) for organization-wide policies</li>
+<li><strong>Audit <code>ignoreErrors</code></strong>: Review quarterly — patterns may suppress real bugs as code evolves</li>
+</ul></div>
+      </div>
+    </section>
+
+    <!-- 8. Bottom CTA -->
+    <section class="detail-cta" data-astro-cid-qcigfm7x>
+  <h2 class="detail-cta__headline" data-astro-cid-qcigfm7x>Ready to use sentry-pack?</h2>
+  <div class="detail-cta__actions" data-astro-cid-qcigfm7x>
+    <button class="detail-cta__primary" data-copy-install="/plugin install sentry-pack@claude-code-plugins-plus" data-astro-cid-qcigfm7x>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" data-astro-cid-qcigfm7x>
+        <rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" stroke-width="1.5" data-astro-cid-qcigfm7x></rect>
+        <path d="M3 11V3a1 1 0 011-1h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" data-astro-cid-qcigfm7x></path>
+      </svg>
+      <span class="detail-cta__btn-text" data-astro-cid-qcigfm7x>Copy Install Command</span>
+    </button>
+    
+  </div>
+</section>
+
+<script type="module">document.querySelectorAll("[data-copy-install]").forEach(t=>{t.addEventListener("click",async()=>{const a=t.dataset.copyInstall||"";await navigator.clipboard.writeText(a);const e=t.querySelector(".detail-cta__btn-text");if(e){const o=e.textContent;e.textContent="Copied!",t.classList.add("copied"),window.trackEvent&&window.trackEvent("install_copied",{plugin_name:a.split(" ").pop()||"",source:"detail_cta"}),setTimeout(()=>{e.textContent=o,t.classList.remove("copied")},2e3)}})});</script>
+
+    <!-- 9. Related Skills (6, with tool pills) -->
+    <section class="related-skills-section" data-astro-cid-jrlgpo3w>
+        <h2 class="related-skills-heading" data-astro-cid-jrlgpo3w>Related Skills</h2>
+        <div class="related-skills-grid" data-astro-cid-jrlgpo3w>
+          <a href="/skills/abridge-ci-integration/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-ci-integration</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Configure CI/CD pipeline for Abridge clinical AI integrations with GitHub Actions.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-common-errors/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-common-errors</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Diagnose and fix common Abridge clinical AI integration errors.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-a/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-a</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge ambient clinical documentation capture-to-note pipeline.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-b/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-b</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge patient-facing documentation and after-visit summary generation.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-cost-tuning/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-cost-tuning</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Optimize Abridge clinical AI costs through tier selection, session management, and usage monitoring for healthcare organizations.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-debug-bundle/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-debug-bundle</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Collect Abridge debug evidence for support tickets and troubleshooting.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a>
+        </div>
+      </section>
+
+  </div>
+
+  
+  <script>
+    document.querySelectorAll('.install-command').forEach(el => {
+      el.addEventListener('click', function() {
+        const text = this.dataset.copy || this.textContent;
+        navigator.clipboard.writeText(text).then(() => {
+          const originalText = this.textContent;
+          this.textContent = 'Copied to clipboard!';
+          this.style.color = 'var(--brand-green)';
+          setTimeout(() => {
+            this.textContent = originalText;
+            this.style.color = '';
+          }, 2000);
+        });
+      });
+    });
+  </script>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

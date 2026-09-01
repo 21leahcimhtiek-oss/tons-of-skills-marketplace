@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>hubspot-contact-dedup - Agent Skill</title>
+    <meta name="description" content="Deduplicate HubSpot contacts at production scale — surviving import storms, wrong-winner merges, fuzzy-match blind spots, association orphans, rate-limit exhaustion, and silent merge failures on conflicting lifecycle or opt-out status. Use when cleaning a CRM after a bulk import, running a nightly dedup pipeline on millions of records, recovering from a merge that destroyed the wrong timeline, or building fuzzy matching beyond HubSpot's native email-uniqueness. Trigger with &quot;hubspot dedup&quot;, &quot;hubspot merge contacts&quot;, &quot;hubspot duplicate contacts&quot;, &quot;hubspot contact cleanup&quot;, &quot;hubspot import duplicates&quot;, &quot;hubspot fuzzy match contacts&quot;.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://tonsofskills.com/tons-of-skills-marketplace/skills/hubspot-contact-dedup/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/hubspot-contact-dedup/">
+    <meta property="og:title" content="hubspot-contact-dedup - Agent Skill">
+    <meta property="og:description" content="Deduplicate HubSpot contacts at production scale — surviving import storms, wrong-winner merges, fuzzy-match blind spots, association orphans, rate-limit exhaustion, and silent merge failures on conflicting lifecycle or opt-out status. Use when cleaning a CRM after a bulk import, running a nightly dedup pipeline on millions of records, recovering from a merge that destroyed the wrong timeline, or building fuzzy matching beyond HubSpot's native email-uniqueness. Trigger with &quot;hubspot dedup&quot;, &quot;hubspot merge contacts&quot;, &quot;hubspot duplicate contacts&quot;, &quot;hubspot contact cleanup&quot;, &quot;hubspot import duplicates&quot;, &quot;hubspot fuzzy match contacts&quot;.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="hubspot-contact-dedup - Agent Skill">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/hubspot-contact-dedup/">
+    <meta name="twitter:title" content="hubspot-contact-dedup - Agent Skill">
+    <meta name="twitter:description" content="Deduplicate HubSpot contacts at production scale — surviving import storms, wrong-winner merges, fuzzy-match blind spots, association orphans, rate-limit exhaustion, and silent merge failures on conflicting lifecycle or opt-out status. Use when cleaning a CRM after a bulk import, running a nightly dedup pipeline on millions of records, recovering from a merge that destroyed the wrong timeline, or building fuzzy matching beyond HubSpot's native email-uniqueness. Trigger with &quot;hubspot dedup&quot;, &quot;hubspot merge contacts&quot;, &quot;hubspot duplicate contacts&quot;, &quot;hubspot contact cleanup&quot;, &quot;hubspot import duplicates&quot;, &quot;hubspot fuzzy match contacts&quot;.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"hubspot-contact-dedup","description":"Deduplicate HubSpot contacts at production scale — surviving import storms, wrong-winner merges, fuzzy-match blind spots, association orphans, rate-limit exhaustion, and silent merge failures on conflicting lifecycle or opt-out status. Use when cleaning a CRM after a bulk import, running a nightly dedup pipeline on millions of records, recovering from a merge that destroyed the wrong timeline, or building fuzzy matching beyond HubSpot's native email-uniqueness. Trigger with \"hubspot dedup\", \"hubspot merge contacts\", \"hubspot duplicate contacts\", \"hubspot contact cleanup\", \"hubspot import duplicates\", \"hubspot fuzzy match contacts\".","version":"2.9.0","author":{"@type":"Person","name":"Jeremy Longshore"},"license":"MIT","programmingLanguage":"Claude Code Agent Skill","isPartOf":{"@type":"SoftwareApplication","name":"hubspot-pack","applicationCategory":"unknown"}}</script>
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.breadcrumbs[data-astro-cid-ilhxcym7]{margin-bottom:var(--space-5)}.breadcrumbs__list[data-astro-cid-ilhxcym7]{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;list-style:none;padding:0;margin:0;font-family:var(--font-mono);font-size:var(--text-sm, .8rem)}.breadcrumbs__item[data-astro-cid-ilhxcym7]{display:flex;align-items:center;gap:.375rem}.breadcrumbs__link[data-astro-cid-ilhxcym7]{color:var(--text-3);text-decoration:none;transition:color var(--duration-fast, .2s) var(--ease-out)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:hover{color:var(--primary)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:0}.breadcrumbs__sep[data-astro-cid-ilhxcym7]{color:var(--text-3);user-select:none;font-size:.7em;line-height:1}.breadcrumbs__current[data-astro-cid-ilhxcym7]{color:var(--text-2)}.detail-cta[data-astro-cid-qcigfm7x]{background:var(--surface-3, var(--brand-light-gray));border-top:1px solid var(--border, var(--brand-light-gray));border-radius:var(--radius-lg);padding:2rem 1.5rem;margin-top:2rem;text-align:center}.detail-cta__headline[data-astro-cid-qcigfm7x]{font-family:var(--font-display);font-weight:700;font-size:1.35rem;color:var(--text, var(--brand-dark));margin-bottom:1.25rem}.detail-cta__actions[data-astro-cid-qcigfm7x]{display:flex;justify-content:center;gap:.75rem;flex-wrap:wrap}.detail-cta__primary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:var(--primary);color:#0a0a0c;border:none;border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;cursor:pointer;transition:background var(--duration-fast) var(--ease-out),transform var(--duration-fast) var(--ease-out)}.detail-cta__primary[data-astro-cid-qcigfm7x]:hover{background:var(--primary-dark, var(--primary-dark));transform:translateY(-1px)}.detail-cta__primary[data-astro-cid-qcigfm7x].copied{background:var(--positive, var(--brand-green))}.detail-cta__secondary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:transparent;color:var(--text, var(--brand-dark));border:1px solid var(--border, var(--brand-mid-gray));border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;text-decoration:none;transition:border-color var(--duration-fast) var(--ease-out),color var(--duration-fast) var(--ease-out)}.detail-cta__secondary[data-astro-cid-qcigfm7x]:hover{border-color:var(--primary);color:var(--primary)}@media(max-width:480px){.detail-cta__actions[data-astro-cid-qcigfm7x]{flex-direction:column;align-items:stretch}.detail-cta__primary[data-astro-cid-qcigfm7x],.detail-cta__secondary[data-astro-cid-qcigfm7x]{justify-content:center}}
+</style>
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/_slug_@_@astro.wF9emvVq.css"></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  
+  
+
+  <div class="skill-detail" data-astro-cid-jrlgpo3w>
+    <!-- 1. Breadcrumbs -->
+    <nav aria-label="Breadcrumb" class="breadcrumbs" data-astro-cid-ilhxcym7>
+  <ol class="breadcrumbs__list" itemscope itemtype="https://schema.org/BreadcrumbList" data-astro-cid-ilhxcym7>
+    <li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Home</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="1">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/skills/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Skills</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="2">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          <span class="breadcrumbs__current" aria-current="page" itemprop="name" data-astro-cid-ilhxcym7>
+              hubspot-contact-dedup
+            </span>
+          <meta itemprop="position" content="3">
+        </li>
+  </ol>
+</nav>
+
+    <!-- 2. Header (enhanced) -->
+    <header class="skill-header" data-astro-cid-jrlgpo3w>
+      <h1 data-astro-cid-jrlgpo3w>hubspot-contact-dedup</h1>
+      <p class="skill-description" data-astro-cid-jrlgpo3w>Deduplicate HubSpot contacts at production scale — surviving import storms, wrong-winner merges, fuzzy-match blind spots, association orphans, rate-limit exhaustion, and silent merge failures on conflicting lifecycle or opt-out status. Use when cleaning a CRM after a bulk import, running a nightly dedup pipeline on millions of records, recovering from a merge that destroyed the wrong timeline, or building fuzzy matching beyond HubSpot&#39;s native email-uniqueness. Trigger with &quot;hubspot dedup&quot;, &quot;hubspot merge contacts&quot;, &quot;hubspot duplicate contacts&quot;, &quot;hubspot contact cleanup&quot;, &quot;hubspot import duplicates&quot;, &quot;hubspot fuzzy match contacts&quot;.</p>
+
+      <div class="skill-metadata" data-astro-cid-jrlgpo3w>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>v2.9.0</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>Jeremy Longshore</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>MIT</span>
+        </div>
+      </div>
+
+      
+    </header>
+
+    <!-- 4. Allowed Tools -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Allowed Tools</h2>
+      <div class="tools-grid" data-astro-cid-jrlgpo3w>
+        <span class="tool-badge" data-astro-cid-jrlgpo3w>Read</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(curl:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(jq:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(python3:*)</span>
+      </div>
+      
+    </section>
+
+    <!-- 5. Provided by Plugin -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Provided by Plugin</h2>
+      <div class="plugin-info" data-astro-cid-jrlgpo3w>
+        <div class="plugin-details" data-astro-cid-jrlgpo3w>
+          <h3 data-astro-cid-jrlgpo3w>
+            <a href="/plugins/hubspot-pack/" data-astro-cid-jrlgpo3w>hubspot-pack</a>
+          </h3>
+          <p data-astro-cid-jrlgpo3w>Claude Code skill pack for HubSpot (10 production-engineer skills)</p>
+          <div class="plugin-meta" data-astro-cid-jrlgpo3w>
+            <span data-astro-cid-jrlgpo3w>unknown</span>
+            <span data-astro-cid-jrlgpo3w>v2.9.0</span>
+          </div>
+        </div>
+        <a href="/plugins/hubspot-pack/" class="btn-primary" data-astro-cid-jrlgpo3w>View Plugin</a>
+      </div>
+    </section>
+
+    <!-- 6. Installation -->
+    <section class="section-box dark" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Installation</h2>
+      <p class="install-note" style="color: var(--brand-light-gray); margin-bottom: 0.75rem;" data-astro-cid-jrlgpo3w>This skill is included in the hubspot-pack plugin:</p>
+      <pre class="install-command" data-copy="/plugin install hubspot-pack@claude-code-plugins-plus" data-astro-cid-jrlgpo3w><code data-astro-cid-jrlgpo3w>/plugin install hubspot-pack@claude-code-plugins-plus</code></pre>
+      <p class="install-note" data-astro-cid-jrlgpo3w>Click to copy</p>
+    </section>
+
+    <!-- 7. Skill Content (Markdown) -->
+    <section class="skill-content-section" data-astro-cid-jrlgpo3w>
+      <h2 data-astro-cid-jrlgpo3w>Instructions</h2>
+      <div class="skill-content" data-astro-cid-jrlgpo3w>
+        <div data-astro-cid-jrlgpo3w><h1>HubSpot Contact Deduplication</h1>
+<h2>Overview</h2>
+<p>Merge duplicate contacts in HubSpot and operate that process in production, at scale, without data loss. This is not a one-click cleanup guide — it is the logic your pipeline runs when a sales ops team imports 80,000 leads from a tradeshow CSV that already exist in the CRM, when a merge destroys the &quot;winner&quot; contact&#39;s email history, when a fuzzy match on &quot;Jon&quot; vs &quot;John&quot; leaves a six-figure deal associated to a ghost record, and when on-call discovers that 40,000 contacts were merged without checking opt-out flags.</p>
+<p>The six production failures this skill prevents:</p>
+<ol>
+<li><strong>Import storms creating thousands of exact duplicates</strong> — HubSpot enforces email uniqueness only at the property level; the merge API has no dedup-all-at-once endpoint. A 100K-row CSV import where 60% of rows already exist creates 60,000 duplicates that must be found and merged one pair at a time within a 100 req/10s rate envelope.</li>
+<li><strong>Merge destroying the wrong timeline</strong> — <code>POST /crm/v3/objects/contacts/merge</code> requires a <code>primaryObjectId</code>. Picking the wrong one demotes the older contact&#39;s full activity timeline — calls, emails, form submissions — to the discarded record&#39;s history.</li>
+<li><strong>Property-based dedup missing fuzzy matches</strong> — Email-exact dedup leaves &quot;john@gmail.com&quot; and &quot;jon.smith@googlemail.com&quot; as separate records. Phone dedup leaves &quot;+1 (512) 867-5309&quot; and &quot;5128675309&quot; as separate records. Without normalization your CRM accumulates a shadow population of semantically identical but technically distinct contacts.</li>
+<li><strong>Post-merge association orphans</strong> — When a secondary contact has deals, tickets, or company associations, HubSpot re-parents most automatically — but not all. Custom object associations and some third-party-integration links may not follow.</li>
+<li><strong>Rate-limit exhaustion on large catalogs</strong> — A 1-million-contact dedup scan requires 10,000 batch reads (2.7 hours at full throughput, before merge calls). Naive single-threaded loops exhaust the 500K daily quota before the search phase finishes.</li>
+<li><strong>Silent merge failures on conflicting lifecycle or opt-out status</strong> — The merge API returns 200 even when the resulting contact has <code>hs_email_optout=true</code> overriding the primary&#39;s opted-in status. HubSpot&#39;s &quot;most recently updated value wins&quot; rule is wrong for compliance flags.</li>
+</ol>
+<h2>Auth</h2>
+<p>Authenticate with a private app token (<code>pat-na1-*</code>) or OAuth access token. Pass it on every request:</p>
+<pre data-lang="bash"><code>
+Authorization: Bearer {your-token}
+</code></pre>
+<p>Required scopes: <code>crm.objects.contacts.read</code>, <code>crm.objects.contacts.write</code>, <code>crm.associations.read</code>, <code>crm.associations.write</code>. See the <a href="https://github.com/jeremylongshore/claude-code-plugins-plus-skills/tree/main/plugins/saas-packs/hubspot-pack/skills/hubspot-auth/SKILL.md">hubspot-auth skill</a> for token caching, OAuth refresh, and scope-drift detection.</p>
+<h2>Prerequisites</h2>
+<ul>
+<li>Python 3.10+ (<code>requests</code>, <code>phonenumbers</code>, <code>rapidfuzz</code>) for the full pipeline</li>
+<li>HubSpot Professional or Enterprise account (batch merge at scale)</li>
+<li>Private app token with required scopes (above)</li>
+<li><code>jq</code> for shell examples</li>
+<li>For catalogs &gt;500K contacts: confirm daily quota with HubSpot support</li>
+</ul>
+<h2>Instructions</h2>
+<h3>Step 1. Discover duplicates with search</h3>
+<p>Find exact duplicates by email using the search API. Never pull all contacts into memory for comparison — use the search endpoint with specific filter values.</p>
+<pre data-lang="bash"><code>
+# Find all contacts sharing a normalized email
+curl -s -X POST &quot;https://api.hubapi.com/crm/v3/objects/contacts/search&quot; \
+  -H &quot;Authorization: Bearer {your-token}&quot; \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{
+    &quot;filterGroups&quot;: [{&quot;filters&quot;: [
+      {&quot;propertyName&quot;:&quot;email&quot;,&quot;operator&quot;:&quot;EQ&quot;,&quot;value&quot;:&quot;jane.doe@example.com&quot;}
+    ]}],
+    &quot;properties&quot;: [&quot;email&quot;,&quot;firstname&quot;,&quot;lastname&quot;,&quot;hs_object_id&quot;,&quot;createdate&quot;,
+                   &quot;lifecyclestage&quot;,&quot;hs_email_optout&quot;,&quot;hs_email_hard_bounce_reason_enum&quot;],
+    &quot;sorts&quot;: [{&quot;propertyName&quot;:&quot;createdate&quot;,&quot;direction&quot;:&quot;ASCENDING&quot;}],
+    &quot;limit&quot;: 10
+  }&#39; | jq &#39;[.results[] | {id, created:.properties.createdate}]&#39;
+</code></pre>
+<p>For full-portal scans across millions of contacts use the four-stage Python pipeline in <a href="references/implementation-guide.md">implementation-guide.md</a>. The pipeline writes a local SQLite checkpoint so rate-limit interruptions do not require starting over.</p>
+<h3>Step 2. Select the primary (winner) contact</h3>
+<p>The oldest contact by <code>createdate</code> is the primary — its timeline is most historically complete. Two overrides apply:</p>
+<ul>
+<li>If the oldest contact has <code>hs_email_optout=true</code> and the newer one does not, prefer the opted-in record as primary to avoid propagating unsubscribe status.</li>
+<li>If the oldest contact has a test-domain email (<code>@mailinator.com</code>, <code>@example.com</code>, <code>@test.com</code>), always make the real-address contact the primary.</li>
+</ul>
+<pre data-lang="python"><code>
+from datetime import datetime
+
+def pick_primary(contacts: list[dict]) -&gt; tuple[dict, list[dict]]:
+    &quot;&quot;&quot;Return (primary, secondaries). contacts is a list of HubSpot result dicts.&quot;&quot;&quot;
+    TEST_DOMAINS = {&quot;mailinator.com&quot;,&quot;example.com&quot;,&quot;test.com&quot;,&quot;yopmail.com&quot;}
+
+    def is_test(email: str) -&gt; bool:
+        return (email or &quot;&quot;).split(&quot;@&quot;)[-1].lower() in TEST_DOMAINS
+
+    # Sort oldest first (default primary)
+    sorted_c = sorted(contacts, key=lambda c: c[&quot;properties&quot;][&quot;createdate&quot;])
+    primary = sorted_c[0]
+
+    # Opt-out override
+    if primary[&quot;properties&quot;].get(&quot;hs_email_optout&quot;) == &quot;true&quot;:
+        opted_in = next((c for c in sorted_c[1:] if c[&quot;properties&quot;].get(&quot;hs_email_optout&quot;) != &quot;true&quot;), None)
+        if opted_in:
+            primary = opted_in
+
+    # Test email override
+    if is_test(primary[&quot;properties&quot;].get(&quot;email&quot;, &quot;&quot;)):
+        real = next((c for c in sorted_c if not is_test(c[&quot;properties&quot;].get(&quot;email&quot;, &quot;&quot;))), None)
+        if real:
+            primary = real
+
+    secondaries = [c for c in contacts if c[&quot;id&quot;] != primary[&quot;id&quot;]]
+    return primary, secondaries
+</code></pre>
+<h3>Step 3. Normalize emails and phones for fuzzy matching</h3>
+<p>Exact-email dedup leaves a shadow population. Normalize before comparing:</p>
+<pre data-lang="python"><code>
+import phonenumbers
+
+def normalize_email(raw: str) -&gt; str:
+    lower = (raw or &quot;&quot;).strip().lower().replace(&quot;@googlemail.com&quot;, &quot;@gmail.com&quot;)
+    local, _, domain = lower.partition(&quot;@&quot;)
+    if domain == &quot;gmail.com&quot;:
+        local = local.split(&quot;+&quot;)[0].replace(&quot;.&quot;, &quot;&quot;)
+    return f&quot;{local}@{domain}&quot; if domain else lower
+
+def normalize_phone(raw: str, region: str = &quot;US&quot;) -&gt; str | None:
+    try:
+        p = phonenumbers.parse((raw or &quot;&quot;).strip(), region)
+        if phonenumbers.is_valid_number(p):
+            return phonenumbers.format_number(p, phonenumbers.PhoneNumberFormat.E164)
+    except Exception:
+        pass
+    return None
+</code></pre>
+<p>For name similarity and the full confidence-scoring matrix, see <a href="references/implementation-guide.md">implementation-guide.md</a> § Stage 2.</p>
+<h3>Step 4. Pre-merge compliance check</h3>
+<p>Before merging, verify neither contact has blocking compliance flags:</p>
+<pre data-lang="python"><code>
+def pre_merge_check(a: dict, b: dict) -&gt; tuple[bool, str]:
+    &quot;&quot;&quot;Returns (can_merge, reason). False = queue for human review.&quot;&quot;&quot;
+    pa, pb = a[&quot;properties&quot;], b[&quot;properties&quot;]
+    if pa.get(&quot;hs_email_hard_bounce_reason_enum&quot;) or pb.get(&quot;hs_email_hard_bounce_reason_enum&quot;):
+        return False, &quot;hard_bounce_present&quot;
+    # Asymmetric GDPR legal basis requires human review
+    a_gdpr = bool(pa.get(&quot;hs_legal_basis&quot;))
+    b_gdpr = bool(pb.get(&quot;hs_legal_basis&quot;))
+    if a_gdpr != b_gdpr:
+        return False, &quot;gdpr_basis_asymmetry&quot;
+    return True, &quot;ok&quot;
+
+# Expected post-merge opt-out: conservative — opted out if either contact is opted out
+def resolve_optout(a: dict, b: dict) -&gt; bool:
+    return (a[&quot;properties&quot;].get(&quot;hs_email_optout&quot;) == &quot;true&quot; or
+            b[&quot;properties&quot;].get(&quot;hs_email_optout&quot;) == &quot;true&quot;)
+</code></pre>
+<h3>Step 5. Execute merge with rate limiting</h3>
+<pre data-lang="python"><code>
+import time, requests
+
+MERGE_URL = &quot;https://api.hubapi.com/crm/v3/objects/contacts/merge&quot;
+_window_start = time.monotonic()
+_window_calls = 0
+
+def rate_gate(burst_limit: int = 90) -&gt; None:
+    &quot;&quot;&quot;Enforce burst limit (90/10s — leaves buffer below HubSpot&#39;s 100/10s cap).&quot;&quot;&quot;
+    global _window_start, _window_calls
+    elapsed_ms = (time.monotonic() - _window_start) * 1000
+    if elapsed_ms &gt;= 10_000:
+        _window_start = time.monotonic()
+        _window_calls = 0
+    if _window_calls &gt;= burst_limit:
+        time.sleep((10_000 - elapsed_ms) / 1000 + 0.05)
+        _window_start = time.monotonic()
+        _window_calls = 0
+    _window_calls += 1
+
+def merge_contacts(token: str, primary_id: str, secondary_id: str) -&gt; bool:
+    headers = {&quot;Authorization&quot;: f&quot;Bearer {token}&quot;, &quot;Content-Type&quot;: &quot;application/json&quot;}
+    for attempt in range(3):
+        rate_gate()
+        resp = requests.post(MERGE_URL, headers=headers,
+                             json={&quot;primaryObjectId&quot;: primary_id, &quot;objectIdToMerge&quot;: secondary_id},
+                             timeout=30)
+        if resp.status_code == 200:
+            return True
+        if resp.status_code == 429:
+            time.sleep(int(resp.headers.get(&quot;Retry-After&quot;, &quot;10&quot;)))
+            continue
+        if resp.status_code &gt;= 500:
+            time.sleep(min(60, 5 * 2 ** attempt))
+            continue
+        # Non-retryable (400, 404, 409)
+        print(f&quot;Merge failed {resp.status_code}: {resp.text}&quot;)
+        return False
+    return False
+</code></pre>
+<p>Stop the pipeline before hitting the daily quota:</p>
+<pre data-lang="python"><code>
+DAILY_STOP_AT = 480_000  # Stop at 96% of 500K quota
+
+def check_quota(resp: requests.Response) -&gt; None:
+    remaining = int(resp.headers.get(&quot;X-HubSpot-RateLimit-Daily-Remaining&quot;, 500_000))
+    if (500_000 - remaining) &gt;= DAILY_STOP_AT:
+        raise SystemExit(&quot;Daily quota near limit — stopping. Resume after midnight UTC reset.&quot;)
+</code></pre>
+<h3>Step 6. Post-merge verification and association repair</h3>
+<p>After merging, verify that the surviving contact&#39;s <code>hs_email_optout</code> matches the expected value (Step 4) and patch it if it drifted. Then audit associations that may not have transferred automatically:</p>
+<pre data-lang="bash"><code>
+# Check associations on surviving contact (replace 12345 with actual primary contact ID)
+curl -s &quot;https://api.hubapi.com/crm/v4/objects/contacts/12345/associations/deals&quot; \
+  -H &quot;Authorization: Bearer {your-token}&quot; | jq &#39;[.results[].toObjectId]&#39;
+
+# Manually create a missing association (replace 12345 with primary ID, 67890 with deal ID)
+curl -s -X PUT \
+  &quot;https://api.hubapi.com/crm/v4/objects/contacts/12345/associations/deals/67890&quot; \
+  -H &quot;Authorization: Bearer {your-token}&quot; \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;[{&quot;associationCategory&quot;:&quot;HUBSPOT_DEFINED&quot;,&quot;associationTypeId&quot;:3}]&#39;
+</code></pre>
+<p>The full four-stage Python pipeline (scan → pair → qualify → execute) with automatic association repair is in <a href="references/implementation-guide.md">implementation-guide.md</a>.</p>
+<h2>Error Handling</h2>
+<table><thead><tr>
+<th>HTTP Status</th>
+<th>Error</th>
+<th>Root Cause</th>
+<th>Action</th>
+</tr></thead><tbody>
+<tr>
+<td><code>400</code></td>
+<td><code>CONTACT_ALREADY_MERGED</code></td>
+<td>Secondary was already merged into another record</td>
+<td>Re-fetch secondary; check <code>hs_merged_object_ids</code> for surviving primary ID</td>
+</tr>
+<tr>
+<td><code>400</code></td>
+<td><code>SAME_OBJECT_MERGE</code></td>
+<td>Both IDs are identical</td>
+<td>Remove self-merge pairs from candidate list before executing</td>
+</tr>
+<tr>
+<td><code>400</code></td>
+<td><code>INVALID_OBJECT_TYPE</code></td>
+<td>One ID belongs to a different CRM object type</td>
+<td>Verify via <code>GET /crm/v3/objects/contacts/{id}</code> before merging</td>
+</tr>
+<tr>
+<td><code>404</code></td>
+<td><code>OBJECT_NOT_FOUND</code></td>
+<td>Contact was deleted between discovery and merge</td>
+<td>Re-fetch to confirm existence; skip if deleted</td>
+</tr>
+<tr>
+<td><code>409</code></td>
+<td><code>MERGE_IN_PROGRESS</code></td>
+<td>A concurrent merge is already running for this contact</td>
+<td>Retry after 30 seconds</td>
+</tr>
+<tr>
+<td><code>429</code></td>
+<td>Rate limit</td>
+<td>Burst or daily quota exceeded</td>
+<td>Honor <code>Retry-After</code> header; check <code>X-HubSpot-RateLimit-Daily-Remaining</code></td>
+</tr>
+<tr>
+<td><code>500</code></td>
+<td><code>INTERNAL_ERROR</code></td>
+<td>Transient HubSpot platform fault</td>
+<td>Exponential back-off, max 3 retries; log <code>X-HubSpot-Correlation-Id</code> for support</td>
+</tr>
+<tr>
+<td><code>200</code> (silent)</td>
+<td>Opt-out propagated incorrectly</td>
+<td>&quot;Most recently updated wins&quot; resolved compliance flag wrong</td>
+<td>Run post-merge <code>hs_email_optout</code> verification; patch via PATCH endpoint</td>
+</tr>
+</tbody></table>
+<h2>Examples</h2>
+<h3>Merge two contacts via curl</h3>
+<pre data-lang="bash"><code>
+# Step 1: find the duplicate pair sorted oldest-first
+SEARCH=$(curl -s -X POST &quot;https://api.hubapi.com/crm/v3/objects/contacts/search&quot; \
+  -H &quot;Authorization: Bearer {your-token}&quot; -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{&quot;filterGroups&quot;:[{&quot;filters&quot;:[{&quot;propertyName&quot;:&quot;email&quot;,&quot;operator&quot;:&quot;EQ&quot;,&quot;value&quot;:&quot;jane.doe@example.com&quot;}]}],
+       &quot;properties&quot;:[&quot;email&quot;,&quot;createdate&quot;],&quot;sorts&quot;:[{&quot;propertyName&quot;:&quot;createdate&quot;,&quot;direction&quot;:&quot;ASCENDING&quot;}],&quot;limit&quot;:5}&#39;)
+
+PRIMARY_ID=$(echo &quot;$SEARCH&quot; | jq -r &#39;.results[0].id&#39;)
+SECONDARY_ID=$(echo &quot;$SEARCH&quot; | jq -r &#39;.results[1].id&#39;)
+echo &quot;primary=$PRIMARY_ID secondary=$SECONDARY_ID&quot;
+
+# Step 2: merge
+curl -s -X POST &quot;https://api.hubapi.com/crm/v3/objects/contacts/merge&quot; \
+  -H &quot;Authorization: Bearer {your-token}&quot; -H &quot;Content-Type: application/json&quot; \
+  -d &quot;{\&quot;primaryObjectId\&quot;:\&quot;$PRIMARY_ID\&quot;,\&quot;objectIdToMerge\&quot;:\&quot;$SECONDARY_ID\&quot;}&quot; \
+  | jq &#39;{id, email: .properties.email}&#39;
+</code></pre>
+<h3>Dry-run dedup report</h3>
+<pre data-lang="bash"><code>
+python3 - &lt;&lt;&#39;EOF&#39;
+import json, subprocess, sys
+
+TOKEN = &quot;{your-token}&quot;
+EMAIL = &quot;jane.doe@example.com&quot;
+
+out = subprocess.run([
+    &quot;curl&quot;,&quot;-s&quot;,&quot;-X&quot;,&quot;POST&quot;,&quot;https://api.hubapi.com/crm/v3/objects/contacts/search&quot;,
+    &quot;-H&quot;,f&quot;Authorization: Bearer {TOKEN}&quot;,&quot;-H&quot;,&quot;Content-Type: application/json&quot;,
+    &quot;-d&quot;, json.dumps({&quot;filterGroups&quot;:[{&quot;filters&quot;:[{&quot;propertyName&quot;:&quot;email&quot;,&quot;operator&quot;:&quot;EQ&quot;,&quot;value&quot;:EMAIL}]}],
+                      &quot;properties&quot;:[&quot;email&quot;,&quot;firstname&quot;,&quot;lastname&quot;,&quot;createdate&quot;,&quot;lifecyclestage&quot;],
+                      &quot;sorts&quot;:[{&quot;propertyName&quot;:&quot;createdate&quot;,&quot;direction&quot;:&quot;ASCENDING&quot;}],&quot;limit&quot;:10}),
+], capture_output=True, text=True).stdout
+
+data = json.loads(out)
+contacts = data[&quot;results&quot;]
+if len(contacts) &lt; 2:
+    print(&quot;No duplicates found&quot;); sys.exit(0)
+print(f&quot;Found {len(contacts)} contacts for {EMAIL}:&quot;)
+for c in contacts:
+    p = c[&quot;properties&quot;]
+    print(f&quot;  ID {c[&#39;id&#39;]} | created {p[&#39;createdate&#39;]} | stage {p.get(&#39;lifecyclestage&#39;)}&quot;)
+print(f&quot;\nWould merge: primary={contacts[0][&#39;id&#39;]}, secondaries={[c[&#39;id&#39;] for c in contacts[1:]]}&quot;)
+EOF
+</code></pre>
+<h3>Batch read to pre-fetch properties before deciding primary</h3>
+<pre data-lang="bash"><code>
+curl -s -X POST &quot;https://api.hubapi.com/crm/v3/objects/contacts/batch/read&quot; \
+  -H &quot;Authorization: Bearer {your-token}&quot; -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{
+    &quot;inputs&quot;: [{&quot;id&quot;:&quot;101&quot;},{&quot;id&quot;:&quot;202&quot;},{&quot;id&quot;:&quot;303&quot;}],
+    &quot;properties&quot;: [&quot;email&quot;,&quot;phone&quot;,&quot;firstname&quot;,&quot;lastname&quot;,&quot;createdate&quot;,
+                   &quot;lifecyclestage&quot;,&quot;hs_email_optout&quot;,&quot;hs_email_hard_bounce_reason_enum&quot;]
+  }&#39; | jq &#39;[.results[] | {id, email:.properties.email, created:.properties.createdate}]&#39;
+</code></pre>
+<h2>Output</h2>
+<ul>
+<li>Candidate list grouped by normalized email, phone, or name similarity with confidence scores</li>
+<li>Winner selection rationale per merge pair (oldest contact, opt-out override, test-email override)</li>
+<li>Compliance pre-check table per pair (opt-out status, lifecycle, GDPR basis, hard-bounce flag)</li>
+<li>Association audit report — which transferred automatically and which required manual re-parenting</li>
+<li>Merge execution log with rate-limit headers and daily quota burn rate</li>
+<li>Post-merge verification confirming <code>hs_email_optout</code> on surviving records matches expected value</li>
+<li>Human review queue for pairs flagged with conflicting compliance flags or 0.70–0.84 confidence</li>
+</ul>
+<h2>Resources</h2>
+<ul>
+<li><a href="https://developers.hubspot.com/docs/guides/api/crm/objects/contacts#merge-contacts">HubSpot Contacts Merge API</a></li>
+<li><a href="https://developers.hubspot.com/docs/guides/api/crm/search">CRM Search API Reference</a></li>
+<li><a href="https://developers.hubspot.com/docs/reference/api/crm/objects/contacts#post-%2Fcrm%2Fv3%2Fobjects%2Fcontacts%2Fbatch%2Fread">CRM Batch Read API</a></li>
+<li><a href="https://developers.hubspot.com/docs/guides/api/crm/associations/associations-v4">Associations API v4</a></li>
+<li><a href="https://developers.hubspot.com/docs/guides/apps/api-usage/usage-details">Rate Limits Reference</a></li>
+<li>GDPR and Marketing Emails in HubSpot</li>
+<li><a href="references/API_REFERENCE.md">API_REFERENCE.md</a> — merge endpoint shapes, search filter syntax, error codes, property uniqueness enforcement</li>
+<li><a href="references/implementation-guide.md">implementation-guide.md</a> — full four-stage Python pipeline, fuzzy matching, post-merge association cleanup runbook</li>
+</ul></div>
+      </div>
+    </section>
+
+    <!-- 8. Bottom CTA -->
+    <section class="detail-cta" data-astro-cid-qcigfm7x>
+  <h2 class="detail-cta__headline" data-astro-cid-qcigfm7x>Ready to use hubspot-pack?</h2>
+  <div class="detail-cta__actions" data-astro-cid-qcigfm7x>
+    <button class="detail-cta__primary" data-copy-install="/plugin install hubspot-pack@claude-code-plugins-plus" data-astro-cid-qcigfm7x>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" data-astro-cid-qcigfm7x>
+        <rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" stroke-width="1.5" data-astro-cid-qcigfm7x></rect>
+        <path d="M3 11V3a1 1 0 011-1h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" data-astro-cid-qcigfm7x></path>
+      </svg>
+      <span class="detail-cta__btn-text" data-astro-cid-qcigfm7x>Copy Install Command</span>
+    </button>
+    
+  </div>
+</section>
+
+<script type="module">document.querySelectorAll("[data-copy-install]").forEach(t=>{t.addEventListener("click",async()=>{const a=t.dataset.copyInstall||"";await navigator.clipboard.writeText(a);const e=t.querySelector(".detail-cta__btn-text");if(e){const o=e.textContent;e.textContent="Copied!",t.classList.add("copied"),window.trackEvent&&window.trackEvent("install_copied",{plugin_name:a.split(" ").pop()||"",source:"detail_cta"}),setTimeout(()=>{e.textContent=o,t.classList.remove("copied")},2e3)}})});</script>
+
+    <!-- 9. Related Skills (6, with tool pills) -->
+    <section class="related-skills-section" data-astro-cid-jrlgpo3w>
+        <h2 class="related-skills-heading" data-astro-cid-jrlgpo3w>Related Skills</h2>
+        <div class="related-skills-grid" data-astro-cid-jrlgpo3w>
+          <a href="/skills/abridge-ci-integration/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-ci-integration</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Configure CI/CD pipeline for Abridge clinical AI integrations with GitHub Actions.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-common-errors/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-common-errors</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Diagnose and fix common Abridge clinical AI integration errors.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-a/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-a</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge ambient clinical documentation capture-to-note pipeline.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-b/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-b</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge patient-facing documentation and after-visit summary generation.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-cost-tuning/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-cost-tuning</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Optimize Abridge clinical AI costs through tier selection, session management, and usage monitoring for healthcare organizations.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-debug-bundle/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-debug-bundle</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Collect Abridge debug evidence for support tickets and troubleshooting.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a>
+        </div>
+      </section>
+
+  </div>
+
+  
+  <script>
+    document.querySelectorAll('.install-command').forEach(el => {
+      el.addEventListener('click', function() {
+        const text = this.dataset.copy || this.textContent;
+        navigator.clipboard.writeText(text).then(() => {
+          const originalText = this.textContent;
+          this.textContent = 'Copied to clipboard!';
+          this.style.color = 'var(--brand-green)';
+          setTimeout(() => {
+            this.textContent = originalText;
+            this.style.color = '';
+          }, 2000);
+        });
+      });
+    });
+  </script>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

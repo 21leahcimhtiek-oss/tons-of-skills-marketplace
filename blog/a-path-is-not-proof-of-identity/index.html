@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A Path Is Not Proof of Identity — Tons of Skills Work Diary</title>
+    <meta name="description" content="A file descriptor binds you to an object. A path does not. Why a stat check plus a later write still loses to a same-UID directory swap.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://startaitools.com/posts/a-path-is-not-proof-of-identity/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/a-path-is-not-proof-of-identity/">
+    <meta property="og:title" content="A Path Is Not Proof of Identity — Tons of Skills Work Diary">
+    <meta property="og:description" content="A file descriptor binds you to an object. A path does not. Why a stat check plus a later write still loses to a same-UID directory swap.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="A Path Is Not Proof of Identity — Tons of Skills Work Diary">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/a-path-is-not-proof-of-identity/">
+    <meta name="twitter:title" content="A Path Is Not Proof of Identity — Tons of Skills Work Diary">
+    <meta name="twitter:description" content="A file descriptor binds you to an object. A path does not. Why a stat check plus a later write still loses to a same-UID directory swap.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"A Path Is Not Proof of Identity","description":"A file descriptor binds you to an object. A path does not. Why a stat check plus a later write still loses to a same-UID directory swap.","datePublished":"2026-08-28","url":"https://tonsofskills.com/blog/undefined","author":{"@type":"Person","name":"Jeremy Longshore"},"publisher":{"@type":"Organization","name":"Tons of Skills","url":"https://tonsofskills.com"}}</script>
+  
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.post-header[data-astro-cid-7jjqptxk]{background:var(--panel);padding:4rem 1.5rem 3rem;border-bottom:1px solid var(--border)}.post-header-inner[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto}.back-link[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3);text-decoration:none;display:inline-block;margin-bottom:1.5rem;transition:color .2s}.back-link[data-astro-cid-7jjqptxk]:hover{color:var(--primary)}.post-meta[data-astro-cid-7jjqptxk]{display:flex;align-items:center;gap:.75rem;margin-bottom:1rem}time[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3)}.featured-badge[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.2rem .6rem;background:#ce114126;color:var(--red);border-radius:0;font-weight:600;text-transform:uppercase;letter-spacing:.05em}.post-header[data-astro-cid-7jjqptxk] h1[data-astro-cid-7jjqptxk]{font-family:var(--font-body);font-size:clamp(1.5rem,4vw,2.2rem);font-weight:700;color:var(--text);line-height:1.25;margin-bottom:.75rem;letter-spacing:0}.post-desc[data-astro-cid-7jjqptxk]{color:var(--text-2);font-size:1.05rem;line-height:1.6;margin-bottom:1rem}.post-tags[data-astro-cid-7jjqptxk]{display:flex;gap:.4rem;flex-wrap:wrap}.tag[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.15rem .5rem;background:var(--surface-3);color:var(--text-3);border-radius:0}.post-body[data-astro-cid-7jjqptxk]{padding:3rem 1.5rem 4rem}.prose[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto;color:var(--text-2);line-height:1.8;font-size:1rem}.prose[data-astro-cid-7jjqptxk] h2{font-family:var(--font-body);font-size:1.5rem;font-weight:700;color:var(--text);margin:2.5rem 0 1rem;letter-spacing:0}.prose[data-astro-cid-7jjqptxk] h3{font-size:1.2rem;font-weight:600;color:var(--text);margin:2rem 0 .75rem}.prose[data-astro-cid-7jjqptxk] p{margin-bottom:1rem}.prose[data-astro-cid-7jjqptxk] ul,.prose[data-astro-cid-7jjqptxk] ol{margin:.5rem 0 1rem 1.5rem}.prose[data-astro-cid-7jjqptxk] li{margin-bottom:.35rem}.prose[data-astro-cid-7jjqptxk] strong{color:var(--text);font-weight:600}.prose[data-astro-cid-7jjqptxk] code{font-family:var(--font-mono);font-size:.88em;background:var(--surface-3);padding:.15em .35em;border-radius:0;color:var(--primary)}.prose[data-astro-cid-7jjqptxk] a{color:var(--primary);text-decoration:none}.prose[data-astro-cid-7jjqptxk] a:hover{text-decoration:underline}@media(max-width:768px){.post-header[data-astro-cid-7jjqptxk]{padding:3rem 1rem 2rem}.post-body[data-astro-cid-7jjqptxk]{padding:2rem 1rem 3rem}}
+</style></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  <article class="post" data-astro-cid-7jjqptxk>
+    <header class="post-header" data-astro-cid-7jjqptxk>
+      <div class="post-header-inner" data-astro-cid-7jjqptxk>
+        <a href="/blog" class="back-link" data-astro-cid-7jjqptxk>Back to Work Diary</a>
+        <div class="post-meta" data-astro-cid-7jjqptxk>
+          <time datetime="2026-08-28" data-astro-cid-7jjqptxk>August 27, 2026</time>
+          
+        </div>
+        <h1 data-astro-cid-7jjqptxk>A Path Is Not Proof of Identity</h1>
+        <p class="post-desc" data-astro-cid-7jjqptxk>A file descriptor binds you to an object. A path does not. Why a stat check plus a later write still loses to a same-UID directory swap.</p>
+        <div class="post-tags" data-astro-cid-7jjqptxk>
+          <span class="tag" data-astro-cid-7jjqptxk>security</span><span class="tag" data-astro-cid-7jjqptxk>testing</span><span class="tag" data-astro-cid-7jjqptxk>debugging</span><span class="tag" data-astro-cid-7jjqptxk>devops</span><span class="tag" data-astro-cid-7jjqptxk>ci-cd</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="post-body" data-astro-cid-7jjqptxk>
+      <div class="prose" data-astro-cid-7jjqptxk>
+        <p>Five marketplace submissions rejected simultaneously for the same security defect class. Every one created local state under the default umask, checked permissions with <code>[[ -f ]]</code>, then wrote to the name later. Between the check and the write, a same-UID attacker could plant a symlink at that path, and the open would follow it. The first remediation looked like the textbook answer: <code>umask 077</code>, <code>stat -c %s</code> for size, <code>timeout 2</code> on jq, and <code>mktemp + mv</code> for atomic writes. The reviewer rejected that too.</p>
+<p>The reason is this: <code>[[ -f ]]</code> resolves the path, <code>stat</code> resolves it again, and <code>write_session()</code> resolves it a third time. Nothing binds those three calls to the same inode. A path is a name. A name is resolved fresh on every syscall. Checking a name and then acting on it is a race condition, specifically a TOCTOU (time-of-check-time-of-use) bug. You cannot fix that bug in a language whose only handle is a name.</p>
+<h2 id="the-defect-class-a-symlink-race-in-local-state">The defect class: a symlink race in local state</h2>
+<p>Five Omarchy plugin submissions hit this defect simultaneously (marketplace issues #2899 through #2903). Each plugin’s shell helper:</p>
+<ul>
+<li>created <code>~/.local/state/&#x3C;plugin>/</code> under the default umask, so it was group/world readable during creation</li>
+<li>wrote to a state file via <code>> "$file"</code> or <code>>> "$file"</code>, which follows a pre-existing symlink</li>
+<li>read the whole mutable file into jq with no regular-file check, no byte ceiling, and no timeout</li>
+</ul>
+<p>A symlink planted at the state path redirects the write to any file the user owns. That is a plain symlink attack, and nothing in the helper was positioned to notice it. A FIFO or oversized file at the path hangs the jq that the QML side polls every five seconds.</p>
+<p>The contributing-clanker lane (the shared security gate suite) told itself those places were safe. It enforced gates on network input, on QML rendering, on command construction. It never modeled filesystem object identity. A gate lane’s blind spot is exactly where threat lives.</p>
+<h2 id="round-one-the-rejection">Round one: the rejection</h2>
+<p>The first remediation shipped what looked like a complete answer. Quiet Queue’s round-one attempt (commit 5c7a817):</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#79B8FF">umask</span><span style="color:#79B8FF"> 077</span></span>
+<span class="line"><span style="color:#E1E4E8">root</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">"${</span><span style="color:#E1E4E8">XDG_STATE_HOME</span><span style="color:#F97583">:-</span><span style="color:#E1E4E8">$HOME</span><span style="color:#F97583">/</span><span style="color:#9ECBFF">.</span><span style="color:#E1E4E8">local</span><span style="color:#F97583">/</span><span style="color:#E1E4E8">state</span><span style="color:#9ECBFF">}/omarchy-quiet-queue"</span></span>
+<span class="line"><span style="color:#E1E4E8">session</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">"</span><span style="color:#E1E4E8">$root</span><span style="color:#9ECBFF">/session.json"</span></span>
+<span class="line"><span style="color:#B392F0">mkdir</span><span style="color:#79B8FF"> -p</span><span style="color:#9ECBFF"> "</span><span style="color:#E1E4E8">$root</span><span style="color:#9ECBFF">"</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">session_max_bytes</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">4096</span></span>
+<span class="line"><span style="color:#B392F0">read_session</span><span style="color:#E1E4E8">() {</span></span>
+<span class="line"><span style="color:#F97583">  local</span><span style="color:#E1E4E8"> filter</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">"</span><span style="color:#79B8FF">$1</span><span style="color:#9ECBFF">"</span><span style="color:#E1E4E8"> default</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">"</span><span style="color:#79B8FF">$2</span><span style="color:#9ECBFF">"</span><span style="color:#E1E4E8"> size</span></span>
+<span class="line"><span style="color:#F97583">  if</span><span style="color:#E1E4E8"> [[ </span><span style="color:#F97583">!</span><span style="color:#F97583"> -f</span><span style="color:#9ECBFF"> "</span><span style="color:#E1E4E8">$session</span><span style="color:#9ECBFF">"</span><span style="color:#F97583"> ||</span><span style="color:#F97583"> -L</span><span style="color:#9ECBFF"> "</span><span style="color:#E1E4E8">$session</span><span style="color:#9ECBFF">"</span><span style="color:#E1E4E8"> ]]; </span><span style="color:#F97583">then</span><span style="color:#79B8FF"> printf</span><span style="color:#9ECBFF"> '%s'</span><span style="color:#9ECBFF"> "</span><span style="color:#E1E4E8">$default</span><span style="color:#9ECBFF">"</span><span style="color:#E1E4E8">; </span><span style="color:#F97583">return</span><span style="color:#E1E4E8">; </span><span style="color:#F97583">fi</span></span>
+<span class="line"><span style="color:#E1E4E8">  size</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">"$(</span><span style="color:#79B8FF">stat</span><span style="color:#79B8FF"> -c</span><span style="color:#9ECBFF"> %s "</span><span style="color:#E1E4E8">$session</span><span style="color:#9ECBFF">" </span><span style="color:#F97583">2></span><span style="color:#9ECBFF">/dev/null </span><span style="color:#F97583">||</span><span style="color:#79B8FF"> printf</span><span style="color:#79B8FF"> 0</span><span style="color:#9ECBFF">)"</span></span>
+<span class="line"><span style="color:#F97583">  if</span><span style="color:#F97583"> !</span><span style="color:#E1E4E8"> [[ </span><span style="color:#9ECBFF">"</span><span style="color:#E1E4E8">$size</span><span style="color:#9ECBFF">"</span><span style="color:#F97583"> =~</span><span style="color:#E1E4E8"> ^[0-9]+$ ]] </span><span style="color:#F97583">||</span><span style="color:#E1E4E8"> (( size </span><span style="color:#F97583">></span><span style="color:#E1E4E8"> session_max_bytes )); </span><span style="color:#F97583">then</span><span style="color:#79B8FF"> printf</span><span style="color:#9ECBFF"> '%s'</span><span style="color:#9ECBFF"> "</span><span style="color:#E1E4E8">$default</span><span style="color:#9ECBFF">"</span><span style="color:#E1E4E8">; </span><span style="color:#F97583">return</span><span style="color:#E1E4E8">; </span><span style="color:#F97583">fi</span></span>
+<span class="line"><span style="color:#B392F0">  timeout</span><span style="color:#79B8FF"> 2</span><span style="color:#9ECBFF"> jq</span><span style="color:#79B8FF"> -r</span><span style="color:#9ECBFF"> "</span><span style="color:#E1E4E8">$filter</span><span style="color:#9ECBFF">"</span><span style="color:#9ECBFF"> "</span><span style="color:#E1E4E8">$session</span><span style="color:#9ECBFF">"</span><span style="color:#F97583"> 2></span><span style="color:#9ECBFF">/dev/null</span><span style="color:#F97583"> ||</span><span style="color:#79B8FF"> printf</span><span style="color:#9ECBFF"> '%s'</span><span style="color:#9ECBFF"> "</span><span style="color:#E1E4E8">$default</span><span style="color:#9ECBFF">"</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">write_session</span><span style="color:#E1E4E8">() {</span></span>
+<span class="line"><span style="color:#F97583">  local</span><span style="color:#E1E4E8"> tmp</span></span>
+<span class="line"><span style="color:#E1E4E8">  tmp</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">"$(</span><span style="color:#B392F0">mktemp</span><span style="color:#9ECBFF"> "</span><span style="color:#E1E4E8">$root</span><span style="color:#9ECBFF">/.session.XXXXXX")"</span></span>
+<span class="line"><span style="color:#B392F0">  cat</span><span style="color:#F97583"> ></span><span style="color:#9ECBFF"> "</span><span style="color:#E1E4E8">$tmp</span><span style="color:#9ECBFF">"</span></span>
+<span class="line"><span style="color:#B392F0">  mv</span><span style="color:#79B8FF"> -f</span><span style="color:#9ECBFF"> "</span><span style="color:#E1E4E8">$tmp</span><span style="color:#9ECBFF">"</span><span style="color:#9ECBFF"> "</span><span style="color:#E1E4E8">$session</span><span style="color:#9ECBFF">"</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>That closes a descriptor and then reopens a mutable pathname. The <code>[[ -f ]]</code> check, then <code>stat</code>, then <code>jq</code> are three separate path resolutions. Nothing binds them to the same inode. Between <code>stat</code> and <code>jq</code>, a same-UID competitor swaps the file for a symlink. The <code>write_session</code> function creates a temp file inside the private directory, but <code>mktemp</code> and <code>mv</code> each re-resolve <code>$root</code>. Rename <code>$root</code> to <code>.parked</code>, plant a symlink at <code>$root</code> pointing anywhere, and both calls land inside the attacker’s target. The reviewer said no.</p>
+<h2 id="why-not-the-obvious-approach">Why not the obvious approach?</h2>
+<p>The obvious move was to keep the helpers in bash and add more checks. Bash already powers every other plugin helper. The linting infrastructure already knew how to read it. Adding <code>[[ -f ]]</code>, <code>stat</code>, and <code>timeout</code> is cheap.</p>
+<p>It lost because bash has no way to hold a file descriptor across operations. There is no <code>fstat</code>, no <code>O_NOFOLLOW</code>, no <code>O_DIRECTORY</code>. Every check bash can express is a check on a name, not on an object. You cannot fix a TOCTOU bug in a language whose only handle is a name. Leaving bash meant a rewrite of six helpers, a tool orthogonal to the rest of the codebase, and an interpreter that immediately tripped an existing gate banning Perl shebangs as a non-guaranteed runtime (resolved below, in the same commit that taught C41 to see the new helpers). That cost is real. But it is the only honest fix.</p>
+<p>Every round-one control has a round-two replacement, and the difference is always the same one thing: whether the check and the use touch the same object.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Round one, resolved by name</th><th>Round two, bound to a descriptor</th><th>What changes</th></tr></thead><tbody><tr><td><code>[[ -f "$session" ]]</code> then read</td><td><code>sysopen($fh, ...)</code> then <code>stat($fh)</code></td><td>The thing checked is the thing read</td></tr><tr><td><code>mkdir -p</code> plus <code>umask 077</code></td><td><code>sysopen(O_DIRECTORY, O_NOFOLLOW)</code> then <code>chdir</code></td><td>The parent cannot be swapped after the check</td></tr><tr><td><code>mktemp</code> then <code>mv</code></td><td><code>sysopen(O_CREAT, O_EXCL, O_NOFOLLOW)</code> then <code>rename</code></td><td>No window to adopt a file you did not create</td></tr><tr><td><code>stat -c %s</code> then <code>jq</code></td><td>byte ceiling taken from <code>stat($fh)</code></td><td>The size checked is the size read</td></tr><tr><td><code>timeout 2 jq</code></td><td><code>O_NONBLOCK</code> at open, then the <code>-f</code> test on <code>stat($fh)</code></td><td>A FIFO cannot stall the open, and the regular-file check rejects it</td></tr></tbody></table>
+<h2 id="descriptor-bound-lifecycles">Descriptor-bound lifecycles</h2>
+<p>Round two (commit 229d6d4) rewrote the runtime helpers from bash to Perl. The key move: hold the state directory open from the start and never let it go.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="perl"><code><span class="line"><span style="color:#79B8FF">umask</span><span style="color:#E1E4E8"> 0077;</span></span>
+<span class="line"><span style="color:#F97583">my</span><span style="color:#E1E4E8"> $root = File::Spec</span><span style="color:#F97583">-></span><span style="color:#E1E4E8">catdir($base, </span><span style="color:#9ECBFF">"omarchy-quiet-queue"</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#E1E4E8">make_path($root, { </span><span style="color:#79B8FF">mode</span><span style="color:#F97583"> =></span><span style="color:#E1E4E8"> 0700 }) </span><span style="color:#F97583">unless</span><span style="color:#F97583"> -d</span><span style="color:#E1E4E8"> $root;</span></span>
+<span class="line"><span style="color:#F97583">my</span><span style="color:#E1E4E8"> $dir;</span></span>
+<span class="line"><span style="color:#79B8FF">sysopen</span><span style="color:#E1E4E8">($dir, $root, O_RDONLY | O_DIRECTORY | O_NOFOLLOW) </span><span style="color:#F97583">or</span><span style="color:#F97583"> die</span><span style="color:#9ECBFF"> "unsafe state directory</span><span style="color:#79B8FF">\n</span><span style="color:#9ECBFF">"</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">my</span><span style="color:#E1E4E8"> @ds = </span><span style="color:#79B8FF">stat</span><span style="color:#E1E4E8">($dir);</span></span>
+<span class="line"><span style="color:#F97583">die</span><span style="color:#9ECBFF"> "unsafe state directory</span><span style="color:#79B8FF">\n</span><span style="color:#9ECBFF">"</span><span style="color:#F97583"> unless</span><span style="color:#E1E4E8"> @ds &#x26;&#x26; </span><span style="color:#F97583">-d</span><span style="color:#E1E4E8"> _ &#x26;&#x26; $ds[4] == $&#x3C;;</span></span>
+<span class="line"><span style="color:#79B8FF">chmod</span><span style="color:#E1E4E8"> 0700, $dir;</span></span>
+<span class="line"><span style="color:#79B8FF">chdir</span><span style="color:#E1E4E8"> $dir </span><span style="color:#F97583">or</span><span style="color:#F97583"> die</span><span style="color:#9ECBFF"> "cannot pin state directory</span><span style="color:#79B8FF">\n</span><span style="color:#9ECBFF">"</span><span style="color:#E1E4E8">;</span></span></code></pre>
+<p><code>O_NOFOLLOW</code> refuses a planted symlink at open time instead of after. <code>O_DIRECTORY</code> means the kernel will not open this if it is not a directory. <code>O_RDONLY</code> is the minimum. <code>stat($dir)</code> on the open filehandle (the <code>$dir</code> object you hold, not the name) proves you own it. <code>chdir $dir</code> pins the parent so later relative opens like <code>session.json</code> resolve inside the object you hold, not inside a path an attacker swapped.</p>
+<p>The read side stats the open descriptor, not the name:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="perl"><code><span class="line"><span style="color:#F97583">sub</span><span style="color:#B392F0"> read_session</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">  return</span><span style="color:#E1E4E8"> { </span><span style="color:#79B8FF">until</span><span style="color:#F97583"> =></span><span style="color:#E1E4E8"> 0, </span><span style="color:#79B8FF">owned</span><span style="color:#F97583"> =></span><span style="color:#E1E4E8"> JSON::PP::false() } </span><span style="color:#F97583">unless</span><span style="color:#F97583"> -e</span><span style="color:#E1E4E8"> $session;</span></span>
+<span class="line"><span style="color:#F97583">  my</span><span style="color:#E1E4E8"> $fh;</span></span>
+<span class="line"><span style="color:#F97583">  return</span><span style="color:#E1E4E8"> { </span><span style="color:#79B8FF">until</span><span style="color:#F97583"> =></span><span style="color:#E1E4E8"> 0, </span><span style="color:#79B8FF">owned</span><span style="color:#F97583"> =></span><span style="color:#E1E4E8"> JSON::PP::false() } </span><span style="color:#F97583">unless</span><span style="color:#79B8FF"> sysopen</span><span style="color:#E1E4E8">($fh, $session, O_RDONLY | O_NONBLOCK | O_NOFOLLOW);</span></span>
+<span class="line"><span style="color:#F97583">  my</span><span style="color:#E1E4E8"> @st = </span><span style="color:#79B8FF">stat</span><span style="color:#E1E4E8">($fh);</span></span>
+<span class="line"><span style="color:#F97583">  unless</span><span style="color:#E1E4E8"> (@st &#x26;&#x26; </span><span style="color:#F97583">-f</span><span style="color:#E1E4E8"> _ &#x26;&#x26; $st[4] == $&#x3C; &#x26;&#x26; $st[7] > 0 &#x26;&#x26; $st[7] &#x3C;= $max_bytes) { </span><span style="color:#79B8FF">close</span><span style="color:#E1E4E8"> $fh; </span><span style="color:#F97583">return</span><span style="color:#E1E4E8"> { </span><span style="color:#79B8FF">until</span><span style="color:#F97583"> =></span><span style="color:#E1E4E8"> 0, </span><span style="color:#79B8FF">owned</span><span style="color:#F97583"> =></span><span style="color:#E1E4E8"> JSON::PP::false() } }</span></span>
+<span class="line"><span style="color:#6A737D">  # read from $fh...</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p><code>stat($fh)</code> interrogates the object you actually hold. <code>O_NONBLOCK</code> means a FIFO cannot stall the open, which a blocking <code>O_RDONLY</code> on a FIFO would do until a writer showed up. It does not reject the FIFO by itself. The <code>-f _</code> test against <code>stat($fh)</code> on the next line does that. The <code>$st[4] == $&#x3C;</code> check verifies you own this inode. The byte ceiling is enforced against the object, not a name that could be swapped between the check and the enforcement.</p>
+<p>The write side uses <code>O_EXCL</code>:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="perl"><code><span class="line"><span style="color:#F97583">sub</span><span style="color:#B392F0"> open_temp</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">  for</span><span style="color:#E1E4E8"> (1 .. 32) {</span></span>
+<span class="line"><span style="color:#F97583">    my</span><span style="color:#E1E4E8"> $name = </span><span style="color:#79B8FF">sprintf</span><span style="color:#9ECBFF"> ".session.</span><span style="color:#E1E4E8">%d</span><span style="color:#9ECBFF">.%08x"</span><span style="color:#E1E4E8">, $$, </span><span style="color:#79B8FF">int</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">rand</span><span style="color:#E1E4E8">(0xffffffff));</span></span>
+<span class="line"><span style="color:#F97583">    my</span><span style="color:#E1E4E8"> $fh;</span></span>
+<span class="line"><span style="color:#F97583">    return</span><span style="color:#E1E4E8"> ($name, $fh) </span><span style="color:#F97583">if</span><span style="color:#79B8FF"> sysopen</span><span style="color:#E1E4E8">($fh, $name, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0600);</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#F97583">  die</span><span style="color:#9ECBFF"> "cannot create private session temp</span><span style="color:#79B8FF">\n</span><span style="color:#9ECBFF">"</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">sub</span><span style="color:#B392F0"> write_session</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">  my</span><span style="color:#E1E4E8"> ($data) = @_;</span></span>
+<span class="line"><span style="color:#F97583">  my</span><span style="color:#E1E4E8"> ($temp, $fh) = open_temp();</span></span>
+<span class="line"><span style="color:#F97583">  my</span><span style="color:#E1E4E8"> $payload = encode_json($data) . </span><span style="color:#9ECBFF">"</span><span style="color:#79B8FF">\n</span><span style="color:#9ECBFF">"</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">  my</span><span style="color:#E1E4E8"> $offset = 0;</span></span>
+<span class="line"><span style="color:#F97583">  while</span><span style="color:#E1E4E8"> ($offset &#x3C; </span><span style="color:#79B8FF">length</span><span style="color:#E1E4E8"> $payload) {</span></span>
+<span class="line"><span style="color:#F97583">    my</span><span style="color:#E1E4E8"> $n = </span><span style="color:#79B8FF">syswrite</span><span style="color:#E1E4E8">($fh, </span><span style="color:#79B8FF">substr</span><span style="color:#E1E4E8">($payload, $offset));</span></span>
+<span class="line"><span style="color:#F97583">    die</span><span style="color:#9ECBFF"> "session write failed</span><span style="color:#79B8FF">\n</span><span style="color:#9ECBFF">"</span><span style="color:#F97583"> unless</span><span style="color:#79B8FF"> defined</span><span style="color:#E1E4E8">($n) &#x26;&#x26; $n > 0;</span></span>
+<span class="line"><span style="color:#E1E4E8">    $offset += $n;</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">  $fh</span><span style="color:#F97583">-></span><span style="color:#E1E4E8">sync </span><span style="color:#F97583">or</span><span style="color:#F97583"> die</span><span style="color:#9ECBFF"> "session fsync failed</span><span style="color:#79B8FF">\n</span><span style="color:#9ECBFF">"</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#79B8FF">  close</span><span style="color:#E1E4E8"> $fh </span><span style="color:#F97583">or</span><span style="color:#F97583"> die</span><span style="color:#9ECBFF"> "session close failed</span><span style="color:#79B8FF">\n</span><span style="color:#9ECBFF">"</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#79B8FF">  rename</span><span style="color:#E1E4E8"> $temp, $session </span><span style="color:#F97583">or</span><span style="color:#F97583"> die</span><span style="color:#9ECBFF"> "session replace failed</span><span style="color:#79B8FF">\n</span><span style="color:#9ECBFF">"</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#79B8FF">  chmod</span><span style="color:#E1E4E8"> 0600, $session;</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p><code>O_EXCL</code> means you created it or you failed. There is no window where you adopt someone else’s file. <code>fsync</code> guarantees the data hits disk. <code>rename</code> is atomic. Every flag is load-bearing.</p>
+<h2 id="proving-it-with-an-adversary">Proving it with an adversary</h2>
+<p>This is the second time this bug class has come up here. <a href="https://startaitools.com/posts/codeql-caught-the-race-i-dismissed/">CodeQL caught the race I dismissed</a> covers the same shape in TypeScript, where the fix was a same-descriptor <code>openSync</code>, <code>fstatSync</code>, <code>writeSync</code> chain. Different language, identical lesson.</p>
+<p>A unit test that asserts “the file has mode 0600 and valid JSON” does not catch this bug. The bash version would pass that assertion while remaining vulnerable. The test had to become an attacker.</p>
+<p>Tests acquired a fixture that races the helper in a tight loop:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="javascript"><code><span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> fs</span><span style="color:#F97583"> =</span><span style="color:#B392F0"> require</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"node:fs"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#E1E4E8"> [</span><span style="color:#79B8FF">dir</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">victim</span><span style="color:#E1E4E8">] </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> process.argv.</span><span style="color:#B392F0">slice</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">2</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> parked</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> `${</span><span style="color:#E1E4E8">dir</span><span style="color:#9ECBFF">}.parked`</span></span>
+<span class="line"><span style="color:#F97583">for</span><span style="color:#E1E4E8"> (;;) {</span></span>
+<span class="line"><span style="color:#F97583">  try</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">    fs.</span><span style="color:#B392F0">renameSync</span><span style="color:#E1E4E8">(dir, parked)</span></span>
+<span class="line"><span style="color:#E1E4E8">    fs.</span><span style="color:#B392F0">symlinkSync</span><span style="color:#E1E4E8">(victim, dir)</span></span>
+<span class="line"><span style="color:#E1E4E8">    fs.</span><span style="color:#B392F0">unlinkSync</span><span style="color:#E1E4E8">(dir)</span></span>
+<span class="line"><span style="color:#E1E4E8">    fs.</span><span style="color:#B392F0">renameSync</span><span style="color:#E1E4E8">(parked, dir)</span></span>
+<span class="line"><span style="color:#E1E4E8">  } </span><span style="color:#F97583">catch</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">    try</span><span style="color:#E1E4E8"> { </span><span style="color:#F97583">if</span><span style="color:#E1E4E8"> (fs.</span><span style="color:#B392F0">existsSync</span><span style="color:#E1E4E8">(parked) </span><span style="color:#F97583">&#x26;&#x26;</span><span style="color:#F97583"> !</span><span style="color:#E1E4E8">fs.</span><span style="color:#B392F0">existsSync</span><span style="color:#E1E4E8">(dir)) fs.</span><span style="color:#B392F0">renameSync</span><span style="color:#E1E4E8">(parked, dir) } </span><span style="color:#F97583">catch</span><span style="color:#E1E4E8"> {}</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>This racer swaps the parent directory itself. The helper opens a relative path inside the state directory; if that directory is suddenly a symlink to somewhere else, the relative open lands elsewhere. The suite asserts the Perl helper holds under it. The bash version would not, by construction: nothing in it survives losing the parent, because everything in it is a fresh path lookup.</p>
+<h2 id="encoding-the-lesson-so-it-cannot-recur">Encoding the lesson so it cannot recur</h2>
+<p>Two gates joined the contributing-clanker lane on the same day (commit a3ab4eb):</p>
+<p><strong>C41: Fail-closed mutable state lifecycle</strong> (204 lines). It blocks any helper that persists mutable state without a descriptor-bound primitive, testing for <code>openat</code>, <code>renameat</code>, <code>O_NOFOLLOW</code> or a declared secure-state helper. <code>mktemp + mv</code> and pathname <code>-f</code> checks stop counting as proof, which is the whole point: they were the round-one answer. It separately refuses the lane unless the test corpus carries hostile final-entry, temp-entry, parent-swap and FIFO coverage. The gate blocks, it is not advisory, and its own regression case proves a state helper that trusts mutable pathnames after <code>mktemp</code> now fails.</p>
+<p><strong>C42: Bounded local recurring scans</strong> (134 lines). It targets the second class in the same review: a scan on a 5 or 20 second timer that buffers or sorts local input before applying its cap. <code>find | sort -z | head -25</code> looks safe because the final output is capped, but <code>sort</code> has already enumerated the whole directory. C42 warns rather than blocks, so it flags the shape without failing a submission on it.</p>
+<p>Widget template commit 516ccd8 vendored both gates so new plugins inherit them. The <code>/omarchy-ship</code> submission auditor now refuses CLEAN status without descriptor-bound lifecycle evidence and hostile parent-swap, temp-entry, final-entry, FIFO, and oversized-input proofs.</p>
+<p>Then the new gate had to be debugged against the code it had just forced into existence.</p>
+<p>Commit 6d924f3: C41 selected runtime files by <code>.sh</code>/<code>.bash</code> extension or by a shell shebang, which covered the extensionless bash helpers fine. Then the helpers stopped being shell. A <code>#!/usr/bin/perl</code> first line matches neither test, so the newly rewritten helpers were invisible to the gate written to check them. The fix extended the shebang match to <code>#!/usr/bin/perl</code>. The same commit had to settle a second collision. C35 (runtime-dependency, an older gate) banned Perl shebangs outright as an interpreter a stock Omarchy install does not guarantee, so the safe rewrite tripped a different gate. Perl was unbanned there because it is a base dependency on the Buzz image, but only with an absolute system shebang, never <code>env</code>, so the session PATH cannot swap the interpreter.</p>
+<p>Commit c9c52ed: C41’s redirect heuristic was <code>>>?\s*"?\$\w+</code>, matching <code>> $file</code> and <code>>> $file</code>. It also matched Perl’s fat comma <code>key => $value</code> as a shell redirection. A negative lookbehind fixed it: <code>(?&#x3C;!=)>>?\s*"?\$\w+</code>. Do not flag <code>=></code>.</p>
+<p>Commit 7d22a5c: That lookbehind was then replaced with a simpler rule. The heuristic was being ported to Perl, and porting a regex to a second language keeps its syntax assumptions. <code>@items > $limit</code> is not a redirection either. The honest fix was to scope the heuristic: run the redirect check on shell helpers only. Perl lifecycle safety is established by the descriptor checks themselves, not by a regex that keeps collecting exceptions.</p>
+<h2 id="the-audit-that-refused-the-claim">The audit that refused the claim</h2>
+<p>The gate work has a mirror at the estate level, and it ran the same night. A gate that passes on a file it never opened and a green CI badge for a check that never ran are the same error: a name standing in for the thing itself. Late the same evening came a 168-line estate readiness audit (omarchy <code>000-docs/004-AA-AUDT-omarchy-estate-readiness-2026-08-29.md</code>). It found:</p>
+<ul>
+<li>16/16 worktrees clean, git fsck clean, 444/444 local tests pass across 16 repos, all hosted gates green</li>
+<li>but: CI proves static and unit tests, NOT a running Omarchy shell. No repo’s GitHub workflow executes <code>rig-verify.sh</code> or <code>rig-render.sh</code>. A green hosted workflow does not prove a plugin loads. Current-source rig proof exists only for Desk Transition, Foundry, and Crew Chief. Widget Template has no proof receipt at all.</li>
+<li>9 live listings, but only Listening Post’s validated commit matches its current head. The other eight reference older snapshots.</li>
+<li>None of the 16 mains has branch protection. 15/16 use mutable action tags. Six repos declare coverage thresholds but invoke raw <code>node --test</code>, bypassing the threshold command.</li>
+</ul>
+<p>The audit explicitly refused a “best in class” or “fully production certified” claim. It prescribed the honest public status instead: “16 maintained Omarchy plugin repositories; 9 live marketplace listings; all local suites currently green; marketplace verification and production-render certification are tracked per exact commit.”</p>
+<h2 id="also-shipped">Also shipped</h2>
+<ul>
+<li>claude-code-plugins ed4765e43: enforce marketplace compliance metric ratchets in CI</li>
+<li>intent-blueprint-docs b9297e0: model-neutral documentation platform; 29c2fd8 made package validation race-free (another race, same week)</li>
+<li>omarchy-desk-transition-entry 2e06d94: capture desk transition with active outputs</li>
+<li>omarchy-crew-chief-entry 0ef344e: harden process arguments, proven on the real rig, validator and QML-lint receipts both zero-error, local suite 25/25</li>
+<li>omarchy-workspace-storyboard-entry e597cdc: pin current Node 24 actions</li>
+<li>omarchy-widget-template 868d0f5: land governance scaffolding (editorconfig, gitattributes, issue and PR templates, dependabot, CODE_OF_CONDUCT, CONTRIBUTING, SECURITY)</li>
+<li>omarchy 6f2e2b7 and bfdabf5: refresh live marketplace metrics from scripts/refresh-metrics.sh</li>
+<li>github-profile 6630095 and 23f4930: swap in the cityscape avatar, remove dead embeds, drop a Projects badge GitHub already renders</li>
+<li>comehomealabama 4dea5f5: a journal post shipped through the sibling pipeline</li>
+</ul>
+<p>None of those touched a descriptor. The ones that did were the six helpers a reviewer had already sent back twice, and the gate that had to be taught to see them.</p>
+<h2 id="related-posts">Related Posts</h2>
+<ul>
+<li><a href="https://startaitools.com/posts/gate-the-statement-not-the-tool-name/">Gate the Statement, Not the Tool Name</a></li>
+<li><a href="https://startaitools.com/posts/every-safety-gate-has-a-failure-direction/">Every Safety Gate Has a Failure Direction</a></li>
+<li><a href="https://startaitools.com/posts/honor-the-gate-when-the-verdict-is-inconvenient/">Honor the Gate When the Verdict Is Inconvenient</a></li>
+</ul>
+      </div>
+    </div>
+  </article>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>langchain-ci-integration - Agent Skill</title>
+    <meta name="description" content="Wire LangChain 1.0 / LangGraph 1.0 tests into a GitHub Actions pipeline — unit tests with FakeListChatModel, VCR-gated integration tests, warning-filter policy, and eval-regression merge gates. Complements langchain-local-dev-loop (F23) which covers the inner loop; THIS covers the CI wire-up. Use when setting up GHA for a new LLM service, after a VCR cassette leak incident, or hardening an existing pipeline. Trigger with &quot;langchain ci&quot;, &quot;langchain github actions&quot;, &quot;langchain test pipeline&quot;, &quot;vcr ci&quot;, &quot;langchain eval gate&quot;, &quot;pytest -W error langchain&quot;.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://tonsofskills.com/tons-of-skills-marketplace/skills/langchain-ci-integration/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/langchain-ci-integration/">
+    <meta property="og:title" content="langchain-ci-integration - Agent Skill">
+    <meta property="og:description" content="Wire LangChain 1.0 / LangGraph 1.0 tests into a GitHub Actions pipeline — unit tests with FakeListChatModel, VCR-gated integration tests, warning-filter policy, and eval-regression merge gates. Complements langchain-local-dev-loop (F23) which covers the inner loop; THIS covers the CI wire-up. Use when setting up GHA for a new LLM service, after a VCR cassette leak incident, or hardening an existing pipeline. Trigger with &quot;langchain ci&quot;, &quot;langchain github actions&quot;, &quot;langchain test pipeline&quot;, &quot;vcr ci&quot;, &quot;langchain eval gate&quot;, &quot;pytest -W error langchain&quot;.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="langchain-ci-integration - Agent Skill">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/langchain-ci-integration/">
+    <meta name="twitter:title" content="langchain-ci-integration - Agent Skill">
+    <meta name="twitter:description" content="Wire LangChain 1.0 / LangGraph 1.0 tests into a GitHub Actions pipeline — unit tests with FakeListChatModel, VCR-gated integration tests, warning-filter policy, and eval-regression merge gates. Complements langchain-local-dev-loop (F23) which covers the inner loop; THIS covers the CI wire-up. Use when setting up GHA for a new LLM service, after a VCR cassette leak incident, or hardening an existing pipeline. Trigger with &quot;langchain ci&quot;, &quot;langchain github actions&quot;, &quot;langchain test pipeline&quot;, &quot;vcr ci&quot;, &quot;langchain eval gate&quot;, &quot;pytest -W error langchain&quot;.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"langchain-ci-integration","description":"Wire LangChain 1.0 / LangGraph 1.0 tests into a GitHub Actions pipeline — unit tests with FakeListChatModel, VCR-gated integration tests, warning-filter policy, and eval-regression merge gates. Complements langchain-local-dev-loop (F23) which covers the inner loop; THIS covers the CI wire-up. Use when setting up GHA for a new LLM service, after a VCR cassette leak incident, or hardening an existing pipeline. Trigger with \"langchain ci\", \"langchain github actions\", \"langchain test pipeline\", \"vcr ci\", \"langchain eval gate\", \"pytest -W error langchain\".","version":"2.5.0","author":{"@type":"Person","name":"Jeremy Longshore"},"license":"MIT","programmingLanguage":"Claude Code Agent Skill","isPartOf":{"@type":"SoftwareApplication","name":"langchain-py-pack","applicationCategory":"unknown"}}</script>
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.breadcrumbs[data-astro-cid-ilhxcym7]{margin-bottom:var(--space-5)}.breadcrumbs__list[data-astro-cid-ilhxcym7]{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;list-style:none;padding:0;margin:0;font-family:var(--font-mono);font-size:var(--text-sm, .8rem)}.breadcrumbs__item[data-astro-cid-ilhxcym7]{display:flex;align-items:center;gap:.375rem}.breadcrumbs__link[data-astro-cid-ilhxcym7]{color:var(--text-3);text-decoration:none;transition:color var(--duration-fast, .2s) var(--ease-out)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:hover{color:var(--primary)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:0}.breadcrumbs__sep[data-astro-cid-ilhxcym7]{color:var(--text-3);user-select:none;font-size:.7em;line-height:1}.breadcrumbs__current[data-astro-cid-ilhxcym7]{color:var(--text-2)}.detail-cta[data-astro-cid-qcigfm7x]{background:var(--surface-3, var(--brand-light-gray));border-top:1px solid var(--border, var(--brand-light-gray));border-radius:var(--radius-lg);padding:2rem 1.5rem;margin-top:2rem;text-align:center}.detail-cta__headline[data-astro-cid-qcigfm7x]{font-family:var(--font-display);font-weight:700;font-size:1.35rem;color:var(--text, var(--brand-dark));margin-bottom:1.25rem}.detail-cta__actions[data-astro-cid-qcigfm7x]{display:flex;justify-content:center;gap:.75rem;flex-wrap:wrap}.detail-cta__primary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:var(--primary);color:#0a0a0c;border:none;border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;cursor:pointer;transition:background var(--duration-fast) var(--ease-out),transform var(--duration-fast) var(--ease-out)}.detail-cta__primary[data-astro-cid-qcigfm7x]:hover{background:var(--primary-dark, var(--primary-dark));transform:translateY(-1px)}.detail-cta__primary[data-astro-cid-qcigfm7x].copied{background:var(--positive, var(--brand-green))}.detail-cta__secondary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:transparent;color:var(--text, var(--brand-dark));border:1px solid var(--border, var(--brand-mid-gray));border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;text-decoration:none;transition:border-color var(--duration-fast) var(--ease-out),color var(--duration-fast) var(--ease-out)}.detail-cta__secondary[data-astro-cid-qcigfm7x]:hover{border-color:var(--primary);color:var(--primary)}@media(max-width:480px){.detail-cta__actions[data-astro-cid-qcigfm7x]{flex-direction:column;align-items:stretch}.detail-cta__primary[data-astro-cid-qcigfm7x],.detail-cta__secondary[data-astro-cid-qcigfm7x]{justify-content:center}}
+</style>
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/_slug_@_@astro.wF9emvVq.css"></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  
+  
+
+  <div class="skill-detail" data-astro-cid-jrlgpo3w>
+    <!-- 1. Breadcrumbs -->
+    <nav aria-label="Breadcrumb" class="breadcrumbs" data-astro-cid-ilhxcym7>
+  <ol class="breadcrumbs__list" itemscope itemtype="https://schema.org/BreadcrumbList" data-astro-cid-ilhxcym7>
+    <li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Home</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="1">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/skills/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Skills</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="2">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          <span class="breadcrumbs__current" aria-current="page" itemprop="name" data-astro-cid-ilhxcym7>
+              langchain-ci-integration
+            </span>
+          <meta itemprop="position" content="3">
+        </li>
+  </ol>
+</nav>
+
+    <!-- 2. Header (enhanced) -->
+    <header class="skill-header" data-astro-cid-jrlgpo3w>
+      <h1 data-astro-cid-jrlgpo3w>langchain-ci-integration</h1>
+      <p class="skill-description" data-astro-cid-jrlgpo3w>Wire LangChain 1.0 / LangGraph 1.0 tests into a GitHub Actions pipeline — unit tests with FakeListChatModel, VCR-gated integration tests, warning-filter policy, and eval-regression merge gates. Complements langchain-local-dev-loop (F23) which covers the inner loop; THIS covers the CI wire-up. Use when setting up GHA for a new LLM service, after a VCR cassette leak incident, or hardening an existing pipeline. Trigger with &quot;langchain ci&quot;, &quot;langchain github actions&quot;, &quot;langchain test pipeline&quot;, &quot;vcr ci&quot;, &quot;langchain eval gate&quot;, &quot;pytest -W error langchain&quot;.</p>
+
+      <div class="skill-metadata" data-astro-cid-jrlgpo3w>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>v2.5.0</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>Jeremy Longshore</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>MIT</span>
+        </div>
+      </div>
+
+      
+    </header>
+
+    <!-- 4. Allowed Tools -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Allowed Tools</h2>
+      <div class="tools-grid" data-astro-cid-jrlgpo3w>
+        <span class="tool-badge" data-astro-cid-jrlgpo3w>Read</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Write</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Edit</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(python:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(pytest:*)</span>
+      </div>
+      
+    </section>
+
+    <!-- 5. Provided by Plugin -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Provided by Plugin</h2>
+      <div class="plugin-info" data-astro-cid-jrlgpo3w>
+        <div class="plugin-details" data-astro-cid-jrlgpo3w>
+          <h3 data-astro-cid-jrlgpo3w>
+            <a href="/plugins/langchain-py-pack/" data-astro-cid-jrlgpo3w>langchain-py-pack</a>
+          </h3>
+          <p data-astro-cid-jrlgpo3w>Claude Code skill pack for LangChain 1.0 + LangGraph 1.0 (Python) - 34 skills covering chains, agents, RAG, middleware, checkpointing, HITL, streaming, and production patterns</p>
+          <div class="plugin-meta" data-astro-cid-jrlgpo3w>
+            <span data-astro-cid-jrlgpo3w>unknown</span>
+            <span data-astro-cid-jrlgpo3w>v2.5.0</span>
+          </div>
+        </div>
+        <a href="/plugins/langchain-py-pack/" class="btn-primary" data-astro-cid-jrlgpo3w>View Plugin</a>
+      </div>
+    </section>
+
+    <!-- 6. Installation -->
+    <section class="section-box dark" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Installation</h2>
+      <p class="install-note" style="color: var(--brand-light-gray); margin-bottom: 0.75rem;" data-astro-cid-jrlgpo3w>This skill is included in the langchain-py-pack plugin:</p>
+      <pre class="install-command" data-copy="/plugin install langchain-py-pack@claude-code-plugins-plus" data-astro-cid-jrlgpo3w><code data-astro-cid-jrlgpo3w>/plugin install langchain-py-pack@claude-code-plugins-plus</code></pre>
+      <p class="install-note" data-astro-cid-jrlgpo3w>Click to copy</p>
+    </section>
+
+    <!-- 7. Skill Content (Markdown) -->
+    <section class="skill-content-section" data-astro-cid-jrlgpo3w>
+      <h2 data-astro-cid-jrlgpo3w>Instructions</h2>
+      <div class="skill-content" data-astro-cid-jrlgpo3w>
+        <div data-astro-cid-jrlgpo3w><h1>LangChain CI Integration (Python)</h1>
+<h2>Overview</h2>
+<p>A PR passes every test on your laptop. You push. GHA runs <code>pytest</code> and aborts during collection — before a single test executes — with:</p>
+<pre><code>
+PytestUnraisableExceptionWarning: Exception ignored in: ...
+DeprecationWarning: langchain_community.llms ...
+</code></pre>
+<p>The org runs <code>pytest -W error</code> and a provider SDK emitted a <code>DeprecationWarning</code> at <em>import</em> time, which the warning filter promoted to an exception while pytest was still walking the test tree. This is <strong>P45</strong> and it blocks every PR for the team until someone pins a <code>filterwarnings</code> config.</p>
+<p>Meanwhile the integration suite has its own failure mode: a VCR cassette recorded three months ago at <code>temperature=0</code> against Anthropic is now flaking against a snapshot. <code>temperature=0</code> is not deterministic on Claude — it still nucleus-samples (<strong>P05</strong>) — so the cassette captured <em>one</em> valid completion, not <em>the</em> valid completion. And yesterday a reviewer caught <code>Authorization: Bearer sk-ant-...</code> in a cassette file that had been committed six weeks ago (<strong>P44</strong>) because <code>vcrpy</code> records all request headers by default.</p>
+<p>This skill covers the outer loop: the GitHub Actions workflow, the unit / integration / eval gate separation, VCR cassette hygiene, pytest warning policy, and a merge-blocking eval regression gate. The <strong>inner</strong> loop — fake model fixtures, VCR recording workflow, local determinism tricks — lives in <code>langchain-local-dev-loop</code> (F23); cross-reference it, do not duplicate it. Pin: <code>langchain-core 1.0.x</code>, <code>langgraph 1.0.x</code>, <code>actions/checkout@v4</code>, <code>actions/setup-python@v5</code>, <code>vcrpy 6.x</code>. Pain-catalog anchors: <strong>P05, P43, P44, P45</strong>.</p>
+<h2>Prerequisites</h2>
+<ul>
+<li>Python 3.10, 3.11, or 3.12 (matrix)</li>
+<li><code>langchain-core &gt;= 1.0, &lt; 2.0</code>, <code>langgraph &gt;= 1.0, &lt; 2.0</code></li>
+<li><code>pytest &gt;= 8</code>, <code>pytest-asyncio</code>, <code>vcrpy &gt;= 6</code> (integration)</li>
+<li><code>langchain-local-dev-loop</code> (F23) applied locally — fixtures and recording workflow</li>
+<li>GitHub repo with Actions enabled; secrets set for any live-API nightly job</li>
+</ul>
+<h2>Instructions</h2>
+<h3>Step 1 — GHA workflow skeleton with four jobs</h3>
+<p>Single workflow at <code>.github/workflows/tests.yml</code>. Matrix on unit only; keep integration and eval single-version to control cost.</p>
+<pre data-lang="yaml"><code>
+name: tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: &quot;0 6 * * *&quot;  # nightly live-API re-record check (06:00 UTC)
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: [&quot;3.10&quot;, &quot;3.11&quot;, &quot;3.12&quot;]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: |
+            pyproject.toml
+            requirements*.txt
+      - run: pip install -e &quot;.[test]&quot;
+      - run: pytest tests/unit/ -W error --timeout=30 -q
+
+  integration:
+    needs: unit
+    if: github.event_name == &#39;schedule&#39; || contains(github.event.pull_request.labels.*.name, &#39;run-integration&#39;)
+    runs-on: ubuntu-latest
+    env:
+      RUN_INTEGRATION: &quot;1&quot;
+      VCR_MODE: &quot;none&quot;  # replay-only; nightly cron flips to &quot;once&quot;
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: &quot;3.12&quot;, cache: pip }
+      - run: pip install -e &quot;.[test,integration]&quot;
+      - run: pytest tests/integration/ -W error --timeout=60 -q
+
+  eval:
+    needs: unit
+    if: github.event_name == &#39;pull_request&#39;
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }   # need base ref for delta comparison
+      - uses: actions/setup-python@v5
+        with: { python-version: &quot;3.12&quot;, cache: pip }
+      - run: pip install -e &quot;.[test,eval]&quot;
+      - run: python scripts/run_eval.py --baseline origin/${{ github.base_ref }} --head HEAD --n 100
+      # run_eval.py posts a PR comment and exits nonzero on regression &gt; threshold
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: &quot;3.12&quot;, cache: pip }
+      - run: pip install -e &quot;.[dev]&quot;
+      - run: ruff check .
+      - run: python scripts/dryrun_load_chains.py   # catches ImportError migration regressions
+</code></pre>
+<p>See <a href="references/github-actions-workflow.md">GHA Workflow Reference</a> for the full job definitions including the secret-injection pattern, the matrix caching nuance, and the <code>softprops/action-gh-release</code>-style PR comment action used by the eval job.</p>
+<h3>Step 2 — Unit job: <code>-W error</code> + <code>filterwarnings</code> to neutralize P45</h3>
+<p>Root cause of the collection abort: pytest collects tests by importing them. Some provider SDKs emit <code>DeprecationWarning</code> on import. With <code>-W error</code> those become exceptions during collection. Fix at the <em>filter</em> level, not by dropping <code>-W error</code> (which would mask real warnings).</p>
+<p>In <code>pyproject.toml</code>:</p>
+<pre data-lang="toml"><code>
+[tool.pytest.ini_options]
+filterwarnings = [
+    &quot;error&quot;,
+    # P45 — neutralize known import-time noise; scoped per module so new
+    # warnings from YOUR code still fail the build.
+    &quot;ignore::DeprecationWarning:langchain_community.*&quot;,
+    &quot;ignore::DeprecationWarning:pydantic.*&quot;,
+    &quot;ignore:Pydantic serializer warnings:UserWarning&quot;,
+]
+asyncio_mode = &quot;auto&quot;
+testpaths = [&quot;tests&quot;]
+</code></pre>
+<p>The ordering matters — <code>&quot;error&quot;</code> first, specific <code>&quot;ignore&quot;</code> entries after, so the filters override the global promote-to-error. Keep the list <strong>narrow</strong>: a blanket <code>ignore::DeprecationWarning</code> hides regressions you need to see.</p>
+<p>Unit tests use <code>FakeListChatModel</code> fixtures from F23 (do not redefine them here). One CI-specific gotcha (<strong>P43</strong>): <code>FakeListChatModel</code> does not emit <code>response_metadata[&quot;token_usage&quot;]</code>, so any callback that asserts on token counts will break. Either subclass the fake and inject <code>generation_info</code>, or gate the assertion:</p>
+<pre data-lang="python"><code>
+def test_chain_uses_tokens(patched_chat_model):
+    result = chain.invoke({&quot;input&quot;: &quot;hi&quot;})
+    if patched_chat_model.__class__.__name__ == &quot;FakeListChatModel&quot;:
+        pytest.skip(&quot;fake model doesn&#39;t emit token_usage (P43)&quot;)
+    assert result.response_metadata[&quot;token_usage&quot;][&quot;total_tokens&quot;] &gt; 0
+</code></pre>
+<p>Budget: unit job should finish in <strong>&lt;2 minutes</strong> across the 3-version matrix. If it doesn&#39;t, something is calling out to a real provider — check with <code>pytest --collect-only -q | wc -l</code> and audit which tests lack fake-model fixtures.</p>
+<h3>Step 3 — Integration job: VCR replay + <code>filter_headers</code> (P44)</h3>
+<p>Integration tests replay pre-recorded VCR cassettes. Three rules:</p>
+<ol>
+<li>Gate the job. <code>if: contains(github.event.pull_request.labels.*.name, &#39;run-integration&#39;)</code> or <code>env.RUN_INTEGRATION == &quot;1&quot;</code>, plus a nightly cron that flips to <code>VCR_MODE=once</code> and re-records against live APIs. PRs default to pure replay.</li>
+<li>Enforce <code>filter_headers</code> at the fixture level — not per-test. A single <code>conftest.py</code> prevents any contributor from recording a cassette with raw credentials.</li>
+<li>Pre-commit + CI both scan cassettes for leaked keys. Belt and suspenders.</li>
+</ol>
+<p>Fixture (lives in <code>tests/integration/conftest.py</code>, owned by this skill&#39;s pipeline concern — F23 owns the <em>recording</em> workflow):</p>
+<pre data-lang="python"><code>
+import vcr
+import pytest
+
+@pytest.fixture(scope=&quot;module&quot;)
+def vcr_config():
+    return {
+        &quot;filter_headers&quot;: [
+            &quot;authorization&quot;,
+            &quot;x-api-key&quot;,
+            &quot;anthropic-version&quot;,
+            (&quot;openai-organization&quot;, &quot;REDACTED&quot;),
+        ],
+        &quot;filter_post_data_parameters&quot;: [&quot;api_key&quot;],
+        &quot;record_mode&quot;: &quot;none&quot;,  # CI default: replay only
+        &quot;match_on&quot;: [&quot;method&quot;, &quot;scheme&quot;, &quot;host&quot;, &quot;port&quot;, &quot;path&quot;, &quot;query&quot;],
+    }
+</code></pre>
+<p>Integration suite must finish in <strong>&lt;5 minutes</strong> wall-clock on the runner, or you will start getting cancellation flakes from the <code>concurrency</code> block. If you exceed 5 minutes, split into a nightly-only long tier.</p>
+<p>See <a href="references/integration-gating.md">Integration Gating</a> for the full live-vs-replay decision tree, cost-per-run budget worksheet, and the <code>VCR_MODE</code> flip pattern.</p>
+<h3>Step 4 — Eval-regression gate: merge-blocking PR comment</h3>
+<p>The eval job runs the <code>langchain-eval-harness</code> harness (see that skill for the harness itself — this skill only covers the CI wire-up) against both the PR branch and the merge base. Post a comment; block merge on regression.</p>
+<p><code>scripts/run_eval.py</code> is a thin CI wrapper: check out baseline and head via <code>git worktree</code>, run the harness at each ref, diff the results, post a PR comment, exit nonzero on regression. Full implementation in <a href="references/eval-regression-gate.md">Eval Regression Gate</a>.</p>
+<p>Thresholds:</p>
+<table><thead><tr>
+<th>Gate</th>
+<th>Threshold</th>
+<th>Rationale</th>
+</tr></thead><tbody>
+<tr>
+<td>Aggregate score</td>
+<td>drop &gt;2%</td>
+<td>One-sigma noise on n=100 with well-behaved evals</td>
+</tr>
+<tr>
+<td>Per-example score</td>
+<td>drop &gt;5% on any single case</td>
+<td>Catches quiet regressions masked by aggregate averaging</td>
+</tr>
+<tr>
+<td>Sample size floor</td>
+<td>n ≥ 100</td>
+<td>Below this, aggregate delta is dominated by noise</td>
+</tr>
+</tbody></table>
+<p>The PR comment is a Markdown table with <code>before / after / Δ</code> per metric plus a <strong>bold red</strong> line if the gate failed. Required-status-check on the <code>eval</code> job completes the enforcement. See <a href="references/eval-regression-gate.md">Eval Regression Gate</a> for the comment template and the noise-budget calculation.</p>
+<h3>Step 5 — Pre-commit hooks: secret scan + prompt lint</h3>
+<p>Two layers: local (pre-commit) and CI (re-runs the same hooks as a final catch). Local alone is not sufficient — contributors can skip with <code>-n</code>. CI alone is slow. Run both.</p>
+<p><code>.pre-commit-config.yaml</code>:</p>
+<pre data-lang="yaml"><code>
+repos:
+  - repo: local
+    hooks:
+      - id: vcr-secret-scan
+        name: VCR cassette secret scan (P44)
+        entry: python scripts/scan_cassettes.py
+        language: system
+        files: &quot;tests/integration/cassettes/.*\\.ya?ml$&quot;
+        pass_filenames: true
+
+      - id: prompt-convention-lint
+        name: prompt-convention lint
+        entry: python scripts/lint_prompts.py
+        language: system
+        files: &quot;prompts/.*\\.j2$|src/.*prompts?\\.py$&quot;
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
+    hooks:
+      - id: ruff
+      - id: ruff-format
+
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        args: [&quot;--baseline&quot;, &quot;.secrets.baseline&quot;]
+</code></pre>
+<p><code>scan_cassettes.py</code> greps for <code>sk-[A-Za-z0-9]{20,}</code>, <code>sk-ant-[A-Za-z0-9_-]{20,}</code>, <code>AIza[A-Za-z0-9_-]{35}</code> (Google), <code>xoxb-</code>, and <code>Bearer [A-Za-z0-9._-]{20,}</code>. Fail on any match. This is your last line of defense before <strong>P44</strong> ships to <code>main</code>. See <a href="references/pre-commit-hooks.md">Pre-Commit Hooks</a> for the full pattern list, the prompt-convention lint rules (aligned with <code>claude-prompt-conventions</code>), and the <code>detect-secrets</code> baseline-rotation policy.</p>
+<h3>Step 6 — Dry-run chain loader: catch ImportError migration breaks</h3>
+<p>LangChain 0.x → 1.0 moved integrations into provider packages. A chain that imports <code>from langchain.chat_models import ChatOpenAI</code> works in local dev if you still have the old compat shim installed, and explodes in CI. Dry-run-load every chain module at lint time:</p>
+<pre data-lang="python"><code>
+# scripts/dryrun_load_chains.py
+import importlib, pathlib, sys, traceback
+
+failures = []
+for py in pathlib.Path(&quot;src/chains&quot;).rglob(&quot;*.py&quot;):
+    mod = str(py.with_suffix(&quot;&quot;)).replace(&quot;/&quot;, &quot;.&quot;)
+    try:
+        importlib.import_module(mod)
+    except Exception:
+        failures.append((mod, traceback.format_exc()))
+
+if failures:
+    for mod, tb in failures:
+        print(f&quot;::error::chain {mod} failed to import\n{tb}&quot;)
+    sys.exit(1)
+</code></pre>
+<p>Runs in the <code>lint</code> job. Costs ~5 seconds. Catches every <code>ImportError</code> and every top-level <code>NameError</code> from a bad rename before a single unit test fires.</p>
+<h2>Output</h2>
+<ul>
+<li>GHA workflow with four isolated jobs (unit / integration / eval / lint)</li>
+<li><code>pyproject.toml</code> <code>filterwarnings</code> config that survives <code>-W error</code> (P45)</li>
+<li>VCR <code>conftest.py</code> fixture with enforced <code>filter_headers</code> (P44)</li>
+<li><code>run_eval.py</code> CI wrapper that posts PR comments and blocks merge on regression</li>
+<li><code>.pre-commit-config.yaml</code> with cassette secret scan + prompt lint + ruff</li>
+<li>Dry-run chain loader that catches migration <code>ImportError</code>s</li>
+</ul>
+<h3>Gate policy</h3>
+<table><thead><tr>
+<th>Gate</th>
+<th>Required?</th>
+<th>Target speed</th>
+<th>On failure</th>
+</tr></thead><tbody>
+<tr>
+<td>unit (3 Python versions)</td>
+<td>yes, every PR</td>
+<td>&lt;2 min</td>
+<td>block PR</td>
+</tr>
+<tr>
+<td>lint + dryrun-load</td>
+<td>yes, every PR</td>
+<td>&lt;30 s</td>
+<td>block PR</td>
+</tr>
+<tr>
+<td>integration (VCR replay)</td>
+<td>on <code>run-integration</code> label or nightly</td>
+<td>&lt;5 min</td>
+<td>block merge when run</td>
+</tr>
+<tr>
+<td>integration (live, nightly cron)</td>
+<td>no</td>
+<td>&lt;15 min</td>
+<td>open issue on fail</td>
+</tr>
+<tr>
+<td>eval regression (n≥100)</td>
+<td>yes, every PR</td>
+<td>&lt;10 min</td>
+<td>block merge if agg &gt;2% or per-example &gt;5%</td>
+</tr>
+<tr>
+<td>pre-commit (local)</td>
+<td>yes</td>
+<td>&lt;10 s</td>
+<td>reject commit</td>
+</tr>
+</tbody></table>
+<h2>Error Handling</h2>
+<table><thead><tr>
+<th>Error</th>
+<th>Cause</th>
+<th>Fix</th>
+</tr></thead><tbody>
+<tr>
+<td><code>PytestUnraisableExceptionWarning</code> during collection</td>
+<td><code>-W error</code> + SDK import-time <code>DeprecationWarning</code> (P45)</td>
+<td>Add scoped <code>filterwarnings = [&quot;ignore::DeprecationWarning:langchain_community.*&quot;]</code> to <code>pyproject.toml</code></td>
+</tr>
+<tr>
+<td>VCR replay mismatch after weeks of passing</td>
+<td>Cassette recorded at <code>temp=0</code> on Anthropic (P05); model drift</td>
+<td>Re-record on nightly cron with <code>VCR_MODE=once</code>; treat replay mismatches as eval-gate concerns, not unit failures</td>
+</tr>
+<tr>
+<td><code>sk-ant-...</code> in cassette flagged by reviewer</td>
+<td><code>vcrpy</code> records all headers by default (P44)</td>
+<td>Enforce <code>filter_headers</code> in <code>conftest.py</code>; add <code>scan_cassettes.py</code> to pre-commit AND CI</td>
+</tr>
+<tr>
+<td>Callback <code>AssertionError: &#39;token_usage&#39; not in response_metadata</code></td>
+<td><code>FakeListChatModel</code> doesn&#39;t emit metadata (P43)</td>
+<td>Subclass the fake to inject <code>generation_info</code>, or <code>pytest.skip</code> on fake-model detection</td>
+</tr>
+<tr>
+<td><code>ImportError: cannot import name &#39;ChatOpenAI&#39; from &#39;langchain.chat_models&#39;</code> in CI only</td>
+<td>Legacy compat shim installed locally, not in CI</td>
+<td>Add <code>dryrun_load_chains.py</code> to lint job; fail at lint, not at test</td>
+</tr>
+<tr>
+<td>Eval job times out at 10 min</td>
+<td>n too large or harness not using <code>asyncio</code> concurrency</td>
+<td>Cap at n=100 for PRs; run n=500 nightly; see F23 for async harness pattern</td>
+</tr>
+<tr>
+<td>Concurrency block cancels integration run</td>
+<td>Long job + rapid pushes</td>
+<td>Do not disable; keep integration &lt;5 min or split long tier to nightly</td>
+</tr>
+</tbody></table>
+<h2>Examples</h2>
+<h3>Wiring a new repo from scratch</h3>
+<p>Copy the Step 1 workflow, the Step 2 <code>pyproject.toml</code> block, and the Step 5 pre-commit config. Create <code>tests/unit/</code>, <code>tests/integration/cassettes/</code>, <code>scripts/run_eval.py</code>, <code>scripts/dryrun_load_chains.py</code>, <code>scripts/scan_cassettes.py</code>. Apply <code>langchain-local-dev-loop</code> (F23) first so fake-model fixtures exist before the unit job runs. Enable required status checks: <code>unit (3.10)</code>, <code>unit (3.11)</code>, <code>unit (3.12)</code>, <code>lint</code>, <code>eval</code>. Integration stays optional (label-gated).</p>
+<p>See <a href="references/github-actions-workflow.md">GHA Workflow Reference</a> for the complete copy-pasteable workflow.</p>
+<h3>Hardening after a P44 cassette-leak incident</h3>
+<p>Rotate every leaked key <strong>first</strong> (not a CI concern — incident response). Then: add <code>scan_cassettes.py</code> to pre-commit, re-scan the full history with <code>git log -p -- tests/integration/cassettes/</code>, rewrite history with <code>git-filter-repo</code> if keys hit <code>main</code>, enforce the <code>filter_headers</code> fixture going forward. See <a href="references/pre-commit-hooks.md">Pre-Commit Hooks</a> for the full pattern list and the <code>detect-secrets</code> baseline-rotation playbook.</p>
+<h3>Wiring the eval harness into an existing repo</h3>
+<p>The harness itself lives in <code>langchain-eval-harness</code>. THIS skill only supplies <code>run_eval.py</code> (the CI wrapper that reads the harness output, computes deltas, and posts PR comments) plus the gate thresholds. Drop in the Step 4 script, add the <code>eval</code> job to <code>.github/workflows/tests.yml</code>, make <code>eval</code> a required status check. See <a href="references/eval-regression-gate.md">Eval Regression Gate</a> for the PR-comment Markdown template and the n≥100 noise-budget derivation.</p>
+<h2>Resources</h2>
+<ul>
+<li><a href="https://python.langchain.com/docs/how_to/testing/">LangChain Python: Testing</a></li>
+<li><a href="https://python.langchain.com/api_reference/core/language_models/langchain_core.language_models.fake_chat_models.FakeListChatModel.html"><code>FakeListChatModel</code> API</a></li>
+<li><a href="https://vcrpy.readthedocs.io/en/latest/advanced.html#filter-sensitive-data-from-the-request">vcrpy docs — filtering sensitive data</a></li>
+<li><a href="https://docs.github.com/en/actions">GitHub Actions docs</a></li>
+<li><a href="https://docs.pytest.org/en/stable/how-to/capture-warnings.html">pytest <code>filterwarnings</code></a></li>
+<li>Pair skill: <code>langchain-local-dev-loop</code> (F23) — fake fixtures, local recording</li>
+<li>Pair skill: <code>langchain-eval-harness</code> — eval suite the gate runs against</li>
+<li>Pack pain catalog: <code>docs/pain-catalog.md</code> (entries P05, P43, P44, P45)</li>
+</ul></div>
+      </div>
+    </section>
+
+    <!-- 8. Bottom CTA -->
+    <section class="detail-cta" data-astro-cid-qcigfm7x>
+  <h2 class="detail-cta__headline" data-astro-cid-qcigfm7x>Ready to use langchain-py-pack?</h2>
+  <div class="detail-cta__actions" data-astro-cid-qcigfm7x>
+    <button class="detail-cta__primary" data-copy-install="/plugin install langchain-py-pack@claude-code-plugins-plus" data-astro-cid-qcigfm7x>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" data-astro-cid-qcigfm7x>
+        <rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" stroke-width="1.5" data-astro-cid-qcigfm7x></rect>
+        <path d="M3 11V3a1 1 0 011-1h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" data-astro-cid-qcigfm7x></path>
+      </svg>
+      <span class="detail-cta__btn-text" data-astro-cid-qcigfm7x>Copy Install Command</span>
+    </button>
+    
+  </div>
+</section>
+
+<script type="module">document.querySelectorAll("[data-copy-install]").forEach(t=>{t.addEventListener("click",async()=>{const a=t.dataset.copyInstall||"";await navigator.clipboard.writeText(a);const e=t.querySelector(".detail-cta__btn-text");if(e){const o=e.textContent;e.textContent="Copied!",t.classList.add("copied"),window.trackEvent&&window.trackEvent("install_copied",{plugin_name:a.split(" ").pop()||"",source:"detail_cta"}),setTimeout(()=>{e.textContent=o,t.classList.remove("copied")},2e3)}})});</script>
+
+    <!-- 9. Related Skills (6, with tool pills) -->
+    <section class="related-skills-section" data-astro-cid-jrlgpo3w>
+        <h2 class="related-skills-heading" data-astro-cid-jrlgpo3w>Related Skills</h2>
+        <div class="related-skills-grid" data-astro-cid-jrlgpo3w>
+          <a href="/skills/abridge-ci-integration/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-ci-integration</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Configure CI/CD pipeline for Abridge clinical AI integrations with GitHub Actions.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-common-errors/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-common-errors</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Diagnose and fix common Abridge clinical AI integration errors.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-a/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-a</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge ambient clinical documentation capture-to-note pipeline.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-b/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-b</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge patient-facing documentation and after-visit summary generation.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-cost-tuning/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-cost-tuning</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Optimize Abridge clinical AI costs through tier selection, session management, and usage monitoring for healthcare organizations.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-debug-bundle/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-debug-bundle</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Collect Abridge debug evidence for support tickets and troubleshooting.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a>
+        </div>
+      </section>
+
+  </div>
+
+  
+  <script>
+    document.querySelectorAll('.install-command').forEach(el => {
+      el.addEventListener('click', function() {
+        const text = this.dataset.copy || this.textContent;
+        navigator.clipboard.writeText(text).then(() => {
+          const originalText = this.textContent;
+          this.textContent = 'Copied to clipboard!';
+          this.style.color = 'var(--brand-green)';
+          setTimeout(() => {
+            this.textContent = originalText;
+            this.style.color = '';
+          }, 2000);
+        });
+      });
+    });
+  </script>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>langchain-langgraph-subgraphs - Agent Skill</title>
+    <meta name="description" content="Compose LangGraph 1.0 subgraphs correctly — shared state key propagation, Send / Command(graph=...) dispatch, callback scoping, per-subgraph recursion budgets, and testing each subgraph in isolation. Use when building a planner + executor, a nested agent team, or a reusable subgraph library. Trigger with &quot;langgraph subgraph&quot;, &quot;langgraph composition&quot;, &quot;langgraph send&quot;, &quot;nested agents&quot;, &quot;langgraph state propagation&quot;, &quot;Command(graph=...)&quot;, &quot;langgraph subgraph callbacks&quot;.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://tonsofskills.com/tons-of-skills-marketplace/skills/langchain-langgraph-subgraphs/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/langchain-langgraph-subgraphs/">
+    <meta property="og:title" content="langchain-langgraph-subgraphs - Agent Skill">
+    <meta property="og:description" content="Compose LangGraph 1.0 subgraphs correctly — shared state key propagation, Send / Command(graph=...) dispatch, callback scoping, per-subgraph recursion budgets, and testing each subgraph in isolation. Use when building a planner + executor, a nested agent team, or a reusable subgraph library. Trigger with &quot;langgraph subgraph&quot;, &quot;langgraph composition&quot;, &quot;langgraph send&quot;, &quot;nested agents&quot;, &quot;langgraph state propagation&quot;, &quot;Command(graph=...)&quot;, &quot;langgraph subgraph callbacks&quot;.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="langchain-langgraph-subgraphs - Agent Skill">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/langchain-langgraph-subgraphs/">
+    <meta name="twitter:title" content="langchain-langgraph-subgraphs - Agent Skill">
+    <meta name="twitter:description" content="Compose LangGraph 1.0 subgraphs correctly — shared state key propagation, Send / Command(graph=...) dispatch, callback scoping, per-subgraph recursion budgets, and testing each subgraph in isolation. Use when building a planner + executor, a nested agent team, or a reusable subgraph library. Trigger with &quot;langgraph subgraph&quot;, &quot;langgraph composition&quot;, &quot;langgraph send&quot;, &quot;nested agents&quot;, &quot;langgraph state propagation&quot;, &quot;Command(graph=...)&quot;, &quot;langgraph subgraph callbacks&quot;.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"langchain-langgraph-subgraphs","description":"Compose LangGraph 1.0 subgraphs correctly — shared state key propagation, Send / Command(graph=...) dispatch, callback scoping, per-subgraph recursion budgets, and testing each subgraph in isolation. Use when building a planner + executor, a nested agent team, or a reusable subgraph library. Trigger with \"langgraph subgraph\", \"langgraph composition\", \"langgraph send\", \"nested agents\", \"langgraph state propagation\", \"Command(graph=...)\", \"langgraph subgraph callbacks\".","version":"2.5.0","author":{"@type":"Person","name":"Jeremy Longshore"},"license":"MIT","programmingLanguage":"Claude Code Agent Skill","isPartOf":{"@type":"SoftwareApplication","name":"langchain-py-pack","applicationCategory":"unknown"}}</script>
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.breadcrumbs[data-astro-cid-ilhxcym7]{margin-bottom:var(--space-5)}.breadcrumbs__list[data-astro-cid-ilhxcym7]{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;list-style:none;padding:0;margin:0;font-family:var(--font-mono);font-size:var(--text-sm, .8rem)}.breadcrumbs__item[data-astro-cid-ilhxcym7]{display:flex;align-items:center;gap:.375rem}.breadcrumbs__link[data-astro-cid-ilhxcym7]{color:var(--text-3);text-decoration:none;transition:color var(--duration-fast, .2s) var(--ease-out)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:hover{color:var(--primary)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:0}.breadcrumbs__sep[data-astro-cid-ilhxcym7]{color:var(--text-3);user-select:none;font-size:.7em;line-height:1}.breadcrumbs__current[data-astro-cid-ilhxcym7]{color:var(--text-2)}.detail-cta[data-astro-cid-qcigfm7x]{background:var(--surface-3, var(--brand-light-gray));border-top:1px solid var(--border, var(--brand-light-gray));border-radius:var(--radius-lg);padding:2rem 1.5rem;margin-top:2rem;text-align:center}.detail-cta__headline[data-astro-cid-qcigfm7x]{font-family:var(--font-display);font-weight:700;font-size:1.35rem;color:var(--text, var(--brand-dark));margin-bottom:1.25rem}.detail-cta__actions[data-astro-cid-qcigfm7x]{display:flex;justify-content:center;gap:.75rem;flex-wrap:wrap}.detail-cta__primary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:var(--primary);color:#0a0a0c;border:none;border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;cursor:pointer;transition:background var(--duration-fast) var(--ease-out),transform var(--duration-fast) var(--ease-out)}.detail-cta__primary[data-astro-cid-qcigfm7x]:hover{background:var(--primary-dark, var(--primary-dark));transform:translateY(-1px)}.detail-cta__primary[data-astro-cid-qcigfm7x].copied{background:var(--positive, var(--brand-green))}.detail-cta__secondary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:transparent;color:var(--text, var(--brand-dark));border:1px solid var(--border, var(--brand-mid-gray));border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;text-decoration:none;transition:border-color var(--duration-fast) var(--ease-out),color var(--duration-fast) var(--ease-out)}.detail-cta__secondary[data-astro-cid-qcigfm7x]:hover{border-color:var(--primary);color:var(--primary)}@media(max-width:480px){.detail-cta__actions[data-astro-cid-qcigfm7x]{flex-direction:column;align-items:stretch}.detail-cta__primary[data-astro-cid-qcigfm7x],.detail-cta__secondary[data-astro-cid-qcigfm7x]{justify-content:center}}
+</style>
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/_slug_@_@astro.wF9emvVq.css"></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  
+  
+
+  <div class="skill-detail" data-astro-cid-jrlgpo3w>
+    <!-- 1. Breadcrumbs -->
+    <nav aria-label="Breadcrumb" class="breadcrumbs" data-astro-cid-ilhxcym7>
+  <ol class="breadcrumbs__list" itemscope itemtype="https://schema.org/BreadcrumbList" data-astro-cid-ilhxcym7>
+    <li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Home</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="1">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/skills/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Skills</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="2">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          <span class="breadcrumbs__current" aria-current="page" itemprop="name" data-astro-cid-ilhxcym7>
+              langchain-langgraph-subgraphs
+            </span>
+          <meta itemprop="position" content="3">
+        </li>
+  </ol>
+</nav>
+
+    <!-- 2. Header (enhanced) -->
+    <header class="skill-header" data-astro-cid-jrlgpo3w>
+      <h1 data-astro-cid-jrlgpo3w>langchain-langgraph-subgraphs</h1>
+      <p class="skill-description" data-astro-cid-jrlgpo3w>Compose LangGraph 1.0 subgraphs correctly — shared state key propagation, Send / Command(graph=...) dispatch, callback scoping, per-subgraph recursion budgets, and testing each subgraph in isolation. Use when building a planner + executor, a nested agent team, or a reusable subgraph library. Trigger with &quot;langgraph subgraph&quot;, &quot;langgraph composition&quot;, &quot;langgraph send&quot;, &quot;nested agents&quot;, &quot;langgraph state propagation&quot;, &quot;Command(graph=...)&quot;, &quot;langgraph subgraph callbacks&quot;.</p>
+
+      <div class="skill-metadata" data-astro-cid-jrlgpo3w>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>v2.5.0</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>Jeremy Longshore</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>MIT</span>
+        </div>
+      </div>
+
+      
+    </header>
+
+    <!-- 4. Allowed Tools -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Allowed Tools</h2>
+      <div class="tools-grid" data-astro-cid-jrlgpo3w>
+        <span class="tool-badge" data-astro-cid-jrlgpo3w>Read</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Write</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Edit</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(python:*)</span>
+      </div>
+      
+    </section>
+
+    <!-- 5. Provided by Plugin -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Provided by Plugin</h2>
+      <div class="plugin-info" data-astro-cid-jrlgpo3w>
+        <div class="plugin-details" data-astro-cid-jrlgpo3w>
+          <h3 data-astro-cid-jrlgpo3w>
+            <a href="/plugins/langchain-py-pack/" data-astro-cid-jrlgpo3w>langchain-py-pack</a>
+          </h3>
+          <p data-astro-cid-jrlgpo3w>Claude Code skill pack for LangChain 1.0 + LangGraph 1.0 (Python) - 34 skills covering chains, agents, RAG, middleware, checkpointing, HITL, streaming, and production patterns</p>
+          <div class="plugin-meta" data-astro-cid-jrlgpo3w>
+            <span data-astro-cid-jrlgpo3w>unknown</span>
+            <span data-astro-cid-jrlgpo3w>v2.5.0</span>
+          </div>
+        </div>
+        <a href="/plugins/langchain-py-pack/" class="btn-primary" data-astro-cid-jrlgpo3w>View Plugin</a>
+      </div>
+    </section>
+
+    <!-- 6. Installation -->
+    <section class="section-box dark" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Installation</h2>
+      <p class="install-note" style="color: var(--brand-light-gray); margin-bottom: 0.75rem;" data-astro-cid-jrlgpo3w>This skill is included in the langchain-py-pack plugin:</p>
+      <pre class="install-command" data-copy="/plugin install langchain-py-pack@claude-code-plugins-plus" data-astro-cid-jrlgpo3w><code data-astro-cid-jrlgpo3w>/plugin install langchain-py-pack@claude-code-plugins-plus</code></pre>
+      <p class="install-note" data-astro-cid-jrlgpo3w>Click to copy</p>
+    </section>
+
+    <!-- 7. Skill Content (Markdown) -->
+    <section class="skill-content-section" data-astro-cid-jrlgpo3w>
+      <h2 data-astro-cid-jrlgpo3w>Instructions</h2>
+      <div class="skill-content" data-astro-cid-jrlgpo3w>
+        <div data-astro-cid-jrlgpo3w><h1>LangGraph Subgraphs and Composition (Python)</h1>
+<h2>Overview</h2>
+<p>A parent <code>StateGraph</code> invokes a compiled child subgraph as a node. The child node writes <code>state[&quot;answer&quot;] = &quot;42&quot;</code> and returns. The parent&#39;s next node reads <code>state[&quot;answer&quot;]</code> and gets <code>None</code>. No error, no warning, no deprecation notice — just a silent <code>None</code> that surfaces as a wrong answer three nodes later when the router picks the &quot;couldn&#39;t find it&quot; branch.</p>
+<p>The cause is pain-catalog entry <strong>P21</strong>: LangGraph subgraphs run on an <strong>independent state schema</strong>. Only keys declared in <em>both</em> the parent&#39;s <code>TypedDict</code> and the child&#39;s <code>TypedDict</code> propagate across the subgraph boundary. <code>answer</code> existed in the child schema but not the parent schema, so it was discarded on return. The fix is to declare <code>answer</code> in both schemas (with matching reducers, if the field is a list) or to use explicit <code>Command(graph=ParentGraph, update={&quot;answer&quot;: &quot;42&quot;})</code> to bubble it up.</p>
+<p>The second silent failure waits one step further. Attach a tracing callback to the parent runnable via <code>parent.with_config(callbacks=[tracer])</code> and invoke. The tracer fires on parent nodes and never on child tool calls. This is pain-catalog entry <strong>P28</strong>: LangGraph creates a fresh runtime per subgraph, so callbacks bound at <em>definition time</em> do not inherit. The fix is to pass callbacks at <em>invocation time</em> via <code>config[&quot;callbacks&quot;]</code>, which does propagate.</p>
+<p>This skill walks through the shared-state contract, three dispatch patterns (compiled subgraph as a node, <code>Send</code> fan-out, <code>Command(graph=Parent)</code> bubble-up), callback scoping, per-subgraph <code>recursion_limit</code> budgets, and a testing pattern that exercises every subgraph in isolation before composition. Pin: <code>langgraph 1.0.x</code>, <code>langchain-core 1.0.x</code>. Pain-catalog anchors: <strong>P21, P28</strong>, with supporting references to P18 (reducers), P19 (stream modes on nested graphs), and P55 (recursion budget).</p>
+<p>A planner-executor is typically <strong>1 parent + 2-4 subgraphs</strong>; a hierarchical agent team with a supervisor and N specialists is <strong>1 parent + N subgraphs</strong>. Each subgraph has its own independent <code>recursion_limit</code> (default 25) — a parent at step 20 can still invoke a child that runs 25 of its own steps.</p>
+<h2>Prerequisites</h2>
+<ul>
+<li>Python 3.10+</li>
+<li><code>langgraph &gt;= 1.0, &lt; 2.0</code></li>
+<li><code>langchain-core &gt;= 1.0, &lt; 2.0</code></li>
+<li>Completion of <code>langchain-langgraph-basics</code> (L25) — <code>StateGraph</code>, <code>TypedDict</code> state, <code>Annotated[list, add_messages]</code> reducer, <code>MemorySaver</code> checkpointing</li>
+<li>Test tooling: <code>pytest</code>, <code>langchain_core.language_models.fake_chat_models.FakeListChatModel</code></li>
+</ul>
+<h2>Instructions</h2>
+<h3>Step 1 — Declare the shared-state contract explicitly</h3>
+<p>The single most important decision when composing subgraphs is: <strong>which keys cross the boundary?</strong> Every key that must survive the call <em>must</em> appear in both <code>TypedDict</code> schemas with compatible types and reducers.</p>
+<pre data-lang="python"><code>
+from typing import Annotated, TypedDict
+from langchain_core.messages import AnyMessage
+from langgraph.graph.message import add_messages
+
+# Keys both schemas declare -&gt; these propagate
+# Keys only in parent -&gt; invisible to child
+# Keys only in child -&gt; discarded on return (P21)
+
+class ParentState(TypedDict):
+    # Shared with every subgraph
+    messages: Annotated[list[AnyMessage], add_messages]  # P18 reducer required
+    session_id: str
+
+    # Parent-only coordination fields
+    plan: list[str]
+    current_step: int
+
+class ExecutorState(TypedDict):
+    # Shared with parent — must match reducer exactly (P18)
+    messages: Annotated[list[AnyMessage], add_messages]
+    session_id: str
+
+    # Executor-only scratch — parent never sees these
+    tool_result: dict | None
+    retries: int
+</code></pre>
+<p>If <code>messages</code> on the child used a different reducer (or no reducer), list updates would silently replace instead of append on one side of the boundary (P18). The <code>messages</code> + <code>session_id</code> pair is the propagation contract. Everything else is private to its owner.</p>
+<p>See <a href="references/state-contract.md">State Contract</a> for the full state-propagation matrix and the &quot;subset rule&quot; for schema inheritance.</p>
+<h3>Step 2 — Pick the dispatch pattern</h3>
+<p>Three ways a parent can invoke a subgraph, and each solves a different problem.</p>
+<p><strong>A. Compiled subgraph as a node</strong> — Simplest. Subgraph runs, returns a state update, parent continues.</p>
+<pre data-lang="python"><code>
+from langgraph.graph import StateGraph, END
+
+executor_graph = (
+    StateGraph(ExecutorState)
+    .add_node(&quot;run_tool&quot;, run_tool_node)
+    .add_node(&quot;summarize&quot;, summarize_node)
+    .add_edge(&quot;run_tool&quot;, &quot;summarize&quot;)
+    .add_edge(&quot;summarize&quot;, END)
+    .set_entry_point(&quot;run_tool&quot;)
+    .compile()
+)
+
+parent_graph = (
+    StateGraph(ParentState)
+    .add_node(&quot;plan&quot;, planner_node)
+    .add_node(&quot;execute&quot;, executor_graph)   # compiled subgraph as a node
+    .add_node(&quot;finalize&quot;, finalize_node)
+    .add_edge(&quot;plan&quot;, &quot;execute&quot;)
+    .add_edge(&quot;execute&quot;, &quot;finalize&quot;)
+    .set_entry_point(&quot;plan&quot;)
+    .compile()
+)
+</code></pre>
+<p>Only <code>messages</code> and <code>session_id</code> cross the boundary in either direction (from Step 1). <code>tool_result</code> stays inside the child; <code>plan</code> stays inside the parent.</p>
+<p><strong>B. <code>Send(graph, state)</code> for fan-out</strong> — One parent step spawns N parallel subgraph invocations, each with a different slice of state.</p>
+<pre data-lang="python"><code>
+from langgraph.types import Send
+
+def dispatch_specialists(state: ParentState) -&gt; list[Send]:
+    return [
+        Send(&quot;specialist_graph&quot;, {&quot;messages&quot;: state[&quot;messages&quot;],
+                                   &quot;session_id&quot;: state[&quot;session_id&quot;],
+                                   &quot;topic&quot;: topic})
+        for topic in state[&quot;plan&quot;]
+    ]
+</code></pre>
+<p>Use <code>Send</code> when the number of subgraph calls depends on runtime state. Reducers on shared keys merge the parallel results.</p>
+<p><strong>C. <code>Command(graph=ParentGraph, update=...)</code> to bubble up</strong> — A subgraph node jumps control back to the parent with an explicit state update, skipping the rest of the subgraph.</p>
+<pre data-lang="python"><code>
+from langgraph.types import Command
+
+def specialist_early_exit(state: ExecutorState) -&gt; Command:
+    if state.get(&quot;tool_result&quot;) and state[&quot;tool_result&quot;].get(&quot;done&quot;):
+        return Command(
+            graph=Command.PARENT,
+            update={&quot;messages&quot;: [AIMessage(&quot;done&quot;)]},
+            goto=&quot;finalize&quot;,
+        )
+    return {&quot;retries&quot;: state.get(&quot;retries&quot;, 0) + 1}
+</code></pre>
+<p><code>Command(graph=Command.PARENT)</code> is the explicit opposite of P21 — it forces a field up to the parent scope regardless of schema overlap.</p>
+<p>See <a href="references/dispatch-patterns.md">Dispatch Patterns</a> for the full decision tree (inline function vs subgraph-as-node vs <code>Send</code> vs <code>Command</code> vs separate service) and a sizing guide.</p>
+<h3>Step 3 — Scope callbacks at invocation time, not definition time</h3>
+<pre data-lang="python"><code>
+# WRONG — callbacks bind at definition time and do NOT propagate to subgraphs (P28)
+traced_parent = parent_graph.with_config(callbacks=[tracer])
+traced_parent.invoke({&quot;messages&quot;: [HumanMessage(&quot;...&quot;)], &quot;session_id&quot;: &quot;s1&quot;})
+# tracer fires on parent nodes only. Child tool calls are invisible.
+
+# RIGHT — callbacks pass via config at invocation time, propagating into every subgraph
+parent_graph.invoke(
+    {&quot;messages&quot;: [HumanMessage(&quot;...&quot;)], &quot;session_id&quot;: &quot;s1&quot;},
+    config={
+        &quot;configurable&quot;: {&quot;thread_id&quot;: &quot;s1&quot;},
+        &quot;callbacks&quot;: [tracer],
+    },
+)
+# tracer fires on parent nodes AND every child tool, LLM, and chain event.
+</code></pre>
+<p>Every production invocation path — API handler, batch worker, test harness — should pass callbacks via <code>config[&quot;callbacks&quot;]</code>. Lint for <code>with_config(callbacks=</code> on compiled graphs in CI and flag it.</p>
+<p>See <a href="references/callback-scoping.md">Callback Scoping</a> for the debugging playbook when a callback &quot;should be firing but isn&#39;t.&quot;</p>
+<h3>Step 4 — Budget recursion per subgraph</h3>
+<p>LangGraph&#39;s <code>recursion_limit</code> (default <strong>25</strong> supersteps) is <strong>per-graph, not global</strong>. A parent graph at superstep 20 invoking a subgraph resets the counter inside that subgraph to zero. Pros: one runaway subgraph cannot starve the parent. Cons: adding subgraphs does not reduce your global budget — a poorly bounded specialist can still rack up 25 of its own steps while the parent thinks it spent only one.</p>
+<pre data-lang="python"><code>
+# Parent gets 10 steps of its own planning.
+# Each executor call gets its own 15-step budget, independent of the parent&#39;s 10.
+parent_graph.invoke(
+    initial_state,
+    config={
+        &quot;configurable&quot;: {&quot;thread_id&quot;: &quot;s1&quot;},
+        &quot;recursion_limit&quot;: 10,
+    },
+)
+
+executor_graph.invoke(
+    sub_state,
+    config={&quot;recursion_limit&quot;: 15},
+)
+</code></pre>
+<p>For a parent that dispatches <code>N</code> specialists via <code>Send</code>, worst-case step count is <code>parent_limit + N * specialist_limit</code>. Monitor the actual distribution with a callback on <code>on_chain_start</code> / <code>on_chain_end</code> at each graph boundary — <code>GraphRecursionError</code> with no obvious loop is P55 in the pain catalog, and subgraph composition is the most common cause.</p>
+<h3>Step 5 — Test every subgraph in isolation before composing</h3>
+<p>A subgraph that works alone and breaks in composition is almost always a state-contract bug (Step 1) or a callback-scoping bug (Step 3). Catch both by unit-testing each subgraph with a <code>FakeListChatModel</code> and an in-memory checkpointer before wiring it into a parent.</p>
+<pre data-lang="python"><code>
+from langchain_core.language_models.fake_chat_models import FakeListChatModel
+from langgraph.checkpoint.memory import MemorySaver
+
+def test_executor_subgraph_standalone():
+    fake = FakeListChatModel(responses=[&#39;{&quot;done&quot;: true, &quot;result&quot;: 42}&#39;])
+    graph = build_executor(llm=fake).compile(checkpointer=MemorySaver())
+    out = graph.invoke(
+        {&quot;messages&quot;: [HumanMessage(&quot;do the thing&quot;)],
+         &quot;session_id&quot;: &quot;test&quot;,
+         &quot;tool_result&quot;: None,
+         &quot;retries&quot;: 0},
+        config={&quot;configurable&quot;: {&quot;thread_id&quot;: &quot;test&quot;},
+                &quot;recursion_limit&quot;: 5},
+    )
+    # Assert the shared-contract fields (Step 1) are present on return
+    assert &quot;messages&quot; in out
+    assert out[&quot;session_id&quot;] == &quot;test&quot;
+    # Assert child-only field is scoped correctly
+    assert out[&quot;tool_result&quot;] == {&quot;done&quot;: True, &quot;result&quot;: 42}
+</code></pre>
+<p>See <a href="references/testing-subgraphs.md">Testing Subgraphs</a> for the full isolation pattern — fixtures, state-shape assertions per node, and how to assert callback propagation with a capturing handler.</p>
+<h3>Step 6 — Version subgraphs independently of the parent</h3>
+<p>A reusable subgraph should ship with its own semantic version and a pinned schema contract. Breaking either the shared-state contract (Step 1) or the dispatch signature (Step 2) is a major-version bump; adding a new private child-only field is a patch.</p>
+<pre data-lang="python"><code>
+# executor_subgraph/__init__.py
+__version__ = &quot;1.2.0&quot;
+
+SHARED_KEYS = frozenset({&quot;messages&quot;, &quot;session_id&quot;})  # parent must declare these
+
+def build_executor(llm) -&gt; StateGraph:
+    &quot;&quot;&quot;v1.2.0 executor — adds &#39;retries&#39; field (child-only, backward-compatible).&quot;&quot;&quot;
+    ...
+</code></pre>
+<p>Parents pin <code>executor_subgraph&gt;=1.2.0,&lt;2.0.0</code>. A v2.0.0 that renames <code>session_id</code> forces every parent to re-sync its <code>TypedDict</code>. This is how you catch P21 at <code>pip install</code> time instead of at runtime.</p>
+<h2>Output</h2>
+<ul>
+<li><code>ParentState</code> + per-subgraph child <code>TypedDict</code>s with the shared-key contract declared explicitly; every shared list field has a matching reducer</li>
+<li>Dispatch pattern chosen per subgraph (node vs <code>Send</code> vs <code>Command(graph=PARENT)</code>) with rationale recorded in code comments</li>
+<li>Every invocation path (API, batch, test) passes <code>callbacks</code> via <code>config[&quot;callbacks&quot;]</code> so observability propagates into every subgraph</li>
+<li><code>recursion_limit</code> set explicitly on parent and each subgraph, with the worst-case superstep count documented</li>
+<li>Unit tests for each subgraph in isolation, asserting shared-contract fields on return and callback propagation via a capturing handler</li>
+<li>Reusable subgraphs ship with their own <code>__version__</code> and a frozen <code>SHARED_KEYS</code> set</li>
+</ul>
+<h2>Error Handling</h2>
+<table><thead><tr>
+<th>Error / Symptom</th>
+<th>Cause</th>
+<th>Fix</th>
+</tr></thead><tbody>
+<tr>
+<td>Parent reads <code>state[&quot;foo&quot;]</code> and gets <code>None</code> after subgraph call</td>
+<td>Key declared only in child schema; discarded on return (P21)</td>
+<td>Add <code>foo</code> to parent <code>TypedDict</code>; use matching reducer; or return <code>Command(graph=Command.PARENT, update={&quot;foo&quot;: ...})</code></td>
+</tr>
+<tr>
+<td>Tracer attached to parent never fires on child tool calls</td>
+<td>Callback bound at definition time via <code>.with_config(callbacks=[...])</code> (P28)</td>
+<td>Pass <code>callbacks=[tracer]</code> in <code>config</code> at each <code>invoke()</code> / <code>ainvoke()</code> call</td>
+</tr>
+<tr>
+<td><code>TypeError: unhashable type</code> from the message reducer in the parent after a <code>Send</code> fan-out</td>
+<td>Child schema used <code>list</code> instead of <code>Annotated[list, add_messages]</code> (P18)</td>
+<td>Match reducers on both sides of the boundary</td>
+</tr>
+<tr>
+<td><code>GraphRecursionError: Recursion limit of 25 reached</code> inside a subgraph only</td>
+<td>Subgraph has its own 25-step budget; long sub-loop (P55)</td>
+<td>Set <code>config={&quot;recursion_limit&quot;: N}</code> explicitly or restructure subgraph</td>
+</tr>
+<tr>
+<td>Subgraph returns state but parent sees empty <code>messages</code></td>
+<td>List field not using <code>add_messages</code> reducer on the parent side (P18)</td>
+<td><code>messages: Annotated[list[AnyMessage], add_messages]</code> in both <code>TypedDict</code>s</td>
+</tr>
+<tr>
+<td><code>Command(goto=&quot;next_node&quot;)</code> halts instead of continuing</td>
+<td><code>Command</code> did not set <code>graph=Command.PARENT</code> — tried to <code>goto</code> a parent node from inside the child scope</td>
+<td>Use <code>Command(graph=Command.PARENT, goto=&quot;next_node&quot;, update=...)</code></td>
+</tr>
+<tr>
+<td>Subgraph runs but thread state never persists</td>
+<td>Checkpointer attached only to parent; child <code>invoke()</code> without <code>thread_id</code></td>
+<td>Compile subgraphs with <code>checkpointer</code> too, or invoke with a <code>thread_id</code> matching the parent</td>
+</tr>
+</tbody></table>
+<h2>Examples</h2>
+<h3>Planner-executor — shared messages, private scratch</h3>
+<p>The prototypical 1 + 2-4 composition: a planner writes a step list, an executor runs each step, a finalizer summarizes. <code>messages</code> and <code>session_id</code> cross every boundary; <code>plan</code> is parent-only; <code>tool_result</code> and <code>retries</code> are executor-only. Uses a compiled-subgraph-as-node dispatch (Step 2A). See <a href="references/dispatch-patterns.md">Dispatch Patterns</a> for the full worked example.</p>
+<h3>Hierarchical agent team — supervisor fans out to N specialists</h3>
+<p>A supervisor picks which specialists to invoke and calls <code>Send(&quot;specialist&quot;, ...)</code> in parallel. Each specialist runs its own subgraph with its own recursion budget. Results merge via the <code>messages</code> reducer. See <a href="references/dispatch-patterns.md">Dispatch Patterns</a> for the <code>Send</code>-based fan-out and the callback propagation pattern needed to trace the team.</p>
+<h3>Reusable subgraph library — pinned contract with versioned exports</h3>
+<p>An <code>executor_subgraph</code> package exports <code>build_executor(llm)</code> and a frozen <code>SHARED_KEYS</code> set, ships with a semantic version, and its CI fails if <code>SHARED_KEYS</code> changes without a major-version bump. See <a href="references/state-contract.md">State Contract</a> for the schema-pinning pattern.</p>
+<h3>Testing a specialist with a capturing callback</h3>
+<p>A <code>CaptureHandler</code> subclasses <code>BaseCallbackHandler</code>, appends every <code>on_*</code> event to a list, and asserts both parent and child events are present after a single <code>parent_graph.invoke(..., config={&quot;callbacks&quot;: [handler]})</code>. Catches P28 at PR review. See <a href="references/testing-subgraphs.md">Testing Subgraphs</a> for the full fixture and assertion pattern.</p>
+<h2>Resources</h2>
+<ul>
+<li><a href="https://langchain-ai.github.io/langgraph/concepts/subgraphs/">LangGraph subgraph concepts</a></li>
+<li><a href="https://langchain-ai.github.io/langgraph/how-tos/subgraph/">LangGraph subgraph how-to</a></li>
+<li><a href="https://langchain-ai.github.io/langgraph/reference/types/#langgraph.types.Send"><code>Send</code> API reference</a></li>
+<li><a href="https://langchain-ai.github.io/langgraph/reference/types/#langgraph.types.Command"><code>Command</code> API reference</a></li>
+<li><a href="https://langchain-ai.github.io/langgraph/how-tos/streaming/">LangGraph callback propagation</a></li>
+<li><a href="https://blog.langchain.com/langchain-langgraph-1dot0/">LangChain 1.0 release notes</a></li>
+<li>Sibling skill: <code>langchain-langgraph-basics</code> (L25) — prerequisite <code>StateGraph</code>, reducers, checkpointing</li>
+<li>Pack pain catalog: <code>docs/pain-catalog.md</code> (entries P18, P19, P21, P28, P55)</li>
+</ul></div>
+      </div>
+    </section>
+
+    <!-- 8. Bottom CTA -->
+    <section class="detail-cta" data-astro-cid-qcigfm7x>
+  <h2 class="detail-cta__headline" data-astro-cid-qcigfm7x>Ready to use langchain-py-pack?</h2>
+  <div class="detail-cta__actions" data-astro-cid-qcigfm7x>
+    <button class="detail-cta__primary" data-copy-install="/plugin install langchain-py-pack@claude-code-plugins-plus" data-astro-cid-qcigfm7x>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" data-astro-cid-qcigfm7x>
+        <rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" stroke-width="1.5" data-astro-cid-qcigfm7x></rect>
+        <path d="M3 11V3a1 1 0 011-1h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" data-astro-cid-qcigfm7x></path>
+      </svg>
+      <span class="detail-cta__btn-text" data-astro-cid-qcigfm7x>Copy Install Command</span>
+    </button>
+    
+  </div>
+</section>
+
+<script type="module">document.querySelectorAll("[data-copy-install]").forEach(t=>{t.addEventListener("click",async()=>{const a=t.dataset.copyInstall||"";await navigator.clipboard.writeText(a);const e=t.querySelector(".detail-cta__btn-text");if(e){const o=e.textContent;e.textContent="Copied!",t.classList.add("copied"),window.trackEvent&&window.trackEvent("install_copied",{plugin_name:a.split(" ").pop()||"",source:"detail_cta"}),setTimeout(()=>{e.textContent=o,t.classList.remove("copied")},2e3)}})});</script>
+
+    <!-- 9. Related Skills (6, with tool pills) -->
+    <section class="related-skills-section" data-astro-cid-jrlgpo3w>
+        <h2 class="related-skills-heading" data-astro-cid-jrlgpo3w>Related Skills</h2>
+        <div class="related-skills-grid" data-astro-cid-jrlgpo3w>
+          <a href="/skills/abridge-ci-integration/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-ci-integration</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Configure CI/CD pipeline for Abridge clinical AI integrations with GitHub Actions.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-common-errors/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-common-errors</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Diagnose and fix common Abridge clinical AI integration errors.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-a/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-a</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge ambient clinical documentation capture-to-note pipeline.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-b/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-b</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge patient-facing documentation and after-visit summary generation.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-cost-tuning/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-cost-tuning</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Optimize Abridge clinical AI costs through tier selection, session management, and usage monitoring for healthcare organizations.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-debug-bundle/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-debug-bundle</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Collect Abridge debug evidence for support tickets and troubleshooting.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a>
+        </div>
+      </section>
+
+  </div>
+
+  
+  <script>
+    document.querySelectorAll('.install-command').forEach(el => {
+      el.addEventListener('click', function() {
+        const text = this.dataset.copy || this.textContent;
+        navigator.clipboard.writeText(text).then(() => {
+          const originalText = this.textContent;
+          this.textContent = 'Copied to clipboard!';
+          this.style.color = 'var(--brand-green)';
+          setTimeout(() => {
+            this.textContent = originalText;
+            this.style.color = '';
+          }, 2000);
+        });
+      });
+    });
+  </script>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

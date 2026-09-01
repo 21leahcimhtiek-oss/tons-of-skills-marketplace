@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Building External Plugin Sync: How We Keep 258 Community Plugins Fresh — Tons of Skills Work Diary</title>
+    <meta name="description" content="How we built daily automated sync infrastructure to keep community plugins fresh in the claude-code-plugins marketplace, featuring the n-skills pattern with GitHub Actions and auto-PR creation.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://startaitools.com/posts/building-external-plugin-sync-how-we-keep-258-community-plugins-fresh/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/external-plugin-sync-keeping-community-plugins-fresh/">
+    <meta property="og:title" content="Building External Plugin Sync: How We Keep 258 Community Plugins Fresh — Tons of Skills Work Diary">
+    <meta property="og:description" content="How we built daily automated sync infrastructure to keep community plugins fresh in the claude-code-plugins marketplace, featuring the n-skills pattern with GitHub Actions and auto-PR creation.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="Building External Plugin Sync: How We Keep 258 Community Plugins Fresh — Tons of Skills Work Diary">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/blog/external-plugin-sync-keeping-community-plugins-fresh/">
+    <meta name="twitter:title" content="Building External Plugin Sync: How We Keep 258 Community Plugins Fresh — Tons of Skills Work Diary">
+    <meta name="twitter:description" content="How we built daily automated sync infrastructure to keep community plugins fresh in the claude-code-plugins marketplace, featuring the n-skills pattern with GitHub Actions and auto-PR creation.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"Building External Plugin Sync: How We Keep 258 Community Plugins Fresh","description":"How we built daily automated sync infrastructure to keep community plugins fresh in the claude-code-plugins marketplace, featuring the n-skills pattern with GitHub Actions and auto-PR creation.","datePublished":"2026-01-03","url":"https://tonsofskills.com/blog/undefined","author":{"@type":"Person","name":"Jeremy Longshore"},"publisher":{"@type":"Organization","name":"Tons of Skills","url":"https://tonsofskills.com"}}</script>
+  
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.post-header[data-astro-cid-7jjqptxk]{background:var(--panel);padding:4rem 1.5rem 3rem;border-bottom:1px solid var(--border)}.post-header-inner[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto}.back-link[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3);text-decoration:none;display:inline-block;margin-bottom:1.5rem;transition:color .2s}.back-link[data-astro-cid-7jjqptxk]:hover{color:var(--primary)}.post-meta[data-astro-cid-7jjqptxk]{display:flex;align-items:center;gap:.75rem;margin-bottom:1rem}time[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.8rem;color:var(--text-3)}.featured-badge[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.2rem .6rem;background:#ce114126;color:var(--red);border-radius:0;font-weight:600;text-transform:uppercase;letter-spacing:.05em}.post-header[data-astro-cid-7jjqptxk] h1[data-astro-cid-7jjqptxk]{font-family:var(--font-body);font-size:clamp(1.5rem,4vw,2.2rem);font-weight:700;color:var(--text);line-height:1.25;margin-bottom:.75rem;letter-spacing:0}.post-desc[data-astro-cid-7jjqptxk]{color:var(--text-2);font-size:1.05rem;line-height:1.6;margin-bottom:1rem}.post-tags[data-astro-cid-7jjqptxk]{display:flex;gap:.4rem;flex-wrap:wrap}.tag[data-astro-cid-7jjqptxk]{font-family:var(--font-mono);font-size:.7rem;padding:.15rem .5rem;background:var(--surface-3);color:var(--text-3);border-radius:0}.post-body[data-astro-cid-7jjqptxk]{padding:3rem 1.5rem 4rem}.prose[data-astro-cid-7jjqptxk]{max-width:48rem;margin:0 auto;color:var(--text-2);line-height:1.8;font-size:1rem}.prose[data-astro-cid-7jjqptxk] h2{font-family:var(--font-body);font-size:1.5rem;font-weight:700;color:var(--text);margin:2.5rem 0 1rem;letter-spacing:0}.prose[data-astro-cid-7jjqptxk] h3{font-size:1.2rem;font-weight:600;color:var(--text);margin:2rem 0 .75rem}.prose[data-astro-cid-7jjqptxk] p{margin-bottom:1rem}.prose[data-astro-cid-7jjqptxk] ul,.prose[data-astro-cid-7jjqptxk] ol{margin:.5rem 0 1rem 1.5rem}.prose[data-astro-cid-7jjqptxk] li{margin-bottom:.35rem}.prose[data-astro-cid-7jjqptxk] strong{color:var(--text);font-weight:600}.prose[data-astro-cid-7jjqptxk] code{font-family:var(--font-mono);font-size:.88em;background:var(--surface-3);padding:.15em .35em;border-radius:0;color:var(--primary)}.prose[data-astro-cid-7jjqptxk] a{color:var(--primary);text-decoration:none}.prose[data-astro-cid-7jjqptxk] a:hover{text-decoration:underline}@media(max-width:768px){.post-header[data-astro-cid-7jjqptxk]{padding:3rem 1rem 2rem}.post-body[data-astro-cid-7jjqptxk]{padding:2rem 1rem 3rem}}
+</style></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  <article class="post" data-astro-cid-7jjqptxk>
+    <header class="post-header" data-astro-cid-7jjqptxk>
+      <div class="post-header-inner" data-astro-cid-7jjqptxk>
+        <a href="/blog" class="back-link" data-astro-cid-7jjqptxk>Back to Work Diary</a>
+        <div class="post-meta" data-astro-cid-7jjqptxk>
+          <time datetime="2026-01-03" data-astro-cid-7jjqptxk>January 2, 2026</time>
+          
+        </div>
+        <h1 data-astro-cid-7jjqptxk>Building External Plugin Sync: How We Keep 258 Community Plugins Fresh</h1>
+        <p class="post-desc" data-astro-cid-7jjqptxk>How we built daily automated sync infrastructure to keep community plugins fresh in the claude-code-plugins marketplace, featuring the n-skills pattern with GitHub Actions and auto-PR creation.</p>
+        <div class="post-tags" data-astro-cid-7jjqptxk>
+          <span class="tag" data-astro-cid-7jjqptxk>claude-code</span><span class="tag" data-astro-cid-7jjqptxk>automation</span><span class="tag" data-astro-cid-7jjqptxk>github-actions</span><span class="tag" data-astro-cid-7jjqptxk>open-source</span><span class="tag" data-astro-cid-7jjqptxk>plugin-marketplace</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="post-body" data-astro-cid-7jjqptxk>
+      <div class="prose" data-astro-cid-7jjqptxk>
+        <h2 id="the-problem-static-forks-go-stale">The Problem: Static Forks Go Stale</h2>
+<p>We got a PR from <a href="https://github.com/numman-ali">Numman Ali</a> adding two plugins to our Claude Code marketplace:</p>
+<ul>
+<li><strong>gastown</strong>: Multi-agent orchestrator for Claude Code</li>
+<li><strong>zai-cli</strong>: Vision, search, reader, and GitHub exploration</li>
+</ul>
+<p>But then he commented:</p>
+<blockquote>
+<p>“Hey, I’m constantly updating the plugin and this will become stale very quickly, I don’t think it’s a good idea to publish like this. You might want to add a sync mechanism like I’ve done for dev-browser by Sawyer Hood”</p>
+</blockquote>
+<p>He was absolutely right. Copying plugins creates stale forks. His plugins evolve rapidly in his <a href="https://github.com/numman-ali/n-skills">n-skills repository</a>. We needed a better approach.</p>
+<h2 id="the-n-skills-pattern-daily-automated-sync">The n-skills Pattern: Daily Automated Sync</h2>
+<p>Numman’s n-skills marketplace solves this with external sync:</p>
+<ol>
+<li><strong>sources.yaml</strong> - Manifest listing external repos</li>
+<li><strong>GitHub Actions cron</strong> - Runs daily at midnight UTC</li>
+<li><strong>sync script</strong> - Pulls latest from upstream repos via GitHub API</li>
+<li><strong>.source.json</strong> - Attribution metadata per synced skill</li>
+<li><strong>Auto-PR</strong> - Creates PR with changes for review</li>
+</ol>
+<p>This pattern keeps authors in control while the marketplace stays fresh.</p>
+<h2 id="building-our-sync-infrastructure">Building Our Sync Infrastructure</h2>
+<h3 id="phase-1-validation-the-messy-part">Phase 1: Validation (The Messy Part)</h3>
+<p>First, we ran our validators on Numman’s plugins. This revealed missing 2025 schema fields:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">$</span><span style="color:#9ECBFF"> node</span><span style="color:#9ECBFF"> scripts/validate-plugin.js</span><span style="color:#9ECBFF"> plugins/community/gastown/</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">❌</span><span style="color:#9ECBFF"> SKILL.md</span><span style="color:#9ECBFF"> missing</span><span style="color:#9ECBFF"> required</span><span style="color:#9ECBFF"> fields:</span></span>
+<span class="line"><span style="color:#B392F0">   -</span><span style="color:#9ECBFF"> allowed-tools</span><span style="color:#E1E4E8"> (REQUIRED </span><span style="color:#9ECBFF">for</span><span style="color:#79B8FF"> 2025</span><span style="color:#9ECBFF"> schema</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#B392F0">   -</span><span style="color:#9ECBFF"> version</span><span style="color:#E1E4E8"> (REQUIRED </span><span style="color:#9ECBFF">for</span><span style="color:#79B8FF"> 2025</span><span style="color:#9ECBFF"> schema</span><span style="color:#E1E4E8">)</span></span></code></pre>
+<p>The 2025 Claude Code skills schema requires:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">skill-name</span></span>
+<span class="line"><span style="color:#85E89D">description</span><span style="color:#E1E4E8">: </span><span style="color:#F97583">|</span></span>
+<span class="line"><span style="color:#9ECBFF">  What this skill does with trigger phrases</span></span>
+<span class="line"><span style="color:#85E89D">allowed-tools</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Read, Write, Edit, Bash, Grep, Glob</span></span>
+<span class="line"><span style="color:#85E89D">version</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">1.0.0</span></span>
+<span class="line"><span style="color:#85E89D">license</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Apache-2.0</span></span>
+<span class="line"><span style="color:#85E89D">author</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Name &#x3C;email></span></span></code></pre>
+<p>We fixed both plugins manually, adding the missing fields so validation passed. This raised a question: when sync runs, will our local fixes get overwritten by Numman’s source files?</p>
+<p><strong>Answer</strong>: Yes, and that’s correct. The sync should pull his latest. We just needed to document the 2025 schema fields for him to add on his end.</p>
+<h3 id="phase-2-the-sync-engine">Phase 2: The Sync Engine</h3>
+<p>Created <code>scripts/sync-external.mjs</code> (337 lines):</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="javascript"><code><span class="line"><span style="color:#F97583">import</span><span style="color:#E1E4E8"> https </span><span style="color:#F97583">from</span><span style="color:#9ECBFF"> 'https'</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">import</span><span style="color:#E1E4E8"> yaml </span><span style="color:#F97583">from</span><span style="color:#9ECBFF"> 'js-yaml'</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">// Fetch file content from GitHub API</span></span>
+<span class="line"><span style="color:#F97583">async</span><span style="color:#F97583"> function</span><span style="color:#B392F0"> fetchFromGitHub</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">repo</span><span style="color:#E1E4E8">, </span><span style="color:#FFAB70">filePath</span><span style="color:#E1E4E8">, </span><span style="color:#FFAB70">branch</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> 'main'</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> url</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> `https://api.github.com/repos/${</span><span style="color:#E1E4E8">repo</span><span style="color:#9ECBFF">}/contents/${</span><span style="color:#E1E4E8">filePath</span><span style="color:#9ECBFF">}?ref=${</span><span style="color:#E1E4E8">branch</span><span style="color:#9ECBFF">}`</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">  // Add auth token if available</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> headers</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#9ECBFF">    'User-Agent'</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">'claude-code-plugins-sync'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">    'Accept'</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">'application/vnd.github.v3+json'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  };</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">  if</span><span style="color:#E1E4E8"> (process.env.</span><span style="color:#79B8FF">GITHUB_TOKEN</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#E1E4E8">    headers[</span><span style="color:#9ECBFF">'Authorization'</span><span style="color:#E1E4E8">] </span><span style="color:#F97583">=</span><span style="color:#9ECBFF"> `token ${</span><span style="color:#E1E4E8">process</span><span style="color:#9ECBFF">.</span><span style="color:#E1E4E8">env</span><span style="color:#9ECBFF">.</span><span style="color:#79B8FF">GITHUB_TOKEN</span><span style="color:#9ECBFF">}`</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">  // Fetch and decode base64 content</span></span>
+<span class="line"><span style="color:#6A737D">  // Compare with local files</span></span>
+<span class="line"><span style="color:#6A737D">  // Write updates and .source.json</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p><strong>Key features:</strong></p>
+<ul>
+<li>GitHub API with auth token support</li>
+<li>Recursive directory fetching</li>
+<li>Glob pattern include/exclude filtering</li>
+<li>Dry-run mode for testing</li>
+<li>Source-specific filtering (<code>--source=NAME</code>)</li>
+<li>Provenance tracking via <code>.source.json</code></li>
+</ul>
+<p><strong>The js-yaml dependency issue:</strong></p>
+<p>When testing locally, we hit:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'js-yaml'</span></span></code></pre>
+<p>We tried installing via npm but the local environment had issues. Then we realized: <strong>the GitHub Actions workflow installs js-yaml at runtime</strong>. Local testing failure doesn’t matter because production runs in CI.</p>
+<p>This was a good reminder: don’t over-optimize local dev environments when CI is the target.</p>
+<h3 id="phase-3-sourcesyaml-configuration">Phase 3: sources.yaml Configuration</h3>
+<p>Created the external source manifest:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">sources</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">  - </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">gastown</span></span>
+<span class="line"><span style="color:#85E89D">    description</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Multi-agent orchestrator for Claude Code</span></span>
+<span class="line"><span style="color:#85E89D">    repo</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">numman-ali/n-skills</span></span>
+<span class="line"><span style="color:#85E89D">    source_path</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">skills/tools/gastown</span></span>
+<span class="line"><span style="color:#85E89D">    target_path</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">plugins/community/gastown</span></span>
+<span class="line"><span style="color:#85E89D">    author</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Numman Ali</span></span>
+<span class="line"><span style="color:#85E89D">      github</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">numman-ali</span></span>
+<span class="line"><span style="color:#85E89D">      email</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">numman.ali@gmail.com</span></span>
+<span class="line"><span style="color:#85E89D">    license</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Apache-2.0</span></span>
+<span class="line"><span style="color:#85E89D">    category</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">community</span></span>
+<span class="line"><span style="color:#85E89D">    verified</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">true</span></span>
+<span class="line"><span style="color:#85E89D">    include</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#9ECBFF">"SKILL.md"</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#9ECBFF">"README.md"</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#9ECBFF">"references/**"</span></span>
+<span class="line"><span style="color:#85E89D">    exclude</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#9ECBFF">"node_modules/**"</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#9ECBFF">".git/**"</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#9ECBFF">"*.log"</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">  - </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">zai-cli</span></span>
+<span class="line"><span style="color:#85E89D">    description</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Z.AI vision, search, reader, and GitHub exploration</span></span>
+<span class="line"><span style="color:#85E89D">    repo</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">numman-ali/n-skills</span></span>
+<span class="line"><span style="color:#85E89D">    source_path</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">skills/tools/zai-cli</span></span>
+<span class="line"><span style="color:#85E89D">    target_path</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">plugins/community/zai-cli</span></span>
+<span class="line"><span style="color:#6A737D">    # ... same pattern</span></span></code></pre>
+<p>The include/exclude patterns give authors control over what gets synced.</p>
+<h3 id="phase-4-github-actions-workflow">Phase 4: GitHub Actions Workflow</h3>
+<p>Created <code>.github/workflows/sync-external.yml</code>:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Sync External Plugins</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79B8FF">on</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  schedule</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#85E89D">cron</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">'0 0 * * *'</span><span style="color:#6A737D">  # Daily at midnight UTC</span></span>
+<span class="line"><span style="color:#85E89D">  workflow_dispatch</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    inputs</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      force</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">        description</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">'Force sync even if no changes detected'</span></span>
+<span class="line"><span style="color:#85E89D">        type</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">boolean</span></span>
+<span class="line"><span style="color:#85E89D">        default</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">false</span></span>
+<span class="line"><span style="color:#85E89D">      source</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">        description</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">'Sync only this source (leave empty for all)'</span></span>
+<span class="line"><span style="color:#85E89D">        type</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">string</span></span>
+<span class="line"><span style="color:#85E89D">        default</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">''</span></span>
+<span class="line"><span style="color:#85E89D">      dry_run</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">        description</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">'Dry run - show what would change'</span></span>
+<span class="line"><span style="color:#85E89D">        type</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">boolean</span></span>
+<span class="line"><span style="color:#85E89D">        default</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">false</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">jobs</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  sync</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    runs-on</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">ubuntu-latest</span></span>
+<span class="line"><span style="color:#85E89D">    steps</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#85E89D">uses</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">actions/checkout@v4</span></span>
+<span class="line"><span style="color:#85E89D">        with</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">          fetch-depth</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">0</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#85E89D">uses</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">actions/setup-node@v4</span></span>
+<span class="line"><span style="color:#85E89D">        with</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">          node-version</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">'20'</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Install dependencies</span></span>
+<span class="line"><span style="color:#85E89D">        run</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">npm install js-yaml</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Run sync script</span></span>
+<span class="line"><span style="color:#85E89D">        env</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">          GITHUB_TOKEN</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">${{ secrets.GITHUB_TOKEN }}</span></span>
+<span class="line"><span style="color:#85E89D">        run</span><span style="color:#E1E4E8">: </span><span style="color:#F97583">|</span></span>
+<span class="line"><span style="color:#9ECBFF">          ARGS="--verbose"</span></span>
+<span class="line"><span style="color:#9ECBFF">          if [ "${{ inputs.force }}" = "true" ]; then</span></span>
+<span class="line"><span style="color:#9ECBFF">            ARGS="$ARGS --force"</span></span>
+<span class="line"><span style="color:#9ECBFF">          fi</span></span>
+<span class="line"><span style="color:#9ECBFF">          if [ -n "${{ inputs.source }}" ]; then</span></span>
+<span class="line"><span style="color:#9ECBFF">            ARGS="$ARGS --source=${{ inputs.source }}"</span></span>
+<span class="line"><span style="color:#9ECBFF">          fi</span></span>
+<span class="line"><span style="color:#9ECBFF">          if [ "${{ inputs.dry_run }}" = "true" ]; then</span></span>
+<span class="line"><span style="color:#9ECBFF">            ARGS="$ARGS --dry-run"</span></span>
+<span class="line"><span style="color:#9ECBFF">          fi</span></span>
+<span class="line"><span style="color:#9ECBFF">          node scripts/sync-external.mjs $ARGS</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Create Pull Request</span></span>
+<span class="line"><span style="color:#85E89D">        if</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">steps.changes.outputs.has_changes == 'true'</span></span>
+<span class="line"><span style="color:#85E89D">        uses</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">peter-evans/create-pull-request@v5</span></span>
+<span class="line"><span style="color:#85E89D">        with</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">          token</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">${{ secrets.GITHUB_TOKEN }}</span></span>
+<span class="line"><span style="color:#85E89D">          commit-message</span><span style="color:#E1E4E8">: </span><span style="color:#F97583">|</span></span>
+<span class="line"><span style="color:#9ECBFF">            chore(sync): update external plugins from upstream</span></span>
+<span class="line"><span style="color:#85E89D">          title</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"🔄 Sync external plugins"</span></span>
+<span class="line"><span style="color:#85E89D">          branch</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">sync/external-plugins</span></span>
+<span class="line"><span style="color:#85E89D">          labels</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">automated, sync, external-plugins</span></span></code></pre>
+<p><strong>Workflow features:</strong></p>
+<ul>
+<li>Daily cron at midnight UTC</li>
+<li>Manual dispatch with options (force, source filter, dry-run)</li>
+<li>Auto-PR creation with peter-evans/create-pull-request</li>
+<li>Change detection to avoid empty PRs</li>
+</ul>
+<h3 id="phase-5-testing-the-workflow">Phase 5: Testing the Workflow</h3>
+<p>Triggered a dry-run manually:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">$</span><span style="color:#9ECBFF"> gh</span><span style="color:#9ECBFF"> workflow</span><span style="color:#9ECBFF"> run</span><span style="color:#9ECBFF"> sync-external.yml</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --repo</span><span style="color:#9ECBFF"> jeremylongshore/claude-code-plugins-plus-skills</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  -f</span><span style="color:#9ECBFF"> dry_run=</span><span style="color:#79B8FF">true</span></span></code></pre>
+<p>Results:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>📦 Syncing: gastown</span></span>
+<span class="line"><span>   Found 6 files in source</span></span>
+<span class="line"><span>   📝 Would update: SKILL.md</span></span>
+<span class="line"><span>   📝 Would create: references/commands.md</span></span>
+<span class="line"><span>   📝 Would create: references/concepts.md</span></span>
+<span class="line"><span>   📝 Would create: references/setup.md</span></span>
+<span class="line"><span>   📝 Would create: references/troubleshooting.md</span></span>
+<span class="line"><span>   📝 Would create: references/tutorial.md</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>📦 Syncing: zai-cli</span></span>
+<span class="line"><span>   Found 2 files in source</span></span>
+<span class="line"><span>   📝 Would update: SKILL.md</span></span>
+<span class="line"><span>   📝 Would create: references/advanced.md</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>✅ 8 file(s) would be synced</span></span></code></pre>
+<p>Perfect! The sync discovered Numman’s reference documentation that we didn’t have locally.</p>
+<h2 id="technical-decisions">Technical Decisions</h2>
+<h3 id="why-github-api-instead-of-git-submodules">Why GitHub API Instead of Git Submodules?</h3>
+<p><strong>Submodules are brittle:</strong></p>
+<ul>
+<li>Require recursive clones</li>
+<li>Break easily when upstream changes</li>
+<li>Complicated for contributors</li>
+<li>Hard to manage at scale (258 plugins)</li>
+</ul>
+<p><strong>GitHub API is clean:</strong></p>
+<ul>
+<li>Simple HTTP requests</li>
+<li>No git state to manage</li>
+<li>Easy error handling</li>
+<li>Rate limits are generous with auth token</li>
+</ul>
+<h3 id="why-auto-pr-instead-of-direct-commit">Why Auto-PR Instead of Direct Commit?</h3>
+<p><strong>Safety and transparency:</strong></p>
+<ul>
+<li>Review changes before merging</li>
+<li>Catch breaking updates</li>
+<li>Audit trail for all syncs</li>
+<li>Can add validation checks to PR</li>
+</ul>
+<h3 id="why-sourcejson-for-attribution">Why .source.json for Attribution?</h3>
+<p><strong>Legal and ethical:</strong></p>
+<ul>
+<li>Clear provenance tracking</li>
+<li>License compliance</li>
+<li>Author attribution</li>
+<li>Upstream repo visibility</li>
+</ul>
+<p>Each synced plugin gets <code>.source.json</code>:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="json"><code><span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#79B8FF">  "synced_from"</span><span style="color:#E1E4E8">: {</span></span>
+<span class="line"><span style="color:#79B8FF">    "repo"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"numman-ali/n-skills"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">    "path"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"skills/tools/gastown"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">    "branch"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"main"</span></span>
+<span class="line"><span style="color:#E1E4E8">  },</span></span>
+<span class="line"><span style="color:#79B8FF">  "last_sync"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"2026-01-03T02:48:45.000Z"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">  "author"</span><span style="color:#E1E4E8">: {</span></span>
+<span class="line"><span style="color:#79B8FF">    "name"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"Numman Ali"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">    "github"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"numman-ali"</span></span>
+<span class="line"><span style="color:#E1E4E8">  },</span></span>
+<span class="line"><span style="color:#79B8FF">  "license"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"Apache-2.0"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">  "files_synced"</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">6</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<h2 id="what-we-learned">What We Learned</h2>
+<h3 id="1-validate-before-you-sync">1. Validate Before You Sync</h3>
+<p>Running validators on Numman’s plugins <strong>before</strong> building sync infrastructure revealed the 2025 schema gap. If we’d built sync first, we would’ve synced non-compliant plugins.</p>
+<p><strong>Lesson</strong>: Validate inputs, not just outputs.</p>
+<h3 id="2-local--production">2. Local != Production</h3>
+<p>The js-yaml dependency worked fine in CI but failed locally. We spent time trying to fix the local environment before realizing: <strong>CI is the target, local is nice-to-have</strong>.</p>
+<p><strong>Lesson</strong>: Don’t over-optimize for local dev when CI/CD is the real environment.</p>
+<h3 id="3-documentation-is-infrastructure">3. Documentation Is Infrastructure</h3>
+<p>Adding the “External Plugin Sync” section to README.md wasn’t just documentation - it’s the <strong>contributor onboarding flow</strong>. Authors need to know:</p>
+<ul>
+<li>How to request sync</li>
+<li>What fields are required</li>
+<li>How often sync runs</li>
+<li>How to update their source</li>
+</ul>
+<p><strong>Lesson</strong>: README sections are product features, not afterthoughts.</p>
+<h3 id="4-author-ownership--marketplace-control">4. Author Ownership > Marketplace Control</h3>
+<p>The best part of this pattern: <strong>authors own their code</strong>. We mirror it, but they control:</p>
+<ul>
+<li>Release timing</li>
+<li>Feature development</li>
+<li>Documentation updates</li>
+<li>Version bumping</li>
+</ul>
+<p><strong>Lesson</strong>: Enable creators, don’t gatekeep.</p>
+<h2 id="results-and-impact">Results and Impact</h2>
+<p><strong>Immediate:</strong></p>
+<ul>
+<li>2 plugins (gastown, zai-cli) now sync daily</li>
+<li>8 files will update on first real sync (tonight at midnight UTC)</li>
+<li>Reference docs from n-skills will appear in our marketplace</li>
+</ul>
+<p><strong>Future:</strong></p>
+<ul>
+<li>Open path for more community authors</li>
+<li>Marketplace stays fresh without manual PRs</li>
+<li>Authors can develop at their own pace</li>
+</ul>
+<p><strong>Infrastructure:</strong></p>
+<ul>
+<li>585 lines added (sources.yaml, sync script, workflow, README)</li>
+<li>100% automated after initial setup</li>
+<li>Zero maintenance for plugin authors</li>
+</ul>
+<h2 id="call-to-action-request-external-sync">Call to Action: Request External Sync</h2>
+<p>If you maintain Claude Code plugins in your own repo and want us to sync them:</p>
+<ol>
+<li>
+<p><strong>Open an issue</strong> with:</p>
+<ul>
+<li>Your GitHub repo URL</li>
+<li>Path to your plugin/skill</li>
+<li>Brief description</li>
+</ul>
+</li>
+<li>
+<p><strong>We’ll add you to <code>sources.yaml</code></strong></p>
+</li>
+<li>
+<p><strong>Daily sync begins automatically</strong></p>
+</li>
+</ol>
+<p><strong>Requirements:</strong></p>
+<ul>
+<li>Must follow 2025 skills schema (we’ll help you validate)</li>
+<li>Open source license (MIT, Apache-2.0, etc.)</li>
+<li>Stable repo structure</li>
+</ul>
+<p>We handle the sync, you keep coding.</p>
+<h2 id="related-posts">Related Posts</h2>
+<ul>
+<li>AI-Assisted Technical Writing Automation Workflows - Another example of automation reducing manual work</li>
+<li>Building Post-Compaction Recovery with Beads - How we solve context loss in AI sessions</li>
+<li>AI Dev Transformation Part 4: Dual AI Workflows - Combining human and AI strengths</li>
+</ul>
+<h2 id="resources">Resources</h2>
+<ul>
+<li><strong>Marketplace</strong>: [retired legacy public domain]/</li>
+<li><strong>Sync Infrastructure</strong>: <a href="https://github.com/jeremylongshore/claude-code-plugins-plus-skills/commit/4c006c58">Commit 4c006c58</a></li>
+<li><strong>Numman’s n-skills</strong>: <a href="https://github.com/numman-ali/n-skills">https://github.com/numman-ali/n-skills</a></li>
+<li><strong>Request Sync</strong>: <a href="https://github.com/jeremylongshore/claude-code-plugins-plus-skills/issues">Open an issue</a></li>
+</ul>
+<p><em>Built with Claude Code. The entire sync infrastructure - from problem identification to production deployment - happened in a single session.</em></p>
+      </div>
+    </div>
+  </article>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

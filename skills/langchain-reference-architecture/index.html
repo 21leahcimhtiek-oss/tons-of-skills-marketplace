@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>langchain-reference-architecture - Agent Skill</title>
+    <meta name="description" content="A reference layered architecture for production LangChain 1.0 / LangGraph 1.0 services — LLM factory with version-safe defaults, chain/graph registry, retriever and tool DI, Pydantic-validated config, per-request tenant scoping, middleware ordering, checkpointer selection per environment. Use when starting a new service, refactoring a tangled chain, or onboarding a team to existing code. Trigger with &quot;langchain architecture&quot;, &quot;langchain llm factory&quot;, &quot;langchain chain registry&quot;, &quot;langchain dependency injection&quot;, &quot;langchain project structure&quot;.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://tonsofskills.com/tons-of-skills-marketplace/skills/langchain-reference-architecture/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/langchain-reference-architecture/">
+    <meta property="og:title" content="langchain-reference-architecture - Agent Skill">
+    <meta property="og:description" content="A reference layered architecture for production LangChain 1.0 / LangGraph 1.0 services — LLM factory with version-safe defaults, chain/graph registry, retriever and tool DI, Pydantic-validated config, per-request tenant scoping, middleware ordering, checkpointer selection per environment. Use when starting a new service, refactoring a tangled chain, or onboarding a team to existing code. Trigger with &quot;langchain architecture&quot;, &quot;langchain llm factory&quot;, &quot;langchain chain registry&quot;, &quot;langchain dependency injection&quot;, &quot;langchain project structure&quot;.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="langchain-reference-architecture - Agent Skill">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/langchain-reference-architecture/">
+    <meta name="twitter:title" content="langchain-reference-architecture - Agent Skill">
+    <meta name="twitter:description" content="A reference layered architecture for production LangChain 1.0 / LangGraph 1.0 services — LLM factory with version-safe defaults, chain/graph registry, retriever and tool DI, Pydantic-validated config, per-request tenant scoping, middleware ordering, checkpointer selection per environment. Use when starting a new service, refactoring a tangled chain, or onboarding a team to existing code. Trigger with &quot;langchain architecture&quot;, &quot;langchain llm factory&quot;, &quot;langchain chain registry&quot;, &quot;langchain dependency injection&quot;, &quot;langchain project structure&quot;.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"langchain-reference-architecture","description":"A reference layered architecture for production LangChain 1.0 / LangGraph 1.0 services — LLM factory with version-safe defaults, chain/graph registry, retriever and tool DI, Pydantic-validated config, per-request tenant scoping, middleware ordering, checkpointer selection per environment. Use when starting a new service, refactoring a tangled chain, or onboarding a team to existing code. Trigger with \"langchain architecture\", \"langchain llm factory\", \"langchain chain registry\", \"langchain dependency injection\", \"langchain project structure\".","version":"2.5.0","author":{"@type":"Person","name":"Jeremy Longshore"},"license":"MIT","programmingLanguage":"Claude Code Agent Skill","isPartOf":{"@type":"SoftwareApplication","name":"langchain-py-pack","applicationCategory":"unknown"}}</script>
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.breadcrumbs[data-astro-cid-ilhxcym7]{margin-bottom:var(--space-5)}.breadcrumbs__list[data-astro-cid-ilhxcym7]{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;list-style:none;padding:0;margin:0;font-family:var(--font-mono);font-size:var(--text-sm, .8rem)}.breadcrumbs__item[data-astro-cid-ilhxcym7]{display:flex;align-items:center;gap:.375rem}.breadcrumbs__link[data-astro-cid-ilhxcym7]{color:var(--text-3);text-decoration:none;transition:color var(--duration-fast, .2s) var(--ease-out)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:hover{color:var(--primary)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:0}.breadcrumbs__sep[data-astro-cid-ilhxcym7]{color:var(--text-3);user-select:none;font-size:.7em;line-height:1}.breadcrumbs__current[data-astro-cid-ilhxcym7]{color:var(--text-2)}.detail-cta[data-astro-cid-qcigfm7x]{background:var(--surface-3, var(--brand-light-gray));border-top:1px solid var(--border, var(--brand-light-gray));border-radius:var(--radius-lg);padding:2rem 1.5rem;margin-top:2rem;text-align:center}.detail-cta__headline[data-astro-cid-qcigfm7x]{font-family:var(--font-display);font-weight:700;font-size:1.35rem;color:var(--text, var(--brand-dark));margin-bottom:1.25rem}.detail-cta__actions[data-astro-cid-qcigfm7x]{display:flex;justify-content:center;gap:.75rem;flex-wrap:wrap}.detail-cta__primary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:var(--primary);color:#0a0a0c;border:none;border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;cursor:pointer;transition:background var(--duration-fast) var(--ease-out),transform var(--duration-fast) var(--ease-out)}.detail-cta__primary[data-astro-cid-qcigfm7x]:hover{background:var(--primary-dark, var(--primary-dark));transform:translateY(-1px)}.detail-cta__primary[data-astro-cid-qcigfm7x].copied{background:var(--positive, var(--brand-green))}.detail-cta__secondary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:transparent;color:var(--text, var(--brand-dark));border:1px solid var(--border, var(--brand-mid-gray));border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;text-decoration:none;transition:border-color var(--duration-fast) var(--ease-out),color var(--duration-fast) var(--ease-out)}.detail-cta__secondary[data-astro-cid-qcigfm7x]:hover{border-color:var(--primary);color:var(--primary)}@media(max-width:480px){.detail-cta__actions[data-astro-cid-qcigfm7x]{flex-direction:column;align-items:stretch}.detail-cta__primary[data-astro-cid-qcigfm7x],.detail-cta__secondary[data-astro-cid-qcigfm7x]{justify-content:center}}
+</style>
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/_slug_@_@astro.wF9emvVq.css"></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  
+  
+
+  <div class="skill-detail" data-astro-cid-jrlgpo3w>
+    <!-- 1. Breadcrumbs -->
+    <nav aria-label="Breadcrumb" class="breadcrumbs" data-astro-cid-ilhxcym7>
+  <ol class="breadcrumbs__list" itemscope itemtype="https://schema.org/BreadcrumbList" data-astro-cid-ilhxcym7>
+    <li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Home</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="1">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/skills/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Skills</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="2">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          <span class="breadcrumbs__current" aria-current="page" itemprop="name" data-astro-cid-ilhxcym7>
+              langchain-reference-architecture
+            </span>
+          <meta itemprop="position" content="3">
+        </li>
+  </ol>
+</nav>
+
+    <!-- 2. Header (enhanced) -->
+    <header class="skill-header" data-astro-cid-jrlgpo3w>
+      <h1 data-astro-cid-jrlgpo3w>langchain-reference-architecture</h1>
+      <p class="skill-description" data-astro-cid-jrlgpo3w>A reference layered architecture for production LangChain 1.0 / LangGraph 1.0 services — LLM factory with version-safe defaults, chain/graph registry, retriever and tool DI, Pydantic-validated config, per-request tenant scoping, middleware ordering, checkpointer selection per environment. Use when starting a new service, refactoring a tangled chain, or onboarding a team to existing code. Trigger with &quot;langchain architecture&quot;, &quot;langchain llm factory&quot;, &quot;langchain chain registry&quot;, &quot;langchain dependency injection&quot;, &quot;langchain project structure&quot;.</p>
+
+      <div class="skill-metadata" data-astro-cid-jrlgpo3w>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>v2.5.0</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>Jeremy Longshore</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>MIT</span>
+        </div>
+      </div>
+
+      
+    </header>
+
+    <!-- 4. Allowed Tools -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Allowed Tools</h2>
+      <div class="tools-grid" data-astro-cid-jrlgpo3w>
+        <span class="tool-badge" data-astro-cid-jrlgpo3w>Read</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Write</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Edit</span>
+      </div>
+      
+    </section>
+
+    <!-- 5. Provided by Plugin -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Provided by Plugin</h2>
+      <div class="plugin-info" data-astro-cid-jrlgpo3w>
+        <div class="plugin-details" data-astro-cid-jrlgpo3w>
+          <h3 data-astro-cid-jrlgpo3w>
+            <a href="/plugins/langchain-py-pack/" data-astro-cid-jrlgpo3w>langchain-py-pack</a>
+          </h3>
+          <p data-astro-cid-jrlgpo3w>Claude Code skill pack for LangChain 1.0 + LangGraph 1.0 (Python) - 34 skills covering chains, agents, RAG, middleware, checkpointing, HITL, streaming, and production patterns</p>
+          <div class="plugin-meta" data-astro-cid-jrlgpo3w>
+            <span data-astro-cid-jrlgpo3w>unknown</span>
+            <span data-astro-cid-jrlgpo3w>v2.5.0</span>
+          </div>
+        </div>
+        <a href="/plugins/langchain-py-pack/" class="btn-primary" data-astro-cid-jrlgpo3w>View Plugin</a>
+      </div>
+    </section>
+
+    <!-- 6. Installation -->
+    <section class="section-box dark" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Installation</h2>
+      <p class="install-note" style="color: var(--brand-light-gray); margin-bottom: 0.75rem;" data-astro-cid-jrlgpo3w>This skill is included in the langchain-py-pack plugin:</p>
+      <pre class="install-command" data-copy="/plugin install langchain-py-pack@claude-code-plugins-plus" data-astro-cid-jrlgpo3w><code data-astro-cid-jrlgpo3w>/plugin install langchain-py-pack@claude-code-plugins-plus</code></pre>
+      <p class="install-note" data-astro-cid-jrlgpo3w>Click to copy</p>
+    </section>
+
+    <!-- 7. Skill Content (Markdown) -->
+    <section class="skill-content-section" data-astro-cid-jrlgpo3w>
+      <h2 data-astro-cid-jrlgpo3w>Instructions</h2>
+      <div class="skill-content" data-astro-cid-jrlgpo3w>
+        <div data-astro-cid-jrlgpo3w><h1>LangChain Reference Architecture (Python)</h1>
+<h2>Overview</h2>
+<p>Eight months into a LangChain service, a code review surfaces the mess. Twelve chain definitions live inlined inside FastAPI route handlers. Three retrievers are constructed at module-global scope, one bound to <code>tenant_id=&quot;acme&quot;</code> because that was the first tenant in the pilot — that retriever now returns Acme&#39;s documents to every other tenant, a P33 leak that has been live in production for six weeks. <code>max_retries=6</code> is hardcoded at four separate call sites. A <code>RunnableWithMessageHistory</code> backed by the default <code>InMemoryChatMessageHistory</code> loses every conversation on pod restart (P22) — which is most days, because Cloud Run scales to zero. Config is read from <code>os.environ</code> in three modules with three different fallback strategies. There is no place to put a new provider without touching seven files, and nobody remembers why the retriever is built at import time.</p>
+<p>The fix is not &quot;rename a variable.&quot; The fix is an architecture that made every one of those mistakes hard to write. This skill is the target layered architecture:</p>
+<ul>
+<li><code>app/</code> — FastAPI routes. Thin. Parses HTTP, calls into <code>services</code>, serializes response. No chain logic, no vendor clients, no env vars.</li>
+<li><code>services/</code> — chain and graph definitions. Take dependencies through constructor args, not module-level imports.</li>
+<li><code>adapters/</code> — vendor clients, LLM factory, retriever factory, tool factory. This is where <code>langchain-anthropic</code> is imported. Nowhere else.</li>
+<li><code>config/</code> — one Pydantic <code>Settings</code> class. <code>SecretStr</code> for keys, <code>Literal[&quot;dev&quot;,&quot;staging&quot;,&quot;prod&quot;]</code> for env names, <code>.env</code> file loader.</li>
+<li><code>domain/</code> — Pydantic models, typed LangGraph state, enums. No I/O.</li>
+</ul>
+<p>Five layers, five imports deep at most. Dependency direction is <strong>strictly downward</strong>. <code>app</code> imports <code>services</code>; <code>services</code> imports <code>adapters</code>; <code>adapters</code> imports <code>config</code> and <code>domain</code>. Never the reverse. Import-linter enforces this in CI. Pain-catalog anchors: P22 (in-memory history loses messages — architectural fix is persistent history injected via DI) and P33 (per-tenant vector stores leak if retriever bound at import — architectural fix is per-request factory). Adjacent: P10 (recursion limits), P24 (middleware order), P28 (callback inheritance). Pin: <code>langchain-core 1.0.x</code>, <code>langgraph 1.0.x</code>, <code>langchain-anthropic 1.0.x</code>, <code>langchain-openai 1.0.x</code>, <code>pydantic 2.x</code>, <code>import-linter 2.x</code>.</p>
+<h2>Prerequisites</h2>
+<ul>
+<li>Python 3.10+</li>
+<li><code>langchain-core &gt;= 1.0, &lt; 2.0</code>, <code>langgraph &gt;= 1.0, &lt; 2.0</code></li>
+<li><code>pydantic &gt;= 2.5</code> and <code>pydantic-settings &gt;= 2.1</code></li>
+<li><code>import-linter &gt;= 2.0</code> for layer enforcement in CI</li>
+<li>Provider package(s): <code>langchain-anthropic</code>, <code>langchain-openai</code>, etc.</li>
+<li>For staging/prod checkpointer: <code>langgraph-checkpoint-postgres</code> and a Postgres instance</li>
+<li>Cross-reference: sibling skill <code>langchain-model-inference</code> for the LLM factory&#39;s version-safe defaults</li>
+</ul>
+<h2>Instructions</h2>
+<h3>Step 1 — Adopt the 5-layer directory layout</h3>
+<pre><code>
+src/my_service/
+├── app/                         # Layer 1: HTTP boundary (FastAPI)
+│   ├── __init__.py
+│   ├── main.py                  # FastAPI instance, DI wiring, lifespan
+│   ├── routes/
+│   │   ├── support.py           # POST /support → services.support.run(...)
+│   │   └── health.py
+│   └── deps.py                  # FastAPI Depends() providers
+├── services/                    # Layer 2: chain and graph definitions
+│   ├── __init__.py
+│   ├── registry.py              # name → builder lookup
+│   ├── support/
+│   │   ├── chain.py             # SupportChain(llm, retriever, memory)
+│   │   └── graph.py             # SupportGraph (LangGraph StateGraph)
+│   └── triage/
+│       └── chain.py
+├── adapters/                    # Layer 3: vendor integrations
+│   ├── __init__.py
+│   ├── llm_factory.py           # chat_model(provider, **kwargs) → BaseChatModel
+│   ├── retriever_factory.py     # retriever_for(tenant_id) → Retriever
+│   ├── tool_factory.py          # tools_for(tenant_id) → list[BaseTool]
+│   ├── checkpointer.py          # checkpointer_for(env) → BaseCheckpointSaver
+│   └── history.py               # history_for(session_id, tenant_id) → BaseChatMessageHistory
+├── config/                      # Layer 4: configuration
+│   ├── __init__.py
+│   └── settings.py              # Pydantic Settings
+└── domain/                      # Layer 5: pure models, no I/O
+    ├── __init__.py
+    ├── state.py                 # TypedDict / Pydantic for LangGraph state
+    └── models.py                # request/response schemas
+tests/
+├── unit/                        # fake adapters, assert service logic
+├── integration/                 # real adapters against ephemeral infra
+└── contract/                    # schema snapshots (e.g., tool specs)
+pyproject.toml                   # includes [tool.importlinter] contracts
+</code></pre>
+<p>Typical depth is 5 layers. See <a href="references/directory-layout.md">Directory Layout</a> for the full tree with file-naming conventions.</p>
+<h3>Step 2 — Centralize LLM defaults in an <code>adapters/llm_factory.py</code></h3>
+<p>Chains depend on the <code>BaseChatModel</code> protocol, not a concrete class. The factory is the one place version-safe defaults live:</p>
+<pre data-lang="python"><code>
+# src/my_service/adapters/llm_factory.py
+from langchain_core.language_models import BaseChatModel
+from langchain_anthropic import ChatAnthropic
+from langchain_openai import ChatOpenAI
+
+_SAFE_DEFAULTS = {&quot;timeout&quot;: 30, &quot;max_retries&quot;: 2}
+
+def chat_model(provider: str, **overrides) -&gt; BaseChatModel:
+    defaults = {**_SAFE_DEFAULTS, **overrides}  # caller wins
+    if provider == &quot;anthropic&quot;:
+        return ChatAnthropic(model=&quot;claude-sonnet-4-6&quot;, **defaults)
+    if provider == &quot;openai&quot;:
+        return ChatOpenAI(model=&quot;gpt-4o&quot;, **defaults)
+    raise ValueError(f&quot;Unknown provider: {provider!r}&quot;)
+</code></pre>
+<p>The <code>max_retries=6</code> scatter in the mess-case becomes <code>max_retries=2</code> in exactly one file. Services that want a longer timeout pass <code>timeout=60</code> — but they never set <code>max_retries=6</code> by accident. Cross-reference <code>langchain-model-inference</code> Step 3 for the factory pattern&#39;s provenance; see <a href="references/llm-factory-pattern.md">LLM Factory Pattern</a> for per-provider variants and caching.</p>
+<h3>Step 3 — Replace scattered imports with a chain/graph registry</h3>
+<pre data-lang="python"><code>
+# src/my_service/services/registry.py
+from typing import Callable, Protocol
+from langchain_core.runnables import Runnable
+
+class ChainBuilder(Protocol):
+    def __call__(self, *, tenant_id: str) -&gt; Runnable: ...
+
+_BUILDERS: dict[str, ChainBuilder] = {}
+
+def register(name: str):
+    def decorator(fn: ChainBuilder) -&gt; ChainBuilder:
+        _BUILDERS[name] = fn
+        return fn
+    return decorator
+
+def get(name: str, *, tenant_id: str) -&gt; Runnable:
+    try:
+        return _BUILDERSname
+    except KeyError:
+        raise KeyError(f&quot;No chain registered under {name!r}. Known: {list(_BUILDERS)}&quot;)
+</code></pre>
+<p>Each service module registers itself:</p>
+<pre data-lang="python"><code>
+# src/my_service/services/support/chain.py
+from my_service.services.registry import register
+from my_service.adapters.llm_factory import chat_model
+from my_service.adapters.retriever_factory import retriever_for
+
+@register(&quot;support_agent&quot;)
+def build_support_agent(*, tenant_id: str):
+    llm = chat_model(&quot;anthropic&quot;)
+    retriever = retriever_for(tenant_id=tenant_id)
+    # ... compose chain ...
+    return chain
+</code></pre>
+<p>Routes become one line: <code>chain = registry.get(&quot;support_agent&quot;, tenant=req.tenant_id)</code>. There is one place to look, not twelve.</p>
+<h3>Step 4 — Build retrievers and tools per-request, keyed by tenant (P33)</h3>
+<p>This is the P33 architectural fix. The factory takes <code>tenant_id</code> as a runtime argument. Nothing is bound at import:</p>
+<pre data-lang="python"><code>
+# src/my_service/adapters/retriever_factory.py
+from functools import lru_cache
+from langchain_core.retrievers import BaseRetriever
+from langchain_pinecone import PineconeVectorStore
+from my_service.config.settings import get_settings
+
+@lru_cache(maxsize=256)  # cache the *store*, not the retriever
+def _store_for(tenant_id: str) -&gt; PineconeVectorStore:
+    s = get_settings()
+    return PineconeVectorStore(
+        index_name=s.pinecone_index,
+        namespace=f&quot;tenant:{tenant_id}&quot;,  # per-tenant namespace
+        embedding=...,
+    )
+
+def retriever_for(*, tenant_id: str, k: int = 6) -&gt; BaseRetriever:
+    # Retriever construction &lt;5ms because store is cached — do it per-request.
+    return _store_for(tenant_id).as_retriever(search_kwargs={&quot;k&quot;: k})
+</code></pre>
+<p>The retriever is cheap to build (&lt;5ms typical) so per-request construction is fine. Unit test with two tenants and assert non-overlap. See <a href="references/dependency-rules.md">Dependency Rules</a> for the import-linter contract that forbids <code>services/*.py</code> from importing <code>langchain_pinecone</code> directly.</p>
+<h3>Step 5 — Collapse config to one Pydantic <code>Settings</code></h3>
+<pre data-lang="python"><code>
+# src/my_service/config/settings.py
+from functools import lru_cache
+from typing import Literal
+from pydantic import SecretStr
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=&quot;.env&quot;, env_prefix=&quot;MYSVC_&quot;)
+
+    env: Literal[&quot;dev&quot;, &quot;staging&quot;, &quot;prod&quot;] = &quot;dev&quot;
+    anthropic_api_key: SecretStr
+    openai_api_key: SecretStr
+    pinecone_api_key: SecretStr
+    pinecone_index: str
+    postgres_dsn: SecretStr | None = None  # required when env != &quot;dev&quot;
+
+@lru_cache(maxsize=1)
+def get_settings() -&gt; Settings:
+    return Settings()  # reads env/.env at first call, caches
+</code></pre>
+<p><code>SecretStr</code> prevents keys from leaking into logs. <code>Literal[...]</code> catches typos (<code>env=&quot;staing&quot;</code>) at validation time, not at deploy time.</p>
+<h3>Step 6 — Compose middleware in one place, in the right order</h3>
+<p>Middleware order is a correctness concern (P24 — redaction before caching, or cached responses leak PII across tenants). Wire the stack once in <code>adapters/</code> and hand the composed runnable to every service:</p>
+<pre data-lang="python"><code>
+# src/my_service/adapters/middleware.py
+from langchain_core.runnables import Runnable
+
+def wrap(model: Runnable) -&gt; Runnable:
+    # Order matters: redact -&gt; cache -&gt; retry -&gt; model
+    # Cross-reference L31 (langchain-middleware-patterns) for the full rationale.
+    return (
+        model
+        .with_config(tags=[&quot;mysvc&quot;])
+        # | redaction_middleware()
+        # | cache_middleware()
+        # | retry_middleware()
+    )
+</code></pre>
+<p>Cross-reference <code>langchain-middleware-patterns</code> (L31) for the middleware stack rationale and P25 (retry double-counting tokens).</p>
+<h3>Step 7 — Pick the checkpointer per environment</h3>
+<p>This is the P22 architectural fix. <code>MemorySaver</code> is fine for dev; it is not an option for staging or prod:</p>
+<pre data-lang="python"><code>
+# src/my_service/adapters/checkpointer.py
+from langgraph.checkpoint.base import BaseCheckpointSaver
+from langgraph.checkpoint.memory import MemorySaver
+
+def checkpointer_for(env: str) -&gt; BaseCheckpointSaver:
+    if env == &quot;dev&quot;:
+        return MemorySaver()
+    # Staging/prod: Postgres-backed. Async variant for FastAPI.
+    from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+    from my_service.config.settings import get_settings
+    dsn = get_settings().postgres_dsn
+    assert dsn is not None, &quot;POSTGRES_DSN required outside dev&quot;
+    return AsyncPostgresSaver.from_conn_string(dsn.get_secret_value())
+</code></pre>
+<p>Same for chat history when you use <code>RunnableWithMessageHistory</code> instead of a graph: <code>InMemoryChatMessageHistory</code> in dev, <code>PostgresChatMessageHistory</code> or <code>RedisChatMessageHistory</code> in staging/prod. See <a href="references/per-env-checkpointer.md">Per-Env Checkpointer</a> for the <code>MemorySaver</code> / <code>SqliteSaver</code> / <code>PostgresSaver</code> / <code>AsyncPostgresSaver</code> decision matrix and the migration script between them. Cross-reference <code>langchain-langgraph-checkpointing</code> (L27) for checkpoint schema details.</p>
+<h3>Step 8 — Test strategy: fakes in unit, real adapters in integration</h3>
+<p>The factory boundary is also the fake boundary. Unit tests inject a <code>FakeListChatModel</code> where production injects <code>ChatAnthropic</code>:</p>
+<pre data-lang="python"><code>
+# tests/unit/test_support_chain.py
+from langchain_core.language_models.fake_chat_models import FakeListChatModel
+from my_service.services.support.chain import build_support_agent
+
+def test_support_agent_returns_expected_shape(monkeypatch):
+    monkeypatch.setattr(
+        &quot;my_service.services.support.chain.chat_model&quot;,
+        lambda provider, **kw: FakeListChatModel(responses=[&quot;fixed answer&quot;]),
+    )
+    chain = build_support_agent(tenant_id=&quot;acme&quot;)
+    assert chain.invoke({&quot;input&quot;: &quot;hi&quot;}).content == &quot;fixed answer&quot;
+</code></pre>
+<p>Integration tests use the real adapters against ephemeral Postgres and a sandbox Pinecone namespace. Contract tests snapshot tool JSON schemas so a silent <code>bind_tools</code> change fails CI.</p>
+<h3>Step 9 — Enforce the layer graph in CI with import-linter</h3>
+<pre data-lang="toml"><code>
+# pyproject.toml
+[tool.importlinter]
+root_package = &quot;my_service&quot;
+
+[[tool.importlinter.contracts]]
+name = &quot;Layered architecture&quot;
+type = &quot;layers&quot;
+layers = [
+    &quot;my_service.app&quot;,
+    &quot;my_service.services&quot;,
+    &quot;my_service.adapters&quot;,
+    &quot;my_service.config&quot;,
+    &quot;my_service.domain&quot;,
+]
+
+[[tool.importlinter.contracts]]
+name = &quot;Services do not import vendor SDKs&quot;
+type = &quot;forbidden&quot;
+source_modules = [&quot;my_service.services&quot;]
+forbidden_modules = [
+    &quot;langchain_anthropic&quot;,
+    &quot;langchain_openai&quot;,
+    &quot;langchain_pinecone&quot;,
+]
+</code></pre>
+<p>CI runs <code>lint-imports</code>. A PR that puts <code>from langchain_anthropic import ChatAnthropic</code> inside <code>services/support/chain.py</code> fails — forcing the author to go through <code>adapters/llm_factory.chat_model(&quot;anthropic&quot;)</code> instead.</p>
+<h2>Output</h2>
+<ul>
+<li>5-layer directory tree with <code>app / services / adapters / config / domain</code></li>
+<li><code>adapters/llm_factory.py</code> as the single source of version-safe defaults</li>
+<li><code>services/registry.py</code> with <code>register(...)</code> / <code>get(name, tenant=...)</code> lookup</li>
+<li>Per-request retriever and tool factories keyed by <code>tenant_id</code> (P33 closed)</li>
+<li>One Pydantic <code>Settings</code> with <code>SecretStr</code> keys and <code>Literal[...]</code> env names</li>
+<li>Middleware composition order documented and wired once in <code>adapters</code></li>
+<li>Per-env checkpointer: <code>MemorySaver</code> dev, <code>AsyncPostgresSaver</code> staging/prod (P22 closed)</li>
+<li>Test strategy: fakes at the factory boundary in unit, real adapters in integration</li>
+<li><code>import-linter</code> contracts enforced in CI</li>
+</ul>
+<h2>Error Handling</h2>
+<table><thead><tr>
+<th>Error</th>
+<th>Cause</th>
+<th>Fix</th>
+</tr></thead><tbody>
+<tr>
+<td><code>KeyError: &quot;No chain registered under &#39;support_agent&#39;&quot;</code></td>
+<td>Registry imported before service module registered</td>
+<td>Import <code>services.support.chain</code> from <code>services/__init__.py</code> or <code>app.main</code> startup</td>
+</tr>
+<tr>
+<td>Retriever returns wrong tenant&#39;s documents (P33)</td>
+<td>Retriever bound at module-import scope with hardcoded tenant</td>
+<td>Construct <code>retriever_for(tenant_id=...)</code> per request; retriever build &lt;5ms with cached store</td>
+</tr>
+<tr>
+<td>Chat history empty after pod restart (P22)</td>
+<td><code>RunnableWithMessageHistory</code> backed by <code>InMemoryChatMessageHistory</code> in staging/prod</td>
+<td>Switch to <code>PostgresChatMessageHistory</code> / <code>RedisChatMessageHistory</code> via <code>history_for(env=...)</code> factory</td>
+</tr>
+<tr>
+<td><code>pydantic.ValidationError</code> on <code>env=&quot;staing&quot;</code> typo</td>
+<td><code>Literal[&quot;dev&quot;,&quot;staging&quot;,&quot;prod&quot;]</code> caught at <code>Settings</code> init</td>
+<td>Fix env var before deploy; this is the intended behavior</td>
+</tr>
+<tr>
+<td><code>import-linter</code> failure <code>services imports langchain_anthropic</code></td>
+<td>Vendor SDK imported in services layer</td>
+<td>Route through <code>adapters.llm_factory.chat_model(&quot;anthropic&quot;)</code></td>
+</tr>
+<tr>
+<td><code>GraphRecursionError</code> on vague prompts (P10)</td>
+<td><code>create_react_agent</code> default <code>recursion_limit=25</code></td>
+<td>Set <code>recursion_limit=5-10</code> at graph compile time in the service</td>
+</tr>
+<tr>
+<td>Cached response contains another tenant&#39;s PII (P24)</td>
+<td>Middleware order was cache before redaction</td>
+<td>Compose in <code>adapters/middleware.py</code> as redact → cache → model</td>
+</tr>
+<tr>
+<td>Subgraph traces missing (P28)</td>
+<td>Parent callbacks not inherited into subgraphs</td>
+<td>Pass <code>config={&quot;callbacks&quot;: [...]}</code> explicitly when invoking subgraph</td>
+</tr>
+<tr>
+<td><code>AssertionError: POSTGRES_DSN required outside dev</code></td>
+<td><code>Settings.postgres_dsn</code> None in staging</td>
+<td>Fail fast at startup; do not fall back to <code>MemorySaver</code> silently</td>
+</tr>
+</tbody></table>
+<h2>Examples</h2>
+<h3>Onboarding a new tenant</h3>
+<p>Because retrievers are built per request from <code>tenant_id</code>, onboarding a new tenant is a data concern (create Pinecone namespace, seed documents), not a code concern. No file in <code>services/</code> changes. No redeploy is required to add <code>tenant_id=&quot;zeta&quot;</code>.</p>
+<h3>Adding a new provider</h3>
+<p><code>adapters/llm_factory.py</code> grows one <code>elif</code> branch. <code>config/settings.py</code> grows one <code>SecretStr</code> field. No service module changes — they all depend on <code>BaseChatModel</code>, not <code>ChatAnthropic</code>. Cross-reference <code>langchain-model-inference</code> for the list of provider packages and their 1.0 import paths.</p>
+<h3>Refactoring the 8-month-old mess</h3>
+<p>The migration is layer by layer, bottom up:</p>
+<ol>
+<li>Extract <code>config/settings.py</code> first — it has no dependencies and unlocks the rest</li>
+<li>Extract <code>adapters/llm_factory.py</code> and replace scattered <code>ChatAnthropic(...)</code> calls</li>
+<li>Extract <code>adapters/retriever_factory.py</code> with <code>tenant_id</code> as a runtime arg — this is the P33 fix</li>
+<li>Introduce <code>services/registry.py</code> and move one chain at a time from routes into registered builders</li>
+<li>Turn on <code>import-linter</code> in CI with <code>ignore_imports</code> for routes that have not migrated yet; remove ignores as you go</li>
+<li>Swap <code>MemorySaver</code> for <code>AsyncPostgresSaver</code> in staging last — it is the lowest-risk step once factories exist</li>
+</ol>
+<h2>Resources</h2>
+<ul>
+<li><a href="https://python.langchain.com/docs/concepts/">LangChain 1.0 — Concepts</a></li>
+<li><a href="https://langchain-ai.github.io/langgraph/concepts/persistence/">LangGraph — Persistence and checkpointers</a></li>
+<li><a href="https://docs.pydantic.dev/latest/concepts/pydantic_settings/">Pydantic Settings</a></li>
+<li>import-linter — Layer contracts</li>
+<li><a href="https://fastapi.tiangolo.com/tutorial/dependencies/">FastAPI — Dependency injection</a></li>
+<li>Pack pain catalog: <code>docs/pain-catalog.md</code> (entries P10, P22, P24, P28, P33)</li>
+<li>Sibling skills in this pack (same <code>plugins/saas-packs/langchain-py-pack/skills/</code> directory):</li>
+<li><code>langchain-model-inference</code> — LLM factory defaults provenance</li>
+<li><code>langchain-embeddings-search</code> — retriever and vector-store selection</li>
+<li><code>langchain-sdk-patterns</code> — composition patterns referenced by service builders</li>
+</ul></div>
+      </div>
+    </section>
+
+    <!-- 8. Bottom CTA -->
+    <section class="detail-cta" data-astro-cid-qcigfm7x>
+  <h2 class="detail-cta__headline" data-astro-cid-qcigfm7x>Ready to use langchain-py-pack?</h2>
+  <div class="detail-cta__actions" data-astro-cid-qcigfm7x>
+    <button class="detail-cta__primary" data-copy-install="/plugin install langchain-py-pack@claude-code-plugins-plus" data-astro-cid-qcigfm7x>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" data-astro-cid-qcigfm7x>
+        <rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" stroke-width="1.5" data-astro-cid-qcigfm7x></rect>
+        <path d="M3 11V3a1 1 0 011-1h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" data-astro-cid-qcigfm7x></path>
+      </svg>
+      <span class="detail-cta__btn-text" data-astro-cid-qcigfm7x>Copy Install Command</span>
+    </button>
+    
+  </div>
+</section>
+
+<script type="module">document.querySelectorAll("[data-copy-install]").forEach(t=>{t.addEventListener("click",async()=>{const a=t.dataset.copyInstall||"";await navigator.clipboard.writeText(a);const e=t.querySelector(".detail-cta__btn-text");if(e){const o=e.textContent;e.textContent="Copied!",t.classList.add("copied"),window.trackEvent&&window.trackEvent("install_copied",{plugin_name:a.split(" ").pop()||"",source:"detail_cta"}),setTimeout(()=>{e.textContent=o,t.classList.remove("copied")},2e3)}})});</script>
+
+    <!-- 9. Related Skills (6, with tool pills) -->
+    <section class="related-skills-section" data-astro-cid-jrlgpo3w>
+        <h2 class="related-skills-heading" data-astro-cid-jrlgpo3w>Related Skills</h2>
+        <div class="related-skills-grid" data-astro-cid-jrlgpo3w>
+          <a href="/skills/abridge-ci-integration/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-ci-integration</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Configure CI/CD pipeline for Abridge clinical AI integrations with GitHub Actions.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-common-errors/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-common-errors</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Diagnose and fix common Abridge clinical AI integration errors.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-a/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-a</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge ambient clinical documentation capture-to-note pipeline.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-b/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-b</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge patient-facing documentation and after-visit summary generation.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-cost-tuning/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-cost-tuning</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Optimize Abridge clinical AI costs through tier selection, session management, and usage monitoring for healthcare organizations.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-debug-bundle/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-debug-bundle</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Collect Abridge debug evidence for support tickets and troubleshooting.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a>
+        </div>
+      </section>
+
+  </div>
+
+  
+  <script>
+    document.querySelectorAll('.install-command').forEach(el => {
+      el.addEventListener('click', function() {
+        const text = this.dataset.copy || this.textContent;
+        navigator.clipboard.writeText(text).then(() => {
+          const originalText = this.textContent;
+          this.textContent = 'Copied to clipboard!';
+          this.style.color = 'var(--brand-green)';
+          setTimeout(() => {
+            this.textContent = originalText;
+            this.style.color = '';
+          }, 2000);
+        });
+      });
+    });
+  </script>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

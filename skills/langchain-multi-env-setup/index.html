@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>langchain-multi-env-setup - Agent Skill</title>
+    <meta name="description" content="Build reliable dev / staging / prod isolation for LangChain 1.0 services — Pydantic Settings + SecretStr, cloud Secret Manager in prod, per-env prompt and model version pinning, env-specific checkpointer and observability. Use when graduating from .env-in-dev to real prod infra, or debugging a config that loaded the wrong values in the wrong env. Trigger with &quot;langchain multi-env&quot;, &quot;langchain pydantic settings&quot;, &quot;langchain secret manager&quot;, &quot;langchain env config&quot;, &quot;langchain prod setup&quot;.">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://tonsofskills.com/tons-of-skills-marketplace/skills/langchain-multi-env-setup/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/langchain-multi-env-setup/">
+    <meta property="og:title" content="langchain-multi-env-setup - Agent Skill">
+    <meta property="og:description" content="Build reliable dev / staging / prod isolation for LangChain 1.0 services — Pydantic Settings + SecretStr, cloud Secret Manager in prod, per-env prompt and model version pinning, env-specific checkpointer and observability. Use when graduating from .env-in-dev to real prod infra, or debugging a config that loaded the wrong values in the wrong env. Trigger with &quot;langchain multi-env&quot;, &quot;langchain pydantic settings&quot;, &quot;langchain secret manager&quot;, &quot;langchain env config&quot;, &quot;langchain prod setup&quot;.">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="langchain-multi-env-setup - Agent Skill">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/skills/langchain-multi-env-setup/">
+    <meta name="twitter:title" content="langchain-multi-env-setup - Agent Skill">
+    <meta name="twitter:description" content="Build reliable dev / staging / prod isolation for LangChain 1.0 services — Pydantic Settings + SecretStr, cloud Secret Manager in prod, per-env prompt and model version pinning, env-specific checkpointer and observability. Use when graduating from .env-in-dev to real prod infra, or debugging a config that loaded the wrong values in the wrong env. Trigger with &quot;langchain multi-env&quot;, &quot;langchain pydantic settings&quot;, &quot;langchain secret manager&quot;, &quot;langchain env config&quot;, &quot;langchain prod setup&quot;.">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"langchain-multi-env-setup","description":"Build reliable dev / staging / prod isolation for LangChain 1.0 services — Pydantic Settings + SecretStr, cloud Secret Manager in prod, per-env prompt and model version pinning, env-specific checkpointer and observability. Use when graduating from .env-in-dev to real prod infra, or debugging a config that loaded the wrong values in the wrong env. Trigger with \"langchain multi-env\", \"langchain pydantic settings\", \"langchain secret manager\", \"langchain env config\", \"langchain prod setup\".","version":"2.5.0","author":{"@type":"Person","name":"Jeremy Longshore"},"license":"MIT","programmingLanguage":"Claude Code Agent Skill","isPartOf":{"@type":"SoftwareApplication","name":"langchain-py-pack","applicationCategory":"unknown"}}</script>
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.breadcrumbs[data-astro-cid-ilhxcym7]{margin-bottom:var(--space-5)}.breadcrumbs__list[data-astro-cid-ilhxcym7]{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;list-style:none;padding:0;margin:0;font-family:var(--font-mono);font-size:var(--text-sm, .8rem)}.breadcrumbs__item[data-astro-cid-ilhxcym7]{display:flex;align-items:center;gap:.375rem}.breadcrumbs__link[data-astro-cid-ilhxcym7]{color:var(--text-3);text-decoration:none;transition:color var(--duration-fast, .2s) var(--ease-out)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:hover{color:var(--primary)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:0}.breadcrumbs__sep[data-astro-cid-ilhxcym7]{color:var(--text-3);user-select:none;font-size:.7em;line-height:1}.breadcrumbs__current[data-astro-cid-ilhxcym7]{color:var(--text-2)}.detail-cta[data-astro-cid-qcigfm7x]{background:var(--surface-3, var(--brand-light-gray));border-top:1px solid var(--border, var(--brand-light-gray));border-radius:var(--radius-lg);padding:2rem 1.5rem;margin-top:2rem;text-align:center}.detail-cta__headline[data-astro-cid-qcigfm7x]{font-family:var(--font-display);font-weight:700;font-size:1.35rem;color:var(--text, var(--brand-dark));margin-bottom:1.25rem}.detail-cta__actions[data-astro-cid-qcigfm7x]{display:flex;justify-content:center;gap:.75rem;flex-wrap:wrap}.detail-cta__primary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:var(--primary);color:#0a0a0c;border:none;border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;cursor:pointer;transition:background var(--duration-fast) var(--ease-out),transform var(--duration-fast) var(--ease-out)}.detail-cta__primary[data-astro-cid-qcigfm7x]:hover{background:var(--primary-dark, var(--primary-dark));transform:translateY(-1px)}.detail-cta__primary[data-astro-cid-qcigfm7x].copied{background:var(--positive, var(--brand-green))}.detail-cta__secondary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:transparent;color:var(--text, var(--brand-dark));border:1px solid var(--border, var(--brand-mid-gray));border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;text-decoration:none;transition:border-color var(--duration-fast) var(--ease-out),color var(--duration-fast) var(--ease-out)}.detail-cta__secondary[data-astro-cid-qcigfm7x]:hover{border-color:var(--primary);color:var(--primary)}@media(max-width:480px){.detail-cta__actions[data-astro-cid-qcigfm7x]{flex-direction:column;align-items:stretch}.detail-cta__primary[data-astro-cid-qcigfm7x],.detail-cta__secondary[data-astro-cid-qcigfm7x]{justify-content:center}}
+</style>
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/_slug_@_@astro.wF9emvVq.css"></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+
+  
+  
+
+  <div class="skill-detail" data-astro-cid-jrlgpo3w>
+    <!-- 1. Breadcrumbs -->
+    <nav aria-label="Breadcrumb" class="breadcrumbs" data-astro-cid-ilhxcym7>
+  <ol class="breadcrumbs__list" itemscope itemtype="https://schema.org/BreadcrumbList" data-astro-cid-ilhxcym7>
+    <li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Home</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="1">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/skills/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Skills</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="2">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          <span class="breadcrumbs__current" aria-current="page" itemprop="name" data-astro-cid-ilhxcym7>
+              langchain-multi-env-setup
+            </span>
+          <meta itemprop="position" content="3">
+        </li>
+  </ol>
+</nav>
+
+    <!-- 2. Header (enhanced) -->
+    <header class="skill-header" data-astro-cid-jrlgpo3w>
+      <h1 data-astro-cid-jrlgpo3w>langchain-multi-env-setup</h1>
+      <p class="skill-description" data-astro-cid-jrlgpo3w>Build reliable dev / staging / prod isolation for LangChain 1.0 services — Pydantic Settings + SecretStr, cloud Secret Manager in prod, per-env prompt and model version pinning, env-specific checkpointer and observability. Use when graduating from .env-in-dev to real prod infra, or debugging a config that loaded the wrong values in the wrong env. Trigger with &quot;langchain multi-env&quot;, &quot;langchain pydantic settings&quot;, &quot;langchain secret manager&quot;, &quot;langchain env config&quot;, &quot;langchain prod setup&quot;.</p>
+
+      <div class="skill-metadata" data-astro-cid-jrlgpo3w>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>v2.5.0</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>Jeremy Longshore</span>
+        </div>
+        <div class="metadata-item" data-astro-cid-jrlgpo3w>
+          <span data-astro-cid-jrlgpo3w>MIT</span>
+        </div>
+      </div>
+
+      
+    </header>
+
+    <!-- 4. Allowed Tools -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Allowed Tools</h2>
+      <div class="tools-grid" data-astro-cid-jrlgpo3w>
+        <span class="tool-badge" data-astro-cid-jrlgpo3w>Read</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Write</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Edit</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(python:*)</span><span class="tool-badge" data-astro-cid-jrlgpo3w>Bash(gcloud:*)</span>
+      </div>
+      
+    </section>
+
+    <!-- 5. Provided by Plugin -->
+    <section class="section-box" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Provided by Plugin</h2>
+      <div class="plugin-info" data-astro-cid-jrlgpo3w>
+        <div class="plugin-details" data-astro-cid-jrlgpo3w>
+          <h3 data-astro-cid-jrlgpo3w>
+            <a href="/plugins/langchain-py-pack/" data-astro-cid-jrlgpo3w>langchain-py-pack</a>
+          </h3>
+          <p data-astro-cid-jrlgpo3w>Claude Code skill pack for LangChain 1.0 + LangGraph 1.0 (Python) - 34 skills covering chains, agents, RAG, middleware, checkpointing, HITL, streaming, and production patterns</p>
+          <div class="plugin-meta" data-astro-cid-jrlgpo3w>
+            <span data-astro-cid-jrlgpo3w>unknown</span>
+            <span data-astro-cid-jrlgpo3w>v2.5.0</span>
+          </div>
+        </div>
+        <a href="/plugins/langchain-py-pack/" class="btn-primary" data-astro-cid-jrlgpo3w>View Plugin</a>
+      </div>
+    </section>
+
+    <!-- 6. Installation -->
+    <section class="section-box dark" data-astro-cid-jrlgpo3w>
+      <h2 class="section-title" data-astro-cid-jrlgpo3w>Installation</h2>
+      <p class="install-note" style="color: var(--brand-light-gray); margin-bottom: 0.75rem;" data-astro-cid-jrlgpo3w>This skill is included in the langchain-py-pack plugin:</p>
+      <pre class="install-command" data-copy="/plugin install langchain-py-pack@claude-code-plugins-plus" data-astro-cid-jrlgpo3w><code data-astro-cid-jrlgpo3w>/plugin install langchain-py-pack@claude-code-plugins-plus</code></pre>
+      <p class="install-note" data-astro-cid-jrlgpo3w>Click to copy</p>
+    </section>
+
+    <!-- 7. Skill Content (Markdown) -->
+    <section class="skill-content-section" data-astro-cid-jrlgpo3w>
+      <h2 data-astro-cid-jrlgpo3w>Instructions</h2>
+      <div class="skill-content" data-astro-cid-jrlgpo3w>
+        <div data-astro-cid-jrlgpo3w><h1>LangChain Multi-Env Setup (Python)</h1>
+<h2>Overview</h2>
+<p>A team ships a LangChain 1.0 service to staging with <code>python-dotenv</code> loading <code>.env.staging</code> into <code>os.environ</code>. Security audits — <code>docker exec STAGING-POD env</code> prints <code>ANTHROPIC_API_KEY=sk-ant-api03-...</code> in plain text. Anyone with <code>kubectl exec</code>, any sidecar, any core dump, any error tracker that auto-captures process env sees the key. This is pain <strong>P37</strong>: secrets loaded from <code>.env</code> in production containers leak via <code>env</code>.</p>
+<p>A second failure chains. A developer runs the staging deploy from a shell where <code>LANGCHAIN_ENV=production</code> was set hours earlier. The loader picks the prod <code>.env</code>, staging answers with a prompt commit tuned only for the prod model tier, latency doubles. Two root causes: no type-safe env gate, no startup validation that would have caught the mismatched model id.</p>
+<p>Both are one refactor:</p>
+<pre data-lang="python"><code>
+# BAD — dotenv populates os.environ; any process with container access sees it
+from dotenv import load_dotenv
+load_dotenv(&quot;.env.production&quot;)
+api_key = os.environ[&quot;ANTHROPIC_API_KEY&quot;]  # P37: leaks via `docker exec env`
+
+# GOOD — SecretStr in a validated Settings object, pulled from Secret Manager
+from pydantic import SecretStr
+from pydantic_settings import BaseSettings
+
+class Settings(BaseSettings):
+    env: Literal[&quot;dev&quot;, &quot;staging&quot;, &quot;prod&quot;]
+    anthropic_api_key: SecretStr
+
+settings = build_settings()  # pulls from GCP Secret Manager in prod
+api_key = settings.anthropic_api_key.get_secret_value()
+# repr(settings) prints `SecretStr(&#39;**********&#39;)` — safe to log
+</code></pre>
+<p>This skill owns the per-env <strong>config plumbing</strong> — <code>Settings</code> skeleton, Secret Manager integration, per-env pinning, startup smoke test. It does <strong>not</strong> own the full secrets lifecycle (rotation, revocation, scope) — that belongs to <code>langchain-security-basics</code>.</p>
+<p>Pin: <code>langchain-core 1.0.x</code>, <code>langchain-anthropic 1.0.x</code>, <code>pydantic &gt;= 2.5</code>, <code>pydantic-settings &gt;= 2.1</code>. Pain anchors: <strong>P37</strong> (primary), <strong>P20</strong> (checkpointer schema — cross-ref <code>langchain-langgraph-checkpointing</code>).</p>
+<p>Two numbers: <strong>smoke test &lt; 10 seconds</strong>; <strong>env-var count ~15-30</strong> (more than 30 means <code>Settings</code> is absorbing feature flags and should split).</p>
+<h2>Prerequisites</h2>
+<ul>
+<li>Python 3.10+ (3.11+ recommended for <code>Literal</code> and <code>StrEnum</code> ergonomics)</li>
+<li><code>langchain-core &gt;= 1.0, &lt; 2.0</code></li>
+<li><code>pydantic &gt;= 2.5</code>, <code>pydantic-settings &gt;= 2.1</code></li>
+<li>One secret backend: GCP Secret Manager (<code>google-cloud-secret-manager</code>), AWS Secrets Manager (<code>boto3</code>), or HashiCorp Vault (<code>hvac</code>)</li>
+<li>Completed <code>langchain-sdk-patterns</code> — the <code>Settings</code> object is injected into the chain factories from that skill</li>
+</ul>
+<h2>Instructions</h2>
+<p>Run these six steps in order — each adds one invariant the next step depends on:</p>
+<ol>
+<li>Define a <code>Settings</code> class with <code>SecretStr</code> keys, <code>Literal</code> env, and fail-fast validation.</li>
+<li>Add a per-env loader — file in dev, env vars in staging, Secret Manager in prod.</li>
+<li>Use the cloud Secret Manager client to pull keys into memory only.</li>
+<li>Pin <code>model_id</code>, <code>prompt_commit_hash</code>, and <code>vector_index_name</code> per env.</li>
+<li>Configure the checkpointer per env — memory in dev, Postgres elsewhere.</li>
+<li>Run a startup smoke test under 10 seconds before the HTTP server binds.</li>
+</ol>
+<h3>Step 1 — Create a Settings class with SecretStr and fail-fast validation</h3>
+<pre data-lang="python"><code>
+from typing import Literal
+from pydantic import SecretStr, HttpUrl, Field, ValidationError
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=None,              # see Step 2 — loader picks the file
+        env_file_encoding=&quot;utf-8&quot;,
+        case_sensitive=False,
+        extra=&quot;forbid&quot;,             # reject unknown env vars — typo detection
+    )
+
+    # --- env switch (drives everything else) ---
+    env: Literal[&quot;dev&quot;, &quot;staging&quot;, &quot;prod&quot;] = Field(..., alias=&quot;LANGCHAIN_ENV&quot;)
+
+    # --- secrets (always SecretStr — never str) ---
+    anthropic_api_key: SecretStr = Field(..., alias=&quot;ANTHROPIC_API_KEY&quot;)
+    openai_api_key: SecretStr = Field(..., alias=&quot;OPENAI_API_KEY&quot;)
+    langsmith_api_key: SecretStr = Field(..., alias=&quot;LANGSMITH_API_KEY&quot;)
+
+    # --- per-env pinning (see Step 4) ---
+    model_id: str = Field(..., alias=&quot;LANGCHAIN_MODEL_ID&quot;)
+    prompt_commit_hash: str = Field(..., alias=&quot;LANGCHAIN_PROMPT_COMMIT&quot;)
+    vector_index_name: str = Field(..., alias=&quot;LANGCHAIN_VECTOR_INDEX&quot;)
+
+    # --- endpoints (validated URLs — typo caught at startup) ---
+    checkpointer_url: HttpUrl | None = Field(None, alias=&quot;LANGCHAIN_CHECKPOINTER_URL&quot;)
+    otel_endpoint: HttpUrl = Field(..., alias=&quot;OTEL_EXPORTER_OTLP_ENDPOINT&quot;)
+
+    # --- budget guards (per-env) ---
+    max_cost_usd_per_day: float = Field(10.0, alias=&quot;LANGCHAIN_DAILY_BUDGET_USD&quot;)
+    max_rpm: int = Field(60, alias=&quot;LANGCHAIN_MAX_RPM&quot;)
+</code></pre>
+<p><code>SecretStr</code> masks <code>repr(settings)</code> to <code>SecretStr(&#39;**********&#39;)</code> — a routine <code>logger.info(settings)</code> cannot leak the key. The only way to read plaintext is <code>.get_secret_value()</code>, which greps like a sore thumb in review. <code>extra=&quot;forbid&quot;</code> catches typos (<code>LANGCHIN_MODEL_ID</code>) at import time. <code>HttpUrl</code> rejects <code>http:/otel:4318</code> before the exporter wastes 60s on DNS.</p>
+<p>See <a href="references/settings-skeleton.md">Settings Skeleton</a> for the full class.</p>
+<h3>Step 2 — Per-env config loading (file OR Secret Manager, never both)</h3>
+<pre data-lang="python"><code>
+import os
+from pathlib import Path
+
+def build_settings() -&gt; Settings:
+    env = os.environ.get(&quot;LANGCHAIN_ENV&quot;, &quot;dev&quot;)
+
+    if env == &quot;dev&quot;:
+        # Local dev: .env.dev file, values checked into 1Password not git
+        return Settings(_env_file=Path(&quot;.env.dev&quot;))
+
+    if env == &quot;staging&quot;:
+        # CI / staging: env vars injected by the orchestrator
+        # (GitHub Actions secrets, k8s envFrom: secretRef, etc.)
+        return Settings()  # reads os.environ directly
+
+    if env == &quot;prod&quot;:
+        # Prod: pull from Secret Manager into memory ONLY
+        values = pull_from_secret_manager()
+        return Settings(**values)
+
+    raise ValueError(f&quot;unknown LANGCHAIN_ENV: {env!r}&quot;)
+</code></pre>
+<p>Three loaders, one class. Dev touches a file on disk. Staging inherits env vars from the orchestrator — <code>envFrom: secretRef</code> is readable via <code>docker exec env</code>, but the blast radius is bounded and rotation is weekly.</p>
+<p>Prod is the P37 fix: <code>pull_from_secret_manager()</code> builds a dict and passes kwargs to <code>Settings(...)</code>. Values land in the instance attribute and <strong>never touch <code>os.environ</code></strong>. A subprocess will not inherit them.</p>
+<h3>Step 3 — Secret Manager pull (GCP example; AWS / Vault in reference)</h3>
+<pre data-lang="python"><code>
+from google.cloud import secretmanager
+
+def pull_from_secret_manager() -&gt; dict[str, str]:
+    client = secretmanager.SecretManagerServiceClient()
+    project = os.environ[&quot;GCP_PROJECT_ID&quot;]
+    secret_names = [&quot;ANTHROPIC_API_KEY&quot;, &quot;OPENAI_API_KEY&quot;, &quot;LANGSMITH_API_KEY&quot;]
+    out: dict[str, str] = {}
+    for name in secret_names:
+        resource = f&quot;projects/{project}/secrets/{name}/versions/latest&quot;
+        response = client.access_secret_version(request={&quot;name&quot;: resource})
+        out[name] = response.payload.data.decode(&quot;utf-8&quot;)
+    # Non-secret passthrough (model id, prompt hash, endpoints)
+    for key in [&quot;LANGCHAIN_ENV&quot;, &quot;LANGCHAIN_MODEL_ID&quot;, &quot;LANGCHAIN_PROMPT_COMMIT&quot;,
+                &quot;LANGCHAIN_VECTOR_INDEX&quot;, &quot;LANGCHAIN_CHECKPOINTER_URL&quot;,
+                &quot;OTEL_EXPORTER_OTLP_ENDPOINT&quot;]:
+        if key in os.environ:
+            out[key] = os.environ[key]
+    return out
+</code></pre>
+<p>No <code>os.environ[k] = v</code> line. The dict goes straight into <code>Settings(**values)</code>. Workload-identity IAM handles auth; no static key on disk. For AWS / Vault see <a href="references/secret-manager-integration.md">Secret Manager Integration</a>.</p>
+<h3>Step 4 — Per-env model and prompt pinning</h3>
+<p>Dev, staging, and prod run <strong>different</strong> model ids and <strong>different</strong> prompt commit hashes. Pinning happens at env-var level so app code is env-agnostic (see the Env Matrix below for values). One function reads <code>settings.prompt_commit_hash</code> and pulls from LangSmith (cross-ref <code>langchain-prompt-engineering</code>):</p>
+<pre data-lang="python"><code>
+from langsmith import Client
+ls = Client(api_key=settings.langsmith_api_key.get_secret_value())
+
+def get_prompt(settings: Settings) -&gt; ChatPromptTemplate:
+    return ls.pull_prompt(f&quot;triage-prompt:{settings.prompt_commit_hash}&quot;)
+</code></pre>
+<p><strong>Prevents:</strong> staging loading a prod prompt commit. Pinning per env makes promotion explicit — dev → staging → prod moves one hash at a time. See <a href="references/per-env-pinning.md">Per-Env Pinning</a>.</p>
+<h3>Step 5 — Per-env checkpointer selection</h3>
+<p>Checkpointer choice is per-env too:</p>
+<pre data-lang="python"><code>
+from langgraph.checkpoint.memory import MemorySaver
+from langgraph.checkpoint.postgres import PostgresSaver
+
+def build_checkpointer(settings: Settings):
+    if settings.env == &quot;dev&quot;:
+        return MemorySaver()          # ephemeral, resets on restart
+    # staging + prod: Postgres with env-isolated schema
+    # cross-ref langchain-langgraph-checkpointing (P20) for schema migration
+    return PostgresSaver.from_conn_string(
+        str(settings.checkpointer_url)
+    )
+</code></pre>
+<p>Dev uses <code>MemorySaver</code> — no infra dependency, no state between runs. Staging and prod use <code>PostgresSaver</code> against <strong>separate</strong> databases (or separate schemas). Never share a checkpointer DB between envs; P20 explains — schema migrations on a version bump corrupt cross-env threads.</p>
+<h3>Step 6 — Startup smoke test (&lt; 10 seconds budget)</h3>
+<pre data-lang="python"><code>
+import time
+from anthropic import Anthropic
+
+def validate_integrations(settings: Settings) -&gt; None:
+    t0 = time.monotonic()
+
+    # 1. Model reachable (1-token ping ~ $0.00001)
+    anthropic = Anthropic(api_key=settings.anthropic_api_key.get_secret_value())
+    anthropic.messages.create(
+        model=settings.model_id,
+        max_tokens=1,
+        messages=[{&quot;role&quot;: &quot;user&quot;, &quot;content&quot;: &quot;hi&quot;}],
+    )
+
+    # 2. Checkpointer reachable
+    if settings.env != &quot;dev&quot;:
+        checkpointer = build_checkpointer(settings)
+        checkpointer.setup()  # runs SELECT 1 + schema check
+
+    # 3. Vector store reachable (see langchain-embeddings-search)
+    # ... describe_index call here ...
+
+    # 4. Observability endpoint reachable (OTLP HTTP health)
+    # ... requests.get(f&quot;{settings.otel_endpoint}/health&quot;, timeout=2) ...
+
+    elapsed = time.monotonic() - t0
+    if elapsed &gt; 10.0:
+        raise RuntimeError(
+            f&quot;startup smoke test took {elapsed:.1f}s (budget 10s)&quot;
+        )
+</code></pre>
+<p>Call <code>validate_integrations(settings)</code> <strong>before</strong> the HTTP server binds. Failure aborts the deploy — the readiness probe never goes green, the rollout halts, the bad version takes no traffic. Budget: <strong>10 seconds</strong>. Past 10s an integration is degraded — fail loudly rather than ship a 30s cold start. See <a href="references/startup-smoke-test.md">Startup Smoke Test</a>.</p>
+<h2>Output</h2>
+<ul>
+<li><code>Settings</code> class on <code>pydantic-settings</code> with <code>SecretStr</code> for keys, <code>Literal</code> env, <code>HttpUrl</code> endpoints, <code>extra=&quot;forbid&quot;</code></li>
+<li>Env-specific loader (file → dev; env vars → staging; Secret Manager → prod); values land in <code>Settings</code> only, never <code>os.environ</code></li>
+<li>Cloud Secret Manager integration (GCP / AWS / Vault) with IAM-bound auth; no static keys on disk</li>
+<li>Per-env pinning for <code>model_id</code>, <code>prompt_commit_hash</code>, <code>vector_index_name</code>, <code>checkpointer_url</code></li>
+<li>Per-env checkpointer (<code>MemorySaver</code> dev, <code>PostgresSaver</code> on isolated DBs staging/prod)</li>
+<li>Startup smoke test — model / vector / checkpointer / observability under 10-second budget</li>
+</ul>
+<h2>Env Matrix</h2>
+<table><thead><tr>
+<th>Dimension</th>
+<th>dev</th>
+<th>staging</th>
+<th>prod</th>
+</tr></thead><tbody>
+<tr>
+<td>Secret backend</td>
+<td><code>.env.dev</code> file (git-ignored)</td>
+<td>orchestrator env vars</td>
+<td>cloud Secret Manager, memory only</td>
+</tr>
+<tr>
+<td><code>os.environ</code> holds keys</td>
+<td>yes (local)</td>
+<td>yes (sidecar visible)</td>
+<td><strong>no</strong> (P37 fix)</td>
+</tr>
+<tr>
+<td><code>model_id</code></td>
+<td><code>claude-haiku-4-6</code></td>
+<td><code>claude-sonnet-4-6</code></td>
+<td><code>claude-sonnet-4-6</code></td>
+</tr>
+<tr>
+<td><code>prompt_commit_hash</code></td>
+<td>WIP</td>
+<td>canary</td>
+<td>stable (1 week old)</td>
+</tr>
+<tr>
+<td><code>temperature</code></td>
+<td>0.7</td>
+<td>0.2</td>
+<td>0.2</td>
+</tr>
+<tr>
+<td>Checkpointer</td>
+<td><code>MemorySaver</code></td>
+<td><code>PostgresSaver</code> (staging DB)</td>
+<td><code>PostgresSaver</code> (prod DB)</td>
+</tr>
+<tr>
+<td>Vector index</td>
+<td><code>dev-index</code></td>
+<td><code>staging-index</code></td>
+<td><code>prod-index</code></td>
+</tr>
+<tr>
+<td>OTEL sample rate</td>
+<td>1.0</td>
+<td>1.0</td>
+<td>0.1</td>
+</tr>
+<tr>
+<td>RPM limit</td>
+<td>10</td>
+<td>60</td>
+<td>provider tier</td>
+</tr>
+<tr>
+<td>Daily budget</td>
+<td>$1</td>
+<td>$10</td>
+<td>$500-$5000</td>
+</tr>
+<tr>
+<td>Smoke probes</td>
+<td>model</td>
+<td>model + checkpointer + OTEL</td>
+<td>all four</td>
+</tr>
+</tbody></table>
+<h2>Error Handling</h2>
+<table><thead><tr>
+<th>Error</th>
+<th>Cause</th>
+<th>Fix</th>
+</tr></thead><tbody>
+<tr>
+<td><code>docker exec POD env</code> shows <code>ANTHROPIC_API_KEY=...</code> in prod (P37)</td>
+<td><code>dotenv</code> / plain env injection in prod</td>
+<td>Pull from Secret Manager into <code>Settings(**values)</code>; never write to <code>os.environ</code></td>
+</tr>
+<tr>
+<td>Staging answers with prod prompts / wrong model</td>
+<td>Loader defaulted or picked stale <code>LANGCHAIN_ENV</code></td>
+<td><code>Literal[&quot;dev&quot;,&quot;staging&quot;,&quot;prod&quot;]</code> on env; raise on unknown; no default</td>
+</tr>
+<tr>
+<td><code>ValidationError: extra fields forbidden</code> at startup</td>
+<td>Typo (<code>LANGCHIN_MODEL_ID</code>)</td>
+<td>Fix the typo — <code>extra=&quot;forbid&quot;</code> working as intended</td>
+</tr>
+<tr>
+<td>Startup takes 30s before first request</td>
+<td>Serialized probes or degraded integration</td>
+<td>Enforce 10s budget; parallelize probes; fail the deploy</td>
+</tr>
+<tr>
+<td><code>repr(settings)</code> in a log leaks the API key</td>
+<td>Plain <code>str</code> used, not <code>SecretStr</code></td>
+<td>Change field to <code>SecretStr</code>; repr masks to <code>&#39;**********&#39;</code></td>
+</tr>
+<tr>
+<td>Prod silently using <code>MemorySaver</code></td>
+<td><code>build_checkpointer</code> defaulted when <code>checkpointer_url</code> was None</td>
+<td>Require <code>checkpointer_url</code> in staging/prod via a model validator</td>
+</tr>
+<tr>
+<td>Secret Manager auth fails in CI</td>
+<td>SA not bound; <code>google.auth</code> fell back to ADC</td>
+<td>Bind SA with <code>roles/secretmanager.secretAccessor</code></td>
+</tr>
+<tr>
+<td>Prompt hash rolled forward in staging without dev validation</td>
+<td>Promotion skipped the dev gate</td>
+<td>Enforce dev → staging → prod order in CI (see per-env pinning ref)</td>
+</tr>
+</tbody></table>
+<h2>Examples</h2>
+<h3>Graduating a <code>.env</code>-in-dev service to prod</h3>
+<p>Start: a single <code>.env</code> committed (or leaked via <code>docker exec env</code>). End: <code>Settings</code> class, three loaders, Secret Manager in prod, smoke test under 10s. Three PRs — (1) introduce <code>Settings</code> without changing loader behavior, (2) add <code>SecretStr</code> and migrate call sites to <code>.get_secret_value()</code>, (3) swap prod to Secret Manager and remove the prod <code>.env</code> from the image. See <a href="references/settings-skeleton.md">Settings Skeleton</a> and <a href="references/secret-manager-integration.md">Secret Manager Integration</a>.</p>
+<h3>Wrong-env prompt loaded in staging — postmortem</h3>
+<p>Staging inherited <code>LANGCHAIN_ENV=production</code> from a stale shell. The <code>Literal[&quot;dev&quot;,&quot;staging&quot;,&quot;prod&quot;]</code> field rejects <code>production</code>; CI promotion sets <code>LANGCHAIN_ENV</code> explicitly; <code>direnv</code> pins it per-project. See <a href="references/per-env-pinning.md">Per-Env Pinning</a>.</p>
+<h3>Smoke test blocked a bad model id</h3>
+<p>A prod deploy went out with <code>LANGCHAIN_MODEL_ID=claude-sonnet-4-7</code> (not yet rolled out). The 1-token ping failed with <code>model not found</code>, <code>validate_integrations</code> raised, the container crash-looped, the rollout halted, the previous version kept taking traffic. Zero user impact; failure budget stayed under 3s. See <a href="references/startup-smoke-test.md">Startup Smoke Test</a>.</p>
+<h2>Resources</h2>
+<ul>
+<li><a href="https://docs.pydantic.dev/latest/concepts/pydantic_settings/">Pydantic Settings docs</a></li>
+<li><a href="https://docs.pydantic.dev/latest/api/types/#pydantic.types.SecretStr">Pydantic <code>SecretStr</code></a></li>
+<li><a href="https://cloud.google.com/secret-manager/docs/reference/libraries">GCP Secret Manager client</a></li>
+<li><a href="https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/secretsmanager.html">AWS Secrets Manager <code>boto3</code></a></li>
+<li><a href="https://hvac.readthedocs.io/">HashiCorp Vault <code>hvac</code></a></li>
+<li><a href="https://blog.langchain.com/langchain-langgraph-1dot0/">LangChain 1.0 release notes</a></li>
+<li>Related skills in pack: <code>langchain-security-basics</code> (secrets lifecycle, owns rotation and revocation — not duplicated here); <code>langchain-langgraph-checkpointing</code> (P20 schema migration); <code>langchain-prompt-engineering</code> (prompt pin / LangSmith pull workflow); <code>langchain-reference-architecture</code> (where <code>Settings</code> fits in the DI layer)</li>
+<li>Pack pain catalog: <code>docs/pain-catalog.md</code> (entries P37 primary, P20 cross-ref)</li>
+</ul></div>
+      </div>
+    </section>
+
+    <!-- 8. Bottom CTA -->
+    <section class="detail-cta" data-astro-cid-qcigfm7x>
+  <h2 class="detail-cta__headline" data-astro-cid-qcigfm7x>Ready to use langchain-py-pack?</h2>
+  <div class="detail-cta__actions" data-astro-cid-qcigfm7x>
+    <button class="detail-cta__primary" data-copy-install="/plugin install langchain-py-pack@claude-code-plugins-plus" data-astro-cid-qcigfm7x>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" data-astro-cid-qcigfm7x>
+        <rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" stroke-width="1.5" data-astro-cid-qcigfm7x></rect>
+        <path d="M3 11V3a1 1 0 011-1h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" data-astro-cid-qcigfm7x></path>
+      </svg>
+      <span class="detail-cta__btn-text" data-astro-cid-qcigfm7x>Copy Install Command</span>
+    </button>
+    
+  </div>
+</section>
+
+<script type="module">document.querySelectorAll("[data-copy-install]").forEach(t=>{t.addEventListener("click",async()=>{const a=t.dataset.copyInstall||"";await navigator.clipboard.writeText(a);const e=t.querySelector(".detail-cta__btn-text");if(e){const o=e.textContent;e.textContent="Copied!",t.classList.add("copied"),window.trackEvent&&window.trackEvent("install_copied",{plugin_name:a.split(" ").pop()||"",source:"detail_cta"}),setTimeout(()=>{e.textContent=o,t.classList.remove("copied")},2e3)}})});</script>
+
+    <!-- 9. Related Skills (6, with tool pills) -->
+    <section class="related-skills-section" data-astro-cid-jrlgpo3w>
+        <h2 class="related-skills-heading" data-astro-cid-jrlgpo3w>Related Skills</h2>
+        <div class="related-skills-grid" data-astro-cid-jrlgpo3w>
+          <a href="/skills/abridge-ci-integration/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-ci-integration</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Configure CI/CD pipeline for Abridge clinical AI integrations with GitHub Actions.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-common-errors/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-common-errors</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Diagnose and fix common Abridge clinical AI integration errors.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-a/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-a</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge ambient clinical documentation capture-to-note pipeline.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-core-workflow-b/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-core-workflow-b</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Implement Abridge patient-facing documentation and after-visit summary generation.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-cost-tuning/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-cost-tuning</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Optimize Abridge clinical AI costs through tier selection, session management, and usage monitoring for healthcare organizations.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a><a href="/skills/abridge-debug-bundle/" class="related-skill-card" data-astro-cid-jrlgpo3w>
+              <h3 class="related-skill-title" data-astro-cid-jrlgpo3w>abridge-debug-bundle</h3>
+              <p class="related-skill-description" data-astro-cid-jrlgpo3w>Collect Abridge debug evidence for support tickets and troubleshooting.</p>
+              <div class="related-skill-tools" data-astro-cid-jrlgpo3w>
+                  <span class="related-tool-pill" data-astro-cid-jrlgpo3w>Read</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Write</span><span class="related-tool-pill" data-astro-cid-jrlgpo3w>Edit</span>
+                </div>
+            </a>
+        </div>
+      </section>
+
+  </div>
+
+  
+  <script>
+    document.querySelectorAll('.install-command').forEach(el => {
+      el.addEventListener('click', function() {
+        const text = this.dataset.copy || this.textContent;
+        navigator.clipboard.writeText(text).then(() => {
+          const originalText = this.textContent;
+          this.textContent = 'Copied to clipboard!';
+          this.style.color = 'var(--brand-green)';
+          setTimeout(() => {
+            this.textContent = originalText;
+            this.style.color = '';
+          }, 2000);
+        });
+      });
+    });
+  </script>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="en" data-astro-cid-37fxchfa>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>skills-janitor | Claude Code Plugins</title>
+    <meta name="description" content="Audit, clean and swipe-triage your Claude Code skills — honest always-loaded vs on-demand token costs, usage tracking, duplicate detection, and safe deletion (auto-fix, prune, interactive swipe TUI)">
+    <meta name="author" content="Intent Solutions IO">
+    <meta name="theme-color" content="#0a0a0c">
+    <!-- `href`, not `content`: <link> takes href; `content` is a <meta> attribute,
+         so the previous form was invalid HTML and silently ignored by every crawler. -->
+    <link rel="canonical" href="https://tonsofskills.com/tons-of-skills-marketplace/plugins/skills-janitor/">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Theme: prevent FOUC by setting data-theme before first paint -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+
+    <!-- Referrer policy — the ONE of the three former "security headers" here
+         that a <meta> tag can actually set. `name="referrer"` is the spec form
+         (HTML Standard § 4.2.5.3); the `http-equiv="Referrer-Policy"` spelling
+         used before is not.
+
+         X-Content-Type-Options and X-Frame-Options were REMOVED, not relocated,
+         because they are response-header-only: browsers ignore them in <meta>
+         entirely. Chrome logs "X-Frame-Options may only be set via an HTTP
+         header sent along with a document" on every page load, which is how
+         this was found (console-error sweep, 2026-08-03).
+
+         So the site had NO clickjacking or MIME-sniffing protection — the tags
+         only looked like protection. `curl -I https://tonsofskills.com/` sends
+         none of them either. THE REAL FIX IS IN CADDY on the VPS, and is not in
+         this repo; see the PR description for the exact block to add. Leaving
+         inert tags here would keep the console error and keep implying a
+         protection that is not there. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tonsofskills.com/tons-of-skills-marketplace/plugins/skills-janitor/">
+    <meta property="og:title" content="skills-janitor | Claude Code Plugins">
+    <meta property="og:description" content="Audit, clean and swipe-triage your Claude Code skills — honest always-loaded vs on-demand token costs, usage tracking, duplicate detection, and safe deletion (auto-fix, prune, interactive swipe TUI)">
+    <meta property="og:site_name" content="Tons of Skills">
+    <meta property="og:image" content="https://tonsofskills.com/og-image.png">
+    <meta property="og:image:alt" content="skills-janitor | Claude Code Plugins">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://tonsofskills.com/tons-of-skills-marketplace/plugins/skills-janitor/">
+    <meta name="twitter:title" content="skills-janitor | Claude Code Plugins">
+    <meta name="twitter:description" content="Audit, clean and swipe-triage your Claude Code skills — honest always-loaded vs on-demand token costs, usage tracking, duplicate detection, and safe deletion (auto-fix, prune, interactive swipe TUI)">
+    <meta name="twitter:image" content="https://tonsofskills.com/og-image.png">
+    <meta name="twitter:creator" content="@jeremylshore">
+
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"skills-janitor","description":"Audit, clean and swipe-triage your Claude Code skills — honest always-loaded vs on-demand token costs, usage tracking, duplicate detection, and safe deletion (auto-fix, prune, interactive swipe TUI)","applicationCategory":"DeveloperApplication","operatingSystem":"Cross-platform","author":{"@type":"Organization","name":"Krzysztof Hendzel"},"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}</script>
+
+    <!-- Umami Analytics (self-hosted, privacy-friendly, no cookies, GDPR-clean by design)
+         Source of truth for site-id mapping: ~/.claude/skills/web-analytics/references/site-registry.md
+         Backend: analytics.intentsolutions.io (Contabo VPS, Watchtower-updated) -->
+    <script defer src="https://analytics.intentsolutions.io/script.js" data-website-id="0cee47ed-bee5-48da-8fed-46b3d8a2ddd3" data-domains="tonsofskills.com,www.tonsofskills.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9Z1DTMTT44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9Z1DTMTT44');
+    </script>
+
+    <!-- Unified Analytics Helper -->
+    <script src="/scripts/analytics.js"></script>
+
+    <!-- Fonts: JetBrains Mono only — display, body and code all resolve to it.
+         See marketplace/DESIGN.md § 3 Typography. Weights 400/500 carry running
+         text, 700/800 carry display. Dropping the two Inter families makes this
+         a strictly SMALLER request than before despite the two added weights,
+         which is why the perf budget improves rather than tightens. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/BaseLayout.Be2XItaq.css">
+<style>.breadcrumbs[data-astro-cid-ilhxcym7]{margin-bottom:var(--space-5)}.breadcrumbs__list[data-astro-cid-ilhxcym7]{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;list-style:none;padding:0;margin:0;font-family:var(--font-mono);font-size:var(--text-sm, .8rem)}.breadcrumbs__item[data-astro-cid-ilhxcym7]{display:flex;align-items:center;gap:.375rem}.breadcrumbs__link[data-astro-cid-ilhxcym7]{color:var(--text-3);text-decoration:none;transition:color var(--duration-fast, .2s) var(--ease-out)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:hover{color:var(--primary)}.breadcrumbs__link[data-astro-cid-ilhxcym7]:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:0}.breadcrumbs__sep[data-astro-cid-ilhxcym7]{color:var(--text-3);user-select:none;font-size:.7em;line-height:1}.breadcrumbs__current[data-astro-cid-ilhxcym7]{color:var(--text-2)}.detail-cta[data-astro-cid-qcigfm7x]{background:var(--surface-3, var(--brand-light-gray));border-top:1px solid var(--border, var(--brand-light-gray));border-radius:var(--radius-lg);padding:2rem 1.5rem;margin-top:2rem;text-align:center}.detail-cta__headline[data-astro-cid-qcigfm7x]{font-family:var(--font-display);font-weight:700;font-size:1.35rem;color:var(--text, var(--brand-dark));margin-bottom:1.25rem}.detail-cta__actions[data-astro-cid-qcigfm7x]{display:flex;justify-content:center;gap:.75rem;flex-wrap:wrap}.detail-cta__primary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:var(--primary);color:#0a0a0c;border:none;border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;cursor:pointer;transition:background var(--duration-fast) var(--ease-out),transform var(--duration-fast) var(--ease-out)}.detail-cta__primary[data-astro-cid-qcigfm7x]:hover{background:var(--primary-dark, var(--primary-dark));transform:translateY(-1px)}.detail-cta__primary[data-astro-cid-qcigfm7x].copied{background:var(--positive, var(--brand-green))}.detail-cta__secondary[data-astro-cid-qcigfm7x]{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.5rem;background:transparent;color:var(--text, var(--brand-dark));border:1px solid var(--border, var(--brand-mid-gray));border-radius:var(--radius-md);font-family:var(--font-body);font-weight:600;font-size:.95rem;text-decoration:none;transition:border-color var(--duration-fast) var(--ease-out),color var(--duration-fast) var(--ease-out)}.detail-cta__secondary[data-astro-cid-qcigfm7x]:hover{border-color:var(--primary);color:var(--primary)}@media(max-width:480px){.detail-cta__actions[data-astro-cid-qcigfm7x]{flex-direction:column;align-items:stretch}.detail-cta__primary[data-astro-cid-qcigfm7x],.detail-cta__secondary[data-astro-cid-qcigfm7x]{justify-content:center}}
+</style>
+<link rel="stylesheet" href="/tons-of-skills-marketplace/_astro/_name_@_@astro.DkhX4uPa.css">
+<style>.pcard{display:block;padding:var(--space-5);border-bottom:1px solid var(--rule);color:inherit;text-decoration:none;transition:var(--card-transition);min-width:0;max-width:100%}.pcard:hover{background:var(--panel-2)}.pcard:focus-visible{outline:2px solid var(--signal);outline-offset:-2px}.pcard h3{font-family:var(--font-display);font-size:var(--text-lg);font-weight:600;line-height:1.3;color:var(--ink);margin:0 0 var(--space-2);overflow-wrap:anywhere}.pcard p{font-family:var(--font-sans);font-size:var(--text-sm);font-weight:400;line-height:1.5;color:var(--ink-2);margin:0 0 var(--space-3);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.pcard code{display:block;font-family:var(--font-mono);font-size:var(--text-sm);font-weight:400;line-height:1.4;color:var(--ink);background:var(--panel-2);padding:var(--space-2) var(--space-3);border-radius:0;word-break:break-all;margin:0 0 var(--space-3)}.pcard small{font-family:var(--font-sans);font-size:var(--text-xs);line-height:1.4;color:var(--ink-3)}@media(min-width:768px){.pcard{border:1px solid var(--rule);border-radius:0}}
+</style></head>
+<body data-astro-cid-37fxchfa>
+    <!-- Navigation -->
+    <nav data-astro-cid-37fxchfa>
+        <a href="/" class="logo" data-astro-cid-37fxchfa>
+            <span class="logo-title" data-astro-cid-37fxchfa>Tons of Skills</span>
+        </a>
+        <div class="nav-right" data-astro-cid-37fxchfa>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode" data-astro-cid-37fxchfa>
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><circle cx="12" cy="12" r="5" data-astro-cid-37fxchfa></circle><line x1="12" y1="1" x2="12" y2="3" data-astro-cid-37fxchfa></line><line x1="12" y1="21" x2="12" y2="23" data-astro-cid-37fxchfa></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" data-astro-cid-37fxchfa></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" data-astro-cid-37fxchfa></line><line x1="1" y1="12" x2="3" y2="12" data-astro-cid-37fxchfa></line><line x1="21" y1="12" x2="23" y2="12" data-astro-cid-37fxchfa></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" data-astro-cid-37fxchfa></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" data-astro-cid-37fxchfa></line></svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-37fxchfa><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" data-astro-cid-37fxchfa></path></svg>
+        </button>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" data-astro-cid-37fxchfa>
+            <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" data-astro-cid-37fxchfa></path>
+            </svg>
+            <svg class="close-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-astro-cid-37fxchfa>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" data-astro-cid-37fxchfa></path>
+            </svg>
+        </button>
+        <ul class="nav-links" data-astro-cid-37fxchfa>
+            <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+            <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+            <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+            <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learn</a></li>
+            <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+            <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+            <li data-astro-cid-37fxchfa><a href="/blog" data-astro-cid-37fxchfa>Work Diary</a></li>
+            <li data-astro-cid-37fxchfa><a href="/getting-started" class="nav-cta" data-astro-cid-37fxchfa>Get Started</a></li>
+        </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main data-astro-cid-37fxchfa>
+        
+  
+  <div class="plugin-page" data-astro-cid-vaomz7ca>
+    <div class="container" data-astro-cid-vaomz7ca>
+      <!-- 1. Breadcrumbs (3-level) -->
+      <nav aria-label="Breadcrumb" class="breadcrumbs" data-astro-cid-ilhxcym7>
+  <ol class="breadcrumbs__list" itemscope itemtype="https://schema.org/BreadcrumbList" data-astro-cid-ilhxcym7>
+    <li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Home</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="1">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          
+              <a href="/explore?category=community" class="breadcrumbs__link" itemprop="item" data-astro-cid-ilhxcym7>
+                <span itemprop="name" data-astro-cid-ilhxcym7>Community</span>
+              </a>
+              <span class="breadcrumbs__sep" aria-hidden="true" data-astro-cid-ilhxcym7>&gt;</span>
+            
+          <meta itemprop="position" content="2">
+        </li><li class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" data-astro-cid-ilhxcym7>
+          <span class="breadcrumbs__current" aria-current="page" itemprop="name" data-astro-cid-ilhxcym7>
+              skills-janitor
+            </span>
+          <meta itemprop="position" content="3">
+        </li>
+  </ol>
+</nav>
+
+      <!-- 2. Header -->
+      <div class="header" data-astro-cid-vaomz7ca>
+        <h1 data-astro-cid-vaomz7ca>
+          skills-janitor
+        </h1>
+        
+        <div class="meta" data-astro-cid-vaomz7ca>
+          
+          <span class="meta-item" data-astro-cid-vaomz7ca>v0.1.0</span>
+          <span class="meta-item" data-astro-cid-vaomz7ca>by Krzysztof Hendzel</span>
+        </div>
+      </div>
+
+      <!-- 3. Description -->
+      <p class="description" data-astro-cid-vaomz7ca>Audit, clean and swipe-triage your Claude Code skills — honest always-loaded vs on-demand token costs, usage tracking, duplicate detection, and safe deletion (auto-fix, prune, interactive swipe TUI)</p>
+
+      <!-- 4. Stats Bar -->
+      <div class="stats-bar" data-astro-cid-vaomz7ca>
+          
+          <div class="stat-item" data-astro-cid-vaomz7ca>
+                <span class="stat-value" data-astro-cid-vaomz7ca>MIT</span>
+                <span class="stat-label" data-astro-cid-vaomz7ca>License</span>
+              </div>
+            <span class="stats-divider" aria-hidden="true" data-astro-cid-vaomz7ca></span><div class="stat-item" data-astro-cid-vaomz7ca>
+                <span class="stat-value" data-astro-cid-vaomz7ca>Claude Code</span>
+                <span class="stat-label" data-astro-cid-vaomz7ca>Adapters (declared)</span>
+              </div>
+            
+        </div>
+
+      <!-- 5. Installation -->
+      <div class="section" data-astro-cid-vaomz7ca>
+        <h2 data-astro-cid-vaomz7ca>Installation</h2>
+        <p class="section-hint" data-astro-cid-vaomz7ca>Open Claude Code and run this command:</p>
+        <div class="install-box" data-astro-cid-vaomz7ca>
+          <code class="install-command" data-astro-cid-vaomz7ca>/plugin install skills-janitor@claude-code-plugins-plus</code>
+          <button class="copy-btn" id="copy-btn" data-astro-cid-vaomz7ca>Copy</button>
+        </div>
+        <p class="tip" data-astro-cid-vaomz7ca>
+          Use <code data-astro-cid-vaomz7ca>--global</code> to install for all projects, or <code data-astro-cid-vaomz7ca>--project</code> for current project only.
+        </p>
+      </div>
+
+      <!-- 6. Overview / What It Does (from README) -->
+      
+
+      <!-- 7. Features (from README) -->
+      
+
+      <!-- 8. Skills -->
+      <div class="section skills-section" data-astro-cid-vaomz7ca>
+          <div class="skills-header" data-astro-cid-vaomz7ca>
+            <h2 data-astro-cid-vaomz7ca>Skills (5) <small data-count-provenance="plugin-local" data-astro-cid-vaomz7ca>plugin-local skills</small></h2>
+            <button class="expand-all-btn" id="expand-all-btn" data-astro-cid-vaomz7ca>Expand All</button>
+          </div>
+          <div class="gist-list" data-astro-cid-vaomz7ca>
+            <div class="gist-card" data-skill-slug="janitor-discover" data-astro-cid-vaomz7ca>
+                <div class="gist-header" data-astro-cid-vaomz7ca>
+                  <button class="gist-toggle" aria-label="Toggle skill content" data-astro-cid-vaomz7ca>
+                    <svg class="toggle-icon" width="12" height="12" viewBox="0 0 12 12" data-astro-cid-vaomz7ca>
+                      <path d="M4 2 L10 6 L4 10 Z" fill="currentColor" data-astro-cid-vaomz7ca></path>
+                    </svg>
+                  </button>
+                  <span class="gist-filename" data-astro-cid-vaomz7ca>janitor-discover</span>
+                  <a href="/skills/janitor-discover/" class="gist-view-link" data-astro-cid-vaomz7ca>View full skill &rarr;</a>
+                </div>
+                <div class="gist-body" data-astro-cid-vaomz7ca>
+                  <p class="gist-description" data-astro-cid-vaomz7ca>Find new skills on GitHub or check a specific skill before installing.</p>
+                  <div class="gist-tools" data-astro-cid-vaomz7ca>
+                      <span class="tool-pill" data-astro-cid-vaomz7ca>Read</span><span class="tool-pill" data-astro-cid-vaomz7ca>Bash(bash:*)</span>
+                    </div>
+                </div>
+                <div class="gist-content" style="display: none;" data-astro-cid-vaomz7ca>
+                  <div class="gist-content-inner" data-astro-cid-vaomz7ca><h1>Skill Discovery &amp; Pre-Install Check</h1>
+<p>Combined entry point for finding skills on GitHub and for evaluating a specific skill (URL or local path) before installing it.</p>
+<h2>Overview</h2>
+<p>Replaces the v1.2 split between <code>/janitor-search</code> and <code>/janitor-precheck</code>. The dispatcher picks the right mode from the argument shape. Search results are relevance-gated (a repo must carry a skill signal in its name/description/topics) and ranked by relevance before stars, so generic mega-repos don&#39;t crowd out actual skills.</p>
+<table><thead><tr>
+<th>Argument</th>
+<th>Mode</th>
+<th>What runs</th>
+</tr></thead><tbody>
+<tr>
+<td>Keyword(s) like <code>seo</code> or <code>n8n workflows</code></td>
+<td>Discovery</td>
+<td><code>search.sh</code> — find matching skills on GitHub</td>
+</tr>
+<tr>
+<td><code>--compare &lt;skill-name&gt;</code></td>
+<td>Comparison</td>
+<td><code>search.sh --compare</code> — find alternatives to a local skill</td>
+</tr>
+<tr>
+<td>Full URL: <code>https://github.com/user/skill</code></td>
+<td>Pre-install check</td>
+<td><code>precheck.sh</code> — analyze before installing</td>
+</tr>
+<tr>
+<td>Short repo: <code>user/skill</code></td>
+<td>Pre-install check</td>
+<td><code>precheck.sh</code> (auto-expanded to URL)</td>
+</tr>
+<tr>
+<td>Local path: <code>~/path/to/skill</code></td>
+<td>Pre-install check</td>
+<td><code>precheck.sh</code> (local folder)</td>
+</tr>
+</tbody></table>
+<h2>Prerequisites</h2>
+<ul>
+<li>Claude Code with the skills-janitor plugin installed (provides <code>scripts/discover.sh</code>, <code>search.sh</code>, <code>precheck.sh</code>, <code>compare.sh</code>)</li>
+<li>bash 3.2+ and <code>curl</code></li>
+<li>Network access to <code>api.github.com</code> (anonymous OK; set <code>GITHUB_TOKEN</code> for higher rate limits and code search)</li>
+</ul>
+<h2>Instructions</h2>
+<h3>Step 1: Dispatch on argument shape</h3>
+<pre data-lang="bash"><code>
+bash ~/.claude/skills/skills-janitor/scripts/discover.sh &lt;query-or-url&gt; [options]
+</code></pre>
+<p>Examples:</p>
+<ul>
+<li><code>discover.sh seo</code> — search for SEO-related skills</li>
+<li><code>discover.sh n8n --limit 20</code> — top 20 n8n skills</li>
+<li><code>discover.sh --compare marketing-seo-audit</code> — alternatives to a local skill</li>
+<li><code>discover.sh https://github.com/user/my-skill</code> — check before installing</li>
+<li><code>discover.sh user/my-skill</code> — same, short form</li>
+</ul>
+<h3>Step 2: Present results per mode</h3>
+<p><strong>Discovery mode</strong> — ranked list of GitHub repos with skill name, description, stars, last updated, and a one-line verdict.</p>
+<p><strong>Pre-install mode</strong> — overlap analysis: which of the user&#39;s existing skills (including plugin skills) overlap with the candidate by description, and a recommendation to install / skip / replace.</p>
+<h2>Output</h2>
+<p>Discovery: a numbered table (repository, stars, updated, INSTALLED/AVAILABLE status). Pre-install: overlap buckets (HIGH</div>
+                </div>
+              </div><div class="gist-card" data-skill-slug="janitor-fix" data-astro-cid-vaomz7ca>
+                <div class="gist-header" data-astro-cid-vaomz7ca>
+                  <button class="gist-toggle" aria-label="Toggle skill content" data-astro-cid-vaomz7ca>
+                    <svg class="toggle-icon" width="12" height="12" viewBox="0 0 12 12" data-astro-cid-vaomz7ca>
+                      <path d="M4 2 L10 6 L4 10 Z" fill="currentColor" data-astro-cid-vaomz7ca></path>
+                    </svg>
+                  </button>
+                  <span class="gist-filename" data-astro-cid-vaomz7ca>janitor-fix</span>
+                  <a href="/skills/janitor-fix/" class="gist-view-link" data-astro-cid-vaomz7ca>View full skill &rarr;</a>
+                </div>
+                <div class="gist-body" data-astro-cid-vaomz7ca>
+                  <p class="gist-description" data-astro-cid-vaomz7ca>Automatically fix skill problems (safe preview first).</p>
+                  <div class="gist-tools" data-astro-cid-vaomz7ca>
+                      <span class="tool-pill" data-astro-cid-vaomz7ca>Read</span><span class="tool-pill" data-astro-cid-vaomz7ca>Bash(bash:*)</span>
+                    </div>
+                </div>
+                <div class="gist-content" style="display: none;" data-astro-cid-vaomz7ca>
+                  <div class="gist-content-inner" data-astro-cid-vaomz7ca><h1>Auto-Fix</h1>
+<p>Automatically fix common skill issues. Dry-run by default — shows what would change without modifying files.</p>
+<h2>Overview</h2>
+<p>Repairs frontmatter problems (missing delimiters, empty descriptions, missing version fields) across user, project, and codex-scope skills, and — in <code>--prune</code> mode — removes broken symlinks and empty skill directories. Plugin/marketplace skills are never modified (changes would be overwritten on update).</p>
+<h2>Prerequisites</h2>
+<ul>
+<li>Claude Code with the skills-janitor plugin installed (provides <code>scripts/fix.sh</code>)</li>
+<li>bash 3.2+ (the stock macOS bash works; no external dependencies)</li>
+<li>Write access to the user&#39;s own skill directories (<code>~/.claude/skills</code>, <code>./.claude/skills</code>, <code>~/.agents/skills</code>)</li>
+</ul>
+<h2>Instructions</h2>
+<h3>Step 1: Preview first (always)</h3>
+<pre data-lang="bash"><code>
+bash ~/.claude/skills/skills-janitor/scripts/fix.sh            # preview fixes
+bash ~/.claude/skills/skills-janitor/scripts/fix.sh --prune    # preview broken/orphaned removals
+</code></pre>
+<h3>Step 2: Show the user the preview and confirm</h3>
+<p>Never jump straight to <code>--apply</code>. Present the <code>[DRY RUN]</code> lines and ask before writing.</p>
+<h3>Step 3: Apply</h3>
+<pre data-lang="bash"><code>
+bash ~/.claude/skills/skills-janitor/scripts/fix.sh --apply           # apply fixes
+bash ~/.claude/skills/skills-janitor/scripts/fix.sh --prune --apply   # remove broken skills
+</code></pre>
+<p>What it fixes:</p>
+<ul>
+<li>Adds missing frontmatter delimiters (<code>---</code>)</li>
+<li>Fills empty <code>description</code> fields with a template</li>
+<li>Adds missing <code>version</code> field (defaults to &quot;1.0.0&quot;)</li>
+<li>Generates template descriptions using the skill folder name</li>
+</ul>
+<p>Prune mode finds and removes:</p>
+<ul>
+<li><strong>Broken symlinks</strong> — skill folder points to deleted source</li>
+<li><strong>Empty directories</strong> — skill folder with no SKILL.md</li>
+<li><strong>Orphaned skills</strong> — user-scope copies of plugin skills</li>
+</ul>
+<p>Safety model: dry-run by default (must pass <code>--apply</code> to write), skips plugin/marketplace skills, logs ALL changes with timestamps to <code>data/changelog.log</code>, always asks for confirmation before removing.</p>
+<h2>Output</h2>
+<p>Per-skill action lines (<code>[DRY RUN]</code> / <code>[FIXED]</code> / <code>[PRUNED]</code> / <code>[SKIP]</code>) followed by a summary of fixable issues, skipped items, and prunable entries. In dry-run mode the summary ends with &quot;Run with --apply to make these changes.&quot;</p>
+<h2>Error Handling</h2>
+<ol>
+<li><strong>Error</strong>: A fix produced an unexpected result in a SKILL.md <strong>Solution</strong>: Every applied change is logged in <code>data/changelog.log</code> with a timestamp — show the log entry and restore the affected field manually; template descriptions are meant to be r</div>
+                </div>
+              </div><div class="gist-card" data-skill-slug="janitor-report" data-astro-cid-vaomz7ca>
+                <div class="gist-header" data-astro-cid-vaomz7ca>
+                  <button class="gist-toggle" aria-label="Toggle skill content" data-astro-cid-vaomz7ca>
+                    <svg class="toggle-icon" width="12" height="12" viewBox="0 0 12 12" data-astro-cid-vaomz7ca>
+                      <path d="M4 2 L10 6 L4 10 Z" fill="currentColor" data-astro-cid-vaomz7ca></path>
+                    </svg>
+                  </button>
+                  <span class="gist-filename" data-astro-cid-vaomz7ca>janitor-report</span>
+                  <a href="/skills/janitor-report/" class="gist-view-link" data-astro-cid-vaomz7ca>View full skill &rarr;</a>
+                </div>
+                <div class="gist-body" data-astro-cid-vaomz7ca>
+                  <p class="gist-description" data-astro-cid-vaomz7ca>Full health check of all your skills in one report.</p>
+                  <div class="gist-tools" data-astro-cid-vaomz7ca>
+                      <span class="tool-pill" data-astro-cid-vaomz7ca>Read</span><span class="tool-pill" data-astro-cid-vaomz7ca>Bash(bash:*)</span>
+                    </div>
+                </div>
+                <div class="gist-content" style="display: none;" data-astro-cid-vaomz7ca>
+                  <div class="gist-content-inner" data-astro-cid-vaomz7ca><h1>Health Report</h1>
+<p>Generate a comprehensive health report combining inventory, quality checks, duplicate detection, and broken skill findings.</p>
+<h2>Overview</h2>
+<p>One report covering every place a skill lives: user, project, codex, plugin, and source scopes. Plugin skills appear with their full invocation name (e.g. <code>marketing-skills:image</code>, <code>figma:figma-use</code>) — these were invisible to the v1.2 report. The scan JSON also includes an <code>agents</code> array (subagents from <code>~/.claude/agents</code> — their descriptions are always-loaded too) and per-plugin <code>update_available</code> (installed commit vs marketplace HEAD) — surface stale plugins and heavy agents in the report.</p>
+<p>Modes:</p>
+<ul>
+<li><strong><code>/janitor-report</code></strong> (default) — full health check: inventory + lint + duplicates + broken</li>
+<li><strong><code>/janitor-report --brief</code></strong> — inventory only (replaces the old <code>/janitor-audit</code>)</li>
+</ul>
+<h2>Prerequisites</h2>
+<ul>
+<li>Claude Code with the skills-janitor plugin installed (provides <code>scripts/scan.sh</code>, <code>lint.sh</code>, <code>detect_dupes.sh</code>)</li>
+<li>bash 3.2+ (the stock macOS bash works; no external dependencies)</li>
+<li>Read access to <code>~/.claude/skills</code>, <code>~/.claude/agents</code>, and installed plugin metadata</li>
+<li>No authentication or API keys required — the scripts read local files only</li>
+</ul>
+<h2>Instructions</h2>
+<h3>Step 1: Run the scripts</h3>
+<p>Full report:</p>
+<pre data-lang="bash"><code>
+bash ~/.claude/skills/skills-janitor/scripts/scan.sh
+bash ~/.claude/skills/skills-janitor/scripts/lint.sh
+bash ~/.claude/skills/skills-janitor/scripts/detect_dupes.sh
+</code></pre>
+<p>Brief mode (inventory only):</p>
+<pre data-lang="bash"><code>
+bash ~/.claude/skills/skills-janitor/scripts/scan.sh
+</code></pre>
+<h3>Step 2: What each script covers</h3>
+<ul>
+<li><strong>Inventory (scan.sh)</strong> — all skills across scopes, symlink status, frontmatter fields, line counts; <code>agents</code> and <code>plugins</code> (with <code>update_available</code>) arrays; <code>broken_symlinks</code> count.</li>
+<li><strong>Quality checks (lint.sh)</strong> — Critical: broken symlinks, missing SKILL.md, missing frontmatter. Warning: missing/empty name or description, description too short/long, missing version. Info: no body content, no Gotchas section, large files.</li>
+<li><strong>Duplicate detection (detect_dupes.sh)</strong> — name collisions (two distinct skills with the same qualified name at different paths) and description overlap (Jaccard similarity &gt;30%), with cross-scope user-vs-plugin pairs explicitly surfaced (e.g. <code>marketing-seo-audit</code> (user) ↔ <code>marketing-skills:seo-audit</code> (plugin)).</li>
+</ul>
+<h3>Step 3: Present a unified report</h3>
+<p>Merge the three outputs into one table with severity levels, then recommend actions.</p>
+<h2>Output</h2>
+<pre><code>
+| Skill            </div>
+                </div>
+              </div><div class="gist-card" data-skill-slug="janitor-swipe" data-astro-cid-vaomz7ca>
+                <div class="gist-header" data-astro-cid-vaomz7ca>
+                  <button class="gist-toggle" aria-label="Toggle skill content" data-astro-cid-vaomz7ca>
+                    <svg class="toggle-icon" width="12" height="12" viewBox="0 0 12 12" data-astro-cid-vaomz7ca>
+                      <path d="M4 2 L10 6 L4 10 Z" fill="currentColor" data-astro-cid-vaomz7ca></path>
+                    </svg>
+                  </button>
+                  <span class="gist-filename" data-astro-cid-vaomz7ca>janitor-swipe</span>
+                  <a href="/skills/janitor-swipe/" class="gist-view-link" data-astro-cid-vaomz7ca>View full skill &rarr;</a>
+                </div>
+                <div class="gist-body" data-astro-cid-vaomz7ca>
+                  <p class="gist-description" data-astro-cid-vaomz7ca>Tinder for your Claude Code skills.</p>
+                  <div class="gist-tools" data-astro-cid-vaomz7ca>
+                      <span class="tool-pill" data-astro-cid-vaomz7ca>Read</span><span class="tool-pill" data-astro-cid-vaomz7ca>Bash(bash:*)</span>
+                    </div>
+                </div>
+                <div class="gist-content" style="display: none;" data-astro-cid-vaomz7ca>
+                  <div class="gist-content-inner" data-astro-cid-vaomz7ca><h1>Janitor Swipe — interactive skill triage</h1>
+<p>A bash TUI that puts every installed skill into a sorted deck and lets the user swipe keep / delete / skip on each card.</p>
+<h2>Overview</h2>
+<p>The deck is sorted &quot;most likely waste first&quot; — heavy, never-used skills appear at the top, so most users hit <code>← delete</code> a few times and quit before reviewing the whole list. The swipe is scope-aware and honest about what it can delete: user-scope skills are actually removed (after confirmation), plugin skills are flagged for review instead.</p>
+<h2>Prerequisites</h2>
+<ul>
+<li>Claude Code with the skills-janitor plugin installed (provides <code>scripts/swipe.sh</code> and <code>swipe-build-deck.sh</code>)</li>
+<li>bash 3.2+ (the stock macOS bash works; no external dependencies)</li>
+<li><strong>An interactive terminal at least 50 columns x 22 rows</strong> — the TUI reads single keypresses</li>
+</ul>
+<h2>Instructions</h2>
+<h3>Step 1: Tell the user to run it via <code>!</code></h3>
+<p>Inside Claude Code, the Bash tool&#39;s stdin is non-interactive, so the keypress reader can&#39;t work. The user must invoke it via the <code>!</code> prefix so the command runs in their actual shell:</p>
+<pre><code>
+!bash ~/.claude/skills/skills-janitor/scripts/swipe.sh
+</code></pre>
+<p>When the user asks for <code>/janitor-swipe</code>, tell them to run that command in their terminal. Do NOT try to run it yourself via the Bash tool — it will error with &quot;needs an interactive terminal&quot;.</p>
+<h3>Step 2: Explain the card and controls</h3>
+<p>Each card shows:</p>
+<ul>
+<li>Skill name + position in deck (e.g. <code>[3 / 47]</code>)</li>
+<li>Context cost split: <code>X always · Y on trigger</code> (description tokens are permanent; body loads only when the skill fires)</li>
+<li>Usage count and last invoked date</li>
+<li>Scope (<code>user</code>, <code>project</code>, <code>plugin · &lt;plugin-name&gt;</code>, etc.)</li>
+<li>3-line truncated description</li>
+<li>Verdict label (e.g. <em>&quot;Unused + heavy on trigger — prime delete candidate&quot;</em>)</li>
+</ul>
+<p>Controls:</p>
+<ul>
+<li><code>←</code> / <code>h</code> / <code>d</code> — stage for delete</li>
+<li><code>→</code> / <code>l</code> / <code>k</code> — keep</li>
+<li><code>↓</code> / <code>j</code> / <code>s</code> / space — skip</li>
+<li><code>u</code> — undo (back up one card, clear its decision)</li>
+<li><code>i</code> — inspect (show full SKILL.md description)</li>
+<li><code>q</code> / Esc — quit (still shows summary for decisions made so far)</li>
+</ul>
+<h3>Step 3: Scope-aware deletion (the critical correctness point)</h3>
+<table><thead><tr>
+<th>Scope</th>
+<th>What happens on swipe left</th>
+</tr></thead><tbody>
+<tr>
+<td><code>user</code>, <code>project</code>, <code>codex-user</code>, <code>codex-project</code></td>
+<td>Path is staged for <code>rm -rf</code> (or unlink if symlink)</td>
+</tr>
+<tr>
+<td><code>plugin</code>, <code>plugin-source</code></td>
+<td>NOT deleted — flagged u</div>
+                </div>
+              </div><div class="gist-card" data-skill-slug="janitor-value" data-astro-cid-vaomz7ca>
+                <div class="gist-header" data-astro-cid-vaomz7ca>
+                  <button class="gist-toggle" aria-label="Toggle skill content" data-astro-cid-vaomz7ca>
+                    <svg class="toggle-icon" width="12" height="12" viewBox="0 0 12 12" data-astro-cid-vaomz7ca>
+                      <path d="M4 2 L10 6 L4 10 Z" fill="currentColor" data-astro-cid-vaomz7ca></path>
+                    </svg>
+                  </button>
+                  <span class="gist-filename" data-astro-cid-vaomz7ca>janitor-value</span>
+                  <a href="/skills/janitor-value/" class="gist-view-link" data-astro-cid-vaomz7ca>View full skill &rarr;</a>
+                </div>
+                <div class="gist-body" data-astro-cid-vaomz7ca>
+                  <p class="gist-description" data-astro-cid-vaomz7ca>Show whether each skill is earning its context-window cost — combined tokens-used view sorted by waste.</p>
+                  <div class="gist-tools" data-astro-cid-vaomz7ca>
+                      <span class="tool-pill" data-astro-cid-vaomz7ca>Read</span><span class="tool-pill" data-astro-cid-vaomz7ca>Bash(bash:*)</span>
+                    </div>
+                </div>
+                <div class="gist-content" style="display: none;" data-astro-cid-vaomz7ca>
+                  <div class="gist-content-inner" data-astro-cid-vaomz7ca><h1>Skill Value Report</h1>
+<p>Show whether each installed skill is earning the context-window tokens it costs.</p>
+<h2>Overview</h2>
+<p>Combine token cost and usage tracking into a single view of every installed skill, sorted with the heaviest unused skills at the top. The report splits each skill&#39;s cost into what is permanently loaded (the description) and what only loads on demand (the body), then cross-references recent invocations so the user can see which skills are dead weight.</p>
+<p>Replaces the v1.2 split between <code>/janitor-tokens</code> (cost only) and <code>/janitor-usage</code> (usage only).</p>
+<h2>Prerequisites</h2>
+<ul>
+<li>Claude Code with the skills-janitor plugin installed (provides <code>scripts/value.sh</code>)</li>
+<li>bash 3.2+ (the stock macOS bash works; no external dependencies)</li>
+<li>Read access to <code>~/.claude/skills</code>, <code>~/.claude/agents</code>, and local Claude Code session history</li>
+<li>No authentication or API keys required — the script reads local files only</li>
+</ul>
+<h2>Instructions</h2>
+<h3>Step 1: Run the value script</h3>
+<pre data-lang="bash"><code>
+bash ~/.claude/skills/skills-janitor/scripts/value.sh [--weeks N] [--budget N] [--json]
+</code></pre>
+<ul>
+<li><code>--weeks N</code> — usage lookback window (default: 4)</li>
+<li><code>--budget N</code> — context window size for % calculations (default: 200000)</li>
+<li><code>--json</code> — emit raw JSON</li>
+</ul>
+<h3>Step 2: Present the results</h3>
+<p>Show the table and summary to the user. When explaining results, do NOT describe body tokens as permanent context cost — only descriptions are always loaded. Plugin-namespaced skills appear with their full invocation name (e.g., <code>marketing-skills:image</code>, <code>figma:figma-use</code>).</p>
+<h3>Step 3: Suggest action when waste is high</h3>
+<p>If &quot;unused skill cost&quot; exceeds 20% of the budget, recommend the user run <code>/janitor-report</code> for a full health check or (in v1.4+) <code>/janitor-swipe</code> to triage interactively.</p>
+<h2>Output</h2>
+<p>A table of every installed skill with:</p>
+<ul>
+<li><strong>Always</strong> — description tokens, permanently in the system prompt (the real context rent)</li>
+<li><strong>Body</strong> — the rest of SKILL.md, loaded only when the skill triggers (progressive disclosure)</li>
+<li><strong>Used?</strong> — <code>yes</code> if invoked in the lookback window, else <code>NO</code></li>
+<li><strong>Last Used</strong> — date of most recent invocation</li>
+</ul>
+<p>Followed by a summary:</p>
+<ul>
+<li>Total tokens loaded into context (the always-loaded TOTAL includes skills plus subagent descriptions from <code>~/.claude/agents</code>, reported as % of budget)</li>
+<li>Active vs. unused split</li>
+<li>Top wasters: heavy skills with zero usage</li>
+</ul>
+<h2>Error Handling</h2>
+<ol>
+<li><strong>Error</strong>: <code>value.sh: No such file or directory</code> <strong>Solution</strong>: The plugin is installed under a differen</div>
+                </div>
+              </div>
+          </div>
+        </div>
+
+      <!-- 9. Usage / How It Works (from README) -->
+      
+
+      <!-- 10. Use Cases (from README) -->
+      
+
+      <!-- 11. FAQ (from README troubleshooting) -->
+      
+
+      <!-- 12. Bottom CTA -->
+      <section class="detail-cta" data-astro-cid-qcigfm7x>
+  <h2 class="detail-cta__headline" data-astro-cid-qcigfm7x>Ready to use skills-janitor?</h2>
+  <div class="detail-cta__actions" data-astro-cid-qcigfm7x>
+    <button class="detail-cta__primary" data-copy-install="/plugin install skills-janitor@claude-code-plugins-plus" data-astro-cid-qcigfm7x>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" data-astro-cid-qcigfm7x>
+        <rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" stroke-width="1.5" data-astro-cid-qcigfm7x></rect>
+        <path d="M3 11V3a1 1 0 011-1h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" data-astro-cid-qcigfm7x></path>
+      </svg>
+      <span class="detail-cta__btn-text" data-astro-cid-qcigfm7x>Copy Install Command</span>
+    </button>
+    <a href="https://github.com/khendzel/skills-janitor" class="detail-cta__secondary" target="_blank" rel="noopener" data-astro-cid-qcigfm7x>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" data-astro-cid-qcigfm7x>
+          <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" data-astro-cid-qcigfm7x></path>
+        </svg>
+        View on GitHub
+      </a>
+  </div>
+</section>
+
+<script type="module">document.querySelectorAll("[data-copy-install]").forEach(t=>{t.addEventListener("click",async()=>{const a=t.dataset.copyInstall||"";await navigator.clipboard.writeText(a);const e=t.querySelector(".detail-cta__btn-text");if(e){const o=e.textContent;e.textContent="Copied!",t.classList.add("copied"),window.trackEvent&&window.trackEvent("install_copied",{plugin_name:a.split(" ").pop()||"",source:"detail_cta"}),setTimeout(()=>{e.textContent=o,t.classList.remove("copied")},2e3)}})});</script>
+
+      <!-- 13. Related Plugins -->
+      <div class="section" data-astro-cid-vaomz7ca>
+          <h2 data-astro-cid-vaomz7ca>Related Plugins</h2>
+          <div class="related-plugins" data-astro-cid-vaomz7ca>
+            <a class="pcard" href="/plugins/fairdb-ops-manager">
+  <h3>fairdb-ops-manager</h3>
+  <p>Database operations management for FairDB PostgreSQL clusters</p>
+  <code>/plugin install fairdb-ops-manager@claude-code-plugins-plus</code>
+  
+</a><a class="pcard" href="/plugins/jeremy-firestore">
+  <h3>jeremy-firestore</h3>
+  <p>Firestore database specialist for schema design, queries, and real-time sync</p>
+  <code>/plugin install jeremy-firestore@claude-code-plugins-plus</code>
+  
+</a><a class="pcard" href="/plugins/claude-never-forgets">
+  <h3>claude-never-forgets</h3>
+  <p>Persistent memory plugin for Claude Code - remembers preferences, decisions, and corrections across sessions and context limits</p>
+  <code>/plugin install claude-never-forgets@claude-code-plugins-plus</code>
+  
+</a><a class="pcard" href="/plugins/geepers-agents">
+  <h3>geepers-agents</h3>
+  <p>Multi-agent orchestration system with 51 specialized agents for development workflows, code quality, deployment, research, games, and more. Includes orchestrators for checkpoint, deploy, quality, fullstack, research, games, corpus, web, and python workflows.</p>
+  <code>/plugin install geepers-agents@claude-code-plugins-plus</code>
+  
+</a><a class="pcard" href="/plugins/sprint">
+  <h3>sprint</h3>
+  <p>Autonomous multi-agent development framework with spec-driven sprints. Write specs, run /sprint, and let coordinated agents (backend, frontend, QA, UI testing) handle implementation through self-iterating convergent loops.</p>
+  <code>/plugin install sprint@claude-code-plugins-plus</code>
+  
+</a><a class="pcard" href="/plugins/jeremy-firebase">
+  <h3>jeremy-firebase</h3>
+  <p>Firebase platform expert for Firestore, Auth, Functions, and Vertex AI integration</p>
+  <code>/plugin install jeremy-firebase@claude-code-plugins-plus</code>
+  
+</a>
+          </div>
+        </div>
+
+      <!-- 14. Tags Footer -->
+      <div class="tags-footer" data-astro-cid-vaomz7ca>
+          <span class="tags-label" data-astro-cid-vaomz7ca>Tags</span>
+          <div class="tags-list" data-astro-cid-vaomz7ca>
+            <span class="tag" data-astro-cid-vaomz7ca>skills</span><span class="tag" data-astro-cid-vaomz7ca>cleanup</span><span class="tag" data-astro-cid-vaomz7ca>context-window</span><span class="tag" data-astro-cid-vaomz7ca>token-budget</span><span class="tag" data-astro-cid-vaomz7ca>maintenance</span><span class="tag" data-astro-cid-vaomz7ca>tui</span>
+          </div>
+        </div>
+    </div>
+  </div>
+
+  <script type="module">const c=document.getElementById("copy-btn"),a=document.querySelector(".install-command");c&&a&&c.addEventListener("click",async()=>{const t=a.textContent||"";await navigator.clipboard.writeText(t),c.textContent="Copied!",c.classList.add("copied"),window.trackEvent&&window.trackEvent("install_copied",{plugin_name:t.split(" ").pop()||"",source:"plugin_detail"}),setTimeout(()=>{c.textContent="Copy",c.classList.remove("copied")},2e3)});document.querySelectorAll(".gist-toggle").forEach(t=>{t.addEventListener("click",()=>{const e=t.closest(".gist-card");if(!e)return;const n=e.querySelector(".gist-content"),o=t.querySelector(".toggle-icon");if(!n||!o)return;const l=n.style.display!=="none";n.style.display=l?"none":"block",o.style.transform=l?"":"rotate(90deg)",e.classList.toggle("expanded",!l)})});document.querySelectorAll(".gist-header").forEach(t=>{t.addEventListener("click",e=>{const n=e.target;if(n.closest("a")||n.closest(".gist-toggle"))return;const o=t.querySelector(".gist-toggle");o&&o.click()})});const s=document.getElementById("expand-all-btn");if(s){let t=!1;s.addEventListener("click",()=>{t=!t,s.textContent=t?"Collapse All":"Expand All",document.querySelectorAll(".gist-card").forEach(e=>{const n=e.querySelector(".gist-content"),o=e.querySelector(".toggle-icon");!n||!o||(n.style.display=t?"block":"none",o.style.transform=t?"rotate(90deg)":"",e.classList.toggle("expanded",t))})})}document.querySelectorAll("[data-expandable]").forEach(t=>{const e=t.querySelector(".readme-content");if(!e||e.scrollHeight<=400)return;e.classList.add("truncated");const n=document.createElement("button");n.className="show-more-btn",n.textContent="Show more",n.addEventListener("click",()=>{const o=e.classList.contains("truncated");e.classList.toggle("truncated",!o),n.textContent=o?"Show less":"Show more"}),e.insertAdjacentElement("afterend",n)});</script>
+
+    </main>
+
+    <!-- Footer -->
+    <footer data-astro-cid-37fxchfa>
+        <div class="footer-inner" data-astro-cid-37fxchfa>
+            <div class="footer-signup-row" data-astro-cid-37fxchfa>
+                <h4 data-astro-cid-37fxchfa>Agent Skills in Your Inbox</h4>
+                <form data-signup-form="footer" class="footer-signup-form" data-astro-cid-37fxchfa>
+                    <input type="email" name="email" placeholder="you@example.com" required data-astro-cid-37fxchfa>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;" data-astro-cid-37fxchfa>
+                    <button type="submit" data-astro-cid-37fxchfa>Subscribe</button>
+                </form>
+                <p class="footer-form-note" data-astro-cid-37fxchfa>No spam, ever. Unsubscribe with one click.</p>
+            </div>
+
+            <div class="footer-columns" data-astro-cid-37fxchfa>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Product</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/explore" data-astro-cid-37fxchfa>Explore</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/skills" data-astro-cid-37fxchfa>Skills</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/cowork" data-astro-cid-37fxchfa>Cowork</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/compare-marketplaces" data-astro-cid-37fxchfa>Compare</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/tools" data-astro-cid-37fxchfa>Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Resources</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/docs" data-astro-cid-37fxchfa>Docs</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/changelog" data-astro-cid-37fxchfa>Changelog</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/collections" data-astro-cid-37fxchfa>Collections</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/playbooks" data-astro-cid-37fxchfa>Playbooks</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/research" data-astro-cid-37fxchfa>Research</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/learning" data-astro-cid-37fxchfa>Learning</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Company</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/community" data-astro-cid-37fxchfa>Community</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/community#hall-of-fame" data-astro-cid-37fxchfa>Hall of Fame</a></li>
+                        <li data-astro-cid-37fxchfa><a href="https://github.com/jeremylongshore/claude-code-plugins" target="_blank" data-astro-cid-37fxchfa>GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" data-astro-cid-37fxchfa>
+                    <h5 data-astro-cid-37fxchfa>Legal</h5>
+                    <ul data-astro-cid-37fxchfa>
+                        <li data-astro-cid-37fxchfa><a href="/privacy" data-astro-cid-37fxchfa>Privacy</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/terms" data-astro-cid-37fxchfa>Terms</a></li>
+                        <li data-astro-cid-37fxchfa><a href="/acceptable-use" data-astro-cid-37fxchfa>Acceptable Use</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Partner badge + byline. Lives INSIDE the real footer rather than
+                 as a separate block above it — the homepage used to end with its
+                 own mini-footer and then the site footer, which read as two
+                 footers stacked. Homepage only, per the rebrand decision; flip
+                 `isHome` to `true` to show it site-wide. -->
+            
+
+            <div class="footer-bottom" data-astro-cid-37fxchfa>
+                <p class="footer-blurb" data-astro-cid-37fxchfa>Tons of Skills by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" data-astro-cid-37fxchfa>Intent Solutions</a>. Open-source plugins, agents and skills for AI coding agents.</p>
+                <p class="footer-copyright" data-astro-cid-37fxchfa>&copy; 2026 Tons of Skills | <a href="https://intentsolutions.io" target="_blank" data-astro-cid-37fxchfa>Intent Solutions</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Light theme global overrides (must be unscoped to target body/nav/footer) -->
+    
+
+    <!-- Email signup + killer-skill nomination forms.
+         Posts to /api/forms/{signup,nominate} on the same origin. The endpoint
+         is a tiny Node service on the VPS (`forms-api.service`, 127.0.0.1:8090)
+         that forwards to the Slack webhook in /etc/intentsolutions/notify.env.
+         Anti-spam: honeypot field `website`, email/URL regex, 8 KiB body cap,
+         per-IP rate limit on the server. See
+         intent-os/ops/host/services/forms-api. -->
+    <script type="module">
+      (() => {
+        const flash = (btn, msg, ok = true, restoreMs = 3000) => {
+          const orig = btn.dataset.origText ?? btn.textContent;
+          if (!btn.dataset.origText) btn.dataset.origText = orig;
+          btn.textContent = msg;
+          btn.style.opacity = ok ? '0.85' : '1';
+          btn.disabled = ok;
+          if (!ok) setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.opacity = '';
+            btn.disabled = false;
+          }, restoreMs);
+        };
+
+        const wireSignup = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const honey = form.querySelector('input[name="website"]');
+          const email = (emailInput?.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            flash(btn, 'Invalid email', false);
+            return;
+          }
+          flash(btn, 'Subscribing…', true, 0);
+          try {
+            const r = await fetch('/api/forms/signup', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                email,
+                source: form.dataset.signupForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "You're in!", true, 0);
+              if (emailInput) emailInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireNomination = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const repoInput = form.querySelector('input[name="repo"]');
+          const honey = form.querySelector('input[name="website"]');
+          const repoUrl = (repoInput?.value || '').trim();
+          if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(repoUrl)) {
+            flash(btn, 'GitHub URL only', false);
+            return;
+          }
+          flash(btn, 'Submitting…', true, 0);
+          try {
+            const r = await fetch('/api/forms/nominate', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                repoUrl,
+                source: form.dataset.nominationForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, 'Submitted!', true, 0);
+              if (repoInput) repoInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const wireContact = (form) => form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector('button[type="submit"]');
+          const nameInput = form.querySelector('input[name="name"]');
+          const emailInput = form.querySelector('input[type="email"]');
+          const messageInput = form.querySelector('textarea[name="message"]');
+          const honey = form.querySelector('input[name="website"]');
+          const name = (nameInput?.value || '').trim();
+          const email = (emailInput?.value || '').trim();
+          const message = (messageInput?.value || '').trim();
+          if (name.length < 2) { flash(btn, 'Name required', false); return; }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { flash(btn, 'Invalid email', false); return; }
+          if (message.length < 10) { flash(btn, 'Tell me more', false); return; }
+          flash(btn, 'Sending…', true, 0);
+          try {
+            const r = await fetch('/api/forms/contact', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                name,
+                email,
+                message,
+                source: form.dataset.contactForm || 'unknown',
+                website: honey?.value || ''
+              })
+            });
+            if (r.ok) {
+              flash(btn, "Got it — back within 24h!", true, 0);
+              if (nameInput) nameInput.value = '';
+              if (emailInput) emailInput.value = '';
+              if (messageInput) messageInput.value = '';
+            } else if (r.status === 429) {
+              flash(btn, 'Slow down', false);
+            } else {
+              const j = await r.json().catch(() => ({}));
+              flash(btn, j.error || 'Something went wrong', false);
+            }
+          } catch {
+            flash(btn, 'Network error', false);
+          }
+        });
+
+        const init = () => {
+          document.querySelectorAll('[data-signup-form]').forEach(wireSignup);
+          document.querySelectorAll('[data-nomination-form]').forEach(wireNomination);
+          document.querySelectorAll('[data-contact-form]').forEach(wireContact);
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+    </script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    var next = current === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('theme', next);
+                    var meta = document.querySelector('meta[name="theme-color"]');
+                    if (meta) meta.setAttribute('content', next === 'dark' ? '#0a0a0c' : '#fafaf9');
+                });
+            }
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        });
+    </script>
+
+    <!-- Nav Scroll State -->
+    <script>
+        (function() {
+            var nav = document.querySelector('nav');
+            if (!nav) return;
+            function onScroll() {
+                if (window.scrollY > 20) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+
+    <!-- Mobile Menu Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var menuToggle = document.querySelector('.mobile-menu-toggle');
+            var navLinks = document.querySelector('.nav-links');
+            var menuIcon = document.querySelector('.menu-icon');
+            var closeIcon = document.querySelector('.close-icon');
+
+            if (menuToggle && navLinks) {
+                menuToggle.addEventListener('click', function() {
+                    navLinks.classList.toggle('active');
+                    document.body.classList.toggle('menu-open');
+
+                    if (navLinks.classList.contains('active')) {
+                        menuIcon.style.display = 'none';
+                        closeIcon.style.display = 'block';
+                    } else {
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    });
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (navLinks.classList.contains('active') &&
+                        !navLinks.contains(e.target) &&
+                        !menuToggle.contains(e.target)) {
+                        navLinks.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                        menuIcon.style.display = 'block';
+                        closeIcon.style.display = 'none';
+                    }
+                });
+            }
+
+            // Track outbound link clicks (nav + footer)
+            document.querySelectorAll('nav a[target="_blank"], footer a[target="_blank"]').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.trackEvent) {
+                        window.trackEvent('outbound_click', {
+                            url: link.href,
+                            link_text: link.textContent.trim()
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
